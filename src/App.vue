@@ -4,7 +4,9 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 </script>
 
 <template>
-  <DefaultLayout>
-    <RouterView />
-  </DefaultLayout>
+  <RouterView v-slot="{ Component, route }">
+    <component :is="route.meta.layout === 'full' ? Component : DefaultLayout">
+      <component v-if="route.meta.layout !== 'full'" :is="Component" />
+    </component>
+  </RouterView>
 </template>
