@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 const features = [
   {
     title: 'タスク管理',
@@ -41,7 +42,7 @@ const workflowSteps = [
       </p>
       <div class="hero__actions">
         <button type="button" class="cta-primary">無料で始める</button>
-        <button type="button" class="cta-secondary">デモを見る</button>
+        <RouterLink to="/demo/dashboard" class="cta-secondary">デモを見る</RouterLink>
       </div>
     </div>
     <div class="hero__visual">
