@@ -2,6 +2,8 @@ import {
   type AuthProvider,
   createUserWithEmailAndPassword,
   deleteUser,
+  reload,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   updateProfile,
@@ -10,21 +12,57 @@ import {
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore'
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { auth, db, githubProvider, googleProvider, storage } from '@/firebase/config'
-import type { LoginPayload, SignUpPayload, SocialProvider, UserProfile } from '@/types/auth'
+import type {
+  CredentialSignUpPayload,
+  LoginPayload,
+  ProfileSetupPayload,
+  SocialProvider,
+  UserProfile,
+} from '@/types/auth'
 
 const providerMap: Record<SocialProvider, AuthProvider> = {
   google: googleProvider,
   github: githubProvider,
 }
 
-export async function registerWithEmail(payload: SignUpPayload) {
+export async function registerCredentials(payload: CredentialSignUpPayload) {
   const credential = await createUserWithEmailAndPassword(auth, payload.email, payload.password)
+  await sendEmailVerification(credential.user)
+  return credential.user
+}
 
-  await updateProfile(credential.user, {
-    displayName: payload.nickname || payload.fullName,
+export async function resendVerificationEmail() {
+  const user = auth.currentUser
+  if (!user) {
+    throw new Error('ユーザーが認証されていません。')
+  }
+  await sendEmailVerification(user)
+}
+
+export async function refreshCurrentUser() {
+  const user = auth.currentUser
+  if (!user) {
+    return null
+  }
+  await reload(user)
+  return user
+}
+
+export async function saveProfileDetails(payload: ProfileSetupPayload) {
+  const user = auth.currentUser
+
+  if (!user) {
+    throw new Error('ユーザーが認証されていません。')
+  }
+
+  const displayName = payload.nickname?.trim() || payload.fullName
+  await updateProfile(user, { displayName })
+
+  return persistProfile(user, {
+    fullName: payload.fullName,
+    nickname: payload.nickname,
+    birthday: payload.birthday ?? '',
   })
-
-  return persistProfile(credential.user, payload)
 }
 
 export async function loginWithEmail(payload: LoginPayload) {
