@@ -1,15 +1,15 @@
 <script setup lang="ts">
 const props = withDefaults(
   defineProps<{
-    title: string
-    description?: string
-    brandName?: string
+    title: string;
+    description?: string;
+    brandName?: string;
   }>(),
   {
-    brandName: 'TaskFlow',
-    description: '',
-  },
-)
+    brandName: "Teammie",
+    description: "",
+  }
+);
 </script>
 
 <template>
