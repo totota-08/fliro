@@ -1,9 +1,12 @@
 import {
   type AuthProvider,
+  applyActionCode,
+  confirmPasswordReset,
   createUserWithEmailAndPassword,
   deleteUser,
   reload,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   updateProfile,
@@ -46,6 +49,19 @@ export async function refreshCurrentUser() {
   }
   await reload(user)
   return user
+}
+
+export async function sendPasswordReset(email: string) {
+  await sendPasswordResetEmail(auth, email)
+}
+
+export async function applyEmailVerificationCode(oobCode: string) {
+  await applyActionCode(auth, oobCode)
+  await refreshCurrentUser()
+}
+
+export async function confirmPasswordResetWithCode(oobCode: string, newPassword: string) {
+  await confirmPasswordReset(auth, oobCode, newPassword)
 }
 
 export async function saveProfileDetails(payload: ProfileSetupPayload) {

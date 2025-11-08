@@ -2,6 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '@/pages/HomePage.vue'
 import SignUpPage from '@/pages/auth/SignUpPage.vue'
 import LoginPage from '@/pages/auth/LoginPage.vue'
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage.vue'
+import ResetPasswordConfirmPage from '@/pages/auth/ResetPasswordConfirmPage.vue'
+import VerifyEmailPage from '@/pages/auth/VerifyEmailPage.vue'
 import AuthDebugPage from '@/pages/debug/AuthDebugPage.vue'
 import DashboardDemoPage from '@/pages/demo/DashboardDemoPage.vue'
 import MyTasksPage from '@/pages/demo/MyTasksPage.vue'
@@ -20,6 +23,18 @@ export const router = createRouter({
       meta: { layout: 'full' },
     },
     {
+      path: '/auth/reset/confirm',
+      name: ROUTE_NAMES.passwordResetConfirm,
+      component: ResetPasswordConfirmPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/verify',
+      name: ROUTE_NAMES.verifyEmail,
+      component: VerifyEmailPage,
+      meta: { layout: 'full' },
+    },
+    {
       path: '/auth/signup',
       name: ROUTE_NAMES.signup,
       component: SignUpPage,
@@ -29,6 +44,12 @@ export const router = createRouter({
       path: '/auth/login',
       name: ROUTE_NAMES.login,
       component: LoginPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/reset',
+      name: ROUTE_NAMES.passwordReset,
+      component: ResetPasswordPage,
       meta: { layout: 'full' },
     },
     {

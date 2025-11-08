@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from "vue-router";
 import AppButton from "@/components/ui/AppButton.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 
@@ -87,12 +88,12 @@ const pricingPlans = [
               />
             </svg>
           </span>
-          <span class="landing__title">Teammie</span>
+          <span class="landing__title">Teamie</span>
         </div>
         <div class="landing__links">
           <a href="#features">機能</a>
           <a href="#pricing">料金</a>
-          <a href="#demo">デモ</a>
+          <RouterLink class="landing__link" :to="{ name: ROUTE_NAMES.demoDashboard }">デモ</RouterLink>
           <AppButton
             :to="{ name: ROUTE_NAMES.login }"
             variant="secondary"
@@ -115,14 +116,14 @@ const pricingPlans = [
           </p>
           <h1>チームのタスク管理とコミュニケーションを一つに</h1>
           <p>
-            Teammieは、タスク管理とチャットを統合した新しいコラボレーションツールです。
+            Teamieは、タスク管理とチャットを統合した新しいコラボレーションツールです。
             シンプルで直感的なインターフェースで、チームの生産性を最大化します。
           </p>
           <div class="hero__actions">
             <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
               >無料で始める</AppButton
             >
-            <AppButton :to="{ hash: '#features' }" variant="outline"
+            <AppButton :to="{ name: ROUTE_NAMES.demoDashboard }" variant="outline"
               >デモを見る</AppButton
             >
           </div>
@@ -220,7 +221,7 @@ const pricingPlans = [
 
       <section class="cta">
         <div class="cta__inner">
-          <h2>今すぐTeammieを始めましょう</h2>
+          <h2>今すぐTeamieを始めましょう</h2>
           <p>
             14日間の無料トライアルで、すべての機能をお試しいただけます。
             クレジットカードの登録は不要です。
@@ -243,7 +244,7 @@ const pricingPlans = [
                 />
               </svg>
             </span>
-            <span class="landing__title">Teammie</span>
+            <span class="landing__title">Teamie</span>
           </div>
           <p>チームのタスク管理とコミュニケーションを一つに。</p>
         </div>
@@ -267,7 +268,7 @@ const pricingPlans = [
         </ul>
       </div>
       <p class="landing__copyright">
-        © {{ new Date().getFullYear() }} Teammie. All rights reserved.
+        © {{ new Date().getFullYear() }} Teamie. All rights reserved.
       </p>
     </footer>
   </div>
