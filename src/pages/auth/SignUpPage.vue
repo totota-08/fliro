@@ -2,6 +2,8 @@
 import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
+import AuthBrand from '@/components/ui/AuthBrand.vue'
+import AuthFormField from '@/components/ui/AuthFormField.vue'
 import { createAccount, authenticateWithProvider } from '@/services/accountActions'
 import { ROUTE_NAMES } from '@/constants/routes'
 import type { SocialProvider } from '@/types/auth'
