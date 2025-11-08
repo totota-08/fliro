@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
 const currentYear = new Date().getFullYear()
+const route = useRoute()
+const showHeader = computed(() => route.name === 'home')
 </script>
 
 <template>
   <div class="layout">
-    <header class="layout__header">
+    <header v-if="showHeader" class="layout__header">
       <div class="layout__brand">
         <span class="layout__logo">Teamie</span>
         <span class="layout__tagline">少人数チームのためのプロジェクト管理</span>
