@@ -108,7 +108,7 @@ function mapFirebaseError(error: unknown) {
             <input v-model="rememberMe" type="checkbox" />
             <span>ログイン状態を保持</span>
           </label>
-          <RouterLink :to="{ name: ROUTE_NAMES.login, query: { mode: 'reset' } }">
+          <RouterLink :to="{ name: ROUTE_NAMES.passwordReset }">
             パスワードを忘れた場合
           </RouterLink>
         </div>
