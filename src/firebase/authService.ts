@@ -78,6 +78,8 @@ export async function saveProfileDetails(payload: ProfileSetupPayload) {
     fullName: payload.fullName,
     nickname: payload.nickname,
     birthday: payload.birthday ?? '',
+    jobRole: payload.jobRole,
+    jobTitle: payload.jobTitle ?? '',
   })
 }
 
@@ -141,6 +143,8 @@ async function persistProfile(user: User, overrides: Partial<UserProfile> = {}) 
     nickname: overrides.nickname ?? existing?.nickname ?? user.displayName ?? '',
     birthday: overrides.birthday ?? existing?.birthday ?? '',
     avatarUrl: overrides.avatarUrl ?? existing?.avatarUrl ?? user.photoURL ?? '',
+    jobRole: overrides.jobRole ?? existing?.jobRole ?? '',
+    jobTitle: overrides.jobTitle ?? existing?.jobTitle ?? '',
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   }

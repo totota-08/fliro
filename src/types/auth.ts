@@ -5,6 +5,8 @@ export interface UserProfile {
   nickname: string
   birthday: string
   avatarUrl: string
+  jobRole: string
+  jobTitle: string
   createdAt: string
   updatedAt: string
 }
@@ -18,6 +20,8 @@ export interface ProfileSetupPayload {
   fullName: string
   nickname?: string
   birthday?: string
+  jobRole: string
+  jobTitle?: string
 }
 
 export interface LoginPayload {

@@ -17,6 +17,7 @@ import {
 } from '@/firebase/authService'
 import { ROUTE_NAMES } from '@/constants/routes'
 import type { SocialProvider } from '@/types/auth'
+import { auth } from '@/firebase/config'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,6 +33,8 @@ const profileForm = reactive({
   fullName: '',
   nickname: '',
   birthday: '',
+  jobRole: '',
+  jobTitle: '',
 })
 
 const providerLoading = ref<SocialProvider | null>(null)
@@ -48,9 +51,37 @@ const credentialEmail = ref('')
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref<string | null>(null)
 
+const hydrateProfileFromUser = () => {
+  const user = auth.currentUser
+  if (!user) return
+
+  if (!profileForm.fullName && user.displayName) {
+    profileForm.fullName = user.displayName
+  }
+
+  if (!profileForm.nickname && user.displayName) {
+    profileForm.nickname = user.displayName
+  }
+
+  if (!credentialEmail.value && user.email) {
+    credentialEmail.value = user.email
+  }
+}
+
 const providerOptions: { id: SocialProvider; label: string; icon: string }[] = [
   { id: 'google', label: 'Googleで登録', icon: 'google' },
   { id: 'github', label: 'GitHubで登録', icon: 'github' },
+]
+
+const jobOptions = [
+  { value: '', label: '職業を選択してください' },
+  { value: 'engineer', label: 'エンジニア' },
+  { value: 'designer', label: 'デザイナー' },
+  { value: 'product', label: 'プロダクトマネージャー' },
+  { value: 'marketing', label: 'マーケター' },
+  { value: 'sales', label: '営業' },
+  { value: 'cs', label: 'カスタマーサクセス' },
+  { value: 'other', label: 'その他' },
 ]
 
 const stepOrder: SignUpStep[] = ['credentials', 'verify', 'profile']
@@ -65,7 +96,11 @@ const credentialValid = computed(() => {
 })
 
 const profileValid = computed(() => {
-  return profileForm.fullName.trim().length > 1 && Boolean(profileForm.birthday)
+  return (
+    profileForm.fullName.trim().length > 1 &&
+    Boolean(profileForm.birthday) &&
+    Boolean(profileForm.jobRole)
+  )
 })
 
 const redirectPath = computed(() => {
@@ -109,7 +144,8 @@ const handleProviderSelect = async (provider: SocialProvider) => {
 
   try {
     await authenticateWithProvider(provider)
-    await router.push(redirectPath.value)
+    hydrateProfileFromUser()
+    currentStep.value = 'profile'
   } catch (error) {
     console.error(error)
     credentialError.value = mapFirebaseError(error)
@@ -144,6 +180,7 @@ const checkVerificationStatus = async () => {
     const user = await refreshCurrentUser()
     if (user?.emailVerified) {
       currentStep.value = 'profile'
+      hydrateProfileFromUser()
       return
     }
     verificationError.value = 'まだメール認証が確認できません。確認後に再度お試しください。'
@@ -167,6 +204,8 @@ const handleProfileSubmit = async () => {
       fullName: profileForm.fullName,
       nickname,
       birthday: profileForm.birthday,
+      jobRole: profileForm.jobRole,
+      jobTitle: profileForm.jobTitle,
     })
 
     if (avatarFile.value) {
@@ -324,6 +363,22 @@ function mapFirebaseError(error: unknown) {
             />
 
             <AuthFormField v-model="profileForm.birthday" label="生年月日" type="date" required />
+
+            <div class="job-field">
+              <label class="job-field__label" for="jobRole">職業</label>
+              <select id="jobRole" v-model="profileForm.jobRole" required>
+                <option v-for="option in jobOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+
+            <AuthFormField
+              v-model="profileForm.jobTitle"
+              label="役職 (任意)"
+              type="text"
+              placeholder="例: プロジェクトマネージャー"
+            />
 
             <div class="avatar-field">
               <span>アイコン</span>
@@ -491,6 +546,32 @@ function mapFirebaseError(error: unknown) {
   margin: 0;
   font-size: 0.85rem;
   color: #93b1b5;
+}
+
+.job-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.job-field__label {
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.job-field select {
+  border: 1px solid #93b1b5;
+  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  background: #fff;
+  color: #0b2e33;
+}
+
+.job-field select:focus {
+  outline: none;
+  border-color: #4f7c82;
+  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.2);
 }
 
 .avatar-field__preview img {
