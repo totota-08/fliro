@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
+import AppButton from '@/components/ui/AppButton.vue'
+import { ROUTE_NAMES } from '@/constants/routes'
 const features = [
   {
     title: 'タスク管理',
@@ -31,93 +34,209 @@ const workflowSteps = [
 </script>
 
 <template>
-  <section class="hero">
-    <div class="hero__content">
-      <h1>チームの動きを可視化し、スムーズな連携を。</h1>
-      <p>
-        Teamie は、少人数チームのための軽量なプロジェクト管理ツールです。
-        タスク、進捗、コミュニケーションをひとつにまとめ、日々の連携を滑らかにします。
-        ここに書いてあることは全て仮です無視してください。
-      </p>
-      <div class="hero__actions">
-        <button type="button" class="cta-primary">無料で始める</button>
-        <button type="button" class="cta-secondary">デモを見る</button>
+  <div class="landing">
+    <header class="landing__header">
+      <div class="landing__brand">
+        <span class="landing__logo">Teamie</span>
+        <span class="landing__tagline">少人数チームのためのプロジェクト管理</span>
       </div>
-    </div>
-    <div class="hero__visual">
-      <div class="dashboard-mock">
-        <div class="dashboard-mock__header">
-          <span class="dot" />
-          <span class="dot" />
-          <span class="dot" />
-        </div>
-        <div class="dashboard-mock__body">
-          <div class="card card--backlog">
-            <h3>Backlog</h3>
-            <ul>
-              <li>オンボーディング資料の更新</li>
-              <li>初回ユーザー調査の準備</li>
-            </ul>
-          </div>
-          <div class="card card--progress">
-            <h3>In Progress</h3>
-            <ul>
-              <li>チームダッシュボードの実装</li>
-              <li>デイリースタンドアップの自動化</li>
-            </ul>
-          </div>
-          <div class="card card--done">
-            <h3>Done</h3>
-            <ul>
-              <li>Firebase 認証のセットアップ</li>
-              <li>UI コンポーネントの設計</li>
-            </ul>
+      <nav class="landing__nav">
+        <a class="landing__link" href="#features">機能</a>
+        <a class="landing__link" href="#workflow">ワークフロー</a>
+        <a class="landing__link" href="#faq">FAQ</a>
+        <RouterLink class="landing__cta" :to="{ name: ROUTE_NAMES.login }">ログイン</RouterLink>
+        <RouterLink class="landing__cta landing__cta--primary" :to="{ name: ROUTE_NAMES.signup }">
+          無料で始める
+        </RouterLink>
+      </nav>
+    </header>
+
+    <main class="landing__main">
+      <section class="hero">
+        <div class="hero__content">
+          <h1>チームの動きを可視化し、スムーズな連携を。</h1>
+          <p>
+            Teamie は、少人数チームのための軽量なプロジェクト管理ツールです。
+            タスク、進捗、コミュニケーションをひとつにまとめ、日々の連携を滑らかにします。
+            ここに書いてあることは全て仮です無視してください。
+          </p>
+          <div class="hero__actions">
+            <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary">
+              無料で始める
+            </AppButton>
+            <AppButton :to="{ name: ROUTE_NAMES.login }" variant="secondary">
+              ログイン
+            </AppButton>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
+        <div class="hero__visual">
+          <div class="dashboard-mock">
+            <div class="dashboard-mock__header">
+              <span class="dot" />
+              <span class="dot" />
+              <span class="dot" />
+            </div>
+            <div class="dashboard-mock__body">
+              <div class="card card--backlog">
+                <h3>Backlog</h3>
+                <ul>
+                  <li>オンボーディング資料の更新</li>
+                  <li>初回ユーザー調査の準備</li>
+                </ul>
+              </div>
+              <div class="card card--progress">
+                <h3>In Progress</h3>
+                <ul>
+                  <li>チームダッシュボードの実装</li>
+                  <li>デイリースタンドアップの自動化</li>
+                </ul>
+              </div>
+              <div class="card card--done">
+                <h3>Done</h3>
+                <ul>
+                  <li>Firebase 認証のセットアップ</li>
+                  <li>UI コンポーネントの設計</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <section id="features" class="section">
-    <h2>Teamie が提供すること</h2>
-    <div class="feature-grid">
-      <article v-for="feature in features" :key="feature.title" class="feature-card">
-        <h3>{{ feature.title }}</h3>
-        <p>{{ feature.description }}</p>
-      </article>
-    </div>
-  </section>
+      <section id="features" class="section">
+        <h2>Teamie が提供すること</h2>
+        <div class="feature-grid">
+          <article v-for="feature in features" :key="feature.title" class="feature-card">
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.description }}</p>
+          </article>
+        </div>
+      </section>
 
-  <section id="workflow" class="section">
-    <h2>導入から運用までのシンプルなステップ</h2>
-    <ol class="workflow-list">
-      <li v-for="step in workflowSteps" :key="step.step">
-        <h3>{{ step.step }}</h3>
-        <p>{{ step.detail }}</p>
-      </li>
-    </ol>
-  </section>
+      <section id="workflow" class="section">
+        <h2>導入から運用までのシンプルなステップ</h2>
+        <ol class="workflow-list">
+          <li v-for="step in workflowSteps" :key="step.step">
+            <h3>{{ step.step }}</h3>
+            <p>{{ step.detail }}</p>
+          </li>
+        </ol>
+      </section>
 
-  <section id="faq" class="section">
-    <h2>よくあるご質問</h2>
-    <div class="faq">
-      <details>
-        <summary>小規模チームでも使いやすいですか？</summary>
-        <p>最大 10 名ほどのチームでの運用を想定したシンプルな UI/UX を提供します。</p>
-      </details>
-      <details>
-        <summary>どのような認証に対応していますか？</summary>
-        <p>Firebase Authentication を中心に、Google アカウント連携をサポート予定です。</p>
-      </details>
-      <details>
-        <summary>料金体系はどうなりますか？</summary>
-        <p>ベータ版期間中は無料でお使いいただけます。正式リリース後の料金は検討中です。</p>
-      </details>
-    </div>
-  </section>
+      <section id="faq" class="section">
+        <h2>よくあるご質問</h2>
+        <div class="faq">
+          <details>
+            <summary>小規模チームでも使いやすいですか？</summary>
+            <p>最大 10 名ほどのチームでの運用を想定したシンプルな UI/UX を提供します。</p>
+          </details>
+          <details>
+            <summary>どのような認証に対応していますか？</summary>
+            <p>Firebase Authentication を中心に、Google アカウント連携をサポート予定です。</p>
+          </details>
+          <details>
+            <summary>料金体系はどうなりますか？</summary>
+            <p>ベータ版期間中は無料でお使いいただけます。正式リリース後の料金は検討中です。</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="landing__footer">
+      <p>© {{ new Date().getFullYear() }} Teamie</p>
+    </footer>
+  </div>
 </template>
 
 <style scoped>
+.landing {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--surface-elevated);
+}
+
+.landing__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 3rem;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.landing__brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.landing__logo {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.landing__tagline {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.landing__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.landing__link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.landing__link:hover {
+  color: var(--primary);
+}
+
+.landing__cta {
+  border-radius: 999px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--primary-strong);
+}
+
+.landing__cta--primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.landing__main {
+  flex: 1;
+  padding: 3rem;
+}
+
+.landing__footer {
+  padding: 1.5rem 3rem;
+  text-align: center;
+  background: var(--surface-muted);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.landing__cta:hover {
+  border-color: var(--primary);
+}
+
+.landing__cta--primary:hover {
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
+}
+
 .hero {
   display: grid;
   gap: 4rem;
@@ -151,38 +270,6 @@ const workflowSteps = [
   flex-wrap: wrap;
   gap: 1rem;
   margin-top: 2rem;
-}
-
-.cta-primary,
-.cta-secondary {
-  border-radius: 999px;
-  padding: 0.85rem 1.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: transform 150ms ease, box-shadow 150ms ease;
-}
-
-.cta-primary {
-  background: var(--primary);
-  color: var(--surface-elevated);
-  box-shadow: 0 10px 25px rgba(79, 124, 130, 0.25);
-}
-
-.cta-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(79, 124, 130, 0.35);
-}
-
-.cta-secondary {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--primary-strong);
-}
-
-.cta-secondary:hover {
-  transform: translateY(-1px);
-  border-color: var(--primary);
 }
 
 .hero__note {
@@ -355,6 +442,16 @@ details p {
 }
 
 @media (max-width: 768px) {
+  .landing__header,
+  .landing__footer {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .landing__nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .hero {
     gap: 2.5rem;
   }
