@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
+import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AuthFormField from '@/components/ui/AuthFormField.vue'
 import {
@@ -129,21 +130,12 @@ function mapFirebaseError(error: unknown) {
         <span>または</span>
       </div>
 
-      <div class="social-group">
-        <button
-          v-for="provider in providers"
-          :key="provider.id"
-          type="button"
-          class="social-btn"
-          :disabled="Boolean(providerLoading) && providerLoading !== provider.id"
-          @click="handleProvider(provider.id)"
-        >
-          <span class="social-icon" :data-icon="provider.icon" />
-          {{
-            providerLoading === provider.id ? `${provider.label}中...` : provider.label
-          }}
-        </button>
-      </div>
+      <AuthProviderButtons
+        class="provider-section"
+        :providers="providers"
+        :loading="providerLoading"
+        @select="handleProvider"
+      />
 
       <p class="login-helper">
         アカウントをお持ちでない場合
@@ -301,6 +293,10 @@ function mapFirebaseError(error: unknown) {
 
 .login-helper a:hover {
   color: #0b2e33;
+}
+
+.provider-section {
+  margin-top: 1rem;
 }
 
 @media (max-width: 640px) {

@@ -6,7 +6,7 @@ const props = withDefaults(
     brandName?: string;
   }>(),
   {
-    brandName: "Teammie",
+    brandName: "Teamie",
     description: "",
   }
 );
