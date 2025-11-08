@@ -1,18 +1,6 @@
-import {
-  deleteCurrentAccount,
-  loginWithEmail,
-  loginWithProvider,
-  registerWithEmail,
-  uploadAvatar,
-} from '@/firebase/authService'
+import { deleteCurrentAccount, loginWithEmail, loginWithProvider, saveProfileDetails, uploadAvatar } from '@/firebase/authService'
 import { setProfile } from '@/store/auth'
-import type { LoginPayload, SignUpPayload, SocialProvider } from '@/types/auth'
-
-export async function createAccount(payload: SignUpPayload) {
-  const profile = await registerWithEmail(payload)
-  setProfile(profile)
-  return profile
-}
+import type { LoginPayload, ProfileSetupPayload, SocialProvider } from '@/types/auth'
 
 export async function authenticateWithEmail(payload: LoginPayload) {
   const profile = await loginWithEmail(payload)
@@ -22,6 +10,12 @@ export async function authenticateWithEmail(payload: LoginPayload) {
 
 export async function authenticateWithProvider(provider: SocialProvider) {
   const profile = await loginWithProvider(provider)
+  setProfile(profile)
+  return profile
+}
+
+export async function completeProfileSetup(payload: ProfileSetupPayload) {
+  const profile = await saveProfileDetails(payload)
   setProfile(profile)
   return profile
 }

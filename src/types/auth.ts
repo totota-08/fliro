@@ -9,13 +9,15 @@ export interface UserProfile {
   updatedAt: string
 }
 
-export interface SignUpPayload {
+export interface CredentialSignUpPayload {
   email: string
   password: string
+}
+
+export interface ProfileSetupPayload {
   fullName: string
-  nickname: string
-  birthday: string
-  avatarUrl?: string
+  nickname?: string
+  birthday?: string
 }
 
 export interface LoginPayload {
