@@ -1,0 +1,76 @@
+import { computed, ref, watch } from 'vue'
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
+import type { User } from 'firebase/auth'
+import { auth } from '@/firebase/config'
+import { fetchProfile } from '@/firebase/authService'
+import type { UserProfile } from '@/types/auth'
+
+const currentUser = ref<User | null>(null)
+const profile = ref<UserProfile | null>(null)
+const authReady = ref(false)
+
+let initPromise: Promise<void> | null = null
+
+export function useAuthStore() {
+  const isAuthenticated = computed(() => currentUser.value !== null)
+
+  return {
+    user: currentUser,
+    profile,
+    authReady,
+    isAuthenticated,
+  }
+}
+
+export function setProfile(data: UserProfile | null) {
+  profile.value = data
+}
+
+export async function initAuthListener() {
+  if (initPromise) {
+    return initPromise
+  }
+
+  initPromise = new Promise((resolve) => {
+    onAuthStateChanged(auth, async (user) => {
+      currentUser.value = user
+
+      if (user) {
+        try {
+          profile.value = await fetchProfile(user.uid)
+        } catch (error) {
+          console.error('Failed to load profile', error)
+          profile.value = null
+        }
+      } else {
+        profile.value = null
+      }
+
+      if (!authReady.value) {
+        authReady.value = true
+        resolve()
+      }
+    })
+  })
+
+  return initPromise
+}
+
+export function waitForAuthReady() {
+  if (authReady.value) {
+    return Promise.resolve()
+  }
+
+  return new Promise<void>((resolve) => {
+    const stop = watch(authReady, (ready) => {
+      if (ready) {
+        stop()
+        resolve()
+      }
+    })
+  })
+}
+
+export async function signOutUser() {
+  await firebaseSignOut(auth)
+}
