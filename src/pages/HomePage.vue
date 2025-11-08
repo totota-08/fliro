@@ -4,31 +4,64 @@ import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 const features = [
   {
-    title: 'タスク管理',
-    description: 'チームのタスクを視覚的に整理し、担当者とステータスを素早く把握できます。',
+    title: '直感的なタスク管理',
+    description:
+      'ドラッグ&ドロップでタスクを簡単に管理。担当者の割り当て、期限設定、ステータス変更がスムーズに行えます。',
+    icon: 'board',
   },
   {
-    title: '進捗レポート',
-    description: '日次・週次の進捗を自動で集計し、プロジェクトの健康状態を共有できます。',
+    title: 'リアルタイムチャット',
+    description:
+      'プロジェクトごとのチャットルームで、チームメンバーとリアルタイムにコミュニケーション。',
+    icon: 'chat',
   },
   {
-    title: 'コミュニケーション',
-    description: 'コメントやメンション機能で、コンテキストを失わずにやり取りができます。',
+    title: 'カンバンボード',
+    description: '視覚的にタスクの進捗を把握。ToDo、進行中、完了のステータスを一目で確認できます。',
+    icon: 'kanban',
+  },
+  {
+    title: 'チーム管理',
+    description: 'メンバーの招待、役割の設定、進捗の確認が簡単。10名前後のチームに最適化されています。',
+    icon: 'team',
+  },
+  {
+    title: '柔軟な設定',
+    description: '通知設定、プロジェクトのカスタマイズ、権限管理など、チームに合わせた設定が可能です。',
+    icon: 'settings',
+  },
+  {
+    title: 'チャットからタスク生成',
+    description: 'チャットメッセージから直接タスクを作成。会話の流れを止めずにタスク管理ができます。',
+    icon: 'spark',
   },
 ]
 
-const workflowSteps = [
+const pricingPlans = [
   {
-    step: '① プロジェクトを作成',
-    detail: 'テンプレートからプロジェクトをセットアップ。必要な一覧が最初から揃っています。',
+    name: 'フリー',
+    price: '¥0',
+    unit: '/月',
+    highlight: false,
+    features: ['最大3名まで', '基本的なタスク管理', 'チャット機能'],
+    cta: '始める',
   },
   {
-    step: '② タスクを分解',
-    detail: 'チームメンバーにタスクを割り当て、期限と優先度を設定します。',
+    name: 'スタンダード',
+    price: '¥1,200',
+    unit: '/月',
+    highlight: true,
+    ribbon: '人気',
+    features: ['最大10名まで', 'すべての機能', '優先サポート', 'データエクスポート'],
+    cta: '始める',
   },
   {
-    step: '③ 進捗を共有',
-    detail: 'ステータス更新はワンクリック。自動生成レポートで関係者に透明性を提供します。',
+    name: 'エンタープライズ',
+    price: 'お問い合わせ',
+    unit: '',
+    highlight: false,
+    features: ['無制限のメンバー', '専任サポート', 'カスタム統合', 'SLA保証'],
+    cta: 'お問い合わせ',
   },
 ]
 </script>
@@ -239,43 +272,44 @@ const workflowSteps = [
 
 .hero {
   display: grid;
-  gap: 4rem;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 3rem;
   align-items: center;
-  margin-bottom: 4rem;
-}
-
-.hero__content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  padding: 4rem 1.5rem 2rem;
+  max-width: 1140px;
+  margin: 0 auto;
 }
 
 .hero__content h1 {
-  font-size: clamp(2.5rem, 4vw, 3.5rem);
-  font-weight: 700;
-  color: var(--text-strong);
-  line-height: 1.2;
+  font-size: clamp(2.5rem, 5vw, 3.75rem);
+  margin: 0.75rem 0 1rem;
 }
 
 .hero__content p {
-  margin-top: 1.5rem;
-  font-size: 1.05rem;
-  color: var(--text-muted);
+  color: #4f7c82;
+  font-size: 1.1rem;
   line-height: 1.75;
+}
+
+.hero__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  color: #4f7c82;
+  font-size: 0.85rem;
 }
 
 .hero__actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 1rem;
+  flex-wrap: wrap;
   margin-top: 2rem;
 }
 
 .hero__note {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #93b1b5;
 }
 
 .hero__visual {
@@ -283,162 +317,229 @@ const workflowSteps = [
   justify-content: center;
 }
 
-.dashboard-mock {
-  width: min(100%, 420px);
+.hero-card {
+  width: min(460px, 100%);
   border-radius: 1.5rem;
-  background: var(--surface-elevated);
-  box-shadow: 0 25px 50px rgba(11, 46, 51, 0.18);
-  overflow: hidden;
-  border: 1px solid var(--border-light);
+  background: #fff;
+  border: 1px solid rgba(147, 177, 181, 0.35);
+  box-shadow: 0 40px 70px rgba(11, 46, 51, 0.18);
 }
 
-.dashboard-mock__header {
+.hero-card header {
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: var(--surface-muted);
+  border-bottom: 1px solid rgba(147, 177, 181, 0.2);
 }
 
-.dot {
+.hero-card header span {
   width: 0.75rem;
   height: 0.75rem;
-  border-radius: 50%;
-  background: var(--border-light);
+  border-radius: 999px;
+  background: rgba(147, 177, 181, 0.6);
 }
 
-.dashboard-mock__body {
+.hero-card__body {
+  padding: 1.25rem 1.5rem;
   display: grid;
   gap: 1rem;
-  padding: 1.5rem;
 }
 
-.card {
+.hero-card__body div {
+  padding: 1rem;
   border-radius: 1rem;
-  padding: 1.25rem;
-  border: 1px solid var(--border-light);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  background: rgba(184, 227, 233, 0.35);
 }
 
-.card h3 {
-  font-size: 1rem;
+.hero-card__body p {
+  margin: 0 0 0.35rem;
   font-weight: 600;
-  color: var(--text-strong);
 }
 
-.card ul {
-  list-style: none;
-  padding: 0;
+.hero-card__body ul {
   margin: 0;
-  display: grid;
-  gap: 0.5rem;
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  padding-left: 1rem;
+  color: #4f7c82;
 }
 
-.card--backlog {
-  background: var(--surface);
-}
-
-.card--progress {
-  background: var(--surface-muted);
-}
-
-.card--done {
-  background: var(--primary);
-  color: var(--surface-elevated);
-}
-
-.card--done h3,
-.card--done ul {
-  color: var(--surface-elevated);
-}
-
-.section {
-  margin-bottom: 4rem;
-}
-
-.section h2 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-strong);
-  margin-bottom: 2rem;
+.section-heading {
   text-align: center;
+  max-width: 720px;
+  margin: 0 auto 2.5rem;
 }
 
-.feature-grid {
+.section-heading p {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #4f7c82;
+  font-weight: 600;
+  margin: 0;
+}
+
+.section-heading h2 {
+  margin: 0.5rem 0 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.features,
+.pricing,
+.cta {
+  padding: 4rem 1.5rem;
+  background: #fff;
+}
+
+.features__grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  max-width: 1140px;
+  margin: 0 auto;
 }
 
 .feature-card {
+  border: 1px solid #b8e3e9;
+  border-radius: 1.5rem;
   padding: 1.75rem;
-  border-radius: 1.25rem;
-  background: var(--surface-elevated);
-  border: 1px solid var(--border-light);
-  box-shadow: 0 12px 25px rgba(11, 46, 51, 0.12);
+  background: #f8fcfd;
+  transition: box-shadow 150ms ease, transform 150ms ease;
 }
 
-.feature-card h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
+.feature-card:hover {
+  box-shadow: 0 25px 40px rgba(11, 46, 51, 0.15);
+  transform: translateY(-4px);
+}
+
+.feature-card__icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  background: #b8e3e9;
   margin-bottom: 1rem;
-  color: var(--text-strong);
 }
 
-.feature-card p {
-  color: var(--text-muted);
-  line-height: 1.7;
+.pricing {
+  background: linear-gradient(135deg, rgba(184, 227, 233, 0.25), #fff);
 }
 
-.workflow-list {
+.pricing__grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1.5rem;
-  list-style: none;
-  padding: 0;
-  max-width: 720px;
+  max-width: 1140px;
   margin: 0 auto;
 }
 
-.workflow-list h3 {
+.pricing-card {
+  background: #fff;
+  border: 2px solid #b8e3e9;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.pricing-card--highlight {
+  border-color: #4f7c82;
+  box-shadow: 0 30px 60px rgba(11, 46, 51, 0.25);
+}
+
+.pricing-card__ribbon {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4f7c82;
+  color: #fff;
+  padding: 0.3rem 1.2rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-strong);
 }
 
-.workflow-list p {
-  margin-top: 0.5rem;
-  color: var(--text-muted);
+.pricing-card__price span {
+  font-size: 2.5rem;
+  font-weight: 700;
 }
 
-.faq {
+.pricing-card__price small {
+  color: #93b1b5;
+  margin-left: 0.3rem;
+}
+
+.pricing-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.65rem;
+  color: #4f7c82;
+}
+
+.cta {
+  background: #4f7c82;
+  color: #fff;
+}
+
+.cta__inner {
   max-width: 720px;
   margin: 0 auto;
-  display: grid;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-details {
-  border-radius: 1rem;
-  padding: 1.25rem 1.5rem;
-  background: var(--surface-elevated);
-  border: 1px solid var(--border-light);
-  cursor: pointer;
-}
-
-summary {
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-details[open] summary {
-  margin-bottom: 0.75rem;
-}
-
-details p {
-  color: var(--text-muted);
+.cta__inner p {
+  color: #b8e3e9;
+  margin: 0;
   line-height: 1.7;
+}
+
+.landing__footer {
+  background: #0b2e33;
+  color: #fff;
+  padding: 3rem 1.5rem;
+}
+
+.landing__footer-grid {
+  max-width: 1140px;
+  margin: 0 auto 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+}
+
+.landing__footer-grid ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: #93b1b5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.landing__footer-grid li:first-child {
+  font-weight: 700;
+  color: #fff;
+}
+
+.landing__footer-grid a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.landing__footer-grid a:hover {
+  color: #fff;
+}
+
+.landing__copyright {
+  text-align: center;
+  color: #93b1b5;
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 @media (max-width: 768px) {
@@ -456,8 +557,8 @@ details p {
     gap: 2.5rem;
   }
 
-  .hero__content {
-    text-align: center;
+  .landing__links {
+    justify-content: center;
   }
 
   .hero__actions {
