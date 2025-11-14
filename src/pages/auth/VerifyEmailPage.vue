@@ -12,7 +12,6 @@ const oobCode = ref<string | null>(null)
 const loading = ref(true)
 const success = ref(false)
 const errorMessage = ref('')
-const continueUrl = computed(() => (typeof route.query.continueUrl === 'string' ? route.query.continueUrl : null))
 
 onMounted(async () => {
   const code = route.query.oobCode
@@ -51,13 +50,8 @@ onMounted(async () => {
   }
 })
 
-const goToLogin = () => router.push({ name: ROUTE_NAMES.login })
 const goToContinue = () => {
-  if (continueUrl.value) {
-    window.location.assign(continueUrl.value)
-    return
-  }
-  goToLogin()
+  window.close()
 }
 </script>
 
@@ -73,8 +67,8 @@ const goToContinue = () => {
         <p v-if="loading">メール認証を処理しています...</p>
         <template v-else>
           <p v-if="success">
-            これでアカウントの登録が完了しました。
-            {{ continueUrl ? '続行先に移動してください。' : 'ログイン画面に戻ってサインインしてください。' }}
+            プロフィールの登録を行なってください。<br>
+            こちらの画面は閉じても問題ありません。
           </p>
           <p v-if="errorMessage" class="action-error">{{ errorMessage }}</p>
         </template>
@@ -82,9 +76,9 @@ const goToContinue = () => {
 
       <div class="action-footer">
         <AppButton v-if="success" variant="primary" @click="goToContinue">
-          {{ continueUrl ? '続行する' : 'ログインへ' }}
+          ウィンドウを閉じる
         </AppButton>
-        <RouterLink v-else :to="{ name: ROUTE_NAMES.passwordReset }">ヘルプを見る</RouterLink>
+        <RouterLink v-else :to="{ name: ROUTE_NAMES.home }">ヘルプを見る</RouterLink>
       </div>
     </div>
   </div>
