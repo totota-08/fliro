@@ -9,6 +9,7 @@ export interface UserProfile {
   jobTitle: string
   createdAt: string
   updatedAt: string
+  setUp :boolean
 }
 
 export interface CredentialSignUpPayload {

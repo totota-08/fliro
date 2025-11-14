@@ -80,6 +80,7 @@ export async function saveProfileDetails(payload: ProfileSetupPayload) {
     birthday: payload.birthday ?? '',
     jobRole: payload.jobRole,
     jobTitle: payload.jobTitle ?? '',
+    setUp: true,
   })
 }
 
@@ -147,6 +148,7 @@ async function persistProfile(user: User, overrides: Partial<UserProfile> = {}) 
     jobTitle: overrides.jobTitle ?? existing?.jobTitle ?? '',
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
+    setUp: overrides.setUp ?? existing?.setUp ?? false,
   }
 
   await setDoc(ref, profile, { merge: true })
