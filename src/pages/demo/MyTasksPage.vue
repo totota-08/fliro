@@ -123,7 +123,7 @@ type DecoratedTask = Task & {
 const decorateTask = (task: Task): DecoratedTask => {
   const daysUntil = getDaysUntilDue(task.dueDate)
   let dueMessage = ''
-  let dueClass = ''
+  let dueClass: DecoratedTask['dueClass'] = ''
 
   if (daysUntil < 0) {
     dueMessage = `${Math.abs(daysUntil)}日遅れ`

@@ -1,60 +1,111 @@
-import type { Component } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
-
-type ComponentModule = { default: Component }
-const componentModules = {
-  ...import.meta.glob<ComponentModule>('@/pages/**/*.vue', { eager: true }),
-  ...import.meta.glob<ComponentModule>('@/components/**/*.vue', { eager: true }),
-} satisfies Record<string, ComponentModule>
-
-const getComponent = (fileName: string): Component => {
-  for (const [path, module] of Object.entries(componentModules)) {
-    if (path.endsWith(fileName)) {
-      return module.default
-    }
-  }
-
-  throw new Error(`Component "${fileName}" was not found in the registered directories.`)
-}
-
-const HomePage = getComponent('HomePage.vue')
-const DashboardDemoPage = getComponent('DashboardDemoPage.vue')
-const MyTasksPage = getComponent('MyTasksPage.vue')
-const TeamPage = getComponent('TeamPage.vue')
-const NotFoundErrorPage = getComponent('404.vue')
+import HomePage from '@/pages/HomePage.vue'
+import SignUpPage from '@/pages/auth/SignUpPage.vue'
+import LoginPage from '@/pages/auth/LoginPage.vue'
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage.vue'
+import ResetPasswordConfirmPage from '@/pages/auth/ResetPasswordConfirmPage.vue'
+import VerifyEmailPage from '@/pages/auth/VerifyEmailPage.vue'
+import AuthDebugPage from '@/pages/debug/AuthDebugPage.vue'
+import DashboardDemoPage from '@/pages/demo/DashboardDemoPage.vue'
+import MyTasksPage from '@/pages/demo/MyTasksPage.vue'
+import TeamPage from '@/pages/demo/TeamPage.vue'
+import NotFoundPage from '@/components/errorPage/404.vue'
+import { useAuthStore, waitForAuthReady } from '@/store/auth'
+import { ROUTE_NAMES } from '@/constants/routes'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      name: 'home',
+      name: ROUTE_NAMES.home,
       component: HomePage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/reset/confirm',
+      name: ROUTE_NAMES.passwordResetConfirm,
+      component: ResetPasswordConfirmPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/verify',
+      name: ROUTE_NAMES.verifyEmail,
+      component: VerifyEmailPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/signup',
+      name: ROUTE_NAMES.signup,
+      component: SignUpPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/login',
+      name: ROUTE_NAMES.login,
+      component: LoginPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/auth/reset',
+      name: ROUTE_NAMES.passwordReset,
+      component: ResetPasswordPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/debug/auth',
+      name: ROUTE_NAMES.authDebug,
+      component: AuthDebugPage,
+      meta: { requiresAuth: true, layout: 'full' },
     },
     {
       path: '/demo/dashboard',
       name: 'demo.dashboard',
       component: DashboardDemoPage,
-      meta: { layout: 'full', section: 'dashboard' },
     },
     {
       path: '/demo/tasks',
       name: 'demo.tasks',
       component: MyTasksPage,
-      meta: { layout: 'full', section: 'tasks' },
     },
     {
       path: '/demo/team',
       name: 'demo.team',
       component: TeamPage,
-      meta: { layout: 'full', section: 'team' },
     },
     {
-      path: '/:notFound(.*)',
-      name: 'error.404',
-      component: NotFoundErrorPage,
+      path: '/:pathMatch(.*)*',
+      name: ROUTE_NAMES.notFound,
+      component: NotFoundPage,
+      meta: { layout: 'full' },
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+  await waitForAuthReady()
+
+  if (to.meta.requiresAuth && !auth.isAuthenticated.value) {
+    return {
+      name: ROUTE_NAMES.login,
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  const authRestricted = [String(ROUTE_NAMES.login), String(ROUTE_NAMES.signup)]
+
+  if (to.name && authRestricted.includes(String(to.name)) && auth.isAuthenticated.value) {
+    const needsSetup = Boolean(auth.profile.value && auth.profile.value.setUp === false)
+    const goingToSignup = String(to.name) === String(ROUTE_NAMES.signup)
+    const explicitlySetupFlow = String(to.query.setup) === 'false'
+
+    if (goingToSignup && (needsSetup || explicitlySetupFlow)) {
+      return true
+    }
+
+    return { name: ROUTE_NAMES.authDebug }
+  }
 })
 
 export default router

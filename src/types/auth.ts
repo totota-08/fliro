@@ -1,0 +1,33 @@
+export interface UserProfile {
+  uid: string
+  email: string
+  fullName: string
+  nickname: string
+  birthday: string
+  avatarUrl: string
+  jobRole: string
+  jobTitle: string
+  createdAt: string
+  updatedAt: string
+  setUp :boolean
+}
+
+export interface CredentialSignUpPayload {
+  email: string
+  password: string
+}
+
+export interface ProfileSetupPayload {
+  fullName: string
+  nickname?: string
+  birthday?: string
+  jobRole: string
+  jobTitle?: string
+}
+
+export interface LoginPayload {
+  email: string
+  password: string
+}
+
+export type SocialProvider = 'google' | 'github'
