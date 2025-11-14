@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
@@ -11,6 +11,7 @@ import {
   updateAccountAvatar,
 } from '@/services/accountActions'
 import {
+  fetchProfile,
   refreshCurrentUser,
   registerCredentials,
   resendVerificationEmail,
@@ -50,6 +51,17 @@ const credentialEmail = ref('')
 
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref<string | null>(null)
+
+onMounted(async () => {
+  const user = auth.currentUser
+  if (route.query.setup === 'false' && user) {
+    const profile = await fetchProfile(user.uid)
+    if (profile && !profile.setUp) {
+      currentStep.value = 'profile'
+      hydrateProfileFromUser()
+    }
+  }
+})
 
 const hydrateProfileFromUser = () => {
   const user = auth.currentUser

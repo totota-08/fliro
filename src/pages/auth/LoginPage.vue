@@ -11,6 +11,8 @@ import {
 } from '@/services/accountActions'
 import { ROUTE_NAMES } from '@/constants/routes'
 import type { SocialProvider } from '@/types/auth'
+import { fetchProfile } from '@/firebase/authService'
+import { auth } from '@/firebase/config'
 
 const router = useRouter()
 const route = useRoute()
@@ -33,7 +35,17 @@ const providers: { id: SocialProvider; label: string; icon: string }[] = [
   { id: 'google', label: 'Google でログイン', icon: 'google' },
   { id: 'github', label: 'GitHub でログイン', icon: 'github' },
 ]
+const checksetUp = async () => {
+  const user = auth.currentUser
+  if (!user) return
 
+  const profile = await fetchProfile(user.uid)
+  if (profile && profile.setUp === false) {
+    await router.push({ name: ROUTE_NAMES.signup, query: { setup: 'false' } })
+    return
+  }
+  await router.push(redirectTarget.value)
+}
 const handleSubmit = async () => {
   if (loading.value) return
 
@@ -42,7 +54,7 @@ const handleSubmit = async () => {
 
   try {
     await authenticateWithEmail({ ...form })
-    await router.push(redirectTarget.value)
+    await checksetUp()
   } catch (error) {
     console.error(error)
     errorMessage.value = mapFirebaseError(error)
@@ -59,7 +71,7 @@ const handleProvider = async (provider: SocialProvider) => {
 
   try {
     await authenticateWithProvider(provider)
-    await router.push(redirectTarget.value)
+    await checksetUp()
   } catch (error) {
     console.error(error)
     errorMessage.value = mapFirebaseError(error)

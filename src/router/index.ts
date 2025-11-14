@@ -96,6 +96,14 @@ router.beforeEach(async (to) => {
   const authRestricted = [String(ROUTE_NAMES.login), String(ROUTE_NAMES.signup)]
 
   if (to.name && authRestricted.includes(String(to.name)) && auth.isAuthenticated.value) {
+    const needsSetup = Boolean(auth.profile.value && auth.profile.value.setUp === false)
+    const goingToSignup = String(to.name) === String(ROUTE_NAMES.signup)
+    const explicitlySetupFlow = String(to.query.setup) === 'false'
+
+    if (goingToSignup && (needsSetup || explicitlySetupFlow)) {
+      return true
+    }
+
     return { name: ROUTE_NAMES.authDebug }
   }
 })
