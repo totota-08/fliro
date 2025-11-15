@@ -10,6 +10,7 @@ export const ROUTE_NAMES = {
   projectDebug: 'project-debug',
   inviteAccept: 'invite-accept',
   myPage: 'my-page',
+  secretAccess: 'secret-access',
   secretChat: 'secret-chat',
   notFound: 'not-found',
   demoDashboard: 'demo.dashboard',

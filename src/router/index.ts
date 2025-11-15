@@ -17,6 +17,7 @@ import CreateProjectPage from '@/pages/projects/CreateProjectPage.vue'
 import InviteAcceptPage from '@/pages/invite/InviteAcceptPage.vue'
 import MyPage from '@/pages/account/MyPage.vue'
 import SecretChatPage from '@/pages/secret/SecretChatPage.vue'
+import SecretAccessPage from '@/pages/secret/SecretAccessPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -91,6 +92,12 @@ export const router = createRouter({
       path: '/secret/chat',
       name: ROUTE_NAMES.secretChat,
       component: SecretChatPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/secret/access',
+      name: ROUTE_NAMES.secretAccess,
+      component: SecretAccessPage,
       meta: { requiresAuth: true },
     },
     {

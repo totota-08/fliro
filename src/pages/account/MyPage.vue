@@ -21,6 +21,7 @@ const { user, profile } = useAuthStore()
 const loading = ref(true)
 const taskList = ref<TaskDoc[]>([])
 const projectCount = ref(0)
+const projects = ref<{ id: string; name: string; role?: string }[]>([])
 const inviteMessage = ref('')
 const keyBuffer = ref('')
 const SECRET = 'teamie'
@@ -31,11 +32,13 @@ async function fetchTasks() {
   loading.value = true
   try {
     const items: TaskDoc[] = []
+    const projectItems: { id: string; name: string; role?: string }[] = []
     const projectsSnap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
     projectCount.value = projectsSnap.size
     for (const docSnap of projectsSnap.docs) {
       const projectId = docSnap.id
       const projectName = (docSnap.data().projectName as string) || 'プロジェクト'
+      projectItems.push({ id: projectId, name: projectName, role: docSnap.data().role as string })
       const tasksSnap = await getDocs(query(collection(db, 'projects', projectId, 'tasks')))
       tasksSnap.forEach((task) => {
         const data = task.data() as any
@@ -49,6 +52,7 @@ async function fetchTasks() {
       })
     }
     taskList.value = items
+    projects.value = projectItems
   } catch (error) {
     console.error('Failed to load tasks', error)
   } finally {
@@ -91,7 +95,7 @@ async function processPendingInvite() {
 function handleKeydown(event: KeyboardEvent) {
   keyBuffer.value = (keyBuffer.value + event.key.toLowerCase()).slice(-SECRET.length)
   if (keyBuffer.value === SECRET) {
-    router.push({ name: ROUTE_NAMES.secretChat })
+    router.push({ name: ROUTE_NAMES.secretAccess })
   }
 }
 
@@ -135,6 +139,27 @@ onBeforeUnmount(() => {
     </section>
 
     <p v-if="inviteMessage" class="alert">{{ inviteMessage }}</p>
+
+    <section class="projects-panel">
+      <header>
+        <div>
+          <h2>参加中のプロジェクト</h2>
+          <p>クリックしてプロジェクトのデバッグ画面にアクセスできます。</p>
+        </div>
+      </header>
+      <div v-if="!projects.length" class="empty">まだプロジェクトに参加していません。</div>
+      <ul v-else class="project-list">
+        <li v-for="project in projects" :key="project.id">
+          <div>
+            <p class="project-name">{{ project.name }}</p>
+            <p class="project-role">ロール: {{ project.role || 'member' }}</p>
+          </div>
+          <AppButton variant="outline" :to="{ name: ROUTE_NAMES.projectDebug, params: { projectId: project.id } }">
+            開く
+          </AppButton>
+        </li>
+      </ul>
+    </section>
 
     <section class="tasks-panel">
       <header>
@@ -225,6 +250,46 @@ dd {
   padding: 1rem;
   border-radius: 1rem;
   color: #0b2e33;
+}
+
+.projects-panel {
+  background: #fff;
+  border-radius: 1.5rem;
+  border: 1px solid #e1ecef;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.project-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e1ecef;
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.project-name {
+  margin: 0;
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.project-role {
+  margin: 0.35rem 0 0;
+  color: #4f7c82;
+  font-size: 0.9rem;
 }
 
 .tasks-panel {
