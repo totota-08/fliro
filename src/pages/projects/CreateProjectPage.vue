@@ -114,27 +114,23 @@ function prevStep() {
   <div class="project-shell">
     <section class="project-hero">
       <p class="hero-eyebrow">Teamie Projects</p>
-      <h1>チームの流れを止めないプロジェクト作成</h1>
-      <p>
-        アカウント作成と同じステップ感で、プロジェクトの基本設定から権限周りまでまとめて登録できます。
-        Asana のように画面全体を使ったレイアウトで、迷わず入力を進められます。
-      </p>
-      <p v-if="scaleStats" class="hero-scale">
+      <h1>メッセージ</h1>
+      <!-- <p v-if="scaleStats" class="hero-scale">
         現在 <strong>{{ scaleStats.users.toLocaleString() }}</strong> 人のユーザーが Teamie を利用し、
         <strong>{{ scaleStats.projects.toLocaleString() }}</strong> 件のプロジェクトが進行中です。
-      </p>
+      </p> -->
       <ul class="hero-list">
         <li>
-          <strong>ライブプレビュー感覚のステップ構成</strong>
-          <span>入力内容を段階的に確認しながら進められます。</span>
+          <strong>強調</strong>
+          <span>テキスト</span>
         </li>
         <li>
-          <strong>ブランドカラー連動</strong>
-          <span>ホームのキーカラーをそのままプロジェクトテーマに適用できます。</span>
+          <strong>強調</strong>
+          <span>テキスト</span>
         </li>
         <li>
-          <strong>権限と公開範囲を細かく制御</strong>
-          <span>公開設定やゲスト閲覧は最後のステップでまとめて設定。</span>
+          <strong>強調</strong>
+          <span>テキスト</span>
         </li>
       </ul>
     </section>
