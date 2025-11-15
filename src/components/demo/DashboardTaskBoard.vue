@@ -1,17 +1,33 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 
-interface TaskItem {
+export interface DemoTaskItem {
+  id?: string
   title: string
   description: string
   status: '未着手' | '進行中' | 'レビュー' | '完了'
   priority: '高' | '中' | '低'
   due: string
   assignee: string
-  comments: number
+  comments?: number
 }
 
-const columns: { key: string; title: string; badge?: string; tasks: TaskItem[] }[] = [
+export interface BoardColumn {
+  key: string
+  title: string
+  badge?: string
+  tasks: DemoTaskItem[]
+}
+
+const props = defineProps<{
+  columns?: BoardColumn[]
+  selectedTaskId?: string | null
+  interactive?: boolean
+}>()
+
+const emit = defineEmits<{ (e: 'create'): void; (e: 'select', taskId: string): void; (e: 'change-status', payload: { taskId: string; status: string }): void }>()
+
+const fallbackColumns: BoardColumn[] = [
   {
     key: 'todo',
     title: '未着手',
@@ -85,13 +101,21 @@ const columns: { key: string; title: string; badge?: string; tasks: TaskItem[] }
   },
 ]
 
-const activeTask = ref<TaskItem | null>(null)
+const columns = computed(() => (props.columns && props.columns.length ? props.columns : fallbackColumns))
+const isDemo = computed(() => !props.columns || !props.columns.length)
+const isInteractive = computed(() => !isDemo.value && props.interactive !== false)
+const activeTask = ref<DemoTaskItem | null>(null)
 const focusTrail = ref<number[]>([])
 const autoHighlightTimer = ref<number>()
+const draggingTask = ref<DemoTaskItem | null>(null)
 
-const flattenedTasks = computed(() => columns.flatMap((column) => column.tasks))
+const flattenedTasks = computed(() => columns.value.flatMap((column) => column.tasks))
 
-function openTask(task: TaskItem) {
+function openTask(task: DemoTaskItem) {
+  if (isInteractive.value) {
+    if (task.id) emit('select', task.id)
+    return
+  }
   activeTask.value = task
   stopAutoHighlight()
 }
@@ -108,19 +132,29 @@ function stopAutoHighlight() {
   focusTrail.value = []
 }
 
+function handleDrop(columnKey: string) {
+  if (!draggingTask.value || !isInteractive.value) return
+  if (draggingTask.value.id) {
+    emit('change-status', { taskId: draggingTask.value.id, status: columnKey })
+  }
+  draggingTask.value = null
+}
+
 onMounted(() => {
-  let cursor = 0
-  autoHighlightTimer.value = window.setInterval(() => {
-    const list = flattenedTasks.value
-    if (!list.length) return
-    const index = cursor % list.length
-    const nextTask = list[index]
-    if (nextTask) {
-      activeTask.value = nextTask
-      focusTrail.value = [index]
-      cursor += 1
-    }
-  }, 7000)
+  if (isDemo.value) {
+    let cursor = 0
+    autoHighlightTimer.value = window.setInterval(() => {
+      const list = flattenedTasks.value
+      if (!list.length) return
+      const index = cursor % list.length
+      const nextTask = list[index]
+      if (nextTask) {
+        activeTask.value = nextTask
+        focusTrail.value = [index]
+        cursor += 1
+      }
+    }, 7000)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -132,7 +166,7 @@ onBeforeUnmount(() => {
   <section class="board">
     <div class="board__header">
       <h2>タスク管理</h2>
-      <button type="button" class="board__new">＋ 新規タスク</button>
+      <button type="button" class="board__new" @click="emit('create')">＋ 新規タスク</button>
     </div>
 
     <div class="board__columns">
@@ -146,10 +180,10 @@ onBeforeUnmount(() => {
           完了したタスクはまだありません。
         </p>
 
-        <div v-else class="board-column__tasks">
+        <div v-else class="board-column__tasks" @dragover.prevent @drop.prevent="handleDrop(column.key)">
           <article
             v-for="task in column.tasks"
-            :key="task.title"
+            :key="task.id || task.title"
             class="task-card"
             :class="{
               'is-selected': activeTask?.title === task.title,
@@ -157,6 +191,8 @@ onBeforeUnmount(() => {
             }"
             role="button"
             tabindex="0"
+            :draggable="isInteractive && !!task.id"
+            @dragstart="isInteractive ? (draggingTask.value = task) : undefined"
             @click="openTask(task)"
             @keydown.enter.prevent="openTask(task)"
           >
@@ -185,7 +221,7 @@ onBeforeUnmount(() => {
     </div>
 
     <transition name="task-detail">
-      <div v-if="activeTask" class="task-detail" role="dialog" aria-modal="true">
+      <div v-if="activeTask && isDemo" class="task-detail" role="dialog" aria-modal="true">
         <div class="task-detail__header">
           <h3>{{ activeTask.title }}</h3>
           <button type="button" class="task-detail__close" @click="closeTask" aria-label="閉じる">

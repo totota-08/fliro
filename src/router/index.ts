@@ -81,7 +81,7 @@ export const router = createRouter({
       path: '/projects/:projectId/dashboard',
       name: ROUTE_NAMES.projectDashboard,
       component: ProjectDashboardPage,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, section: 'dashboard' },
     },
     {
       path: '/invite/:token',

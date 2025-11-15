@@ -1,38 +1,61 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-interface SummaryCard {
+export interface SummaryCard {
   id: string
   label: string
-  value: string
+  value: number | string
   caption: string
   tone?: 'neutral' | 'alert'
 }
 
-const cards: SummaryCard[] = [
-  { id: 'progress', label: '進捗率', value: '68%', caption: '計画タスクの達成率' },
-  { id: 'done', label: '完了', value: '24', caption: '完了済みタスク数' },
-  { id: 'active', label: '進行中', value: '8', caption: '現在進行中のタスク' },
-  { id: 'overdue', label: '期限切れ', value: '3', caption: '期限超過タスク', tone: 'alert' },
+const props = withDefaults(
+  defineProps<{
+    title?: string
+    description?: string
+    note?: string
+    cards?: SummaryCard[]
+    rotate?: boolean
+  }>(),
+  {
+    title: 'Webサイトリニューアル',
+    description: '今週の状況をひと目で確認できます。',
+    note: '※ デモデータです。本番環境では実際の計測値が反映されます。',
+    rotate: true,
+  },
+)
+
+const defaultCards: SummaryCard[] = [
+  { id: 'progress', label: '進捗率', value: 68, caption: '計画タスクの達成率' },
+  { id: 'done', label: '完了', value: 24, caption: '完了済みタスク数' },
+  { id: 'active', label: '進行中', value: 8, caption: '現在進行中のタスク' },
+  { id: 'overdue', label: '期限切れ', value: 3, caption: '期限超過タスク', tone: 'alert' },
 ]
 
+const cardList = computed(() => (props.cards?.length ? props.cards : defaultCards))
+const isDemo = computed(() => !props.cards || props.cards.length === 0)
 const activeCardIndex = ref(0)
-const progressValue = ref(68)
+const progressValue = ref<number>(Number(cardList.value.find((card) => card.id === 'progress')?.value) || 0)
 let highlightTimer: number | undefined
 let progressTimer: number | undefined
 let progressDirection = 1
 
 onMounted(() => {
-  highlightTimer = window.setInterval(() => {
-    activeCardIndex.value = (activeCardIndex.value + 1) % cards.length
-  }, 3800)
+  if (props.rotate && isDemo.value) {
+    highlightTimer = window.setInterval(() => {
+      activeCardIndex.value = (activeCardIndex.value + 1) % cardList.value.length
+    }, 3800)
 
-  progressTimer = window.setInterval(() => {
-    progressValue.value += progressDirection
-    if (progressValue.value >= 72 || progressValue.value <= 62) {
-      progressDirection = -progressDirection
-    }
-  }, 1200)
+    progressTimer = window.setInterval(() => {
+      progressValue.value += progressDirection
+      if (progressValue.value >= Number(defaultCards[0].value) + 4 || progressValue.value <= Number(defaultCards[0].value) - 4) {
+        progressDirection = -progressDirection
+      }
+    }, 1200)
+  } else {
+    activeCardIndex.value = 0
+    progressValue.value = Number(cardList.value.find((card) => card.id === 'progress')?.value) || 0
+  }
 })
 
 onBeforeUnmount(() => {
@@ -45,27 +68,35 @@ onBeforeUnmount(() => {
   <section class="summary">
     <header class="summary__header">
       <div>
-        <h2>Webサイトリニューアル</h2>
-        <p>今週の状況をひと目で確認できます。</p>
+        <h2>{{ props.title }}</h2>
+        <p>{{ props.description }}</p>
       </div>
-      <small class="summary__note">
-        ※ デモデータです。本番環境では実際の計測値が反映されます。
+      <small v-if="props.note" class="summary__note">
+        {{ props.note }}
       </small>
     </header>
 
     <div class="summary__grid">
       <article
-        v-for="(card, index) in cards"
+        v-for="(card, index) in cardList"
         :key="card.id"
         class="summary-card"
         :class="{ 'is-alert': card.tone === 'alert', 'is-active': index === activeCardIndex }"
       >
         <p class="summary-card__label">{{ card.label }}</p>
         <p class="summary-card__value">
-          {{ card.id === 'progress' ? `${progressValue}%` : card.value }}
+          <template v-if="card.id === 'progress' && isDemo">
+            {{ progressValue }}%
+          </template>
+          <template v-else>
+            {{ card.value }}
+          </template>
         </p>
         <div v-if="card.id === 'progress'" class="summary-card__bar">
-          <div class="summary-card__bar-fill" :style="{ width: `${progressValue}%` }" />
+          <div
+            class="summary-card__bar-fill"
+            :style="{ width: `${card.id === 'progress' ? (isDemo ? progressValue : Number(card.value) || 0) : 0}%` }"
+          />
         </div>
         <p class="summary-card__caption">{{ card.caption }}</p>
       </article>
