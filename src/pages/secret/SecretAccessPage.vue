@@ -15,7 +15,7 @@ function handleSubmit() {
     router.push({ name: ROUTE_NAMES.secretChat })
     return
   }
-  message.value = 'アクセス拒否: 正しい隠しコマンドを入力してください。'
+  message.value = 'Access denied'
 }
 </script>
 
@@ -24,12 +24,11 @@ function handleSubmit() {
     <section class="secret-access-card">
       <header>
         <p>Hidden Console</p>
-        <h1>隠しコマンドを入力</h1>
-        <p class="subtitle">特別なキーワードでのみチャットへ入室できます。</p>
+        <h1>Enter the secret key</h1>
       </header>
       <form class="command-form" @submit.prevent="handleSubmit">
-        <label>コマンド
-          <input v-model="command" type="text" placeholder="例: chat" />
+        <label>secret key
+          <input v-model="command" type="text"/>
         </label>
         <button type="submit">アクセス</button>
       </form>
