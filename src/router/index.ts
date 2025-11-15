@@ -18,6 +18,7 @@ import InviteAcceptPage from '@/pages/invite/InviteAcceptPage.vue'
 import MyPage from '@/pages/account/MyPage.vue'
 import SecretChatPage from '@/pages/secret/SecretChatPage.vue'
 import SecretAccessPage from '@/pages/secret/SecretAccessPage.vue'
+import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -75,6 +76,12 @@ export const router = createRouter({
       name: ROUTE_NAMES.projectDebug,
       component: ProjectDebugPage,
       meta: { requiresAuth: true, layout: 'full' },
+    },
+    {
+      path: '/projects/:projectId/dashboard',
+      name: ROUTE_NAMES.projectDashboard,
+      component: ProjectDashboardPage,
+      meta: { requiresAuth: true },
     },
     {
       path: '/invite/:token',

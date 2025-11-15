@@ -83,7 +83,7 @@ async function processPendingInvite() {
     const projectId = await redeemInvite(token, user.value.uid, user.value.email ?? '')
     inviteMessage.value = '招待を承認しました。プロジェクトへ移動します。'
     setTimeout(() => {
-      router.push({ name: ROUTE_NAMES.projectDebug, params: { projectId } })
+      router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId } })
     }, 1200)
   } catch (error) {
     console.error(error)
@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
             <p class="project-name">{{ project.name }}</p>
             <p class="project-role">ロール: {{ project.role || 'member' }}</p>
           </div>
-          <AppButton variant="outline" :to="{ name: ROUTE_NAMES.projectDebug, params: { projectId: project.id } }">
+          <AppButton variant="outline" :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId: project.id } }">
             開く
           </AppButton>
         </li>

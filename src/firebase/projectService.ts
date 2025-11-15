@@ -14,6 +14,8 @@ export async function createProject(payload: CreateProjectPayload, currentUserId
       isPublic: payload.isPublic ?? false,
       allowGuestView: payload.allowGuestView ?? false,
       defaultTaskStatus: 'todo',
+      aiChatEnabled: false,
+      notificationEnabled: true,
     },
     stats: {
       totalTasks: 0,
