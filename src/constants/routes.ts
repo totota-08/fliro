@@ -6,6 +6,11 @@ export const ROUTE_NAMES = {
   passwordResetConfirm: 'password-reset-confirm',
   verifyEmail: 'verify-email',
   authDebug: 'auth-debug',
+  projectCreate: 'project-create',
+  projectDebug: 'project-debug',
+  inviteAccept: 'invite-accept',
+  myPage: 'my-page',
+  secretChat: 'secret-chat',
   notFound: 'not-found',
   demoDashboard: 'demo.dashboard',
 } as const

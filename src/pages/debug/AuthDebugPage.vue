@@ -139,6 +139,13 @@ const handleSignOut = async () => {
       >
         ホームへ戻る
       </button>
+      <button
+        type="button"
+        class="debug-button"
+        @click="router.push({ name: ROUTE_NAMES.projectCreate })"
+      >
+        プロジェクトを作成
+      </button>
       <button type="button" class="debug-button" @click="handleSignOut">
         サインアウト
       </button>

@@ -6,12 +6,17 @@ import ResetPasswordPage from '@/pages/auth/ResetPasswordPage.vue'
 import ResetPasswordConfirmPage from '@/pages/auth/ResetPasswordConfirmPage.vue'
 import VerifyEmailPage from '@/pages/auth/VerifyEmailPage.vue'
 import AuthDebugPage from '@/pages/debug/AuthDebugPage.vue'
+import ProjectDebugPage from '@/pages/debug/ProjectDebugPage.vue'
 import DashboardDemoPage from '@/pages/demo/DashboardDemoPage.vue'
 import MyTasksPage from '@/pages/demo/MyTasksPage.vue'
 import TeamPage from '@/pages/demo/TeamPage.vue'
 import NotFoundPage from '@/components/errorPage/404.vue'
 import { useAuthStore, waitForAuthReady } from '@/store/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
+import CreateProjectPage from '@/pages/projects/CreateProjectPage.vue'
+import InviteAcceptPage from '@/pages/invite/InviteAcceptPage.vue'
+import MyPage from '@/pages/account/MyPage.vue'
+import SecretChatPage from '@/pages/secret/SecretChatPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -59,6 +64,36 @@ export const router = createRouter({
       meta: { requiresAuth: true, layout: 'full' },
     },
     {
+      path: '/debug/projects/new',
+      name: ROUTE_NAMES.projectCreate,
+      component: CreateProjectPage,
+      meta: { requiresAuth: true, layout: 'full' },
+    },
+    {
+      path: '/debug/projects/:projectId',
+      name: ROUTE_NAMES.projectDebug,
+      component: ProjectDebugPage,
+      meta: { requiresAuth: true, layout: 'full' },
+    },
+    {
+      path: '/invite/:token',
+      name: ROUTE_NAMES.inviteAccept,
+      component: InviteAcceptPage,
+      meta: { layout: 'full' },
+    },
+    {
+      path: '/my',
+      name: ROUTE_NAMES.myPage,
+      component: MyPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/secret/chat',
+      name: ROUTE_NAMES.secretChat,
+      component: SecretChatPage,
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/demo/dashboard',
       name: 'demo.dashboard',
       component: DashboardDemoPage,
@@ -104,7 +139,7 @@ router.beforeEach(async (to) => {
       return true
     }
 
-    return { name: ROUTE_NAMES.authDebug }
+    return { name: ROUTE_NAMES.myPage }
   }
 })
 

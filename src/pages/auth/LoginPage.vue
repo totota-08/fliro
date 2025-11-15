@@ -28,7 +28,7 @@ const providerLoading = ref<SocialProvider | null>(null)
 const errorMessage = ref('')
 
 const redirectTarget = computed(() => {
-  return (route.query.redirect as string) || { name: ROUTE_NAMES.authDebug }
+  return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage }
 })
 
 const providers: { id: SocialProvider; label: string; icon: string }[] = [

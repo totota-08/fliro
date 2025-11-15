@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app'
 import { GithubAuthProvider, GoogleAuthProvider, getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
+import { getDatabase } from 'firebase/database'
 
 const requiredEnvVars = [
   'VITE_FIREBASE_API_KEY',
@@ -26,6 +27,7 @@ const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
 const storage = getStorage(app)
+const database = getDatabase(app, import.meta.env.VITE_FIREBASE_DATABASE_URL)
 
 const googleProvider = new GoogleAuthProvider()
 googleProvider.setCustomParameters({ prompt: 'select_account' })
@@ -43,4 +45,4 @@ function validateEnv(key: (typeof requiredEnvVars)[number]) {
   return value
 }
 
-export { app, auth, db, storage, googleProvider, githubProvider }
+export { app, auth, db, storage, database, googleProvider, githubProvider }

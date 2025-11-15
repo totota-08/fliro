@@ -116,7 +116,7 @@ const profileValid = computed(() => {
 })
 
 const redirectPath = computed(() => {
-  return (route.query.redirect as string) || { name: ROUTE_NAMES.authDebug }
+  return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage }
 })
 
 const currentStepIndex = computed(() => {
