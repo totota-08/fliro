@@ -8,7 +8,7 @@ import VerifyEmailPage from '@/pages/auth/VerifyEmailPage.vue'
 import AuthDebugPage from '@/pages/debug/AuthDebugPage.vue'
 import ProjectDebugPage from '@/pages/debug/ProjectDebugPage.vue'
 import DashboardDemoPage from '@/pages/demo/DashboardDemoPage.vue'
-import MyTasksPage from '@/pages/demo/MyTasksPage.vue'
+import DemoMyTasksPage from '@/pages/demo/MyTasksPage.vue'
 import TeamPage from '@/pages/demo/TeamPage.vue'
 import NotFoundPage from '@/components/errorPage/404.vue'
 import { useAuthStore, waitForAuthReady } from '@/store/auth'
@@ -129,7 +129,7 @@ export const router = createRouter({
     {
       path: '/demo/tasks',
       name: 'demo.tasks',
-      component: MyTasksPage,
+      component: DemoMyTasksPage,
     },
     {
       path: '/demo/team',
