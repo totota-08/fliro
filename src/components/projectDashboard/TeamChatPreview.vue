@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-interface ChatMessage {
+export interface PreviewChatMessage {
+  id?: string
   author: string
   time: string
   message: string
@@ -9,8 +10,16 @@ interface ChatMessage {
   highlight?: boolean
 }
 
-const onlineMembers = ref(8)
-const baseMessages: ChatMessage[] = [
+const props = defineProps<{
+  messages?: PreviewChatMessage[]
+  onlineCount?: number
+  showComposer?: boolean
+}>()
+
+const emit = defineEmits<{ (e: 'send', value: string): void }>()
+
+const onlineMembers = ref(props.onlineCount ?? 8)
+const baseMessages: PreviewChatMessage[] = [
   {
     author: '佐藤花子',
     time: '10:30',
@@ -34,7 +43,7 @@ const baseMessages: ChatMessage[] = [
   },
 ]
 
-const demoQueue: ChatMessage[] = [
+const demoQueue: PreviewChatMessage[] = [
   {
     author: 'Teamie Bot',
     time: '11:32',
@@ -48,49 +57,90 @@ const demoQueue: ChatMessage[] = [
   },
 ]
 
-const conversation = ref<ChatMessage[]>([...baseMessages])
+const conversation = ref<PreviewChatMessage[]>(props.messages?.length ? props.messages : [...baseMessages])
 const typing = ref(false)
 let presenceTimer: number | undefined
 let demoTimer: number | undefined
 let queueIndex = 0
+const input = ref('')
+
+const isDemo = computed(() => !props.messages || !props.messages.length)
+
+watch(
+  () => props.messages,
+  (val) => {
+    if (val && val.length) {
+      conversation.value = [...val]
+    }
+  },
+  { deep: true },
+)
+
+watch(
+  () => props.onlineCount,
+  (val) => {
+    if (typeof val === 'number') {
+      onlineMembers.value = val
+    }
+  },
+)
 
 onMounted(() => {
-  presenceTimer = window.setInterval(() => {
-    onlineMembers.value = onlineMembers.value === 8 ? 9 : 8
-  }, 8000)
+  if (isDemo.value) {
+    presenceTimer = window.setInterval(() => {
+      onlineMembers.value = onlineMembers.value === 8 ? 9 : 8
+    }, 8000)
 
-  demoTimer = window.setInterval(() => {
-    if (!demoQueue.length) return
-    const index = queueIndex % demoQueue.length
-    const next = demoQueue[index]
-    if (!next) return
-    queueIndex += 1
-    typing.value = true
-    window.setTimeout(() => {
-      const stamped: ChatMessage = {
-        ...next,
-        time: new Date().toTimeString().slice(0, 5),
-        highlight: true,
-      }
-      const updated = [...conversation.value, stamped]
-      conversation.value = updated
-      typing.value = false
+    demoTimer = window.setInterval(() => {
+      if (!demoQueue.length) return
+      const index = queueIndex % demoQueue.length
+      const next = demoQueue[index]
+      if (!next) return
+      queueIndex += 1
+      typing.value = true
       window.setTimeout(() => {
-        const followUp = [...conversation.value]
-        const targetIndex = updated.length - 1
-        if (followUp[targetIndex]) {
-          followUp[targetIndex] = { ...followUp[targetIndex], highlight: false }
-          conversation.value = followUp
+        const stamped: PreviewChatMessage = {
+          ...next,
+          time: new Date().toTimeString().slice(0, 5),
+          highlight: true,
         }
-      }, 2500)
-    }, 1400)
-  }, 9500)
+        const updated = [...conversation.value, stamped]
+        conversation.value = updated
+        typing.value = false
+        window.setTimeout(() => {
+          const followUp = [...conversation.value]
+          const targetIndex = updated.length - 1
+          if (followUp[targetIndex]) {
+            followUp[targetIndex] = { ...followUp[targetIndex], highlight: false }
+            conversation.value = followUp
+          }
+        }, 2500)
+      }, 1400)
+    }, 9500)
+  }
 })
 
 onBeforeUnmount(() => {
   if (presenceTimer) window.clearInterval(presenceTimer)
   if (demoTimer) window.clearInterval(demoTimer)
 })
+
+function handleSend() {
+  if (!input.value.trim()) return
+  emit('send', input.value.trim())
+  if (!props.messages) {
+    conversation.value = [
+      ...conversation.value,
+      {
+        id: String(Date.now()),
+        author: 'You',
+        time: new Date().toTimeString().slice(0, 5),
+        message: input.value.trim(),
+      },
+    ]
+  }
+  input.value = ''
+}
 </script>
 
 <template>
@@ -106,7 +156,7 @@ onBeforeUnmount(() => {
     <ul class="chat__messages">
       <li
         v-for="message in conversation"
-        :key="`${message.time}-${message.author}`"
+        :key="message.id || `${message.time}-${message.author}`"
         :class="{
           'chat__messages--update': message.type === 'update',
           'is-highlight': message.highlight,
@@ -120,16 +170,16 @@ onBeforeUnmount(() => {
       </li>
     </ul>
 
-    <div v-if="typing" class="chat__typing">
+    <div v-if="typing && isDemo" class="chat__typing">
       <span class="chat__typing-dot" />
       <span class="chat__typing-dot" />
       <span class="chat__typing-dot" />
       Teamie Bot がメッセージを入力しています…
     </div>
 
-    <footer class="chat__footer">
-      <input type="text" placeholder="メッセージを入力..." />
-      <button type="button">送信</button>
+    <footer v-if="props.showComposer !== false" class="chat__footer">
+      <input v-model="input" type="text" placeholder="メッセージを入力..." />
+      <button type="button" @click="handleSend">送信</button>
     </footer>
   </section>
 </template>
