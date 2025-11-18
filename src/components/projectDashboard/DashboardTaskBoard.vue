@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
             role="button"
             tabindex="0"
             :draggable="isInteractive && !!task.id"
-            @dragstart="isInteractive ? (draggingTask.value = task) : undefined"
+            @dragstart="isInteractive ? (draggingTask = task) : undefined"
             @click="openTask(task)"
             @keydown.enter.prevent="openTask(task)"
           >
