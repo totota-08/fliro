@@ -9,7 +9,6 @@ import type { ProjectDoc } from '@/types/project'
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import DashboardTaskBoard, { type BoardColumn } from '@/components/projectDashboard/DashboardTaskBoard.vue'
-import DemoExplainerBanner from '@/components/demo/DemoExplainerBanner.vue'
 import TeamChatPreview, { type PreviewChatMessage } from '@/components/projectDashboard/TeamChatPreview.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import {
@@ -60,8 +59,8 @@ const STATUS_CONFIG = [
 
 const navItems = computed(() => [
   { key: 'dashboard', label: 'ダッシュボード', to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } }, icon: 'dashboard' },
-  { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myPage }, icon: 'tasks' },
-  { key: 'team', label: 'チーム', disabled: true, icon: 'team' },
+  { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
+  { key: 'team', label: 'チャット', to: { name: ROUTE_NAMES.projectChat, params: { projectId: projectId.value } }, icon: 'team' },
   { key: 'settings', label: '設定', disabled: true, icon: 'settings' },
 ])
 
@@ -369,8 +368,6 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="demo__content">
-        <DemoExplainerBanner />
-
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
           :description="`${members.length} 人のメンバーと ${tasks.length} 件のタスク`"
@@ -421,6 +418,10 @@ onBeforeUnmount(() => {
           </section>
 
           <aside class="demo__secondary">
+            <div class="chat-preview__header">
+              <h3>チームチャット（プレビュー）</h3>
+              <AppButton variant="outline" :to="{ name: ROUTE_NAMES.projectChat, params: { projectId: projectId } }">チャットを開く</AppButton>
+            </div>
             <TeamChatPreview :messages="chatPreviewMessages" :online-count="members.length" :show-composer="true" @send="sendChatMessage" />
 
             <section class="ai-panel">
@@ -536,6 +537,13 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.75rem;
   background: #fff;
+}
+
+.chat-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
 }
 
 .ai-panel textarea,

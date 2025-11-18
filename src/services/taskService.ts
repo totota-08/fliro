@@ -46,7 +46,7 @@ export function listenTasks(projectId: string, callback: (tasks: TaskDoc[]) => v
 }
 
 export async function createTask(projectId: string, payload: CreateTaskPayload, userId: string) {
-  await addDoc(collection(db, 'projects', projectId, 'tasks'), {
+  const docRef = await addDoc(collection(db, 'projects', projectId, 'tasks'), {
     title: payload.title,
     description: payload.description ?? '',
     status: payload.status ?? 'todo',
@@ -56,6 +56,7 @@ export async function createTask(projectId: string, payload: CreateTaskPayload, 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
+  return docRef.id
 }
 
 export async function updateTask(projectId: string, taskId: string, updates: Partial<CreateTaskPayload>) {

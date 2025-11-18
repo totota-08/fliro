@@ -19,6 +19,8 @@ import MyPage from '@/pages/account/MyPage.vue'
 import SecretChatPage from '@/pages/secret/SecretChatPage.vue'
 import SecretAccessPage from '@/pages/secret/SecretAccessPage.vue'
 import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
+import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
+import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -82,6 +84,18 @@ export const router = createRouter({
       name: ROUTE_NAMES.projectDashboard,
       component: ProjectDashboardPage,
       meta: { requiresAuth: true, section: 'dashboard' },
+    },
+    {
+      path: '/projects/:projectId/chat',
+      name: ROUTE_NAMES.projectChat,
+      component: ProjectChatPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/tasks',
+      name: ROUTE_NAMES.myTasks,
+      component: MyTasksPage,
+      meta: { requiresAuth: true },
     },
     {
       path: '/invite/:token',
