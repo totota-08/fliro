@@ -60,7 +60,12 @@ const navItems = computed<DashboardNavItem[]>(() =>
       to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
       icon: 'members',
     },
-    { key: 'settings', label: '設定', icon: 'settings', disabled: true },
+    {
+      key: 'settings',
+      label: '設定',
+      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
+      icon: 'settings',
+    },
   ] satisfies DashboardNavItem[],
 )
 

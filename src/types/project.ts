@@ -36,6 +36,7 @@ export interface ProjectDoc {
 export interface ProjectMemberDoc {
   userId: string
   role: 'owner' | 'admin' | 'member' | 'viewer'
+  projectRole: 'owner' | 'member'
   permissions: {
     canEditProject: boolean
     canDeleteTasks: boolean

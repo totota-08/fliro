@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, serverTimestamp, getDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, serverTimestamp, getDoc, updateDoc, getDocs, deleteDoc } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 import type { CreateProjectPayload, ProjectDoc } from '@/types/project'
 import { addProjectMember } from '@/services/projectMembers'
@@ -50,6 +50,46 @@ export async function fetchProject(projectId: string) {
   const snap = await getDoc(ref)
   if (!snap.exists()) return null
   return { id: snap.id, ...(snap.data() as unknown as ProjectDoc) }
+}
+
+export interface UpdateProjectMetadataPayload {
+  name?: string
+  description?: string
+  isPublic?: boolean
+  allowGuestView?: boolean
+}
+
+export async function updateProjectMetadata(projectId: string, payload: UpdateProjectMetadataPayload) {
+  const updateData: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  if (typeof payload.name === 'string') {
+    updateData.name = payload.name.trim()
+  }
+  if (typeof payload.description === 'string') {
+    updateData.description = payload.description.trim()
+  }
+  if (typeof payload.isPublic === 'boolean') {
+    updateData['settings.isPublic'] = payload.isPublic
+  }
+  if (typeof payload.allowGuestView === 'boolean') {
+    updateData['settings.allowGuestView'] = payload.allowGuestView
+  }
+  await updateDoc(doc(db, 'projects', projectId), updateData)
+}
+
+export async function deleteProject(projectId: string) {
+  const membersSnap = await getDocs(collection(db, 'projects', projectId, 'members'))
+  await Promise.all(
+    membersSnap.docs.map(async (member) => {
+      const memberId = member.id
+      await deleteDoc(doc(db, 'projects', projectId, 'members', memberId))
+      await deleteDoc(doc(db, 'userProjects', memberId, 'projects', projectId))
+    }),
+  )
+
+  const tasksSnap = await getDocs(collection(db, 'projects', projectId, 'tasks'))
+  await Promise.all(tasksSnap.docs.map((task) => deleteDoc(doc(db, 'projects', projectId, 'tasks', task.id))))
+
+  await deleteDoc(doc(db, 'projects', projectId))
 }
 
 // icon upload feature removed

@@ -57,7 +57,8 @@ const navItems = computed<DashboardNavItem[]>(() => {
       key: 'settings' as const,
       label: '設定',
       icon: 'settings',
-      disabled: true,
+      to: firstProjectId ? { name: ROUTE_NAMES.projectSettings, params: { projectId: firstProjectId } } : undefined,
+      disabled: !firstProjectId,
     },
   ] satisfies DashboardNavItem[]
 })
