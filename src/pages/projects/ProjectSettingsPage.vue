@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import { db } from '@/firebase/config'
-import { useAuthStore } from '@/store/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { fetchProject, updateProjectMetadata, deleteProject } from '@/firebase/projectService'
+import { db } from '@/firebase/config'
+import { deleteProject, fetchProject, updateProjectMetadata } from '@/firebase/projectService'
+import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
@@ -88,10 +88,10 @@ const canEdit = computed(() => canManage.value)
 const summaryInfo = computed(() => {
   const created = project.value?.createdAt
   const createdLabel =
-    created && 'seconds' in created
-      ? new Date(created.seconds * 1000).toLocaleDateString()
+    created && typeof created === 'object' && 'seconds' in created
+      ? new Date((created as { seconds: number }).seconds * 1000).toLocaleDateString()
       : created
-      ? new Date(created).toLocaleDateString()
+      ? new Date(created as string | number | Date).toLocaleDateString()
       : '-'
   return {
     created: createdLabel,
@@ -147,7 +147,7 @@ async function evaluatePermissions() {
       return
     }
     const data = memberSnap.data() as any
-    canManage.value = Boolean(data.permissions?.canManageSettings)
+    canManage.value = data.projectRole === 'owner'
   } catch (error) {
     console.error('Failed to evaluate permissions', error)
     canManage.value = false
@@ -252,96 +252,173 @@ watch(
             </svg>
           </button>
           <div>
-            <p class="demo__breadcrumb">プロジェクト &gt; 設定</p>
+            <nav class="demo__breadcrumb-nav">
+              <ol class="demo__breadcrumb-list">
+                <li>プロジェクト</li>
+                <li>設定</li>
+              </ol>
+            </nav>
             <h1 class="demo__heading">{{ project?.name || '設定' }}</h1>
           </div>
         </div>
       </header>
 
-      <div class="settings-content">
-        <section v-if="loading" class="settings-card">読み込み中...</section>
-        <section v-else-if="errorMessage" class="settings-card settings-card--error">{{ errorMessage }}</section>
+      <div class="settings-container">
+        <div v-if="loading" class="loading-state">
+          <div class="spinner"></div>
+          <p>読み込み中...</p>
+        </div>
+
+        <div v-else-if="errorMessage" class="error-state">
+          <p>{{ errorMessage }}</p>
+        </div>
 
         <template v-else>
-          <section class="settings-card" :class="{ 'is-disabled': !canEdit }">
-            <div class="settings-card__grid">
-              <div class="settings-meta">
-                <p class="settings-meta__eyebrow">基本情報</p>
-                <h2>{{ project?.name || '未設定のプロジェクト' }}</h2>
-                <ul>
-                  <li>
-                    <span>作成日</span>
-                    <strong>{{ summaryInfo.created }}</strong>
-                  </li>
-                  <li>
-                    <span>オーナー</span>
-                    <strong>{{ summaryInfo.ownerId }}</strong>
-                  </li>
-                  <li>
-                    <span>メンバー数</span>
-                    <strong>{{ summaryInfo.members }}</strong>
-                  </li>
-                </ul>
-              </div>
-              <div class="settings-form-wrapper">
-            <header>
-              <h2>基本情報</h2>
-              <p>プロジェクト名や概要を編集できます。</p>
-            </header>
-            <form class="settings-form" @submit.prevent="handleSave">
-              <label>
-                <span>プロジェクト名</span>
-                <input v-model="form.name" type="text" :disabled="!canEdit" required />
-              </label>
-              <label>
-                <span>説明</span>
-                <textarea v-model="form.description" rows="3" :disabled="!canEdit" placeholder="プロジェクトの補足情報を入力"></textarea>
-              </label>
-              <label class="toggle">
-                <input type="checkbox" v-model="form.isPublic" :disabled="!canEdit" />
-                <span>公開プロジェクトにする</span>
-              </label>
-              <label class="toggle">
-                <input type="checkbox" v-model="form.allowGuestView" :disabled="!canEdit" />
-                <span>ゲスト閲覧を許可する</span>
-              </label>
-              <div class="settings-actions">
-                <AppButton type="submit" :loading="saving" :disabled="!canEdit">
-                  設定を保存
-                </AppButton>
-                <p v-if="successMessage" class="settings-success">{{ successMessage }}</p>
-              </div>
-            </form>
-              </div>
-            </div>
-          </section>
+          <div class="settings-grid">
+            <!-- Main Settings Column -->
+            <div class="settings-main">
+              <section class="card" :class="{ 'is-disabled': !canEdit }">
+                <header class="card-header">
+                  <div class="card-header__icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2>基本設定</h2>
+                    <p>プロジェクトの基本情報を管理します</p>
+                  </div>
+                </header>
+                
+                <form @submit.prevent="handleSave" class="form-stack">
+                  <div class="form-group">
+                    <label for="projectName">プロジェクト名</label>
+                    <input 
+                      id="projectName"
+                      v-model="form.name" 
+                      type="text" 
+                      :disabled="!canEdit" 
+                      required 
+                      class="form-input"
+                      placeholder="プロジェクト名を入力"
+                    />
+                  </div>
 
-          <section class="settings-card settings-card--danger">
-            <header>
-              <h2>危険な操作</h2>
-              <p>プロジェクトを削除するには、登録済みメールアドレスを入力し本人確認を行ってください。</p>
-            </header>
-            <label>
-              <span>本人確認用メールアドレス</span>
-              <input
-                v-model="deleteConfirmInput"
-                type="email"
-              />
-            </label>
-            <p class="danger-note">この操作は取り消せません。タスクやメンバー情報がすべて削除されます。</p>
-            <div class="settings-actions">
-              <AppButton
-                variant="secondary"
-                class="danger-button"
-                :disabled="!canDeleteProject || deleting"
-                :loading="deleting"
-                @click="handleDelete"
-              >
-                プロジェクトを削除
-              </AppButton>
+                  <div class="form-group">
+                    <label for="projectDesc">説明</label>
+                    <textarea 
+                      id="projectDesc"
+                      v-model="form.description" 
+                      rows="4" 
+                      :disabled="!canEdit" 
+                      class="form-textarea"
+                      placeholder="プロジェクトの目的や概要を入力してください"
+                    ></textarea>
+                  </div>
+
+                  <div class="form-toggles">
+                    <label class="toggle-switch">
+                      <input type="checkbox" v-model="form.isPublic" :disabled="!canEdit" />
+                      <span class="toggle-slider"></span>
+                      <span class="toggle-label">
+                        <span class="toggle-title">公開プロジェクト</span>
+                        <span class="toggle-desc">誰でもこのプロジェクトを閲覧できるようになります</span>
+                      </span>
+                    </label>
+
+                    <label class="toggle-switch">
+                      <input type="checkbox" v-model="form.allowGuestView" :disabled="!canEdit" />
+                      <span class="toggle-slider"></span>
+                      <span class="toggle-label">
+                        <span class="toggle-title">ゲスト閲覧を許可</span>
+                        <span class="toggle-desc">アカウントを持たないユーザーも閲覧可能にします</span>
+                      </span>
+                    </label>
+                  </div>
+
+                  <div class="form-actions">
+                    <AppButton type="submit" :loading="saving" :disabled="!canEdit" variant="primary">
+                      変更を保存
+                    </AppButton>
+                    <transition name="fade">
+                      <span v-if="successMessage" class="success-badge">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {{ successMessage }}
+                      </span>
+                    </transition>
+                  </div>
+                </form>
+              </section>
+
+              <section class="card card--danger">
+                <header class="card-header">
+                  <div class="card-header__icon danger-icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2>プロジェクトの削除</h2>
+                    <p>この操作は取り消すことができません。慎重に操作してください。</p>
+                  </div>
+                </header>
+
+                <div class="danger-content">
+                  <div class="danger-warning">
+                    <p>プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。</p>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="deleteConfirm">確認のため、メールアドレスを入力してください</label>
+                    <input
+                      id="deleteConfirm"
+                      v-model="deleteConfirmInput"
+                      type="email"
+                      class="form-input danger-input"
+                      :placeholder="confirmEmail"
+                    />
+                  </div>
+
+                  <div class="danger-actions">
+                    <AppButton
+                      variant="secondary"
+                      class="danger-button"
+                      :disabled="!canDeleteProject || deleting"
+                      :loading="deleting"
+                      @click="handleDelete"
+                    >
+                      プロジェクトを削除
+                    </AppButton>
+                    <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
+                  </div>
+                </div>
+              </section>
             </div>
-            <p v-if="deleteError" class="settings-error">{{ deleteError }}</p>
-          </section>
+
+            <!-- Sidebar Info Column -->
+            <aside class="settings-sidebar">
+              <div class="info-card">
+                <h3>プロジェクト情報</h3>
+                <dl class="info-list">
+                  <div class="info-item">
+                    <dt>作成日</dt>
+                    <dd>{{ summaryInfo.created }}</dd>
+                  </div>
+                  <div class="info-item">
+                    <dt>オーナー</dt>
+                    <dd class="truncate" :title="summaryInfo.ownerId">{{ summaryInfo.ownerId }}</dd>
+                  </div>
+                  <div class="info-item">
+                    <dt>メンバー数</dt>
+                    <dd>{{ summaryInfo.members }}名</dd>
+                  </div>
+                </dl>
+              </div>
+            </aside>
+          </div>
         </template>
       </div>
     </div>
@@ -351,169 +428,372 @@ watch(
 <style scoped>
 @import '@/pages/demo/styles/demo-shell.css';
 
-.settings-content {
+/* Layout & Container */
+.settings-container {
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  animation: fadeIn 0.3s ease-out;
 }
 
-.settings-card {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.25rem;
-  padding: 1.5rem;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.settings-card header h2 {
-  margin: 0;
-}
-
-.settings-card header p {
-  margin: 0.25rem 0 0;
-  color: var(--text-muted);
-}
-
-.settings-card.is-disabled {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.settings-card--error {
-  border-color: rgba(214, 69, 69, 0.3);
-  background: rgba(214, 69, 69, 0.08);
-}
-
-.settings-card--danger {
-  border-color: rgba(214, 69, 69, 0.3);
-}
-
-.settings-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.settings-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-weight: 600;
-}
-
-.settings-form input,
-.settings-form textarea {
-  border: 1px solid #d1dae8;
-  border-radius: 0.95rem;
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.settings-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.settings-success {
-  margin: 0;
-  color: #1c8d72;
-  font-weight: 600;
-}
-
-.settings-error {
-  margin: 0;
-  color: #d64545;
-  font-weight: 600;
-}
-
-.settings-card--danger input {
-  border: 1px solid #f0c9c9;
-}
-
-.settings-card__grid {
+.settings-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: 1fr 300px;
+  gap: 2rem;
+  align-items: start;
 }
 
-.settings-form-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.settings-meta {
-  border: 1px solid rgba(11, 46, 51, 0.1);
-  border-radius: 1rem;
-  padding: 1rem;
-  background: rgba(11, 46, 51, 0.02);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.settings-meta__eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.settings-meta h2 {
-  margin: 0;
-  font-size: 1.3rem;
-}
-
-.settings-meta ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.settings-meta li {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.settings-meta strong {
-  color: var(--text-strong);
-}
-
-.danger-note {
-  margin: 0;
-  color: #8b3a3a;
-  font-size: 0.9rem;
-}
-
-.danger-button {
-  color: #d64545;
-  border: 1px solid rgba(214, 69, 69, 0.4);
-}
-
-@media (max-width: 768px) {
-  .settings-content {
-    padding: 1.25rem;
-  }
-
-  .settings-card__grid {
+@media (max-width: 900px) {
+  .settings-grid {
     grid-template-columns: 1fr;
   }
+  
+  .settings-sidebar {
+    order: -1;
+  }
+}
+
+/* Cards */
+.card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.card-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.card-header__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #f0f9ff;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-header__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.card-header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+}
+
+.card-header p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Forms */
+.form-stack {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #1f2937;
+  transition: all 0.2s;
+  background: #f9fafb;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Toggles */
+.form-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: #e5e7eb;
+  border-radius: 24px;
+  transition: 0.3s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.toggle-slider:before {
+  content: "";
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #3b82f6;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggle-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.toggle-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Actions */
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.success-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: #ecfdf5;
+  color: #059669;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Danger Zone */
+.card--danger {
+  border-color: #fee2e2;
+}
+
+.card--danger .card-header {
+  background: #fef2f2;
+  border-bottom-color: #fee2e2;
+}
+
+.card--danger .card-header__icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.danger-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.danger-warning {
+  padding: 0.75rem;
+  background: #fff5f5;
+  border-radius: 6px;
+  color: #991b1b;
+  font-size: 0.875rem;
+  border-left: 4px solid #ef4444;
+}
+
+.danger-input {
+  border-color: #fca5a5;
+}
+
+.danger-input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.danger-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Sidebar Info */
+.info-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.info-card h3 {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.info-item dt {
+  color: #6b7280;
+}
+
+.info-item dd {
+  font-weight: 500;
+  color: #111827;
+  max-width: 150px;
+}
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Breadcrumb */
+.demo__breadcrumb-nav {
+  margin-bottom: 0.25rem;
+}
+
+.demo__breadcrumb-list {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.demo__breadcrumb-list li:not(:last-child)::after {
+  content: "/";
+  margin: 0 0.5rem;
+  color: #9ca3af;
+}
+
+/* Loading & Animations */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: #6b7280;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
