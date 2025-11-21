@@ -51,7 +51,7 @@ async function handleJoin() {
   errorMsg.value = ''
   try {
     const projectId = await redeemInvite(token, user.value.uid, user.value.email ?? '')
-    await router.push({ name: ROUTE_NAMES.projectDebug, params: { projectId } })
+    await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId } })
   } catch (error) {
     console.error(error)
     errorMsg.value = '招待の承認に失敗しました。'

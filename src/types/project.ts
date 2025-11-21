@@ -4,6 +4,9 @@ export interface ProjectSettings {
   isPublic: boolean
   allowGuestView: boolean
   defaultTaskStatus: string
+  aiChatEnabled?: boolean
+  aiApiKey?: string
+  notificationEnabled?: boolean
 }
 
 export interface ProjectStatsCache {

@@ -85,7 +85,7 @@ async function handleSubmit() {
       pendingInvites.value = [{ email: '' }]
     }
 
-    await router.push({ name: ROUTE_NAMES.projectDebug, params: { projectId: id } })
+    await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId: id } })
   } catch (e) {
     console.error(e)
     errorMsg.value = 'プロジェクトの作成に失敗しました。再度お試しください。'

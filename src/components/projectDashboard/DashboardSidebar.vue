@@ -1,26 +1,36 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
+import type { DashboardNavItem, DashboardProfileInfo, DashboardProjectItem } from '@/types/projectDashboard'
 
-type BaseNavItem = {
-  key: 'dashboard' | 'tasks' | 'team' | 'settings'
-  label: string
-  to?: string
-  icon: 'dashboard' | 'tasks' | 'team' | 'settings'
-  disabled?: boolean
-}
+type NavItem = DashboardNavItem & { active: boolean }
 
-type NavItem = BaseNavItem & { active: boolean }
-
-type ProjectItem = {
-  key: string
-  label: string
-  accent: 'primary' | 'secondary' | 'accent'
-}
-
-const props = defineProps<{
-  open: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    navItems?: DashboardNavItem[]
+    projects?: DashboardProjectItem[]
+    profile?: DashboardProfileInfo
+    brandSubtitle?: string
+  }>(),
+  {
+    navItems: () =>
+      [
+        { key: 'dashboard', label: 'ダッシュボード', to: '/demo/dashboard', icon: 'dashboard' },
+        { key: 'tasks', label: 'マイタスク', to: '/demo/tasks', icon: 'tasks' },
+        { key: 'team', label: 'チーム', to: '/demo/team', icon: 'team' },
+        { key: 'settings', label: '設定', icon: 'settings', disabled: true },
+      ] satisfies DashboardNavItem[],
+    projects: () =>
+      [
+        { key: 'web', label: 'Webサイトリニューアル', accent: 'primary' },
+        { key: 'mobile', label: 'モバイルアプリ開発', accent: 'secondary' },
+        { key: 'marketing', label: 'マーケティングキャンペーン', accent: 'accent' },
+      ] satisfies DashboardProjectItem[],
+    profile: () => ({ name: '田中太郎', email: 'tanaka@example.com' } satisfies DashboardProfileInfo),
+    brandSubtitle: 'デモ体験',
+  },
+)
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -28,44 +38,31 @@ const emit = defineEmits<{
 
 const route = useRoute()
 
-const baseNavItems: BaseNavItem[] = [
-  { key: 'dashboard', label: 'ダッシュボード', to: '/demo/dashboard', icon: 'dashboard' },
-  { key: 'tasks', label: 'マイタスク', to: '/demo/tasks', icon: 'tasks' },
-  { key: 'team', label: 'チーム', to: '/demo/team', icon: 'team' },
-  { key: 'settings', label: '設定', icon: 'settings', disabled: true },
-]
-
 const currentSection = computed(() => {
   if (typeof route.meta.section === 'string') {
-    return route.meta.section as BaseNavItem['key']
+    return route.meta.section as DashboardNavItem['key']
   }
 
   if (typeof route.name === 'string' && route.name.startsWith('demo.')) {
-    return route.name.split('.')[1] as BaseNavItem['key']
+    return route.name.split('.')[1] as DashboardNavItem['key']
   }
 
   if (typeof route.name === 'string' && route.name.startsWith('demo-')) {
-    return route.name.split('-')[1] as BaseNavItem['key']
+    return route.name.split('-')[1] as DashboardNavItem['key']
   }
 
   return undefined
 })
 
 const navigationItems = computed<NavItem[]>(() =>
-  baseNavItems.map((item) => {
-    const matchesPath = item.to ? route.path.startsWith(item.to) : false
+  props.navItems.map((item) => {
+    const matchesPath = typeof item.to === 'string' ? route.path.startsWith(item.to) : false
     return {
       ...item,
       active: currentSection.value === item.key || matchesPath,
     }
   }),
 )
-
-const projectItems: ProjectItem[] = [
-  { key: 'web', label: 'Webサイトリニューアル', accent: 'primary' },
-  { key: 'mobile', label: 'モバイルアプリ開発', accent: 'secondary' },
-  { key: 'marketing', label: 'マーケティングキャンペーン', accent: 'accent' },
-]
 
 const rootClasses = computed(() => ['sidebar', { 'is-hidden': !props.open, 'is-open': props.open }])
 
@@ -83,7 +80,7 @@ const handleNavigate = () => {
     <div class="sidebar__header">
       <div class="sidebar__brand">
         <div class="sidebar__logo">Teamie</div>
-        <p class="sidebar__subtitle">デモ体験</p>
+        <p class="sidebar__subtitle">{{ props.brandSubtitle }}</p>
       </div>
       <button type="button" class="sidebar__toggle" @click="handleClose">
         <span aria-hidden="true">X</span>
@@ -96,7 +93,7 @@ const handleNavigate = () => {
       <ul>
         <li v-for="item in navigationItems" :key="item.key">
           <RouterLink
-            v-if="item.to"
+            v-if="item.to && !item.disabled"
             :to="item.to"
             class="sidebar__nav-button"
             :class="{ 'is-active': item.active }"
@@ -148,9 +145,9 @@ const handleNavigate = () => {
             v-else
             type="button"
             class="sidebar__nav-button is-disabled"
-            disabled
-            title="近日公開"
+            :title="item.tooltip || '近日公開'"
             aria-disabled="true"
+            disabled
           >
             <span class="sidebar__nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -180,18 +177,25 @@ const handleNavigate = () => {
         <button type="button" class="sidebar__add" aria-label="プロジェクトを追加">+</button>
       </div>
       <ul>
-        <li v-for="project in projectItems" :key="project.key">
-          <span class="dot" :class="`dot--${project.accent}`" />
-          {{ project.label }}
+        <li v-for="project in props.projects" :key="project.key">
+          <component
+            :is="project.to ? RouterLink : 'span'"
+            class="sidebar__project-link"
+            :to="project.to"
+            @click="project.to ? handleNavigate() : undefined"
+          >
+            <span class="dot" :class="project.accent ? `dot--${project.accent}` : 'dot--primary'" />
+            {{ project.label }}
+          </component>
         </li>
       </ul>
     </div>
 
     <div class="sidebar__profile">
-      <div class="avatar">田</div>
+      <div class="avatar">{{ props.profile?.name?.charAt(0) || 'T' }}</div>
       <div>
-        <p class="profile__name">田中太郎</p>
-        <p class="profile__mail">tanaka@example.com</p>
+        <p class="profile__name">{{ props.profile?.name }}</p>
+        <p class="profile__mail">{{ props.profile?.email }}</p>
       </div>
     </div>
   </aside>
@@ -344,6 +348,7 @@ const handleNavigate = () => {
 .sidebar__nav-button.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .sidebar__projects {
@@ -399,6 +404,15 @@ const handleNavigate = () => {
   transition: background 0.2s ease;
 }
 
+.sidebar__project-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
 .sidebar__projects li:hover {
   background: rgba(184, 227, 233, 0.12);
 }
@@ -428,37 +442,38 @@ const handleNavigate = () => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.8rem;
   background: rgba(79, 124, 130, 0.16);
   backdrop-filter: blur(10px);
   position: sticky;
   bottom: 1rem;
 }
 
+
+
 .avatar {
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 999px;
+  border-radius: 50%; /* ここを丸にする */
   background: rgba(184, 227, 233, 0.9);
   color: #0b2e33;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0; /* ← これで flex で潰されないようにする */
 }
 
+
 .profile__name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin: 0;
+  font-size: 0.85rem;
 }
 
 .profile__mail {
-  margin: 0;
-  font-size: 0.8rem;
-  color: rgba(245, 252, 255, 0.7);
+  font-size: 0.7rem;
 }
+
 
 .sr-only {
   position: absolute;

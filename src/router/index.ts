@@ -8,7 +8,7 @@ import VerifyEmailPage from '@/pages/auth/VerifyEmailPage.vue'
 import AuthDebugPage from '@/pages/debug/AuthDebugPage.vue'
 import ProjectDebugPage from '@/pages/debug/ProjectDebugPage.vue'
 import DashboardDemoPage from '@/pages/demo/DashboardDemoPage.vue'
-import MyTasksPage from '@/pages/demo/MyTasksPage.vue'
+import DemoMyTasksPage from '@/pages/demo/MyTasksPage.vue'
 import TeamPage from '@/pages/demo/TeamPage.vue'
 import NotFoundPage from '@/components/errorPage/404.vue'
 import { useAuthStore, waitForAuthReady } from '@/store/auth'
@@ -18,6 +18,9 @@ import InviteAcceptPage from '@/pages/invite/InviteAcceptPage.vue'
 import MyPage from '@/pages/account/MyPage.vue'
 import SecretChatPage from '@/pages/secret/SecretChatPage.vue'
 import SecretAccessPage from '@/pages/secret/SecretAccessPage.vue'
+import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
+import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
+import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -77,6 +80,24 @@ export const router = createRouter({
       meta: { requiresAuth: true, layout: 'full' },
     },
     {
+      path: '/projects/:projectId/dashboard',
+      name: ROUTE_NAMES.projectDashboard,
+      component: ProjectDashboardPage,
+      meta: { requiresAuth: true, section: 'dashboard' },
+    },
+    {
+      path: '/projects/:projectId/chat',
+      name: ROUTE_NAMES.projectChat,
+      component: ProjectChatPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/tasks',
+      name: ROUTE_NAMES.myTasks,
+      component: MyTasksPage,
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/invite/:token',
       name: ROUTE_NAMES.inviteAccept,
       component: InviteAcceptPage,
@@ -108,7 +129,7 @@ export const router = createRouter({
     {
       path: '/demo/tasks',
       name: 'demo.tasks',
-      component: MyTasksPage,
+      component: DemoMyTasksPage,
     },
     {
       path: '/demo/team',

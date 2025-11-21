@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import DashboardSidebar from '@/components/demo/DashboardSidebar.vue'
 import DashboardSummaryCards from '@/components/demo/DashboardSummaryCards.vue'
 import DashboardTaskBoard from '@/components/demo/DashboardTaskBoard.vue'
-import TeamChatPreview from '@/components/demo/TeamChatPreview.vue'
 import DemoExplainerBanner from '@/components/demo/DemoExplainerBanner.vue'
+import TeamChatPreview from '@/components/demo/TeamChatPreview.vue'
+import { onMounted, ref } from 'vue'
 
 const isSidebarOpen = ref(true)
 
@@ -72,7 +72,8 @@ onMounted(() => {
 
         <div class="demo__grid">
           <section class="demo__primary">
-            <DashboardSummaryCards />
+            <DashboardSummaryCards
+                      :note="'※ デモデータです。本番環境では実際の計測値が反映されます。'" />
             <DashboardTaskBoard />
           </section>
 
