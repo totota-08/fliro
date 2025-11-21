@@ -1,5 +1,5 @@
 import { database } from '@/firebase/config'
-import { limitToLast, onValue, orderByKey, push, query, ref as dbRef, serverTimestamp } from 'firebase/database'
+import { ref as dbRef, limitToLast, onValue, orderByKey, push, query, serverTimestamp } from 'firebase/database'
 
 export interface ReactionSummary {
   emoji: string
@@ -35,27 +35,38 @@ function summarizeReactions(reactions: any): ReactionSummary[] {
   return Object.entries(counts).map(([emoji, count]) => ({ emoji, count }))
 }
 
-export function listenProjectChat(projectId: string, callback: (messages: ChatMessage[]) => void) {
+export function listenProjectChat(
+  projectId: string,
+  callback: (messages: ChatMessage[]) => void,
+  onError?: (error: Error) => void,
+) {
   const chatRef = query(dbRef(database, `projects/${projectId}/realtimeChat`), orderByKey(), limitToLast(50))
-  const unsubscribe = onValue(chatRef, (snapshot) => {
-    const items: ChatMessage[] = []
-    snapshot.forEach((child) => {
-      const data = child.val() as any
-      items.push({
-        id: child.key || '',
-        text: data?.text ?? '',
-        author: data?.author ?? data?.senderName ?? 'Unknown',
-        senderName: data?.senderName ?? data?.author,
-        senderId: data?.senderId,
-        projectId: data?.projectId,
-        linkedTaskId: data?.linkedTaskId,
-        createdAt: resolveTimestamp(data?.createdAt),
-        reactionSummary: summarizeReactions(data?.reactions),
+  const unsubscribe = onValue(
+    chatRef,
+    (snapshot) => {
+      const items: ChatMessage[] = []
+      snapshot.forEach((child) => {
+        const data = child.val() as any
+        items.push({
+          id: child.key || '',
+          text: data?.text ?? '',
+          author: data?.author ?? data?.senderName ?? 'Unknown',
+          senderName: data?.senderName ?? data?.author,
+          senderId: data?.senderId,
+          projectId: data?.projectId,
+          linkedTaskId: data?.linkedTaskId,
+          createdAt: resolveTimestamp(data?.createdAt),
+          reactionSummary: summarizeReactions(data?.reactions),
+        })
       })
-    })
-    items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
-    callback(items)
-  })
+      items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+      callback(items)
+    },
+    (error) => {
+      console.error('Chat listener error:', error)
+      if (onError) onError(error)
+    },
+  )
   return () => unsubscribe()
 }
 

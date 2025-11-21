@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { collection, doc, getDocs, onSnapshot } from 'firebase/firestore'
-import { db } from '@/firebase/config'
-import { useAuthStore } from '@/store/auth'
-import { ROUTE_NAMES } from '@/constants/routes'
-import type { ProjectDoc } from '@/types/project'
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import TeamChatPreview, { type PreviewChatMessage } from '@/components/projectDashboard/TeamChatPreview.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import {
-  listenTasks,
-  createTask,
-  updateTask,
-  deleteTask,
-  type TaskDoc,
-  type TaskStatus,
-} from '@/services/taskService'
-import { listenProjectChat, sendProjectMessage, addMessageReaction, type ChatMessage } from '@/services/projectChat'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { db } from '@/firebase/config'
+import { addMessageReaction, listenProjectChat, sendProjectMessage, type ChatMessage } from '@/services/projectChat'
 import { updateProjectSettings } from '@/services/projectSettings'
+import {
+    createTask,
+    deleteTask,
+    listenTasks,
+    updateTask,
+    type TaskDoc,
+    type TaskStatus,
+} from '@/services/taskService'
+import { useAuthStore } from '@/store/auth'
+import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
+import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
@@ -255,20 +255,34 @@ function watchProject() {
     aiEnabled.value = Boolean(project.value?.settings?.aiChatEnabled)
     aiKey.value = project.value?.settings?.aiApiKey ?? ''
   })
-  stopMembers = onSnapshot(collection(db, 'projects', projectId.value, 'members'), (snapshot) => {
-    const items: MemberEntry[] = []
-    snapshot.forEach((docSnap) => {
+  stopMembers = onSnapshot(collection(db, 'projects', projectId.value, 'members'), async (snapshot) => {
+    const promises = snapshot.docs.map(async (docSnap) => {
       const data = docSnap.data() as any
       const memberId = data.userId || docSnap.id
-      items.push({
+      let name = data.nickname || data.fullName
+
+      if (!name) {
+        try {
+          const profileSnap = await getDoc(doc(db, 'profiles', memberId))
+          if (profileSnap.exists()) {
+            const profile = profileSnap.data()
+            name = profile.nickname || profile.fullName
+          }
+        } catch (e) {
+          console.error('Failed to fetch profile for', memberId, e)
+        }
+      }
+
+      return {
         id: memberId,
-        name: data.nickname || data.fullName || docSnap.id,
+        name: name || docSnap.id,
         role: data.role,
         email: data.email,
         lastAccessedAt: data.lastAccessedAt,
-      })
+      }
     })
-    members.value = items
+
+    members.value = await Promise.all(promises)
   })
 }
 
@@ -281,10 +295,17 @@ function watchTasks() {
 
 function watchChat() {
   chatLoading.value = true
-  stopChat = listenProjectChat(projectId.value, (messages) => {
-    chatMessages.value = messages
-    chatLoading.value = false
-  })
+  stopChat = listenProjectChat(
+    projectId.value,
+    (messages) => {
+      chatMessages.value = messages
+      chatLoading.value = false
+    },
+    (error) => {
+      console.error('Failed to load chat:', error)
+      chatLoading.value = false
+    },
+  )
 }
 
 function resetWatchers() {
