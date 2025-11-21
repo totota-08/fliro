@@ -19,6 +19,7 @@ const props = withDefaults(
         { key: 'dashboard', label: 'ダッシュボード', to: '/demo/dashboard', icon: 'dashboard' },
         { key: 'tasks', label: 'マイタスク', to: '/demo/tasks', icon: 'tasks' },
         { key: 'team', label: 'チーム', to: '/demo/team', icon: 'team' },
+        { key: 'members', label: 'メンバー', to: '/demo/team', icon: 'members' },
         { key: 'settings', label: '設定', icon: 'settings', disabled: true },
       ] satisfies DashboardNavItem[],
     projects: () =>
@@ -122,6 +123,32 @@ const handleNavigate = () => {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="1.8"
+                />
+              </svg>
+              <svg v-else-if="item.icon === 'members'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path
+                  d="M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="M18 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.4"
+                />
+                <path
+                  d="M15 21v-3a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.8"
+                />
+                <path
+                  d="M22 21v-2.5A3.5 3.5 0 0 0 18.5 15H15"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.4"
                 />
               </svg>
               <svg v-else-if="item.icon === 'settings'" viewBox="0 0 24 24" fill="none" stroke="currentColor">

@@ -20,6 +20,7 @@ import SecretChatPage from '@/pages/secret/SecretChatPage.vue'
 import SecretAccessPage from '@/pages/secret/SecretAccessPage.vue'
 import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
 import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
+import ProjectMembersPage from '@/pages/projects/ProjectMembersPage.vue'
 import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
 export const router = createRouter({
@@ -89,13 +90,19 @@ export const router = createRouter({
       path: '/projects/:projectId/chat',
       name: ROUTE_NAMES.projectChat,
       component: ProjectChatPage,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, section: 'team' },
+    },
+    {
+      path: '/projects/:projectId/members',
+      name: ROUTE_NAMES.projectMembers,
+      component: ProjectMembersPage,
+      meta: { requiresAuth: true, section: 'members' },
     },
     {
       path: '/tasks',
       name: ROUTE_NAMES.myTasks,
       component: MyTasksPage,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, section: 'tasks' },
     },
     {
       path: '/invite/:token',

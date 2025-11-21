@@ -4,7 +4,8 @@ import DashboardSidebar from '@/components/demo/DashboardSidebar.vue'
 
 type TeamMember = {
   id: number
-  name: string
+  familyName: string
+  givenName: string
   email: string
   role: 'オーナー' | '管理者' | 'メンバー'
   avatar?: string
@@ -19,7 +20,8 @@ const isSidebarOpen = ref(true)
 const teamMembers = ref<TeamMember[]>([
   {
     id: 1,
-    name: '田中太郎',
+    familyName: '田中',
+    givenName: '太郎',
     email: 'tanaka@example.com',
     role: 'オーナー',
     avatar: '',
@@ -30,7 +32,8 @@ const teamMembers = ref<TeamMember[]>([
   },
   {
     id: 2,
-    name: '佐藤花子',
+    familyName: '佐藤',
+    givenName: '花子',
     email: 'sato@example.com',
     role: '管理者',
     avatar: '',
@@ -41,7 +44,8 @@ const teamMembers = ref<TeamMember[]>([
   },
   {
     id: 3,
-    name: '鈴木一郎',
+    familyName: '鈴木',
+    givenName: '一郎',
     email: 'suzuki@example.com',
     role: 'メンバー',
     avatar: '',
@@ -52,7 +56,8 @@ const teamMembers = ref<TeamMember[]>([
   },
   {
     id: 4,
-    name: '高橋美咲',
+    familyName: '高橋',
+    givenName: '美咲',
     email: 'takahashi@example.com',
     role: 'メンバー',
     avatar: '',
@@ -63,7 +68,8 @@ const teamMembers = ref<TeamMember[]>([
   },
   {
     id: 5,
-    name: '伊藤健太',
+    familyName: '伊藤',
+    givenName: '健太',
     email: 'ito@example.com',
     role: 'メンバー',
     avatar: '',
@@ -74,7 +80,8 @@ const teamMembers = ref<TeamMember[]>([
   },
   {
     id: 6,
-    name: '渡辺さくら',
+    familyName: '渡辺',
+    givenName: 'さくら',
     email: 'watanabe@example.com',
     role: 'メンバー',
     avatar: '',
@@ -132,6 +139,8 @@ const getCompletionPercent = (member: TeamMember) =>
 
 const getCompletionWidth = (member: TeamMember) =>
   member.tasksCount === 0 ? '0%' : `${((member.completedTasks / member.tasksCount) * 100).toFixed(1)}%`
+
+const formatFullName = (member: TeamMember) => `${member.familyName} ${member.givenName}`
 </script>
 
 <template>
@@ -232,7 +241,7 @@ const getCompletionWidth = (member: TeamMember) =>
                     <span :class="statusClass(member.status)" aria-hidden="true"></span>
                   </div>
                   <div>
-                    <h3>{{ member.name }}</h3>
+                    <h3>{{ formatFullName(member) }}</h3>
                     <div class="team-card__contact">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path
@@ -289,6 +298,31 @@ const getCompletionWidth = (member: TeamMember) =>
                 </div>
               </footer>
             </article>
+          </section>
+
+          <section class="team-table">
+            <h3>メンバー名簿</h3>
+            <p class="team-table__description">テーブルに登録されている苗字・名前を分割して表示しています。</p>
+            <div class="team-table__scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>苗字</th>
+                    <th>名前</th>
+                    <th>メールアドレス</th>
+                    <th>ロール</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="member in teamMembers" :key="`row-${member.id}`">
+                    <td>{{ member.familyName }}</td>
+                    <td>{{ member.givenName }}</td>
+                    <td>{{ member.email }}</td>
+                    <td>{{ member.role }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         </section>
       </div>
@@ -621,6 +655,43 @@ const getCompletionWidth = (member: TeamMember) =>
   border-radius: 999px;
   background: linear-gradient(90deg, #4f7c82, rgba(11, 46, 51, 0.9));
   transition: width 0.3s ease;
+}
+
+.team-table {
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-table__description {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.team-table__scroll {
+  overflow-x: auto;
+}
+
+.team-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.team-table th,
+.team-table td {
+  padding: 0.65rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(11, 46, 51, 0.08);
+}
+
+.team-table th {
+  font-weight: 600;
+  color: #0b2e33;
+  background: rgba(11, 46, 51, 0.04);
 }
 
 @media (max-width: 1200px) {

@@ -4,10 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { doc, getDoc } from 'firebase/firestore'
-import { db } from '@/firebase/config'
+import { auth, db } from '@/firebase/config'
 import { redeemInvite } from '@/services/projectInvites'
-import { rememberInviteToken } from '@/services/inviteSession'
 import { useAuthStore } from '@/store/auth'
+import { signInAnonymously } from 'firebase/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,7 +15,9 @@ const { user } = useAuthStore()
 const token = String(route.params.token || '')
 const loading = ref(true)
 const errorMsg = ref('')
-const projectPreview = ref<{ projectId: string; name?: string; email?: string } | null>(null)
+const projectPreview = ref<{ projectId: string; name?: string; requiresPassword?: boolean } | null>(null)
+const requiresPassword = ref(false)
+const passwordInput = ref('')
 
 onMounted(async () => {
   try {
@@ -24,13 +26,14 @@ onMounted(async () => {
       errorMsg.value = '招待リンクが無効です。'
       return
     }
-    const invite = inviteSnap.data() as { projectId: string; email?: string }
+    const invite = inviteSnap.data() as { projectId: string; passwordHash?: string | null }
     const projectSnap = await getDoc(doc(db, 'projects', invite.projectId))
     projectPreview.value = {
       projectId: invite.projectId,
-      email: invite.email,
       name: projectSnap.exists() ? (projectSnap.data().name as string) : undefined,
+      requiresPassword: Boolean(invite.passwordHash),
     }
+    requiresPassword.value = Boolean(invite.passwordHash)
   } catch (error) {
     console.error(error)
     errorMsg.value = '招待情報を読み込めませんでした。'
@@ -41,20 +44,34 @@ onMounted(async () => {
 
 async function handleJoin() {
   if (!projectPreview.value) return
-  if (!user.value) {
-    rememberInviteToken(token)
-    await router.push({ name: ROUTE_NAMES.login, query: { invite: token } })
+  if (requiresPassword.value && !passwordInput.value.trim()) {
+    errorMsg.value = 'パスワードを入力してください。'
     return
   }
-
   loading.value = true
   errorMsg.value = ''
   try {
-    const projectId = await redeemInvite(token, user.value.uid, user.value.email ?? '')
+    let inviteUser = user.value
+    if (!inviteUser) {
+      const credential = await signInAnonymously(auth)
+      inviteUser = credential.user
+    }
+    if (!inviteUser) {
+      throw new Error('anonymous-signin-failed')
+    }
+    const projectId = await redeemInvite(token, inviteUser.uid, inviteUser.email ?? '', {
+      password: passwordInput.value.trim() || undefined,
+    })
     await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId } })
   } catch (error) {
     console.error(error)
-    errorMsg.value = '招待の承認に失敗しました。'
+    if (error instanceof Error && error.message === 'invite-password-invalid') {
+      errorMsg.value = 'パスワードが正しくありません。'
+    } else if (error instanceof Error && error.message === 'invite-password-required') {
+      errorMsg.value = 'このリンクにはパスワードが必要です。'
+    } else {
+      errorMsg.value = '招待の承認に失敗しました。'
+    }
   } finally {
     loading.value = false
   }
@@ -77,16 +94,27 @@ async function handleJoin() {
             <dt>招待先</dt>
             <dd>{{ projectPreview?.name || projectPreview?.projectId }}</dd>
           </div>
-          <div v-if="projectPreview?.email">
-            <dt>宛先メール</dt>
-            <dd>{{ projectPreview.email }}</dd>
+          <div>
+            <dt>パスワード</dt>
+            <dd>{{ requiresPassword ? '入力が必要です' : '不要' }}</dd>
           </div>
         </dl>
+
+        <div v-if="requiresPassword" class="password-block">
+          <label>
+            <span>参加パスワード</span>
+            <input
+              v-model="passwordInput"
+              type="password"
+              placeholder="リンク作成時のパスワードを入力"
+            />
+          </label>
+        </div>
 
         <div class="actions">
           <AppButton variant="secondary" :to="{ name: ROUTE_NAMES.home }">ホームに戻る</AppButton>
           <AppButton variant="primary" :loading="loading" @click="handleJoin">
-            {{ user ? '参加する' : 'ログインして参加' }}
+            {{ user ? '参加する' : 'アカウントを作成して参加' }}
           </AppButton>
         </div>
       </template>
@@ -148,6 +176,30 @@ dd {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
+}
+
+.password-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.password-block span {
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.password-block input {
+  border: 2px solid #b8e3e9;
+  border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+}
+
+.password-block input:focus {
+  outline: none;
+  border-color: #4f7c82;
+  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.2);
 }
 
 .error {

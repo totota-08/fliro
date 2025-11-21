@@ -1,6 +1,7 @@
 export interface UserProfile {
   uid: string
   email: string
+  emailLower?: string
   fullName: string
   nickname: string
   birthday: string

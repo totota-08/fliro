@@ -4,8 +4,6 @@ import { collection, getDocs, query } from 'firebase/firestore'
 import { useRouter } from 'vue-router'
 import { db } from '@/firebase/config'
 import { useAuthStore } from '@/store/auth'
-import { redeemInvite } from '@/services/projectInvites'
-import { consumeInviteToken, rememberInviteToken } from '@/services/inviteSession'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 
@@ -22,7 +20,6 @@ const loading = ref(true)
 const taskList = ref<TaskDoc[]>([])
 const projectCount = ref(0)
 const projects = ref<{ id: string; name: string; role?: string }[]>([])
-const inviteMessage = ref('')
 const keyBuffer = ref('')
 const SECRET = 'teamie'
 const router = useRouter()
@@ -75,23 +72,6 @@ const upcomingTasks = computed(() => {
 const totalTasks = computed(() => taskList.value.length)
 const completedThisWeek = computed(() => taskList.value.filter((task) => task.status === 'done' || task.status === 'completed').length)
 
-async function processPendingInvite() {
-  if (!user.value) return
-  const token = consumeInviteToken()
-  if (!token) return
-  try {
-    const projectId = await redeemInvite(token, user.value.uid, user.value.email ?? '')
-    inviteMessage.value = '招待を承認しました。プロジェクトへ移動します。'
-    setTimeout(() => {
-      router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId } })
-    }, 1200)
-  } catch (error) {
-    console.error(error)
-    inviteMessage.value = '招待の承認に失敗しました。'
-    rememberInviteToken(token)
-  }
-}
-
 function handleKeydown(event: KeyboardEvent) {
   keyBuffer.value = (keyBuffer.value + event.key.toLowerCase()).slice(-SECRET.length)
   if (keyBuffer.value === SECRET) {
@@ -101,7 +81,6 @@ function handleKeydown(event: KeyboardEvent) {
 
 onMounted(async () => {
   await fetchTasks()
-  await processPendingInvite()
   window.addEventListener('keydown', handleKeydown)
 })
 
@@ -137,8 +116,6 @@ onBeforeUnmount(() => {
         </div>
       </dl>
     </section>
-
-    <p v-if="inviteMessage" class="alert">{{ inviteMessage }}</p>
 
     <section class="projects-panel">
       <header>
@@ -242,14 +219,6 @@ dd {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
-}
-
-.alert {
-  background: #eaf6f6;
-  border-left: 4px solid #4f7c82;
-  padding: 1rem;
-  border-radius: 1rem;
-  color: #0b2e33;
 }
 
 .projects-panel {

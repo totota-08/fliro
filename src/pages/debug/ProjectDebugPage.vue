@@ -12,7 +12,8 @@ const projectId = String(route.params.projectId || '')
 const loading = ref(true)
 const errorMsg = ref('')
 const project = ref<any | null>(null)
-const inviteMessage = ref('')
+const latestLink = ref('')
+const inviteNotice = ref('')
 
 onMounted(async () => {
   try {
@@ -51,6 +52,11 @@ const infoRows = computed(() => {
     { label: '期限', value: formatDate(project.value.dueDate) },
   ]
 })
+
+function handleLinkGenerated(link: string) {
+  latestLink.value = link
+  inviteNotice.value = 'リンクをコピーしてメンバーと共有してください。'
+}
 </script>
 
 <template>
@@ -78,8 +84,9 @@ const infoRows = computed(() => {
 
     <section v-else class="debug-panel">
       <h2>メンバー招待</h2>
-      <ProjectInviteForm :project-id="projectId" mode="send" label="メールアドレス" @sent="inviteMessage = `招待を送信しました。`" />
-      <p v-if="inviteMessage" class="info">{{ inviteMessage }}</p>
+      <ProjectInviteForm :project-id="projectId" @generated="handleLinkGenerated" />
+      <p v-if="latestLink" class="info">{{ latestLink }}</p>
+      <p v-if="inviteNotice" class="info">{{ inviteNotice }}</p>
     </section>
 
     <section v-if="!loading && !errorMsg" class="debug-panel">

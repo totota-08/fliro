@@ -140,6 +140,7 @@ async function persistProfile(user: User, overrides: Partial<UserProfile> = {}) 
   const profile: UserProfile = {
     uid: user.uid,
     email: user.email ?? overrides.email ?? existing?.email ?? '',
+    emailLower: (user.email ?? overrides.email ?? existing?.email ?? '').toLowerCase(),
     fullName: overrides.fullName ?? existing?.fullName ?? user.displayName ?? '',
     nickname: overrides.nickname ?? existing?.nickname ?? user.displayName ?? '',
     birthday: overrides.birthday ?? existing?.birthday ?? '',
