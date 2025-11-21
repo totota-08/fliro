@@ -4,19 +4,19 @@ import { addProjectMember } from '@/services/projectMembers'
 
 interface CreateInviteOptions {
   projectId: string
-  email: string
   createdBy: string
+  password?: string | null
 }
 
 export interface ProjectInviteDoc {
   projectId: string
-  email: string
   token: string
   createdBy: string
   createdAt: Date | null
   acceptedAt?: Date | null
   acceptedBy?: string
   status: 'pending' | 'accepted'
+  passwordHash?: string | null
 }
 
 function createToken() {
@@ -26,40 +26,50 @@ function createToken() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-export async function createProjectInvite({ projectId, email, createdBy }: CreateInviteOptions) {
+async function hashInvitePassword(password: string) {
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    return password
+  }
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+export async function createProjectInvite({ projectId, createdBy, password }: CreateInviteOptions) {
   const token = createToken()
   const ref = doc(db, 'projectInvites', token)
+  const passwordHash = password?.trim() ? await hashInvitePassword(password.trim()) : null
   await setDoc(ref, {
     projectId,
-    email,
     createdBy,
     token,
+    passwordHash,
     createdAt: serverTimestamp(),
     status: 'pending',
   })
   return token
 }
 
-export async function sendProjectInvites(projectId: string, emails: string[], createdBy: string, openMail: boolean) {
-  const sentTokens: string[] = []
-  for (const email of emails) {
-    const token = await createProjectInvite({ projectId, email, createdBy })
-    sentTokens.push(token)
-    if (openMail && typeof window !== 'undefined') {
-      const mailto = buildInviteMailTo(token, email)
-      window.open(mailto, '_blank')
-    }
-  }
-  return sentTokens
-}
-
-export async function redeemInvite(token: string, userId: string, email: string) {
+export async function redeemInvite(token: string, userId: string, email: string, options?: { password?: string }) {
   const ref = doc(db, 'projectInvites', token)
   const snap = await getDoc(ref)
   if (!snap.exists()) {
     throw new Error('招待リンクが無効です。')
   }
   const data = snap.data() as ProjectInviteDoc
+  if (data.passwordHash) {
+    const provided = options?.password?.trim()
+    if (!provided) {
+      throw new Error('invite-password-required')
+    }
+    const hashed = await hashInvitePassword(provided)
+    if (hashed !== data.passwordHash) {
+      throw new Error('invite-password-invalid')
+    }
+  }
   if (data.status === 'accepted') {
     return data.projectId
   }
@@ -75,11 +85,4 @@ export async function redeemInvite(token: string, userId: string, email: string)
     acceptedEmail: email,
   })
   return data.projectId
-}
-
-export function buildInviteMailTo(token: string, email: string) {
-  const inviteUrl = `${window.location.origin}/invite/${token}`
-  const subject = encodeURIComponent('Teamie プロジェクトへの招待')
-  const body = encodeURIComponent(`Teamie のプロジェクトに参加してください。以下のリンクからアクセスできます:\n${inviteUrl}`)
-  return `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`
 }

@@ -1,4 +1,4 @@
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 
 interface AddProjectMemberOptions {
@@ -7,21 +7,39 @@ interface AddProjectMemberOptions {
   role?: 'owner' | 'admin' | 'member' | 'viewer'
   invitedBy: string
   projectName?: string
+  profile?: {
+    nickname?: string
+    fullName?: string
+    email?: string
+    avatarUrl?: string
+  }
 }
 
-export async function addProjectMember({ projectId, userId, role = 'member', invitedBy, projectName }: AddProjectMemberOptions) {
+export async function addProjectMember({
+  projectId,
+  userId,
+  role = 'member',
+  invitedBy,
+  projectName,
+  profile,
+}: AddProjectMemberOptions) {
   const timestamp = serverTimestamp()
+  const profileData = profile ?? {}
   await setDoc(
     doc(db, 'projects', projectId, 'members', userId),
     {
       userId,
       role,
       invitedBy,
+      nickname: profileData.nickname ?? null,
+      fullName: profileData.fullName ?? null,
+      email: profileData.email ?? null,
+      avatarUrl: profileData.avatarUrl ?? null,
       permissions: {
         canEditProject: role === 'owner' || role === 'admin',
         canDeleteTasks: role === 'owner' || role === 'admin',
         canInviteMembers: role === 'owner' || role === 'admin',
-        canManageSettings: role === 'owner'
+        canManageSettings: role === 'owner',
       },
       joinedAt: timestamp,
       lastAccessedAt: timestamp,
@@ -38,4 +56,9 @@ export async function addProjectMember({ projectId, userId, role = 'member', inv
     },
     { merge: true },
   )
+}
+
+export async function removeProjectMember(projectId: string, userId: string) {
+  await deleteDoc(doc(db, 'projects', projectId, 'members', userId))
+  await deleteDoc(doc(db, 'userProjects', userId, 'projects', projectId))
 }

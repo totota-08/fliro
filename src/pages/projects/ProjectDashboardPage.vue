@@ -9,6 +9,7 @@ import type { ProjectDoc } from '@/types/project'
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import TeamChatPreview, { type PreviewChatMessage } from '@/components/projectDashboard/TeamChatPreview.vue'
+import AppButton from '@/components/ui/AppButton.vue'
 import {
   listenTasks,
   createTask,
@@ -25,9 +26,17 @@ const route = useRoute()
 const { user, profile } = useAuthStore()
 const projectId = ref(String(route.params.projectId || ''))
 
+type MemberEntry = {
+  id: string
+  name: string
+  role?: string
+  email?: string
+  lastAccessedAt?: { seconds: number; nanoseconds: number }
+}
+
 const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
-const members = ref<{ id: string; name: string }[]>([])
+const members = ref<MemberEntry[]>([])
 const tasks = ref<TaskDoc[]>([])
 const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
@@ -43,6 +52,7 @@ const aiResponse = ref('')
 const aiLoading = ref(false)
 const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
+const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 20
 
@@ -65,9 +75,14 @@ const navItems = computed<DashboardNavItem[]>(() =>
     {
       key: 'team',
       label: 'チャット',
+      to: { name: ROUTE_NAMES.projectChat, params: { projectId: projectId.value } },
       icon: 'team',
-      disabled: true,
-      tooltip: 'チャットはダッシュボード内で利用できます',
+    },
+    {
+      key: 'members',
+      label: 'メンバー',
+      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
+      icon: 'members',
     },
     { key: 'settings', label: '設定', disabled: true, icon: 'settings' },
   ] satisfies DashboardNavItem[],
@@ -202,6 +217,15 @@ const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
   })),
 )
 
+const onlineMemberCount = computed(() => members.value.filter((member) => isMemberRecentlyActive(member)).length)
+const memberPreviewList = computed(() =>
+  members.value.slice(0, 4).map((member) => ({
+    ...member,
+    statusLabel: memberStatusLabel(member),
+    statusClass: memberStatusClass(member),
+  })),
+)
+
 function evaluateNotifications() {
   const now = Date.now()
   const oneDay = 24 * 60 * 60 * 1000
@@ -227,11 +251,17 @@ function watchProject() {
     aiKey.value = project.value?.settings?.aiApiKey ?? ''
   })
   stopMembers = onSnapshot(collection(db, 'projects', projectId.value, 'members'), (snapshot) => {
-    const items: typeof members.value = []
+    const items: MemberEntry[] = []
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as any
       const memberId = data.userId || docSnap.id
-      items.push({ id: memberId, name: data.nickname || data.fullName || docSnap.id })
+      items.push({
+        id: memberId,
+        name: data.nickname || data.fullName || docSnap.id,
+        role: data.role,
+        email: data.email,
+        lastAccessedAt: data.lastAccessedAt,
+      })
     })
     members.value = items
   })
@@ -356,6 +386,37 @@ async function sendChatMessage(text: string) {
 async function reactToChatMessage(payload: { messageId: string; emoji: string }) {
   if (!user.value || !payload.messageId || !payload.emoji) return
   await addMessageReaction(projectId.value, payload.messageId, payload.emoji, user.value.uid)
+}
+
+function isMemberRecentlyActive(member: MemberEntry) {
+  if (!member.lastAccessedAt?.seconds) return false
+  const lastAccess = member.lastAccessedAt.seconds * 1000
+  return Date.now() - lastAccess < 1000 * 60 * 60 * 4
+}
+
+function memberStatusLabel(member: MemberEntry) {
+  if (!member.lastAccessedAt?.seconds) return 'オフライン'
+  const lastAccess = member.lastAccessedAt.seconds * 1000
+  const diff = Date.now() - lastAccess
+  if (diff < 1000 * 60 * 5) return 'オンライン'
+  if (diff < 1000 * 60 * 60) return '離席中'
+  return 'オフライン'
+}
+
+function memberStatusClass(member: MemberEntry) {
+  const status = memberStatusLabel(member)
+  if (status === 'オンライン') return 'online'
+  if (status === '離席中') return 'away'
+  return 'offline'
+}
+
+function getMemberInitials(name: string) {
+  if (!name) return '??'
+  const trimmed = name.trim()
+  if (trimmed.length <= 2) {
+    return trimmed
+  }
+  return trimmed.slice(0, 2).toUpperCase()
 }
 
 async function saveAiSettings() {
@@ -561,34 +622,93 @@ onBeforeUnmount(() => {
           </section>
 
           <aside class="demo__secondary">
-            <div class="chat-preview__header">
-              <h3>チームチャット</h3>
-              <p>最新メッセージはダッシュボードから直接確認できます。</p>
+            <div class="secondary-tabs">
+              <button
+                type="button"
+                :class="['secondary-tab', { 'is-active': secondaryTab === 'chat' }]"
+                @click="secondaryTab = 'chat'"
+              >
+                チャット
+              </button>
+              <button
+                type="button"
+                :class="['secondary-tab', { 'is-active': secondaryTab === 'members' }]"
+                @click="secondaryTab = 'members'"
+              >
+                メンバー
+              </button>
             </div>
-            <TeamChatPreview
-              :messages="chatPreviewMessages"
-              :online-count="members.length"
-              :show-composer="true"
-              :loading="chatLoading"
-              @send="sendChatMessage"
-              @react="reactToChatMessage"
-            />
 
-            <section class="ai-panel">
-              <h3>AI アシスタント</h3>
-              <label class="toggle">
-                <input type="checkbox" v-model="aiEnabled" />
-                <span>AI を有効化</span>
-              </label>
-              <label>
-                API Key
-                <input v-model="aiKey" type="password" placeholder="sk-..." />
-              </label>
-              <button type="button" @click="saveAiSettings">設定を保存</button>
-              <textarea v-model="aiPrompt" rows="3" placeholder="質問を入力"></textarea>
-              <button type="button" :disabled="aiLoading" @click="askAi">{{ aiLoading ? '応答中...' : 'AIに聞く' }}</button>
-              <p class="ai-response" v-if="aiResponse">{{ aiResponse }}</p>
-            </section>
+            <div v-if="secondaryTab === 'chat'">
+              <div class="chat-preview__header">
+                <h3>チームチャット</h3>
+                <p>最新メッセージはダッシュボードから直接確認できます。</p>
+              </div>
+              <TeamChatPreview
+                :messages="chatPreviewMessages"
+                :online-count="members.length"
+                :show-composer="true"
+                :loading="chatLoading"
+                @send="sendChatMessage"
+                @react="reactToChatMessage"
+              />
+
+              <section class="ai-panel">
+                <h3>AI アシスタント</h3>
+                <label class="toggle">
+                  <input type="checkbox" v-model="aiEnabled" />
+                  <span>AI を有効化</span>
+                </label>
+                <label>
+                  API Key
+                  <input v-model="aiKey" type="password" placeholder="sk-..." />
+                </label>
+                <button type="button" @click="saveAiSettings">設定を保存</button>
+                <textarea v-model="aiPrompt" rows="3" placeholder="質問を入力"></textarea>
+                <button type="button" :disabled="aiLoading" @click="askAi">{{ aiLoading ? '応答中...' : 'AIに聞く' }}</button>
+                <p class="ai-response" v-if="aiResponse">{{ aiResponse }}</p>
+              </section>
+            </div>
+
+            <div v-else class="member-preview">
+              <div class="member-preview__header">
+                <div>
+                  <h3>チームメンバー</h3>
+                  <p>{{ members.length }}名のメンバーを素早く確認できます。</p>
+                </div>
+                <AppButton
+                  class="member-preview__cta"
+                  variant="outline"
+                  :to="{ name: ROUTE_NAMES.projectMembers, params: { projectId } }"
+                >
+                  メンバー管理へ
+                </AppButton>
+              </div>
+
+              <div class="member-preview__stats">
+                <div>
+                  <p>総メンバー</p>
+                  <strong>{{ members.length }}</strong>
+                </div>
+                <div>
+                  <p>オンライン</p>
+                  <strong>{{ onlineMemberCount }}</strong>
+                </div>
+              </div>
+
+              <ul class="member-preview__list">
+                <li v-for="member in memberPreviewList" :key="member.id">
+                  <div class="member-chip">
+                    <div class="member-chip__avatar" aria-hidden="true">{{ getMemberInitials(member.name) }}</div>
+                    <div>
+                      <p class="member-chip__name">{{ member.name }}</p>
+                      <p class="member-chip__meta">{{ member.role || 'member' }}・{{ member.statusLabel }}</p>
+                    </div>
+                  </div>
+                  <span class="member-chip__status" :class="`status-${member.statusClass}`">{{ member.statusLabel }}</span>
+                </li>
+              </ul>
+            </div>
           </aside>
         </div>
       </div>
@@ -776,6 +896,146 @@ onBeforeUnmount(() => {
 .demo__primary {
   display: grid;
   gap: 2rem;
+}
+
+.demo__secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.secondary-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.secondary-tab {
+  flex: 1;
+  border: 1px solid rgba(11, 46, 51, 0.12);
+  border-radius: 1rem;
+  padding: 0.65rem 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-weight: 600;
+  color: #4f7c82;
+}
+
+.secondary-tab.is-active {
+  background: #0b2e33;
+  color: #fff;
+  border-color: #0b2e33;
+  box-shadow: 0 12px 24px rgba(11, 46, 51, 0.18);
+}
+
+.member-preview {
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  background: #fffdf8;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.member-preview__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.member-preview__header h3 {
+  margin: 0;
+}
+
+.member-preview__header p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.member-preview__cta {
+  padding: 0.45rem 1rem;
+  font-size: 0.9rem;
+}
+
+.member-preview__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.member-preview__stats div {
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(184, 227, 233, 0.3);
+}
+
+.member-preview__stats p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.member-preview__stats strong {
+  font-size: 1.4rem;
+  color: #0b2e33;
+}
+
+.member-preview__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.member-chip {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.member-chip__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: rgba(79, 124, 130, 0.15);
+  color: #0b2e33;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.member-chip__name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.member-chip__meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.member-chip__status {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.member-chip__status.status-online {
+  color: #1d9160;
+}
+
+.member-chip__status.status-away {
+  color: #b07816;
+}
+
+.member-chip__status.status-offline {
+  color: #9da8b6;
 }
 
 .wbs {

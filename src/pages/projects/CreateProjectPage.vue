@@ -6,14 +6,10 @@ import AuthFormField from '@/components/ui/AuthFormField.vue'
 import { createProject } from '@/firebase/projectService'
 import { useAuthStore } from '@/store/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
-import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
 import { fetchScaleStats } from '@/services/statsService'
-import { sendProjectInvites } from '@/services/projectInvites'
 
 const router = useRouter()
 const { user } = useAuthStore()
-
-type InviteField = { email: string }
 
 const name = ref('')
 const description = ref('')
@@ -23,8 +19,6 @@ const isPublic = ref(false)
 const allowGuestView = ref(false)
 const startDate = ref<string | null>(null)
 const dueDate = ref<string | null>(null)
-const pendingInvites = ref<InviteField[]>([{ email: '' }])
-
 const submitting = ref(false)
 const errorMsg = ref('')
 
@@ -78,12 +72,6 @@ async function handleSubmit() {
       },
       user.value.uid,
     )
-
-    const inviteEmails = pendingInvites.value.map((item) => item.email.trim()).filter(Boolean)
-    if (inviteEmails.length) {
-      await sendProjectInvites(id, inviteEmails, user.value.uid, true)
-      pendingInvites.value = [{ email: '' }]
-    }
 
     await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId: id } })
   } catch (e) {
@@ -221,7 +209,10 @@ function prevStep() {
               </label>
             </div>
 
-            <ProjectInviteForm v-model="pendingInvites" mode="collect" label="プロジェクト招待リスト" />
+            <div class="invite-hint">
+              <strong>参加リンクについて</strong>
+              <p>プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。</p>
+            </div>
           </div>
         </div>
       </Transition>
@@ -502,6 +493,19 @@ function prevStep() {
   margin: 0.2rem 0 0;
   color: #4f7c82;
   font-size: 0.9rem;
+}
+
+.invite-hint {
+  border: 1px dashed rgba(11, 46, 51, 0.2);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  background: #f8fbfb;
+}
+
+.invite-hint strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #0b2e33;
 }
 
 .panel-error {

@@ -1,13 +1,5 @@
 import { database } from '@/firebase/config'
-import {
-  limitToLast,
-  onValue,
-  orderByChild,
-  push,
-  query,
-  ref as dbRef,
-  serverTimestamp,
-} from 'firebase/database'
+import { limitToLast, onValue, orderByKey, push, query, ref as dbRef, serverTimestamp } from 'firebase/database'
 
 export interface ReactionSummary {
   emoji: string
@@ -44,11 +36,7 @@ function summarizeReactions(reactions: any): ReactionSummary[] {
 }
 
 export function listenProjectChat(projectId: string, callback: (messages: ChatMessage[]) => void) {
-  const chatRef = query(
-    dbRef(database, `projects/${projectId}/realtimeChat`),
-    orderByChild('createdAt'),
-    limitToLast(50),
-  )
+  const chatRef = query(dbRef(database, `projects/${projectId}/realtimeChat`), orderByKey(), limitToLast(50))
   const unsubscribe = onValue(chatRef, (snapshot) => {
     const items: ChatMessage[] = []
     snapshot.forEach((child) => {
