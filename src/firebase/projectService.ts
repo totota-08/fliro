@@ -1,7 +1,7 @@
-import { addDoc, collection, doc, serverTimestamp, getDoc, updateDoc, getDocs, deleteDoc } from 'firebase/firestore'
 import { db } from '@/firebase/config'
-import type { CreateProjectPayload, ProjectDoc } from '@/types/project'
 import { addProjectMember } from '@/services/projectMembers'
+import type { CreateProjectPayload, ProjectDoc } from '@/types/project'
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore'
 
 export async function createProject(payload: CreateProjectPayload, currentUserId: string) {
 
@@ -38,6 +38,7 @@ export async function createProject(payload: CreateProjectPayload, currentUserId
     projectId: projRef.id,
     userId: currentUserId,
     role: 'owner',
+    projectRole: 'owner',
     invitedBy: currentUserId,
     projectName: projectBase.name,
   })

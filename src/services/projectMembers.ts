@@ -1,10 +1,11 @@
-import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '@/firebase/config'
+import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
 
 interface AddProjectMemberOptions {
   projectId: string
   userId: string
   role?: 'owner' | 'admin' | 'member' | 'viewer'
+  projectRole?: 'owner' | 'member'
   invitedBy: string
   projectName?: string
   profile?: {
@@ -19,6 +20,7 @@ export async function addProjectMember({
   projectId,
   userId,
   role = 'member',
+  projectRole = 'member',
   invitedBy,
   projectName,
   profile,
@@ -30,6 +32,7 @@ export async function addProjectMember({
     {
       userId,
       role,
+      projectRole,
       invitedBy,
       nickname: profileData.nickname ?? null,
       fullName: profileData.fullName ?? null,
