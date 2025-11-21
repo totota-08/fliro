@@ -1,5 +1,18 @@
-import { database } from '@/firebase/config'
-import { ref as dbRef, limitToLast, onValue, orderByKey, push, query, serverTimestamp } from 'firebase/database'
+import { database, db } from '@/firebase/config'
+import {
+  ref as dbRef,
+  get as getValue,
+  limitToLast,
+  onValue,
+  orderByKey,
+  push,
+  query,
+  remove,
+  serverTimestamp,
+  set as setValue,
+  update,
+} from 'firebase/database'
+import { doc, getDoc } from 'firebase/firestore'
 
 export interface ReactionSummary {
   emoji: string
@@ -33,6 +46,42 @@ function summarizeReactions(reactions: any): ReactionSummary[] {
     counts[emoji] = (counts[emoji] || 0) + 1
   })
   return Object.entries(counts).map(([emoji, count]) => ({ emoji, count }))
+}
+
+const memberSyncCache = new Map<string, Promise<void>>()
+
+async function ensureRealtimeMember(projectId: string, userId: string) {
+  if (!projectId || !userId) return
+  const cacheKey = `${projectId}:${userId}`
+  if (memberSyncCache.has(cacheKey)) {
+    return memberSyncCache.get(cacheKey)!
+  }
+
+  const task = (async () => {
+    try {
+      const memberRef = dbRef(database, `projects/${projectId}/members/${userId}`)
+      const snapshot = await getValue(memberRef)
+      if (snapshot.exists()) return
+
+      const memberDoc = await getDoc(doc(db, 'projects', projectId, 'members', userId))
+      const data = memberDoc.exists() ? memberDoc.data() : null
+
+      const joinedAt = (data as any)?.joinedAt
+      await setValue(memberRef, {
+        role: (data?.role as string) || 'member',
+        joinedAt: typeof joinedAt?.seconds === 'number' ? joinedAt.seconds * 1000 : Date.now(),
+      })
+    } catch (error) {
+      console.warn('Failed to ensure realtime member entry', error)
+    }
+  })()
+
+  memberSyncCache.set(cacheKey, task)
+  try {
+    await task
+  } finally {
+    memberSyncCache.delete(cacheKey)
+  }
 }
 
 export function listenProjectChat(
@@ -71,6 +120,7 @@ export function listenProjectChat(
 }
 
 export async function sendProjectMessage(projectId: string, senderId: string, senderName: string, text: string) {
+  await ensureRealtimeMember(projectId, senderId)
   await push(dbRef(database, `projects/${projectId}/realtimeChat`), {
     text,
     author: senderName,
@@ -83,9 +133,22 @@ export async function sendProjectMessage(projectId: string, senderId: string, se
 
 export async function addMessageReaction(projectId: string, messageId: string, emoji: string, userId: string) {
   if (!emoji) return
+  await ensureRealtimeMember(projectId, userId)
   await push(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}/reactions`), {
     emoji,
     userId,
     createdAt: serverTimestamp(),
   })
+}
+
+export async function updateProjectMessage(projectId: string, messageId: string, text: string) {
+  if (!text.trim()) return
+  await update(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`), {
+    text: text.trim(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function deleteProjectMessage(projectId: string, messageId: string) {
+  await remove(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`))
 }
