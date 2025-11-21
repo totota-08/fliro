@@ -143,23 +143,6 @@ watch(
                 <span class="chat__author">{{ message.author }}</span>
                 <time class="chat__time">{{ message.time }}</time>
               </div>
-              <div class="chat__actions">
-                <button
-                  v-if="props.allowReactions && message.id"
-                  type="button"
-                  class="chat__reaction-trigger"
-                  @click="toggleReactionPicker(message.id)"
-                >
-                  ＋ リアクション
-                </button>
-                <div
-                  v-if="props.currentUserId && (message.senderId === props.currentUserId || message.author === props.currentUserName)"
-                  class="chat__owner-actions"
-                >
-                  <button type="button" @click="startEditing(message)">編集</button>
-                  <button type="button" @click="deleteMessage(message.id)">削除</button>
-                </div>
-              </div>
             </div>
 
             <div v-if="editingMessageId === message.id" class="chat__editor">
@@ -170,6 +153,25 @@ watch(
               </div>
             </div>
             <p v-else class="chat__text">{{ message.message }}</p>
+
+            <div class="chat__actions">
+              <button
+                v-if="props.allowReactions && message.id"
+                type="button"
+                class="chat__reaction-trigger"
+                @click="toggleReactionPicker(message.id)"
+                title="リアクションを追加"
+              >
+                ☺
+              </button>
+              <div
+                v-if="props.currentUserId && (message.senderId === props.currentUserId || message.author === props.currentUserName)"
+                class="chat__owner-actions"
+              >
+                <button type="button" @click="startEditing(message)" title="編集">✎</button>
+                <button type="button" @click="deleteMessage(message.id)" title="削除">🗑</button>
+              </div>
+            </div>
 
             <div v-if="message.reactions?.length" class="chat__reaction-row">
               <button
@@ -341,10 +343,16 @@ watch(
   background: #ffffff;
   border: 1px solid #d7e2ef;
   color: #0b2e33;
-  border-radius: 16px;
-  padding: 0.9rem 1rem;
-  box-shadow: 0 12px 24px rgba(11, 46, 51, 0.12);
+  border-radius: 0 12px 12px 12px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
   position: relative;
+}
+
+.chat__message:hover .chat__actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .chat__meta {
@@ -352,6 +360,7 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 
 .chat__meta-primary {
@@ -361,30 +370,51 @@ watch(
 }
 
 .chat__actions {
+  position: absolute;
+  top: -12px;
+  right: 10px;
+  background: #ffffff;
+  border: 1px solid #e2edef;
+  border-radius: 8px;
+  padding: 0.25rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.chat__reaction-trigger,
+.chat__owner-actions button {
+  border: none;
+  background: transparent;
+  color: #54757c;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat__reaction-trigger:hover,
+.chat__owner-actions button:hover {
+  background: #f0f7f8;
+  color: #0b2e33;
 }
 
 .chat__owner-actions {
   display: flex;
   gap: 0.25rem;
-}
-
-.chat__owner-actions button {
-  border: 1px solid #d7e2ef;
-  background: rgba(184, 227, 233, 0.2);
-  color: #4f7c82;
-  border-radius: 8px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.chat__owner-actions button:hover {
-  background: rgba(184, 227, 233, 0.35);
-  color: #0b2e33;
+  border-left: 1px solid #e2edef;
+  padding-left: 0.25rem;
+  margin-left: 0.25rem;
 }
 
 .chat__editor {

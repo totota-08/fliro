@@ -140,19 +140,6 @@ onBeforeUnmount(() => {
               <h3 class="chat-message__author">{{ message.author }}</h3>
               <time v-if="message.createdAt" class="chat-message__time">{{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</time>
             </div>
-            <div class="chat-message__controls">
-              <button
-                type="button"
-                class="chat-message__reaction-button"
-                @click.stop="toggleReactionPicker(message.id)"
-              >
-                ＋ リアクション
-              </button>
-              <div v-if="user && (message.senderId === user.uid || message.author === (profile?.nickname || profile?.fullName))" class="chat-message__owner-actions">
-                <button type="button" @click="startEditing(message)">編集</button>
-                <button type="button" @click="deleteMessage(message.id)">削除</button>
-              </div>
-            </div>
           </header>
           
           <div v-if="editingMessageId === message.id" class="chat-message__editor">
@@ -163,6 +150,21 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <p v-else class="chat-message__text">{{ message.text }}</p>
+
+          <div class="chat-message__controls">
+            <button
+              type="button"
+              class="chat-message__reaction-button"
+              @click.stop="toggleReactionPicker(message.id)"
+              title="リアクションを追加"
+            >
+              ☺
+            </button>
+            <div v-if="user && (message.senderId === user.uid || message.author === (profile?.nickname || profile?.fullName))" class="chat-message__owner-actions">
+              <button type="button" @click="startEditing(message)" title="編集">✎</button>
+              <button type="button" @click="deleteMessage(message.id)" title="削除">🗑</button>
+            </div>
+          </div>
 
           <div v-if="message.reactionSummary?.length" class="chat-reaction-summary">
             <button
@@ -263,9 +265,16 @@ header {
   flex: 1;
   background: #ffffff;
   border: 1px solid #d7e2ef;
-  border-radius: 16px;
-  padding: 1rem 1.1rem;
-  box-shadow: 0 12px 24px rgba(11, 46, 51, 0.12);
+  border-radius: 0 12px 12px 12px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  position: relative;
+}
+
+.chat-message:hover .chat-message__controls {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .chat-message__header {
@@ -273,7 +282,7 @@ header {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .chat-message__meta {
@@ -284,63 +293,69 @@ header {
 
 .chat-message__author {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: #0b2e33;
 }
 
 .chat-message__time {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: #6d8a92;
 }
 
 .chat-message__text {
   margin: 0;
-  line-height: 1.55;
+  line-height: 1.5;
   color: #0b2e33;
+  font-size: 0.95rem;
 }
 
 .chat-message__controls {
+  position: absolute;
+  top: -12px;
+  right: 10px;
+  background: #ffffff;
+  border: 1px solid #e2edef;
+  border-radius: 8px;
+  padding: 0.25rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: all 0.2s ease;
+  z-index: 10;
 }
 
-.chat-message__reaction-button {
-  border: 1px dashed #c3d6db;
-  background: rgba(184, 227, 233, 0.22);
-  color: #4f7c82;
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
+.chat-message__reaction-button,
+.chat-message__owner-actions button {
+  border: none;
+  background: transparent;
+  color: #54757c;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.chat-message__reaction-button:hover {
-  background: rgba(184, 227, 233, 0.35);
+.chat-message__reaction-button:hover,
+.chat-message__owner-actions button:hover {
+  background: #f0f7f8;
   color: #0b2e33;
 }
 
 .chat-message__owner-actions {
   display: flex;
   gap: 0.25rem;
-}
-
-.chat-message__owner-actions button {
-  border: 1px solid #d7e2ef;
-  background: rgba(184, 227, 233, 0.2);
-  color: #4f7c82;
-  border-radius: 8px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.chat-message__owner-actions button:hover {
-  background: rgba(184, 227, 233, 0.35);
-  color: #0b2e33;
+  border-left: 1px solid #e2edef;
+  padding-left: 0.25rem;
+  margin-left: 0.25rem;
 }
 
 .chat-message__editor {
