@@ -20,7 +20,6 @@ const props = withDefaults(
   {
     title: 'Webサイトリニューアル',
     description: '今週の状況をひと目で確認できます。',
-    note: '※ デモデータです。本番環境では実際の計測値が反映されます。',
     rotate: true,
   },
 )
@@ -31,11 +30,12 @@ const defaultCards: SummaryCard[] = [
   { id: 'active', label: '進行中', value: 8, caption: '現在進行中のタスク' },
   { id: 'overdue', label: '期限切れ', value: 3, caption: '期限超過タスク', tone: 'alert' },
 ]
+const defaultProgressValue = Number(defaultCards.find((card) => card.id === 'progress')?.value ?? 0)
 
-const cardList = computed(() => (props.cards?.length ? props.cards : defaultCards))
+const cardList = computed<SummaryCard[]>(() => (props.cards && props.cards.length ? props.cards : defaultCards))
 const isDemo = computed(() => !props.cards || props.cards.length === 0)
 const activeCardIndex = ref(0)
-const progressValue = ref<number>(Number(cardList.value.find((card) => card.id === 'progress')?.value) || 0)
+const progressValue = ref<number>(Number(cardList.value.find((card) => card.id === 'progress')?.value ?? 0))
 let highlightTimer: number | undefined
 let progressTimer: number | undefined
 let progressDirection = 1
@@ -48,13 +48,13 @@ onMounted(() => {
 
     progressTimer = window.setInterval(() => {
       progressValue.value += progressDirection
-      if (progressValue.value >= Number(defaultCards[0].value) + 4 || progressValue.value <= Number(defaultCards[0].value) - 4) {
+      if (progressValue.value >= defaultProgressValue + 4 || progressValue.value <= defaultProgressValue - 4) {
         progressDirection = -progressDirection
       }
     }, 1200)
   } else {
     activeCardIndex.value = 0
-    progressValue.value = Number(cardList.value.find((card) => card.id === 'progress')?.value) || 0
+    progressValue.value = Number(cardList.value.find((card) => card.id === 'progress')?.value ?? 0)
   }
 })
 

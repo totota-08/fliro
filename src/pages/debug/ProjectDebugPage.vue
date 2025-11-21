@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import { fetchProject } from '@/firebase/projectService'
 import { ROUTE_NAMES } from '@/constants/routes'
 import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
 
 const route = useRoute()
-const router = useRouter()
 const projectId = String(route.params.projectId || '')
 
 const loading = ref(true)

@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 
-export type TaskStatus = 'todo' | 'in-progress' | 'done'
+export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done'
 
 export interface TaskDoc {
   id: string
@@ -20,10 +20,12 @@ export interface TaskDoc {
   status: TaskStatus
   dueDate?: { seconds: number; nanoseconds: number }
   assigneeId?: string
+  assigneeName?: string
   createdBy: string
   projectId: string
   createdAt?: { seconds: number; nanoseconds: number }
   updatedAt?: { seconds: number; nanoseconds: number }
+  progress?: number
 }
 
 export interface CreateTaskPayload {
@@ -32,6 +34,8 @@ export interface CreateTaskPayload {
   status?: TaskStatus
   dueDate?: Date | null
   assigneeId?: string | null
+  assigneeName?: string | null
+  progress?: number
 }
 
 export function listenTasks(projectId: string, callback: (tasks: TaskDoc[]) => void) {
@@ -39,7 +43,7 @@ export function listenTasks(projectId: string, callback: (tasks: TaskDoc[]) => v
   return onSnapshot(tasksRef, (snapshot) => {
     const items: TaskDoc[] = []
     snapshot.forEach((docSnap) => {
-      items.push({ id: docSnap.id, projectId, ...(docSnap.data() as Omit<TaskDoc, 'id'>) })
+      items.push({ id: docSnap.id, projectId, ...(docSnap.data() as Omit<TaskDoc, 'id' | 'projectId'>) })
     })
     callback(items)
   })
@@ -52,6 +56,8 @@ export async function createTask(projectId: string, payload: CreateTaskPayload, 
     status: payload.status ?? 'todo',
     dueDate: payload.dueDate ?? null,
     assigneeId: payload.assigneeId ?? null,
+    assigneeName: payload.assigneeName ?? null,
+    progress: payload.progress ?? 0,
     createdBy: userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
 export interface PreviewChatMessage {
   id?: string
@@ -7,139 +7,57 @@ export interface PreviewChatMessage {
   time: string
   message: string
   type?: 'update'
-  highlight?: boolean
+  reactions?: { emoji: string; count: number }[]
 }
 
-const props = defineProps<{
-  messages?: PreviewChatMessage[]
-  onlineCount?: number
-  showComposer?: boolean
+const props = withDefaults(
+  defineProps<{
+    messages?: PreviewChatMessage[]
+    onlineCount?: number
+    showComposer?: boolean
+    loading?: boolean
+    allowReactions?: boolean
+    reactionOptions?: string[]
+  }>(),
+  {
+    allowReactions: true,
+    reactionOptions: () => ['👍', '🎉', '❤️', '🔥', '😄'],
+  },
+)
+
+const emit = defineEmits<{
+  (e: 'send', value: string): void
+  (e: 'react', value: { messageId: string; emoji: string }): void
 }>()
 
-const emit = defineEmits<{ (e: 'send', value: string): void }>()
-
-const onlineMembers = ref(props.onlineCount ?? 8)
-const baseMessages: PreviewChatMessage[] = [
-  {
-    author: '佐藤花子',
-    time: '10:30',
-    message: 'トップページのデザイン、レビューお願いします！',
-  },
-  {
-    author: '田中太郎',
-    time: '10:36',
-    type: 'update',
-    message: '新しいタスクが作成されました：「デザイン修正対応」',
-  },
-  {
-    author: '鈴木一郎',
-    time: '11:20',
-    message: 'データベース設計のレビュー会議、明日の14時でどうでしょうか？',
-  },
-  {
-    author: '高橋美咲',
-    time: '11:25',
-    message: '大丈夫です！参加します。',
-  },
-]
-
-const demoQueue: PreviewChatMessage[] = [
-  {
-    author: 'Teamie Bot',
-    time: '11:32',
-    type: 'update',
-    message: '進捗レポートが更新されました。',
-  },
-  {
-    author: '大森健太',
-    time: '11:35',
-    message: 'ユーザーテストのフィードバック、まとめました！後ほど共有します。',
-  },
-]
-
-const conversation = ref<PreviewChatMessage[]>(props.messages?.length ? props.messages : [...baseMessages])
-const typing = ref(false)
-let presenceTimer: number | undefined
-let demoTimer: number | undefined
-let queueIndex = 0
 const input = ref('')
+const onlineMembers = computed(() => props.onlineCount ?? 0)
+const conversation = computed(() => props.messages ?? [])
+const openReactionFor = ref<string | null>(null)
+const defaultReaction = '👍'
 
-const isDemo = computed(() => !props.messages || !props.messages.length)
-
-watch(
-  () => props.messages,
-  (val) => {
-    if (val && val.length) {
-      conversation.value = [...val]
-    }
-  },
-  { deep: true },
-)
-
-watch(
-  () => props.onlineCount,
-  (val) => {
-    if (typeof val === 'number') {
-      onlineMembers.value = val
-    }
-  },
-)
-
-onMounted(() => {
-  if (isDemo.value) {
-    presenceTimer = window.setInterval(() => {
-      onlineMembers.value = onlineMembers.value === 8 ? 9 : 8
-    }, 8000)
-
-    demoTimer = window.setInterval(() => {
-      if (!demoQueue.length) return
-      const index = queueIndex % demoQueue.length
-      const next = demoQueue[index]
-      if (!next) return
-      queueIndex += 1
-      typing.value = true
-      window.setTimeout(() => {
-        const stamped: PreviewChatMessage = {
-          ...next,
-          time: new Date().toTimeString().slice(0, 5),
-          highlight: true,
-        }
-        const updated = [...conversation.value, stamped]
-        conversation.value = updated
-        typing.value = false
-        window.setTimeout(() => {
-          const followUp = [...conversation.value]
-          const targetIndex = updated.length - 1
-          if (followUp[targetIndex]) {
-            followUp[targetIndex] = { ...followUp[targetIndex], highlight: false }
-            conversation.value = followUp
-          }
-        }, 2500)
-      }, 1400)
-    }, 9500)
-  }
-})
-
-onBeforeUnmount(() => {
-  if (presenceTimer) window.clearInterval(presenceTimer)
-  if (demoTimer) window.clearInterval(demoTimer)
-})
+const getInitial = (name?: string) => {
+  if (!name) return '?'
+  return name.trim().charAt(0).toUpperCase()
+}
 
 function handleSend() {
   if (!input.value.trim()) return
   emit('send', input.value.trim())
-  if (!props.messages) {
-    conversation.value = [
-      ...conversation.value,
-      {
-        id: String(Date.now()),
-        author: 'You',
-        time: new Date().toTimeString().slice(0, 5),
-        message: input.value.trim(),
-      },
-    ]
-  }
   input.value = ''
+}
+
+function handleReact(messageId: string | undefined, emoji: string) {
+  if (!messageId || !emoji) return
+  emit('react', { messageId, emoji })
+  if (openReactionFor.value === messageId) {
+    openReactionFor.value = null
+  }
+}
+
+function toggleReactionPicker(messageId: string | undefined) {
+  if (!messageId) return
+  openReactionFor.value = openReactionFor.value === messageId ? null : messageId
 }
 </script>
 
@@ -150,35 +68,75 @@ function handleSend() {
         <h2>チームチャット</h2>
         <p>{{ onlineMembers }}人がオンライン</p>
       </div>
-      <button type="button" class="chat__close" aria-label="閉じる">×</button>
     </header>
 
-    <ul class="chat__messages">
-      <li
-        v-for="message in conversation"
-        :key="message.id || `${message.time}-${message.author}`"
-        :class="{
-          'chat__messages--update': message.type === 'update',
-          'is-highlight': message.highlight,
-        }"
-      >
-        <header>
-          <span class="chat__author">{{ message.author }}</span>
-          <time>{{ message.time }}</time>
-        </header>
-        <p>{{ message.message }}</p>
-      </li>
-    </ul>
-
-    <div v-if="typing && isDemo" class="chat__typing">
-      <span class="chat__typing-dot" />
-      <span class="chat__typing-dot" />
-      <span class="chat__typing-dot" />
-      Teamie Bot がメッセージを入力しています…
+    <div class="chat__body" role="log" aria-live="polite">
+      <p v-if="props.loading" class="chat__empty">読み込み中...</p>
+      <p v-else-if="!conversation.length" class="chat__empty">
+        まだメッセージがありません。最初のメッセージを送信しましょう。
+      </p>
+      <ul v-else class="chat__messages">
+        <li
+          v-for="message in conversation"
+          :key="message.id || `${message.time}-${message.author}-${message.message}`"
+          class="chat__item"
+        >
+          <div class="chat__avatar" aria-hidden="true">{{ getInitial(message.author) }}</div>
+          <div
+            class="chat__bubble"
+            @dblclick="handleReact(message.id, defaultReaction)"
+          >
+            <header class="chat__bubble-header">
+              <div>
+                <span class="chat__author">{{ message.author }}</span>
+                <time>{{ message.time }}</time>
+              </div>
+              <button
+                v-if="props.allowReactions && message.id"
+                type="button"
+                class="chat__reaction-button"
+                @click="toggleReactionPicker(message.id)"
+              >
+                ＋
+              </button>
+            </header>
+            <p>{{ message.message }}</p>
+            <div v-if="message.reactions?.length" class="chat__reaction-summary">
+              <button
+                v-for="reaction in message.reactions"
+                :key="`${message.id}-${reaction.emoji}`"
+                type="button"
+                class="chat__reaction-chip"
+                @click="handleReact(message.id, reaction.emoji)"
+              >
+                {{ reaction.emoji }} <span>{{ reaction.count }}</span>
+              </button>
+            </div>
+            <div
+              v-if="props.allowReactions && message.id && openReactionFor === message.id"
+              class="chat__reaction-picker"
+            >
+              <button
+                v-for="emoji in props.reactionOptions"
+                :key="`${message.id}-picker-${emoji}`"
+                type="button"
+                @click="handleReact(message.id, emoji)"
+              >
+                {{ emoji }}
+              </button>
+            </div>
+          </div>
+        </li>
+      </ul>
     </div>
 
     <footer v-if="props.showComposer !== false" class="chat__footer">
-      <input v-model="input" type="text" placeholder="メッセージを入力..." />
+      <input
+        v-model="input"
+        type="text"
+        placeholder="メッセージを入力..."
+        @keydown.enter.prevent="handleSend"
+      />
       <button type="button" @click="handleSend">送信</button>
     </footer>
   </section>
@@ -216,51 +174,115 @@ function handleSend() {
   color: var(--text-muted);
 }
 
-.chat__close {
-  border: none;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background: rgba(79, 124, 130, 0.15);
-  color: var(--primary-strong);
-  cursor: pointer;
+.chat__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.5rem;
+  gap: 0.75rem;
+}
+
+.chat__empty {
+  margin: 0;
+  color: var(--text-muted);
 }
 
 .chat__messages {
   list-style: none;
   margin: 0;
-  padding: 1.5rem 1.5rem 0.75rem;
-  display: grid;
-  gap: 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   max-height: 320px;
   overflow-y: auto;
 }
 
-.chat__messages li {
-  padding: 1rem;
-  border-radius: 1rem;
-  background: rgba(184, 227, 233, 0.28);
+.chat__item {
   display: grid;
-  gap: 0.4rem;
-  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
 }
 
-.chat__messages--update {
-  border: 1px solid rgba(79, 124, 130, 0.4);
-  background: rgba(184, 227, 233, 0.4);
+.chat__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: rgba(79, 124, 130, 0.22);
+  color: var(--primary-strong);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
 }
 
-.chat__messages li.is-highlight {
-  background: rgba(184, 227, 233, 0.6);
-  box-shadow: 0 16px 28px rgba(11, 46, 51, 0.15);
-  transform: translateY(-2px);
+.chat__bubble {
+  padding: 0.85rem 1rem;
+  border-radius: 1.25rem;
+  background: rgba(184, 227, 233, 0.28);
+  box-shadow: 0 8px 18px rgba(11, 46, 51, 0.08);
 }
 
-.chat__messages header {
+.chat__bubble-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 0.85rem;
   color: var(--text-muted);
+  gap: 0.75rem;
+}
+
+.chat__reaction-summary {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.chat__reaction-chip {
+  border: none;
+  border-radius: 999px;
+  background: rgba(11, 46, 51, 0.08);
+  color: var(--text-strong);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+.chat__reaction-chip span {
+  font-weight: 600;
+}
+
+.chat__reaction-picker {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.chat__reaction-picker button {
+  border: none;
+  background: rgba(11, 46, 51, 0.05);
+  border-radius: 0.65rem;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.chat__reaction-button {
+  border: none;
+  background: rgba(11, 46, 51, 0.08);
+  border-radius: 0.6rem;
+  color: var(--primary-strong);
+  font-size: 0.9rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  cursor: pointer;
 }
 
 .chat__author {
@@ -268,7 +290,7 @@ function handleSend() {
   color: var(--text-strong);
 }
 
-.chat__messages p {
+.chat__bubble p {
   margin: 0;
   color: var(--text);
   line-height: 1.6;
@@ -278,7 +300,7 @@ function handleSend() {
   margin-top: auto;
   display: flex;
   gap: 0.75rem;
-  padding: 1.5rem 1.5rem 1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
   border-top: 1px solid rgba(11, 46, 51, 0.08);
   background: rgba(184, 227, 233, 0.18);
 }
@@ -300,40 +322,6 @@ function handleSend() {
   color: var(--surface-elevated);
   font-weight: 600;
   cursor: pointer;
-}
-
-.chat__typing {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 1.5rem 0.75rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.chat__typing-dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 999px;
-  background: rgba(79, 124, 130, 0.75);
-  animation: typing 1.2s infinite ease-in-out;
-}
-
-.chat__typing-dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.chat__typing-dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-0.25rem);
-  }
 }
 
 @media (max-width: 768px) {

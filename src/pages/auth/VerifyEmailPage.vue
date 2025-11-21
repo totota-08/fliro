@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AppButton from '@/components/ui/AppButton.vue'
