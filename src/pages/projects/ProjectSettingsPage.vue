@@ -85,6 +85,21 @@ const canDeleteProject = computed(
 
 const canEdit = computed(() => canManage.value)
 
+const summaryInfo = computed(() => {
+  const created = project.value?.createdAt
+  const createdLabel =
+    created && 'seconds' in created
+      ? new Date(created.seconds * 1000).toLocaleDateString()
+      : created
+      ? new Date(created).toLocaleDateString()
+      : '-'
+  return {
+    created: createdLabel,
+    ownerId: project.value?.ownerUserId ?? '-',
+    members: project.value?.stats?.totalMembers ?? '-',
+  }
+})
+
 async function loadProjectList() {
   if (!user.value) return
   const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
@@ -249,6 +264,26 @@ watch(
 
         <template v-else>
           <section class="settings-card" :class="{ 'is-disabled': !canEdit }">
+            <div class="settings-card__grid">
+              <div class="settings-meta">
+                <p class="settings-meta__eyebrow">基本情報</p>
+                <h2>{{ project?.name || '未設定のプロジェクト' }}</h2>
+                <ul>
+                  <li>
+                    <span>作成日</span>
+                    <strong>{{ summaryInfo.created }}</strong>
+                  </li>
+                  <li>
+                    <span>オーナー</span>
+                    <strong>{{ summaryInfo.ownerId }}</strong>
+                  </li>
+                  <li>
+                    <span>メンバー数</span>
+                    <strong>{{ summaryInfo.members }}</strong>
+                  </li>
+                </ul>
+              </div>
+              <div class="settings-form-wrapper">
             <header>
               <h2>基本情報</h2>
               <p>プロジェクト名や概要を編集できます。</p>
@@ -277,6 +312,8 @@ watch(
                 <p v-if="successMessage" class="settings-success">{{ successMessage }}</p>
               </div>
             </form>
+              </div>
+            </div>
           </section>
 
           <section class="settings-card settings-card--danger">
@@ -289,7 +326,6 @@ watch(
               <input
                 v-model="deleteConfirmInput"
                 type="email"
-                :placeholder="confirmEmail || 'メールアドレス'"
               />
             </label>
             <p class="danger-note">この操作は取り消せません。タスクやメンバー情報がすべて削除されます。</p>
@@ -405,6 +441,61 @@ watch(
   border: 1px solid #f0c9c9;
 }
 
+.settings-card__grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.settings-form-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-meta {
+  border: 1px solid rgba(11, 46, 51, 0.1);
+  border-radius: 1rem;
+  padding: 1rem;
+  background: rgba(11, 46, 51, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-meta__eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.settings-meta h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.settings-meta ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.settings-meta li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.settings-meta strong {
+  color: var(--text-strong);
+}
+
 .danger-note {
   margin: 0;
   color: #8b3a3a;
@@ -419,6 +510,10 @@ watch(
 @media (max-width: 768px) {
   .settings-content {
     padding: 1.25rem;
+  }
+
+  .settings-card__grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
