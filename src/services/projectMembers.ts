@@ -1,4 +1,5 @@
-import { db } from '@/firebase/config'
+import { database, db } from '@/firebase/config'
+import { ref, remove, set } from 'firebase/database'
 import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
 
 interface AddProjectMemberOptions {
@@ -59,9 +60,20 @@ export async function addProjectMember({
     },
     { merge: true },
   )
+
+  // Sync to Realtime Database for chat rules
+  const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`)
+  await set(rtdbRef, {
+    role,
+    joinedAt: Date.now(),
+  })
 }
 
 export async function removeProjectMember(projectId: string, userId: string) {
   await deleteDoc(doc(db, 'projects', projectId, 'members', userId))
   await deleteDoc(doc(db, 'userProjects', userId, 'projects', projectId))
+
+  // Remove from Realtime Database
+  const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`)
+  await remove(rtdbRef)
 }

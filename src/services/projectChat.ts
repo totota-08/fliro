@@ -1,5 +1,18 @@
-import { database } from '@/firebase/config'
-import { limitToLast, onValue, orderByKey, push, query, ref as dbRef, serverTimestamp } from 'firebase/database'
+import { database, db } from '@/firebase/config'
+import {
+  ref as dbRef,
+  get as getValue,
+  limitToLast,
+  onValue,
+  orderByKey,
+  push,
+  query,
+  remove,
+  serverTimestamp,
+  set as setValue,
+  update,
+} from 'firebase/database'
+import { doc, getDoc } from 'firebase/firestore'
 
 export interface ReactionSummary {
   emoji: string
@@ -35,31 +48,79 @@ function summarizeReactions(reactions: any): ReactionSummary[] {
   return Object.entries(counts).map(([emoji, count]) => ({ emoji, count }))
 }
 
-export function listenProjectChat(projectId: string, callback: (messages: ChatMessage[]) => void) {
-  const chatRef = query(dbRef(database, `projects/${projectId}/realtimeChat`), orderByKey(), limitToLast(50))
-  const unsubscribe = onValue(chatRef, (snapshot) => {
-    const items: ChatMessage[] = []
-    snapshot.forEach((child) => {
-      const data = child.val() as any
-      items.push({
-        id: child.key || '',
-        text: data?.text ?? '',
-        author: data?.author ?? data?.senderName ?? 'Unknown',
-        senderName: data?.senderName ?? data?.author,
-        senderId: data?.senderId,
-        projectId: data?.projectId,
-        linkedTaskId: data?.linkedTaskId,
-        createdAt: resolveTimestamp(data?.createdAt),
-        reactionSummary: summarizeReactions(data?.reactions),
+const memberSyncCache = new Map<string, Promise<void>>()
+
+async function ensureRealtimeMember(projectId: string, userId: string) {
+  if (!projectId || !userId) return
+  const cacheKey = `${projectId}:${userId}`
+  if (memberSyncCache.has(cacheKey)) {
+    return memberSyncCache.get(cacheKey)!
+  }
+
+  const task = (async () => {
+    try {
+      const memberRef = dbRef(database, `projects/${projectId}/members/${userId}`)
+      const snapshot = await getValue(memberRef)
+      if (snapshot.exists()) return
+
+      const memberDoc = await getDoc(doc(db, 'projects', projectId, 'members', userId))
+      const data = memberDoc.exists() ? memberDoc.data() : null
+
+      const joinedAt = (data as any)?.joinedAt
+      await setValue(memberRef, {
+        role: (data?.role as string) || 'member',
+        joinedAt: typeof joinedAt?.seconds === 'number' ? joinedAt.seconds * 1000 : Date.now(),
       })
-    })
-    items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
-    callback(items)
-  })
+    } catch (error) {
+      console.warn('Failed to ensure realtime member entry', error)
+    }
+  })()
+
+  memberSyncCache.set(cacheKey, task)
+  try {
+    await task
+  } finally {
+    memberSyncCache.delete(cacheKey)
+  }
+}
+
+export function listenProjectChat(
+  projectId: string,
+  callback: (messages: ChatMessage[]) => void,
+  onError?: (error: Error) => void,
+) {
+  const chatRef = query(dbRef(database, `projects/${projectId}/realtimeChat`), orderByKey(), limitToLast(50))
+  const unsubscribe = onValue(
+    chatRef,
+    (snapshot) => {
+      const items: ChatMessage[] = []
+      snapshot.forEach((child) => {
+        const data = child.val() as any
+        items.push({
+          id: child.key || '',
+          text: data?.text ?? '',
+          author: data?.author ?? data?.senderName ?? 'Unknown',
+          senderName: data?.senderName ?? data?.author,
+          senderId: data?.senderId,
+          projectId: data?.projectId,
+          linkedTaskId: data?.linkedTaskId,
+          createdAt: resolveTimestamp(data?.createdAt),
+          reactionSummary: summarizeReactions(data?.reactions),
+        })
+      })
+      items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+      callback(items)
+    },
+    (error) => {
+      console.error('Chat listener error:', error)
+      if (onError) onError(error)
+    },
+  )
   return () => unsubscribe()
 }
 
 export async function sendProjectMessage(projectId: string, senderId: string, senderName: string, text: string) {
+  await ensureRealtimeMember(projectId, senderId)
   await push(dbRef(database, `projects/${projectId}/realtimeChat`), {
     text,
     author: senderName,
@@ -72,9 +133,32 @@ export async function sendProjectMessage(projectId: string, senderId: string, se
 
 export async function addMessageReaction(projectId: string, messageId: string, emoji: string, userId: string) {
   if (!emoji) return
+  await ensureRealtimeMember(projectId, userId)
   await push(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}/reactions`), {
     emoji,
     userId,
     createdAt: serverTimestamp(),
   })
+}
+
+export async function updateProjectMessage(
+  projectId: string,
+  messageId: string,
+  text?: string,
+  linkedTaskId?: string,
+) {
+  const updates: any = {
+    updatedAt: serverTimestamp(),
+  }
+  if (text !== undefined && text.trim()) {
+    updates.text = text.trim()
+  }
+  if (linkedTaskId !== undefined) {
+    updates.linkedTaskId = linkedTaskId
+  }
+  await update(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`), updates)
+}
+
+export async function deleteProjectMessage(projectId: string, messageId: string) {
+  await remove(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`))
 }

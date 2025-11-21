@@ -4,11 +4,13 @@ import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import { deleteProject, fetchProject, updateProjectMetadata } from '@/firebase/projectService'
+import { updateProjectSettings } from '@/services/projectSettings'
+import { listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -26,6 +28,14 @@ const deleteError = ref('')
 const deleteConfirmInput = ref('')
 const isSidebarOpen = ref(true)
 const canManage = ref(false)
+
+const aiEnabled = ref(false)
+const aiKey = ref('')
+const aiPrompt = ref('')
+const aiResponse = ref('')
+const aiLoading = ref(false)
+const tasks = ref<TaskDoc[]>([])
+let stopTasks: (() => void) | null = null
 
 const form = ref({
   name: '',
@@ -126,6 +136,8 @@ async function loadProject() {
       isPublic: Boolean(fetched.settings?.isPublic),
       allowGuestView: Boolean(fetched.settings?.allowGuestView),
     }
+    aiEnabled.value = Boolean(fetched.settings?.aiChatEnabled)
+    aiKey.value = fetched.settings?.aiApiKey ?? ''
     await evaluatePermissions()
   } catch (error) {
     console.error(error)
@@ -151,6 +163,65 @@ async function evaluatePermissions() {
   } catch (error) {
     console.error('Failed to evaluate permissions', error)
     canManage.value = false
+  }
+}
+
+function watchTasks() {
+  stopTasks = listenTasks(projectId.value, (list) => {
+    tasks.value = list
+  })
+}
+
+async function saveAiSettings() {
+  if (!canEdit.value) return
+  try {
+    await updateProjectSettings(projectId.value, { aiChatEnabled: aiEnabled.value, aiApiKey: aiKey.value })
+    successMessage.value = 'AI設定を保存しました。'
+    setTimeout(() => {
+      successMessage.value = ''
+    }, 3000)
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = 'AI設定の保存に失敗しました。'
+  }
+}
+
+async function askAi() {
+  if (!aiEnabled.value) {
+    aiResponse.value = 'AI チャットは無効化されています。'
+    return
+  }
+  if (!aiKey.value) {
+    aiResponse.value = '先に API キーを設定してください。'
+    return
+  }
+  if (!aiPrompt.value.trim()) return
+  aiLoading.value = true
+  aiResponse.value = ''
+  try {
+    const summary = tasks.value.slice(0, 10).map((task) => `- ${task.title} [${task.status}]`).join('\n')
+    const body = {
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are a task assistant for the Teamie project.' },
+        { role: 'user', content: `Tasks:\n${summary}\nUser question: ${aiPrompt.value}` },
+      ],
+    }
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${aiKey.value}`,
+      },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) throw new Error('AI API エラー')
+    const data = await response.json()
+    aiResponse.value = data.choices?.[0]?.message?.content || '回答を取得できませんでした。'
+  } catch (error: any) {
+    aiResponse.value = error?.message || 'AI 応答に失敗しました。'
+  } finally {
+    aiLoading.value = false
   }
 }
 
@@ -218,6 +289,11 @@ onMounted(async () => {
   }
   await loadProjectList()
   await loadProject()
+  watchTasks()
+})
+
+onBeforeUnmount(() => {
+  stopTasks?.()
 })
 
 watch(
@@ -225,7 +301,9 @@ watch(
   async (newId) => {
     if (!newId) return
     projectId.value = String(newId)
+    stopTasks?.()
     await loadProject()
+    watchTasks()
   },
 )
 </script>
@@ -351,6 +429,68 @@ watch(
                     </transition>
                   </div>
                 </form>
+              </section>
+
+              <section class="card" :class="{ 'is-disabled': !canEdit }">
+                <header class="card-header">
+                  <div class="card-header__icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2>AI アシスタント</h2>
+                    <p>OpenAI API を使用してタスクのサポートを行います</p>
+                  </div>
+                </header>
+
+                <div class="form-stack">
+                  <div class="form-toggles">
+                    <label class="toggle-switch">
+                      <input type="checkbox" v-model="aiEnabled" :disabled="!canEdit" />
+                      <span class="toggle-slider"></span>
+                      <span class="toggle-label">
+                        <span class="toggle-title">AI アシスタントを有効化</span>
+                        <span class="toggle-desc">タスクの内容に基づいてAIが回答します</span>
+                      </span>
+                    </label>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="aiKey">OpenAI API Key</label>
+                    <input
+                      id="aiKey"
+                      v-model="aiKey"
+                      type="password"
+                      :disabled="!canEdit"
+                      class="form-input"
+                      placeholder="sk-..."
+                    />
+                  </div>
+
+                  <div class="form-actions">
+                    <AppButton type="button" :disabled="!canEdit" variant="primary" @click="saveAiSettings">
+                      設定を保存
+                    </AppButton>
+                  </div>
+
+                  <div v-if="aiEnabled" class="ai-playground">
+                    <h3>テストチャット</h3>
+                    <textarea
+                      v-model="aiPrompt"
+                      class="form-textarea"
+                      placeholder="タスクについて質問してください"
+                    ></textarea>
+                    <div class="form-actions">
+                      <AppButton type="button" :disabled="aiLoading || !aiKey" @click="askAi">
+                        {{ aiLoading ? '応答中...' : 'AIに聞く' }}
+                      </AppButton>
+                    </div>
+                    <div v-if="aiResponse" class="ai-response">
+                      <p>{{ aiResponse }}</p>
+                    </div>
+                  </div>
+                </div>
               </section>
 
               <section class="card card--danger">
@@ -795,5 +935,29 @@ watch(
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.ai-playground {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.ai-playground h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 1rem 0;
+}
+
+.ai-response {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border: 1px solid #bae6fd;
+  color: #0c4a6e;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
 }
 </style>
