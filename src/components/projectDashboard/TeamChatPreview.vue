@@ -9,6 +9,7 @@ export interface PreviewChatMessage {
   type?: 'update'
   reactions?: { emoji: string; count: number }[]
   senderId?: string
+  linkedTaskId?: string
 }
 
 const props = withDefaults(
@@ -21,10 +22,12 @@ const props = withDefaults(
     reactionOptions?: string[]
     currentUserId?: string
     currentUserName?: string
+    tasks?: { id: string; title: string }[]
   }>(),
   {
     allowReactions: true,
     reactionOptions: () => ['👍', '🎉', '❤️', '🔥', '😄'],
+    tasks: () => [],
   },
 )
 
@@ -33,6 +36,8 @@ const emit = defineEmits<{
   (e: 'react', value: { messageId: string; emoji: string }): void
   (e: 'update', value: { messageId: string; text: string }): void
   (e: 'delete', value: string): void
+  (e: 'convert-task', value: { messageId: string; text: string }): void
+  (e: 'link-task', value: { messageId: string; taskId: string }): void
 }>()
 
 const input = ref('')
@@ -43,6 +48,7 @@ const defaultReaction = '👍'
 const chatContainer = ref<HTMLElement | null>(null)
 const editingMessageId = ref<string | null>(null)
 const editingText = ref('')
+const taskMap = computed(() => Object.fromEntries(props.tasks.map((task) => [task.id, task.title])))
 
 const getInitial = (name?: string) => {
   if (!name) return '?'
@@ -100,6 +106,16 @@ function deleteMessage(messageId: string | undefined) {
   emit('delete', messageId)
 }
 
+function convertToTask(messageId: string | undefined, text: string) {
+  if (!messageId) return
+  emit('convert-task', { messageId, text })
+}
+
+function linkTask(messageId: string | undefined, taskId: string) {
+  if (!messageId) return
+  emit('link-task', { messageId, taskId })
+}
+
 watch(
   () => props.messages,
   () => {
@@ -118,10 +134,6 @@ watch(
         <p class="chat__presence">
           <span class="chat__presence-dot" aria-hidden="true" /> {{ onlineMembers }}人がオンライン
         </p>
-      </div>
-      <div class="chat__badges">
-        <span class="chip">Live</span>
-        <span class="chip chip--muted">ダブルクリックでリアクションを追加できます</span>
       </div>
     </header>
 
@@ -164,6 +176,18 @@ watch(
               >
                 ☺
               </button>
+              
+              <div class="chat__task-actions">
+                <button type="button" @click="convertToTask(message.id, message.message)" title="タスク化">📋</button>
+                <div class="chat__link-task-wrapper">
+                  <button type="button" title="タスクに紐付け">🔗</button>
+                  <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)">
+                    <option value="">タスクを選択</option>
+                    <option v-for="task in props.tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+                  </select>
+                </div>
+              </div>
+
               <div
                 v-if="props.currentUserId && (message.senderId === props.currentUserId || message.author === props.currentUserName)"
                 class="chat__owner-actions"
@@ -201,6 +225,12 @@ watch(
                 </button>
               </div>
             </div>
+            
+            <div v-if="message.linkedTaskId" class="chat__linked-task-row">
+              <span class="chat__linked-task">
+                紐付け済み: {{ taskMap[message.linkedTaskId] || message.linkedTaskId }}
+              </span>
+            </div>
           </div>
         </li>
       </ul>
@@ -211,10 +241,9 @@ watch(
         <input
           v-model="input"
           type="text"
-          placeholder="Slackのように、ここからすばやく送信できます"
+          placeholder="メッセージを入力してください"
           @keydown.enter.prevent="handleSend"
         />
-        <small>Enter で送信 / ダブルクリックで 👍</small>
       </div>
       <button type="button" class="chat__send" @click="handleSend">送信</button>
     </footer>
@@ -331,7 +360,7 @@ watch(
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: linear-gradient(160deg, #b8e3e9, #4f7c82);
+  background: #b8e3e9;
   color: #0b2e33;
   font-weight: 700;
   display: grid;
@@ -448,8 +477,8 @@ watch(
 }
 
 .chat__editor-actions button:first-child {
-  background: linear-gradient(135deg, #4f7c82, #9acfd7);
-  color: #0b2e33;
+  background: #4f7c82;
+  color: #ffffff;
   font-weight: 600;
 }
 
@@ -490,13 +519,14 @@ watch(
   border: 1px solid #d7e2ef;
   background: rgba(184, 227, 233, 0.35);
   border-radius: 999px;
-  padding: 0.25rem 0.6rem;
+  padding: 0.15rem 0.5rem;
   cursor: pointer;
   color: #0b2e33;
   display: inline-flex;
-  gap: 0.35rem;
+  gap: 0.25rem;
   align-items: center;
   font-weight: 600;
+  font-size: 0.8rem;
 }
 
 .chat__reaction-trigger {
@@ -528,6 +558,64 @@ watch(
   margin: 0 0 0.35rem;
   color: #4f6b73;
   font-size: 0.85rem;
+}
+
+.chat__task-actions {
+  display: flex;
+  gap: 0.25rem;
+  border-left: 1px solid #e2edef;
+  padding-left: 0.25rem;
+  margin-left: 0.25rem;
+  align-items: center;
+}
+
+.chat__task-actions button {
+  border: none;
+  background: transparent;
+  color: #54757c;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat__task-actions button:hover {
+  background: #f0f7f8;
+  color: #0b2e33;
+}
+
+.chat__link-task-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.chat__link-task-wrapper select {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.chat__linked-task-row {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e2edef;
+}
+
+.chat__linked-task {
+  font-size: 0.75rem;
+  color: #6d8a92;
+  background: #f0f7f8;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
 }
 
 .chat__reaction-grid {
@@ -587,9 +675,9 @@ watch(
 }
 
 .chat__send {
-  background: linear-gradient(135deg, #4f7c82, #9acfd7);
+  background: #4f7c82;
   border: none;
-  color: #0b2e33;
+  color: #ffffff;
   padding: 0.85rem 1.2rem;
   border-radius: 12px;
   font-weight: 700;

@@ -5,15 +5,21 @@ import TeamChatPreview, { type PreviewChatMessage } from '@/components/projectDa
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
-import { addMessageReaction, listenProjectChat, sendProjectMessage, type ChatMessage } from '@/services/projectChat'
-import { updateProjectSettings } from '@/services/projectSettings'
 import {
-    createTask,
-    deleteTask,
-    listenTasks,
-    updateTask,
-    type TaskDoc,
-    type TaskStatus,
+  addMessageReaction,
+  deleteProjectMessage,
+  listenProjectChat,
+  sendProjectMessage,
+  updateProjectMessage,
+  type ChatMessage,
+} from '@/services/projectChat'
+import {
+  createTask,
+  deleteTask,
+  listenTasks,
+  updateTask,
+  type TaskDoc,
+  type TaskStatus,
 } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
@@ -45,11 +51,6 @@ const chatLoading = ref(true)
 const notifications = ref<string[]>([])
 const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all' })
 const showMyTasksOnly = ref(false)
-const aiEnabled = ref(false)
-const aiKey = ref('')
-const aiPrompt = ref('')
-const aiResponse = ref('')
-const aiLoading = ref(false)
 const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
 const secondaryTab = ref<'chat' | 'members'>('chat')
@@ -219,6 +220,8 @@ const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
       : '--:--',
     message: message.text,
     reactions: message.reactionSummary || [],
+    senderId: message.senderId,
+    linkedTaskId: message.linkedTaskId,
   })),
 )
 
@@ -252,8 +255,6 @@ function watchProject() {
   stopProject = onSnapshot(doc(db, 'projects', projectId.value), (snapshot) => {
     if (!snapshot.exists()) return
     project.value = snapshot.data() as ProjectDoc
-    aiEnabled.value = Boolean(project.value?.settings?.aiChatEnabled)
-    aiKey.value = project.value?.settings?.aiApiKey ?? ''
   })
   stopMembers = onSnapshot(collection(db, 'projects', projectId.value, 'members'), async (snapshot) => {
     const promises = snapshot.docs.map(async (docSnap) => {
@@ -414,6 +415,27 @@ async function reactToChatMessage(payload: { messageId: string; emoji: string })
   await addMessageReaction(projectId.value, payload.messageId, payload.emoji, user.value.uid)
 }
 
+async function handleUpdateMessage(payload: { messageId: string; text: string }) {
+  if (!user.value || !payload.messageId || !payload.text) return
+  await updateProjectMessage(projectId.value, payload.messageId, payload.text)
+}
+
+async function handleDeleteMessage(messageId: string) {
+  if (!user.value || !messageId) return
+  await deleteProjectMessage(projectId.value, messageId)
+}
+
+async function handleConvertToTask(payload: { messageId: string; text: string }) {
+  if (!user.value) return
+  const taskId = await createTask(projectId.value, { title: payload.text }, user.value.uid)
+  await updateProjectMessage(projectId.value, payload.messageId, undefined, taskId)
+}
+
+async function handleLinkTask(payload: { messageId: string; taskId: string }) {
+  if (!user.value) return
+  await updateProjectMessage(projectId.value, payload.messageId, undefined, payload.taskId)
+}
+
 function isMemberRecentlyActive(member: MemberEntry) {
   if (!member.lastAccessedAt?.seconds) return false
   const lastAccess = member.lastAccessedAt.seconds * 1000
@@ -445,48 +467,7 @@ function getMemberInitials(name: string) {
   return trimmed.slice(0, 2).toUpperCase()
 }
 
-async function saveAiSettings() {
-  await updateProjectSettings(projectId.value, { aiChatEnabled: aiEnabled.value, aiApiKey: aiKey.value })
-}
 
-async function askAi() {
-  if (!aiEnabled.value) {
-    aiResponse.value = 'AI チャットは無効化されています。'
-    return
-  }
-  if (!aiKey.value) {
-    aiResponse.value = '先に API キーを設定してください。'
-    return
-  }
-  if (!aiPrompt.value.trim()) return
-  aiLoading.value = true
-  aiResponse.value = ''
-  try {
-    const summary = tasks.value.slice(0, 10).map((task) => `- ${task.title} [${task.status}]`).join('\n')
-    const body = {
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a task assistant for the Teamie project.' },
-        { role: 'user', content: `Tasks:\n${summary}\nUser question: ${aiPrompt.value}` },
-      ],
-    }
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${aiKey.value}`,
-      },
-      body: JSON.stringify(body),
-    })
-    if (!response.ok) throw new Error('AI API エラー')
-    const data = await response.json()
-    aiResponse.value = data.choices?.[0]?.message?.content || '回答を取得できませんでした。'
-  } catch (error: any) {
-    aiResponse.value = error?.message || 'AI 応答に失敗しました。'
-  } finally {
-    aiLoading.value = false
-  }
-}
 
 function closeSidebar() {
   isSidebarOpen.value = false
@@ -675,25 +656,16 @@ onBeforeUnmount(() => {
                 :online-count="members.length"
                 :show-composer="true"
                 :loading="chatLoading"
+                :current-user-id="user?.uid"
+                :current-user-name="profile?.nickname || profile?.fullName"
+                :tasks="tasks"
                 @send="sendChatMessage"
                 @react="reactToChatMessage"
+                @update="handleUpdateMessage"
+                @delete="handleDeleteMessage"
+                @convert-task="handleConvertToTask"
+                @link-task="handleLinkTask"
               />
-
-              <section class="ai-panel">
-                <h3>AI アシスタント</h3>
-                <label class="toggle">
-                  <input type="checkbox" v-model="aiEnabled" />
-                  <span>AI を有効化</span>
-                </label>
-                <label>
-                  API Key
-                  <input v-model="aiKey" type="password" placeholder="sk-..." />
-                </label>
-                <button type="button" @click="saveAiSettings">設定を保存</button>
-                <textarea v-model="aiPrompt" rows="3" placeholder="質問を入力"></textarea>
-                <button type="button" :disabled="aiLoading" @click="askAi">{{ aiLoading ? '応答中...' : 'AIに聞く' }}</button>
-                <p class="ai-response" v-if="aiResponse">{{ aiResponse }}</p>
-              </section>
             </div>
 
             <div v-else class="member-preview">

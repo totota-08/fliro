@@ -141,12 +141,22 @@ export async function addMessageReaction(projectId: string, messageId: string, e
   })
 }
 
-export async function updateProjectMessage(projectId: string, messageId: string, text: string) {
-  if (!text.trim()) return
-  await update(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`), {
-    text: text.trim(),
+export async function updateProjectMessage(
+  projectId: string,
+  messageId: string,
+  text?: string,
+  linkedTaskId?: string,
+) {
+  const updates: any = {
     updatedAt: serverTimestamp(),
-  })
+  }
+  if (text !== undefined && text.trim()) {
+    updates.text = text.trim()
+  }
+  if (linkedTaskId !== undefined) {
+    updates.linkedTaskId = linkedTaskId
+  }
+  await update(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`), updates)
 }
 
 export async function deleteProjectMessage(projectId: string, messageId: string) {
