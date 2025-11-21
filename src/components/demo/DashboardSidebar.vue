@@ -432,6 +432,8 @@ const handleNavigate = () => {
   border-radius: 1rem;
   background: rgba(79, 124, 130, 0.16);
   backdrop-filter: blur(10px);
+  position: sticky;
+  bottom: 1rem;
 }
 
 .avatar {

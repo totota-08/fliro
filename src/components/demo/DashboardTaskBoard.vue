@@ -226,7 +226,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  overflow-x: hidden;
 }
+
 
 .board__header {
   display: flex;
@@ -275,7 +277,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  box-sizing: border-box;
+  min-width: 0;
 }
+
 
 .board-column__header {
   display: flex;
@@ -324,7 +329,10 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  width: 100%;
+  box-sizing: border-box;
 }
+
 
 .task-card__head {
   display: flex;
