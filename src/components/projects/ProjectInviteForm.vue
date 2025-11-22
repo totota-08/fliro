@@ -20,6 +20,14 @@ const emit = defineEmits<{
 const { user } = useAuthStore()
 const enablePassword = ref(false)
 const password = ref('')
+const expiryOptions = [
+  { label: '24時間', value: 24 },
+  { label: '7日間', value: 24 * 7 },
+  { label: '30日間', value: 24 * 30 },
+  { label: '期限なし', value: null },
+]
+const expiry = ref<number | null>(24 * 7)
+const maxUses = ref<string>('')
 const generating = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -38,6 +46,11 @@ async function handleGenerate() {
     errorMessage.value = 'パスワードは4文字以上で入力してください。'
     return
   }
+  const maxUsesNumber = maxUses.value.trim() ? Number(maxUses.value.trim()) : null
+  if (maxUsesNumber !== null && (!Number.isFinite(maxUsesNumber) || maxUsesNumber < 1)) {
+    errorMessage.value = '利用回数は1以上の数値を入力してください。'
+    return
+  }
   generating.value = true
   errorMessage.value = ''
   successMessage.value = ''
@@ -46,6 +59,8 @@ async function handleGenerate() {
       projectId: props.projectId,
       createdBy: user.value.uid,
       password: enablePassword.value ? password.value.trim() : null,
+      expiresInHours: expiry.value ?? null,
+      maxUses: maxUsesNumber,
     })
     const link = typeof window !== 'undefined' ? `${window.location.origin}/invite/${token}` : token
     generatedLink.value = link
@@ -121,6 +136,16 @@ function tryFallbackCopy(text: string) {
         type="password"
         placeholder="共有用パスワード（4文字以上）"
       />
+
+      <label class="small-label">有効期限</label>
+      <select v-model="expiry">
+        <option v-for="opt in expiryOptions" :key="String(opt.value)" :value="opt.value">
+          {{ opt.label }}
+        </option>
+      </select>
+
+      <label class="small-label">利用回数上限（任意・未入力で無制限）</label>
+      <input v-model="maxUses" type="number" min="1" placeholder="例) 10" />
     </div>
 
     <div class="invite-actions">
@@ -172,12 +197,25 @@ function tryFallbackCopy(text: string) {
   gap: 0.75rem;
 }
 
+.invite-options select,
+.invite-options input[type='number'] {
+  border: 2px solid #b8e3e9;
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.9rem;
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
   color: #0b2e33;
+}
+
+.small-label {
+  font-weight: 600;
+  color: #0b2e33;
+  font-size: 0.9rem;
 }
 
 .invite-options input[type='password'] {
