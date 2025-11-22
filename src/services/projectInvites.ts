@@ -6,6 +6,8 @@ interface CreateInviteOptions {
   projectId: string
   createdBy: string
   password?: string | null
+  expiresInHours?: number | null
+  maxUses?: number | null
 }
 
 export interface ProjectInviteDoc {
@@ -17,6 +19,10 @@ export interface ProjectInviteDoc {
   acceptedBy?: string
   status: 'pending' | 'accepted'
   passwordHash?: string | null
+  expiresAt?: Date | null
+  maxUses?: number | null
+  usedCount?: number | null
+  acceptedEmail?: string | null
 }
 
 function createToken() {
@@ -38,10 +44,19 @@ async function hashInvitePassword(password: string) {
     .join('')
 }
 
-export async function createProjectInvite({ projectId, createdBy, password }: CreateInviteOptions) {
+export async function createProjectInvite({
+  projectId,
+  createdBy,
+  password,
+  expiresInHours,
+  maxUses,
+}: CreateInviteOptions) {
   const token = createToken()
   const ref = doc(db, 'projectInvites', token)
   const passwordHash = password?.trim() ? await hashInvitePassword(password.trim()) : null
+  const expiresAt =
+    typeof expiresInHours === 'number' && expiresInHours > 0 ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000) : null
+  const sanitizedMaxUses = typeof maxUses === 'number' && maxUses > 0 ? Math.max(1, Math.floor(maxUses)) : null
   await setDoc(ref, {
     projectId,
     createdBy,
@@ -49,6 +64,9 @@ export async function createProjectInvite({ projectId, createdBy, password }: Cr
     passwordHash,
     createdAt: serverTimestamp(),
     status: 'pending',
+    expiresAt,
+    maxUses: sanitizedMaxUses,
+    usedCount: 0,
   })
   return token
 }
@@ -60,6 +78,28 @@ export async function redeemInvite(token: string, userId: string, email: string,
     throw new Error('招待リンクが無効です。')
   }
   const data = snap.data() as ProjectInviteDoc
+
+  let expiresAtMillis: number | null = null
+  const rawExpires = (data as any).expiresAt
+  if (rawExpires) {
+    if (typeof rawExpires.toMillis === 'function') {
+      expiresAtMillis = rawExpires.toMillis()
+    } else if (typeof rawExpires.seconds === 'number') {
+      expiresAtMillis = rawExpires.seconds * 1000
+    } else if (rawExpires instanceof Date) {
+      expiresAtMillis = rawExpires.getTime()
+    }
+  }
+  if (expiresAtMillis && Date.now() > expiresAtMillis) {
+    throw new Error('invite-expired')
+  }
+
+  const maxUses = data.maxUses ?? null
+  const usedCount = data.usedCount ?? 0
+  if (maxUses && usedCount >= maxUses) {
+    throw new Error('invite-usage-limit')
+  }
+
   if (data.passwordHash) {
     const provided = options?.password?.trim()
     if (!provided) {
@@ -70,7 +110,7 @@ export async function redeemInvite(token: string, userId: string, email: string,
       throw new Error('invite-password-invalid')
     }
   }
-  if (data.status === 'accepted') {
+  if (data.status === 'accepted' && (!maxUses || usedCount >= maxUses)) {
     return data.projectId
   }
 
@@ -79,7 +119,8 @@ export async function redeemInvite(token: string, userId: string, email: string,
 
   await addProjectMember({ projectId: data.projectId, userId, role: 'member', invitedBy: data.createdBy, projectName })
   await updateDoc(ref, {
-    status: 'accepted',
+    status: maxUses && usedCount + 1 >= maxUses ? 'accepted' : 'pending',
+    usedCount: usedCount + 1,
     acceptedAt: serverTimestamp(),
     acceptedBy: userId,
     acceptedEmail: email,

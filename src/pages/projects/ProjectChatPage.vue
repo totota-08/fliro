@@ -349,6 +349,18 @@ onBeforeUnmount(() => {
               <button type="button" class="reaction-button" @click.stop="toggleReactionPicker(message.id)" title="リアクション">
                 ☺
               </button>
+              
+              <div class="chat-card__actions">
+                <button type="button" @click="convertToTask(message.id, message.text)" title="タスク化">📋</button>
+                <div class="chat-card__link-task-wrapper">
+                  <button type="button" title="タスクに紐付け">🔗</button>
+                  <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)">
+                    <option value="">タスクを選択</option>
+                    <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="chat-card__actions" v-if="user && (message.senderId === user.uid || message.author === (profile?.nickname || profile?.fullName))">
                 <button type="button" @click="startEditing(message)" title="編集">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -383,19 +395,6 @@ onBeforeUnmount(() => {
             </div>
             <p v-else class="chat-card__text">{{ message.text }}</p>
 
-            <div class="chat-card__toolbar">
-              <div class="chat-card__links">
-                <button type="button" @click="convertToTask(message.id, message.text)">タスク化</button>
-                <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)">
-                  <option value="">タスクに紐付け</option>
-                  <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
-                </select>
-                <span v-if="message.linkedTaskId">
-                  紐付け済み: {{ taskMap[message.linkedTaskId] || message.linkedTaskId }}
-                </span>
-              </div>
-            </div>
-
             <div v-if="message.reactionSummary?.length" class="chat-card__reactions">
               <button
                 v-for="reaction in message.reactionSummary"
@@ -419,6 +418,12 @@ onBeforeUnmount(() => {
                   {{ emoji }}
                 </button>
               </div>
+            </div>
+            
+            <div v-if="message.linkedTaskId" class="chat-card__linked-task-row">
+              <span class="chat-card__linked-task">
+                紐付け済み: {{ taskMap[message.linkedTaskId] || message.linkedTaskId }}
+              </span>
             </div>
           </div>
         </article>
@@ -796,38 +801,36 @@ onBeforeUnmount(() => {
   color: #0b2e33;
 }
 
-.chat-card__toolbar {
-  margin-top: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.chat-card__link-task-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
 }
 
-.chat-card__links {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.chat-card__links button,
-.chat-card__links select {
-  border: 1px solid #d7e2ef;
-  border-radius: 6px;
-  padding: 0.35rem 0.6rem;
-  background: #f7fbfc;
-  color: #4f7c82;
-  font-size: 0.85rem;
+.chat-card__link-task-wrapper select {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.chat-card__links button:hover,
-.chat-card__links select:hover {
-  background: #e9f4f7;
-  border-color: #b8e3e9;
+.chat-card__linked-task-row {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #54757c;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-card__linked-task {
+  background: #f0f7f8;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #e2edef;
 }
 
 .chat-card__reactions {
