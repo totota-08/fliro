@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { ROUTE_NAMES } from '@/constants/routes'
 import type { DashboardNavItem, DashboardProfileInfo, DashboardProjectItem } from '@/types/projectDashboard'
 
 type NavItem = DashboardNavItem & { active: boolean }
@@ -218,13 +219,17 @@ const handleNavigate = () => {
       </ul>
     </div>
 
-    <div class="sidebar__profile">
+    <RouterLink
+      :to="{ name: ROUTE_NAMES.myPage }"
+      class="sidebar__profile"
+      @click="handleNavigate"
+    >
       <div class="avatar">{{ props.profile?.name?.charAt(0) || 'T' }}</div>
       <div>
         <p class="profile__name">{{ props.profile?.name }}</p>
         <p class="profile__mail">{{ props.profile?.email }}</p>
       </div>
-    </div>
+    </RouterLink>
   </aside>
 </template>
 
@@ -475,8 +480,15 @@ const handleNavigate = () => {
   backdrop-filter: blur(10px);
   position: sticky;
   bottom: 1rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
+.sidebar__profile:hover {
+  background: rgba(184, 227, 233, 0.28);
+  transform: translateY(-1px);
+}
 
 
 .avatar {

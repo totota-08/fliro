@@ -26,6 +26,7 @@ export interface ChatMessage {
   senderName?: string
   senderId?: string
   projectId?: string
+  channelId?: string
   linkedTaskId?: string
   createdAt?: number
   reactionSummary?: ReactionSummary[]
@@ -103,6 +104,7 @@ export function listenProjectChat(
           senderName: data?.senderName ?? data?.author,
           senderId: data?.senderId,
           projectId: data?.projectId,
+          channelId: typeof data?.channelId === 'string' ? data.channelId : 'general',
           linkedTaskId: data?.linkedTaskId,
           createdAt: resolveTimestamp(data?.createdAt),
           reactionSummary: summarizeReactions(data?.reactions),
@@ -119,7 +121,13 @@ export function listenProjectChat(
   return () => unsubscribe()
 }
 
-export async function sendProjectMessage(projectId: string, senderId: string, senderName: string, text: string) {
+export async function sendProjectMessage(
+  projectId: string,
+  senderId: string,
+  senderName: string,
+  text: string,
+  channelId = 'general',
+) {
   await ensureRealtimeMember(projectId, senderId)
   await push(dbRef(database, `projects/${projectId}/realtimeChat`), {
     text,
@@ -127,6 +135,7 @@ export async function sendProjectMessage(projectId: string, senderId: string, se
     senderName,
     senderId,
     projectId,
+    channelId,
     createdAt: serverTimestamp(),
   })
 }

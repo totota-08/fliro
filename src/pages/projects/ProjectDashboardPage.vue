@@ -407,6 +407,7 @@ async function sendChatMessage(text: string) {
     user.value.uid,
     profile.value?.nickname || profile.value?.fullName || 'User',
     text,
+    'general',
   )
 }
 
