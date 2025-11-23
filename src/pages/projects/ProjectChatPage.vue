@@ -41,6 +41,8 @@ const { user, profile } = useAuthStore()
 const projectId = String(route.params.projectId)
 const messages = ref<ChatMessage[]>([])
 const input = ref('')
+const createTaskOnSend = ref(false)
+const selectedTaskId = ref('')
 const tasks = ref<TaskDoc[]>([])
 const project = ref<ProjectDoc | null>(null)
 const projectMembers = ref<ProjectMember[]>([])
@@ -49,6 +51,7 @@ const reactionOptions = ['👍', '🎉', '❤️', '🔥', '😄']
 const openReactionFor = ref<string | null>(null)
 const defaultReaction = '👍'
 const chatContainer = ref<HTMLElement | null>(null)
+const composerInputEl = ref<HTMLInputElement | null>(null)
 const editingMessageId = ref<string | null>(null)
 const editingText = ref('')
 const channelSearch = ref('')
@@ -60,6 +63,9 @@ const newMessagePreview = ref('新着メッセージがあります')
 const unreadChannels = ref<Record<string, boolean>>({})
 const seenMessages = ref<Record<string, string>>({})
 const replyingTo = ref<ChatMessage | null>(null)
+const mentionQuery = ref('')
+const mentionDropdownOpen = ref(false)
+const mentionCaret = ref(0)
 
 let unsubscribeTasks: (() => void) | null = null
 let unsubscribeChat: (() => void) | null = null
@@ -139,6 +145,16 @@ const memberMap = computed(() => {
     map.set(member.userId, member)
   })
   return map
+})
+
+const mentionCandidates = computed(() => {
+  const q = mentionQuery.value.trim().toLowerCase()
+  return projectMembers.value
+    .map((member) => ({
+      id: member.userId,
+      name: member.nickname || member.fullName || member.displayName || member.userId,
+    }))
+    .filter((entry) => (q ? entry.name.toLowerCase().includes(q) : true))
 })
 
 const lastMessageMeta = computed(() => {
@@ -248,18 +264,181 @@ function watchMembers() {
   })
 }
 
+function memberNameById(id?: string | null) {
+  if (!id) return ''
+  const member = projectMembers.value.find((m) => m.userId === id)
+  return member?.nickname || member?.fullName || member?.displayName || ''
+}
+
+function extractMentions(text: string) {
+  const matches = text.match(/@([^\s@]+)/g) || []
+  return matches
+    .map((tag) => tag.replace('@', ''))
+    .map((name) => {
+      const member = projectMembers.value.find(
+        (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === name.toLowerCase(),
+      )
+      return { name, userId: member?.userId }
+    })
+}
+
+function handleComposerInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  mentionCaret.value = target.selectionStart ?? input.value.length
+  const uptoCaret = input.value.slice(0, mentionCaret.value)
+  const match = uptoCaret.match(/@([^\s@]{0,20})$/)
+  if (match) {
+    mentionQuery.value = match[1]
+    mentionDropdownOpen.value = true
+  } else {
+    mentionDropdownOpen.value = false
+    mentionQuery.value = ''
+  }
+}
+
+function insertMention(candidate: { id: string; name: string }) {
+  const start = mentionCaret.value
+  const textBefore = input.value.slice(0, start)
+  const match = textBefore.match(/@([^\s@]{0,20})$/)
+  const prefixLen = match ? match[0].length : 0
+  const insertPos = start - prefixLen
+  input.value = `${input.value.slice(0, insertPos)}@${candidate.name} ${input.value.slice(start)}`
+  mentionDropdownOpen.value = false
+  nextTick(() => {
+    const el = composerInputEl.value
+    if (el) {
+      const cursor = insertPos + candidate.name.length + 2
+      el.focus()
+      el.setSelectionRange(cursor, cursor)
+    }
+  })
+}
+
+function resetComposer() {
+  input.value = ''
+  replyingTo.value = null
+  createTaskOnSend.value = false
+  selectedTaskId.value = ''
+  mentionDropdownOpen.value = false
+  mentionQuery.value = ''
+  openReactionFor.value = null
+}
+
+async function sendBotMessage(text: string) {
+  await sendProjectMessage(
+    projectId,
+    'bot',
+    'Teamie Bot',
+    text,
+    currentChannel.value?.id || 'general',
+    undefined,
+    { isBot: true },
+  )
+}
+
+async function handleSlashCommand(text: string, mentions: { name: string; userId?: string | null }[]) {
+  const lower = text.toLowerCase()
+  if (lower.startsWith('/ping')) {
+    await sendBotMessage('pong')
+    return true
+  }
+  if (lower.startsWith('/time')) {
+    await sendBotMessage(new Date().toLocaleString())
+    return true
+  }
+  if (lower.startsWith('/news')) {
+    try {
+      const res = await fetch('https://hn.algolia.com/api/v1/search?tags=front_page')
+      const data = await res.json()
+      const items = (data?.hits || []).slice(0, 3).map((hit: any, idx: number) => `${idx + 1}. ${hit?.title}`)
+      await sendBotMessage(items.length ? `今日のニュース\n${items.join('\n')}` : 'ニュースを取得できませんでした')
+    } catch (error) {
+      await sendBotMessage('ニュースの取得に失敗しました')
+    }
+    return true
+  }
+  if (lower.startsWith('/newtask')) {
+    const titleMatch = text.match(/\/newTask\s*"([^"]+)"/i)
+    const whoMatch = text.match(/\/who\s+([^\s]+)/i)
+    const title = titleMatch?.[1] || text.replace(/\/newTask/i, '').trim()
+    const assigneeName = whoMatch?.[1]
+    const assignee =
+      (assigneeName &&
+        projectMembers.value.find((m) =>
+          (m.nickname || m.fullName || m.displayName || '').toLowerCase().includes(assigneeName.toLowerCase()),
+        )?.userId) ||
+      mentions.find((m) => m.userId)?.userId ||
+      null
+    const taskId = await createTask(
+      projectId,
+      { title: title || '新規タスク', assigneeId: assignee, assigneeName: assignee ? memberNameById(assignee) : null },
+      user.value!.uid,
+    )
+    await sendProjectMessage(
+      projectId,
+      user.value!.uid,
+      profile.value?.nickname || profile.value?.fullName || 'User',
+      title || text,
+      currentChannel.value?.id || 'general',
+      undefined,
+      { linkedTaskId: taskId, mentions: mentions.map((m) => m.userId || m.name), isTask: true },
+    )
+    await sendBotMessage(
+      `${profile.value?.nickname || profile.value?.fullName || 'ユーザー'}さんが${
+        assignee ? memberNameById(assignee) || '担当者未設定' : '担当者未設定'
+      }にタスクを割り当てました`,
+    )
+    return true
+  }
+  return false
+}
+
 async function sendMessage() {
   if (!input.value.trim() || !user.value) return
+  const text = input.value.trim()
+  const mentions = extractMentions(text)
+
+  if (text.startsWith('/')) {
+    const handled = await handleSlashCommand(text, mentions)
+    if (handled) {
+      resetComposer()
+      return
+    }
+  }
+
+  let linkedTaskId: string | null = null
+  if (createTaskOnSend.value) {
+    const assignee = mentions.find((m) => m.userId)?.userId || null
+    linkedTaskId = await createTask(
+      projectId,
+      {
+        title: text,
+        assigneeId: assignee,
+        assigneeName: assignee ? memberNameById(assignee) : null,
+      },
+      user.value.uid,
+    )
+  } else if (selectedTaskId.value) {
+    linkedTaskId = selectedTaskId.value
+  }
+
   await sendProjectMessage(
     projectId,
     user.value.uid,
     profile.value?.nickname || profile.value?.fullName || 'User',
-    input.value.trim(),
+    text,
     currentChannel.value?.id || 'general',
-    replyingTo.value?.id
+    replyingTo.value?.id,
+    {
+      linkedTaskId: linkedTaskId || undefined,
+      mentions: mentions.map((m) => m.userId || m.name),
+      isTask: createTaskOnSend.value || Boolean(linkedTaskId),
+    },
   )
-  input.value = ''
-  replyingTo.value = null
+  if (linkedTaskId) {
+    activeChannelId.value = linkedTaskId
+  }
+  resetComposer()
   markChannelAsRead(currentChannel.value?.id || 'general')
   newMessageBanner.value = false
   scrollToBottom()
@@ -438,6 +617,7 @@ onBeforeUnmount(() => {
                 <span class="timestamp" v-if="message.createdAt">
                   {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                 </span>
+                <span v-if="message.linkedTaskId || message.isTask" class="message-badge badge-task">タスク</span>
                 <span 
                   v-if="getMessageTypeLabel(detectMessageType(message.text))" 
                   class="message-badge"
@@ -586,15 +766,41 @@ onBeforeUnmount(() => {
           <span>返信中: <strong>{{ replyingTo.author }}</strong></span>
           <button @click="cancelReplying" class="cancel-reply-btn">✕</button>
         </div>
+        <div class="composer-options">
+          <label class="option">
+            <input v-model="createTaskOnSend" type="checkbox" />
+            <span>このメッセージをタスク化</span>
+          </label>
+          <label class="option">
+            <span>既存タスクに紐付け</span>
+            <select v-model="selectedTaskId">
+              <option value="">なし</option>
+              <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+            </select>
+          </label>
+        </div>
         <div class="input-wrapper">
           <input 
             v-model="input" 
             type="text" 
             id="messageInput" 
             :placeholder="composerPlaceholder"
+            ref="composerInputEl"
             @keydown.enter="sendMessage"
+            @input="handleComposerInput"
+            @keyup="handleComposerInput"
           >
           <button class="send-btn" type="button" @click="sendMessage">→</button>
+        </div>
+        <div v-if="mentionDropdownOpen && mentionCandidates.length" class="mention-dropdown">
+          <button
+            v-for="candidate in mentionCandidates"
+            :key="candidate.id"
+            type="button"
+            @click="insertMention(candidate)"
+          >
+            @{{ candidate.name }}
+          </button>
         </div>
       </div>
     </main>
@@ -880,6 +1086,11 @@ onBeforeUnmount(() => {
   color: #0b2e33;
 }
 
+.badge-task {
+  background: rgba(79, 124, 130, 0.15);
+  color: #0b2e33;
+}
+
 .message-text {
   font-size: 15px;
   line-height: 1.6;
@@ -1105,6 +1316,30 @@ onBeforeUnmount(() => {
   background: #ffffff;
 }
 
+.composer-options {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  align-items: center;
+  color: #0b2e33;
+  font-weight: 600;
+}
+
+.composer-options .option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.composer-options select {
+  border-radius: 0.65rem;
+  border: 1px solid #d1dae8;
+  padding: 0.35rem 0.55rem;
+  background: #fff;
+}
+
 .reply-banner {
   display: flex;
   justify-content: space-between;
@@ -1195,5 +1430,26 @@ onBeforeUnmount(() => {
 
 .send-btn:active {
   transform: scale(0.95);
+}
+
+.mention-dropdown {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+.mention-dropdown button {
+  border: 1px solid #d1dae8;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.mention-dropdown button:hover {
+  background: rgba(11, 46, 51, 0.08);
 }
 </style>

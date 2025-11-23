@@ -31,6 +31,9 @@ export interface ChatMessage {
   createdAt?: number
   reactionSummary?: ReactionSummary[]
   replyToId?: string
+  mentions?: string[]
+  isBot?: boolean
+  isTask?: boolean
 }
 
 function resolveTimestamp(value: any): number | undefined {
@@ -110,6 +113,9 @@ export function listenProjectChat(
           createdAt: resolveTimestamp(data?.createdAt),
           reactionSummary: summarizeReactions(data?.reactions),
           replyToId: data?.replyToId,
+          mentions: Array.isArray(data?.mentions) ? data.mentions : [],
+          isBot: Boolean(data?.isBot),
+          isTask: Boolean(data?.isTask),
         })
       })
       items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
@@ -130,8 +136,11 @@ export async function sendProjectMessage(
   text: string,
   channelId = 'general',
   replyToId?: string,
+  metadata?: { linkedTaskId?: string | null; mentions?: string[]; isBot?: boolean; isTask?: boolean },
 ) {
-  await ensureRealtimeMember(projectId, senderId)
+  if (!metadata?.isBot) {
+    await ensureRealtimeMember(projectId, senderId)
+  }
   const payload: any = {
     text,
     author: senderName,
@@ -144,6 +153,10 @@ export async function sendProjectMessage(
   if (replyToId) {
     payload.replyToId = replyToId
   }
+  if (metadata?.linkedTaskId) payload.linkedTaskId = metadata.linkedTaskId
+  if (metadata?.mentions?.length) payload.mentions = metadata.mentions
+  if (metadata?.isBot) payload.isBot = metadata.isBot
+  if (metadata?.isTask) payload.isTask = metadata.isTask
   await push(dbRef(database, `projects/${projectId}/realtimeChat`), payload)
 }
 

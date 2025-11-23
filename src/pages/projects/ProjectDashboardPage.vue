@@ -222,6 +222,7 @@ const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
     reactions: message.reactionSummary || [],
     senderId: message.senderId,
     linkedTaskId: message.linkedTaskId,
+    isTask: message.isTask,
   })),
 )
 
