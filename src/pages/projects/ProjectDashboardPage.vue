@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
-import TeamChatPreview, { type PreviewChatMessage } from '@/components/projectDashboard/TeamChatPreview.vue'
+import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
@@ -23,7 +23,7 @@ import {
 } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
-import type { DashboardNavItem } from '@/types/projectDashboard'
+import type { DashboardNavItem, PreviewChatMessage } from '@/types/projectDashboard'
 import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'

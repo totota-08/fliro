@@ -30,6 +30,7 @@ export interface ChatMessage {
   linkedTaskId?: string
   createdAt?: number
   reactionSummary?: ReactionSummary[]
+  replyToId?: string
 }
 
 function resolveTimestamp(value: any): number | undefined {
@@ -108,6 +109,7 @@ export function listenProjectChat(
           linkedTaskId: data?.linkedTaskId,
           createdAt: resolveTimestamp(data?.createdAt),
           reactionSummary: summarizeReactions(data?.reactions),
+          replyToId: data?.replyToId,
         })
       })
       items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
@@ -127,9 +129,10 @@ export async function sendProjectMessage(
   senderName: string,
   text: string,
   channelId = 'general',
+  replyToId?: string,
 ) {
   await ensureRealtimeMember(projectId, senderId)
-  await push(dbRef(database, `projects/${projectId}/realtimeChat`), {
+  const payload: any = {
     text,
     author: senderName,
     senderName,
@@ -137,7 +140,11 @@ export async function sendProjectMessage(
     projectId,
     channelId,
     createdAt: serverTimestamp(),
-  })
+  }
+  if (replyToId) {
+    payload.replyToId = replyToId
+  }
+  await push(dbRef(database, `projects/${projectId}/realtimeChat`), payload)
 }
 
 export async function addMessageReaction(projectId: string, messageId: string, emoji: string, userId: string) {
