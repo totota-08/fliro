@@ -11,6 +11,18 @@ export type DashboardNavItem = {
   tooltip?: string
 }
 
+import type { ReactionSummary } from '@/services/projectChat'
+
+export interface PreviewChatMessage {
+  id: string
+  author: string
+  time: string
+  message: string
+  reactions?: ReactionSummary[]
+  senderId?: string
+  linkedTaskId?: string | null
+}
+
 export type DashboardProjectItem = {
   key: string
   label: string

@@ -1,6 +1,17 @@
 import { database, db } from '@/firebase/config'
 import { ref, remove, set } from 'firebase/database'
-import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+
+export interface ProjectMember {
+  userId: string
+  role: 'owner' | 'admin' | 'member' | 'viewer'
+  projectRole: 'owner' | 'member'
+  nickname?: string
+  fullName?: string
+  email?: string
+  avatarUrl?: string
+  displayName?: string // Computed property for display
+}
 
 interface AddProjectMemberOptions {
   projectId: string
@@ -15,6 +26,27 @@ interface AddProjectMemberOptions {
     email?: string
     avatarUrl?: string
   }
+}
+
+export function listenProjectMembers(projectId: string, callback: (members: ProjectMember[]) => void) {
+  const membersRef = collection(db, 'projects', projectId, 'members')
+  return onSnapshot(membersRef, (snapshot) => {
+    const members: ProjectMember[] = []
+    snapshot.forEach((doc) => {
+      const data = doc.data()
+      members.push({
+        userId: doc.id,
+        role: data.role,
+        projectRole: data.projectRole,
+        nickname: data.nickname,
+        fullName: data.fullName,
+        email: data.email,
+        avatarUrl: data.avatarUrl,
+        displayName: data.nickname || data.fullName || 'Unknown User',
+      })
+    })
+    callback(members)
+  })
 }
 
 export async function addProjectMember({

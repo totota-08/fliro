@@ -1,252 +1,190 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import type { TaskDoc } from '@/services/taskService';
+import type { PreviewChatMessage } from '@/types/projectDashboard';
+import { computed, reactive, ref, toRefs } from 'vue';
 
-export interface PreviewChatMessage {
-  id?: string
-  author: string
-  time: string
-  message: string
-  type?: 'update'
-  reactions?: { emoji: string; count: number }[]
-  senderId?: string
-  linkedTaskId?: string
-}
-
-const props = withDefaults(
-  defineProps<{
-    messages?: PreviewChatMessage[]
-    onlineCount?: number
-    showComposer?: boolean
-    loading?: boolean
-    allowReactions?: boolean
-    reactionOptions?: string[]
-    currentUserId?: string
-    currentUserName?: string
-    tasks?: { id: string; title: string }[]
-  }>(),
-  {
-    allowReactions: true,
-    reactionOptions: () => ['👍', '🎉', '❤️', '🔥', '😄'],
-    tasks: () => [],
-  },
-)
-
-const emit = defineEmits<{
-  (e: 'send', value: string): void
-  (e: 'react', value: { messageId: string; emoji: string }): void
-  (e: 'update', value: { messageId: string; text: string }): void
-  (e: 'delete', value: string): void
-  (e: 'convert-task', value: { messageId: string; text: string }): void
-  (e: 'link-task', value: { messageId: string; taskId: string }): void
+const props = defineProps<{
+  messages: PreviewChatMessage[]
+  onlineCount?: number
+  showComposer?: boolean
+  loading?: boolean
+  currentUserId?: string | null
+  currentUserName?: string | null
+  tasks?: TaskDoc[]
 }>()
 
+const emit = defineEmits<{
+  (e: 'send', text: string): void
+  (e: 'react', payload: { messageId: string; emoji: string }): void
+  (e: 'update', payload: { messageId: string; text: string }): void
+  (e: 'delete', messageId: string): void
+  (e: 'convert-task', payload: { messageId: string; text: string }): void
+  (e: 'link-task', payload: { messageId: string; taskId: string }): void
+}>()
+
+const chatMessages = computed(() => props.messages || [])
+const availableTasks = computed(() => props.tasks || [])
+const composerEnabled = computed(() => props.showComposer !== false)
+const { onlineCount, loading, currentUserName } = toRefs(props)
+
 const input = ref('')
-const onlineMembers = computed(() => props.onlineCount ?? 0)
-const conversation = computed(() => props.messages ?? [])
-const openReactionFor = ref<string | null>(null)
-const defaultReaction = '👍'
-const chatContainer = ref<HTMLElement | null>(null)
 const editingMessageId = ref<string | null>(null)
 const editingText = ref('')
-const taskMap = computed(() => Object.fromEntries(props.tasks.map((task) => [task.id, task.title])))
+const reactionPalette = ['👍', '🎉', '🔥', '❤️', '💡']
+const linkSelections = reactive<Record<string, string>>({})
 
-const getInitial = (name?: string) => {
-  if (!name) return '?'
-  return name.trim().charAt(0).toUpperCase()
-}
-
-function handleSend() {
-  if (!input.value.trim()) return
-  emit('send', input.value.trim())
+function send() {
+  const text = input.value.trim()
+  if (!text) return
+  emit('send', text)
   input.value = ''
-  scrollToBottom()
 }
 
-function handleReact(messageId: string | undefined, emoji: string) {
-  if (!messageId || !emoji) return
-  emit('react', { messageId, emoji })
-  if (openReactionFor.value === messageId) {
-    openReactionFor.value = null
-  }
-}
-
-function toggleReactionPicker(messageId: string | undefined) {
-  if (!messageId) return
-  openReactionFor.value = openReactionFor.value === messageId ? null : messageId
-}
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    }
-  })
-}
-
-function startEditing(message: PreviewChatMessage) {
-  if (!message.id) return
+function startEdit(message: PreviewChatMessage) {
   editingMessageId.value = message.id
   editingText.value = message.message
 }
 
-function cancelEditing() {
+function saveEdit() {
+  if (!editingMessageId.value) return
+  const text = editingText.value.trim()
+  if (!text) {
+    cancelEdit()
+    return
+  }
+  emit('update', { messageId: editingMessageId.value, text })
+  cancelEdit()
+}
+
+function cancelEdit() {
   editingMessageId.value = null
   editingText.value = ''
 }
 
-function saveEditing() {
-  if (!editingMessageId.value || !editingText.value.trim()) return
-  emit('update', { messageId: editingMessageId.value, text: editingText.value })
-  cancelEditing()
+function reactTo(messageId: string, emoji: string) {
+  if (!emoji) return
+  emit('react', { messageId, emoji })
 }
 
-function deleteMessage(messageId: string | undefined) {
-  if (!messageId) return
-  if (!confirm('このメッセージを削除してもよろしいですか？')) return
+function deleteMessage(messageId: string) {
   emit('delete', messageId)
 }
 
-function convertToTask(messageId: string | undefined, text: string) {
-  if (!messageId) return
-  emit('convert-task', { messageId, text })
+function convertToTask(message: PreviewChatMessage) {
+  emit('convert-task', { messageId: message.id, text: message.message })
 }
 
-function linkTask(messageId: string | undefined, taskId: string) {
-  if (!messageId) return
+function linkTask(messageId: string, taskId: string) {
+  if (!taskId) return
+  linkSelections[messageId] = taskId
   emit('link-task', { messageId, taskId })
 }
 
-watch(
-  () => props.messages,
-  () => {
-    scrollToBottom()
-  },
-  { deep: true },
-)
+function taskTitle(taskId?: string | null) {
+  if (!taskId) return ''
+  const match = availableTasks.value.find((task) => task.id === taskId)
+  return match?.title || ''
+}
+
+function canEdit(message: PreviewChatMessage) {
+  if (!props.currentUserId) return false
+  if (!message.senderId) return true
+  return message.senderId === props.currentUserId
+}
 </script>
 
 <template>
   <section class="chat">
     <header class="chat__header">
-      <div class="chat__title">
-        <p class="chat__eyebrow">Team Feed</p>
-        <h2>チームチャット</h2>
-        <p class="chat__presence">
-          <span class="chat__presence-dot" aria-hidden="true" /> {{ onlineMembers }}人がオンライン
-        </p>
+      <div>
+        <h3>チームチャット</h3>
+        <p v-if="onlineCount !== undefined">{{ onlineCount }}人がオンライン</p>
+        <p v-else>チームの最新メッセージを表示します</p>
       </div>
+      <span v-if="loading" class="chat__badge">同期中...</span>
     </header>
 
-    <div class="chat__body" role="log" aria-live="polite">
-      <p v-if="props.loading" class="chat__empty">読み込み中...</p>
-      <p v-else-if="!conversation.length" class="chat__empty">
-        まだメッセージがありません。最初のメッセージを送信しましょう。
-      </p>
-      <ul v-else class="chat__timeline" ref="chatContainer">
-        <li
-          v-for="message in conversation"
-          :key="message.id || `${message.time}-${message.author}-${message.message}`"
-          class="chat__message"
-        >
-          <div class="chat__avatar" aria-hidden="true">{{ getInitial(message.author) }}</div>
-          <div class="chat__bubble" @dblclick="handleReact(message.id, defaultReaction)">
-            <div class="chat__meta">
-              <div class="chat__meta-primary">
-                <span class="chat__author">{{ message.author }}</span>
-                <time class="chat__time">{{ message.time }}</time>
-              </div>
-            </div>
-
-            <div v-if="editingMessageId === message.id" class="chat__editor">
-              <input v-model="editingText" type="text" @keydown.enter="saveEditing" />
-              <div class="chat__editor-actions">
-                <button type="button" @click="saveEditing">保存</button>
-                <button type="button" @click="cancelEditing">キャンセル</button>
-              </div>
-            </div>
-            <p v-else class="chat__text">{{ message.message }}</p>
-
-            <div class="chat__actions">
-              <button
-                v-if="props.allowReactions && message.id"
-                type="button"
-                class="chat__reaction-trigger"
-                @click="toggleReactionPicker(message.id)"
-                title="リアクションを追加"
-              >
-                ☺
-              </button>
-              
-              <div class="chat__task-actions">
-                <button type="button" @click="convertToTask(message.id, message.message)" title="タスク化">📋</button>
-                <div class="chat__link-task-wrapper">
-                  <button type="button" title="タスクに紐付け">🔗</button>
-                  <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)">
-                    <option value="">タスクを選択</option>
-                    <option v-for="task in props.tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div
-                v-if="props.currentUserId && (message.senderId === props.currentUserId || message.author === props.currentUserName)"
-                class="chat__owner-actions"
-              >
-                <button type="button" @click="startEditing(message)" title="編集">✎</button>
-                <button type="button" @click="deleteMessage(message.id)" title="削除">🗑</button>
-              </div>
-            </div>
-
-            <div v-if="message.reactions?.length" class="chat__reaction-row">
-              <button
-                v-for="reaction in message.reactions"
-                :key="`${message.id}-${reaction.emoji}`"
-                type="button"
-                class="chat__reaction-chip"
-                @click="handleReact(message.id, reaction.emoji)"
-              >
-                {{ reaction.emoji }} <span>{{ reaction.count }}</span>
-              </button>
-            </div>
-
-            <div
-              v-if="props.allowReactions && message.id && openReactionFor === message.id"
-              class="chat__reaction-picker"
-            >
-              <p>リアクションを選択</p>
-              <div class="chat__reaction-grid">
-                <button
-                  v-for="emoji in props.reactionOptions"
-                  :key="`${message.id}-picker-${emoji}`"
-                  type="button"
-                  @click="handleReact(message.id, emoji)"
-                >
-                  {{ emoji }}
-                </button>
-              </div>
-            </div>
-            
-            <div v-if="message.linkedTaskId" class="chat__linked-task-row">
-              <span class="chat__linked-task">
-                紐付け済み: {{ taskMap[message.linkedTaskId] || message.linkedTaskId }}
-              </span>
-            </div>
+    <ul v-if="chatMessages.length" class="chat__messages">
+      <li v-for="message in chatMessages" :key="message.id">
+        <header class="chat__message-header">
+          <div>
+            <span class="chat__author">{{ message.author }}</span>
+            <time>{{ message.time }}</time>
           </div>
-        </li>
-      </ul>
+          <span v-if="message.linkedTaskId" class="chat__task-pill">
+            #{{ taskTitle(message.linkedTaskId) || message.linkedTaskId }}
+          </span>
+        </header>
+
+        <div v-if="editingMessageId === message.id" class="chat__editor">
+          <textarea v-model="editingText" rows="2" />
+          <div class="chat__editor-actions">
+            <button type="button" class="ghost" @click="cancelEdit">キャンセル</button>
+            <button type="button" @click="saveEdit">保存</button>
+          </div>
+        </div>
+        <p v-else class="chat__body">{{ message.message }}</p>
+
+        <div class="chat__meta">
+          <div v-if="message.reactions?.length" class="chat__reactions">
+            <button
+              v-for="reaction in message.reactions"
+              :key="`${message.id}-${reaction.emoji}`"
+              type="button"
+              @click="reactTo(message.id, reaction.emoji)"
+            >
+              <span>{{ reaction.emoji }}</span>
+              <span class="chat__reaction-count">{{ reaction.count }}</span>
+            </button>
+          </div>
+          <div class="chat__actions">
+            <span class="chat__hint">リアクション</span>
+            <button
+              v-for="emoji in reactionPalette"
+              :key="`${message.id}-${emoji}`"
+              type="button"
+              class="ghost"
+              @click="reactTo(message.id, emoji)"
+            >
+              {{ emoji }}
+            </button>
+            <button type="button" class="ghost" @click="convertToTask(message)">タスク化</button>
+            <label v-if="availableTasks.length" class="chat__task-linker">
+              <span>リンク</span>
+              <select
+                :value="message.linkedTaskId || linkSelections[message.id] || ''"
+                @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">未リンク</option>
+                <option v-for="task in availableTasks" :key="task.id" :value="task.id">
+                  {{ task.title }}
+                </option>
+              </select>
+            </label>
+            <button v-if="canEdit(message)" type="button" class="ghost" @click="startEdit(message)">編集</button>
+            <button v-if="canEdit(message)" type="button" class="ghost danger" @click="deleteMessage(message.id)">
+              削除
+            </button>
+          </div>
+        </div>
+      </li>
+    </ul>
+    <div v-else class="chat__empty">
+      <p>メッセージがまだありません。最初のメッセージを送信してみましょう。</p>
     </div>
 
-    <footer v-if="props.showComposer !== false" class="chat__composer">
-      <div class="chat__input-wrap">
-        <input
-          v-model="input"
-          type="text"
-          placeholder="メッセージを入力してください"
-          @keydown.enter.prevent="handleSend"
-        />
+    <div v-if="composerEnabled" class="chat__composer">
+      <textarea
+        v-model="input"
+        rows="2"
+        :placeholder="currentUserName ? `${currentUserName}として送信` : 'メッセージを入力...'"
+        @keyup.enter.exact.prevent="send"
+      />
+      <div class="chat__composer-actions">
+        <button type="button" class="ghost" @click="input = ''">クリア</button>
+        <button type="button" @click="send">送信</button>
       </div>
-      <button type="button" class="chat__send" @click="handleSend">送信</button>
-    </footer>
+    </div>
   </section>
 </template>
 
@@ -254,459 +192,255 @@ watch(
 .chat {
   display: flex;
   flex-direction: column;
-  border-radius: 1rem;
-  border: 1px solid #e2edef;
-  background: linear-gradient(135deg, #f7fbfc, #edf4f6);
-  box-shadow: 0 16px 24px rgba(11, 46, 51, 0.08);
+  border-radius: 1.25rem;
+  border: 1px solid var(--border-light, #d1dae8);
+  background: var(--surface-elevated, #fff);
+  box-shadow: 0 18px 28px rgba(11, 46, 51, 0.12);
   overflow: hidden;
-  color: #0b2e33;
+  padding: 1rem 1.25rem 1.25rem;
+  gap: 0.75rem;
 }
 
 .chat__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
-  gap: 1rem;
-  background: rgba(255, 255, 255, 0.86);
-  border-bottom: 1px solid #e2edef;
 }
 
-.chat__title h2 {
-  margin: 0.25rem 0 0;
+.chat__header h3 {
+  margin: 0;
   font-size: 1.1rem;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  color: var(--text-strong, #0b2e33);
 }
 
-.chat__eyebrow {
-  margin: 0;
-  font-size: 0.75rem;
-  opacity: 0.7;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.chat__header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #6b7280);
 }
 
-.chat__presence {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
-  color: #54757c;
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.chat__presence-dot {
-  width: 8px;
-  height: 8px;
-  background: #31c48d;
-  border-radius: 50%;
-  box-shadow: 0 0 0 6px rgba(49, 196, 141, 0.16);
-}
-
-.chat__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.65rem;
+.chat__badge {
+  padding: 0.3rem 0.7rem;
   border-radius: 999px;
-  background: #e9f4f7;
-  border: 1px solid #d7e2ef;
-  font-size: 0.8rem;
+  background: rgba(79, 124, 130, 0.12);
+  color: #2f5d63;
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
-.chip--muted {
-  background: #f5fafc;
-  color: #6d8a92;
-}
-
-.chat__body {
-  flex: 1;
-  padding: 1rem 1.25rem 1.25rem;
-  background: radial-gradient(circle at 10% 20%, rgba(147, 177, 181, 0.16), transparent 35%),
-    radial-gradient(circle at 82% 12%, rgba(79, 124, 130, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.15));
-}
-
-.chat__empty {
-  margin: 0;
-  color: #6d8a92;
-}
-
-.chat__timeline {
+.chat__messages {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  max-height: 320px;
+  display: grid;
+  gap: 0.9rem;
+  max-height: 420px;
   overflow-y: auto;
 }
 
-.chat__message {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.chat__avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: #b8e3e9;
-  color: #0b2e33;
-  font-weight: 700;
+.chat__messages li {
+  border: 1px solid rgba(79, 124, 130, 0.15);
+  border-radius: 1rem;
+  padding: 0.85rem 0.95rem;
+  background: rgba(184, 227, 233, 0.22);
   display: grid;
-  place-items: center;
+  gap: 0.35rem;
 }
 
-.chat__bubble {
-  flex: 1;
-  background: #ffffff;
-  border: 1px solid #d7e2ef;
-  color: #0b2e33;
-  border-radius: 0 12px 12px 12px;
-  padding: 0.75rem 1rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  position: relative;
-}
-
-.chat__message:hover .chat__actions {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.chat__meta {
+.chat__message-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.chat__meta-primary {
-  display: inline-flex;
   gap: 0.5rem;
-  align-items: baseline;
-}
-
-.chat__actions {
-  position: absolute;
-  top: -12px;
-  right: 10px;
-  background: #ffffff;
-  border: 1px solid #e2edef;
-  border-radius: 8px;
-  padding: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.chat__reaction-trigger,
-.chat__owner-actions button {
-  border: none;
-  background: transparent;
-  color: #54757c;
-  border-radius: 4px;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.chat__reaction-trigger:hover,
-.chat__owner-actions button:hover {
-  background: #f0f7f8;
-  color: #0b2e33;
-}
-
-.chat__owner-actions {
-  display: flex;
-  gap: 0.25rem;
-  border-left: 1px solid #e2edef;
-  padding-left: 0.25rem;
-  margin-left: 0.25rem;
-}
-
-.chat__editor {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.chat__editor input {
-  border: 1px solid #d7e2ef;
-  border-radius: 8px;
-  padding: 0.6rem;
-  width: 100%;
   font-size: 0.9rem;
-  background: #f7fbfc;
-}
-
-.chat__editor-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.chat__editor-actions button {
-  border: none;
-  border-radius: 8px;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.chat__editor-actions button:first-child {
-  background: #4f7c82;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.chat__editor-actions button:first-child:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(79, 124, 130, 0.25);
-}
-
-.chat__editor-actions button:last-child {
-  background: #f7fbfc;
-  color: #6d8a92;
-  border: 1px solid #d7e2ef;
+  color: var(--text-muted, #6b7280);
 }
 
 .chat__author {
   font-weight: 700;
-  color: #0b2e33;
+  color: var(--text-strong, #0b2e33);
+  margin-right: 0.4rem;
 }
 
-.chat__time {
-  font-size: 0.78rem;
-  color: #6d8a92;
-}
-
-.chat__text {
-  margin: 0.35rem 0 0;
-  line-height: 1.55;
-}
-
-.chat__reaction-row {
-  margin-top: 0.65rem;
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.chat__reaction-chip {
-  border: 1px solid #d7e2ef;
-  background: rgba(184, 227, 233, 0.35);
+.chat__task-pill {
   border-radius: 999px;
-  padding: 0.15rem 0.5rem;
-  cursor: pointer;
-  color: #0b2e33;
-  display: inline-flex;
-  gap: 0.25rem;
-  align-items: center;
-  font-weight: 600;
+  background: #0b2e33;
+  color: #fff;
+  padding: 0.25rem 0.65rem;
   font-size: 0.8rem;
+  white-space: nowrap;
 }
 
-.chat__reaction-trigger {
-  border: 1px dashed #c3d6db;
-  background: rgba(184, 227, 233, 0.22);
-  color: #4f7c82;
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
+.chat__body {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--text, #0f172a);
 }
 
-.chat__reaction-trigger:hover {
-  background: rgba(184, 227, 233, 0.35);
-  color: #0b2e33;
-}
-
-.chat__reaction-picker {
-  margin-top: 0.5rem;
-  background: rgba(184, 227, 233, 0.2);
-  border: 1px solid #d7e2ef;
-  border-radius: 12px;
-  padding: 0.65rem;
-  box-shadow: 0 12px 22px rgba(11, 46, 51, 0.12);
-}
-
-.chat__reaction-picker p {
-  margin: 0 0 0.35rem;
-  color: #4f6b73;
-  font-size: 0.85rem;
-}
-
-.chat__task-actions {
-  display: flex;
-  gap: 0.25rem;
-  border-left: 1px solid #e2edef;
-  padding-left: 0.25rem;
-  margin-left: 0.25rem;
-  align-items: center;
-}
-
-.chat__task-actions button {
-  border: none;
-  background: transparent;
-  color: #54757c;
-  border-radius: 4px;
-  width: 28px;
-  height: 28px;
+.chat__meta {
   display: grid;
-  place-items: center;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  gap: 0.45rem;
 }
 
-.chat__task-actions button:hover {
-  background: #f0f7f8;
-  color: #0b2e33;
-}
-
-.chat__link-task-wrapper {
-  position: relative;
-  width: 28px;
-  height: 28px;
-}
-
-.chat__link-task-wrapper select {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.chat__linked-task-row {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e2edef;
-}
-
-.chat__linked-task {
-  font-size: 0.75rem;
-  color: #6d8a92;
-  background: #f0f7f8;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-}
-
-.chat__reaction-grid {
+.chat__reactions {
   display: flex;
-  gap: 0.35rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.chat__reaction-picker button {
-  border: 1px solid #d7e2ef;
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem;
+.chat__reactions button {
+  border: 1px solid rgba(79, 124, 130, 0.35);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  background: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  color: #0b2e33;
-  transition: transform 0.12s ease, background 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
 }
 
-.chat__reaction-picker button:hover {
-  background: #f0f7f8;
-  transform: translateY(-1px);
+.chat__reaction-count {
+  font-size: 0.85rem;
+  color: #2f5d63;
+}
+
+.chat__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chat__actions button {
+  border: 1px solid rgba(79, 124, 130, 0.25);
+  background: #fff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.7rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.chat__actions button.ghost {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.chat__actions button.danger {
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.45);
+}
+
+.chat__hint {
+  font-size: 0.85rem;
+  color: var(--text-muted, #6b7280);
+  margin-right: 0.35rem;
+}
+
+.chat__task-linker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text-muted, #6b7280);
+}
+
+.chat__task-linker select {
+  border-radius: 0.65rem;
+  border: 1px solid rgba(79, 124, 130, 0.35);
+  padding: 0.35rem 0.5rem;
+  background: #fff;
+}
+
+.chat__empty {
+  border: 1px dashed rgba(79, 124, 130, 0.35);
+  border-radius: 1rem;
+  padding: 1rem;
+  color: var(--text-muted, #6b7280);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .chat__composer {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid rgba(11, 46, 51, 0.08);
+  padding-top: 0.75rem;
+}
+
+.chat__composer textarea {
+  width: 100%;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(79, 124, 130, 0.35);
+  padding: 0.75rem 0.85rem;
+  resize: vertical;
+  min-height: 68px;
+}
+
+.chat__composer-actions {
   display: flex;
-  gap: 0.75rem;
-  padding: 0.9rem 1.25rem 1.1rem;
-  align-items: center;
-  background: #f7fbfc;
-  border-top: 1px solid #e2edef;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
-.chat__input-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat__composer input {
-  flex: 1;
-  padding: 0.85rem 1rem;
-  border-radius: 12px;
-  border: 1px solid #d7e2ef;
-  background: #ffffff;
-  color: #0b2e33;
-  font-size: 0.95rem;
-  outline: none;
-}
-
-.chat__input-wrap small {
-  margin-top: 0.3rem;
-  color: #6d8a92;
-}
-
-.chat__composer input::placeholder {
-  color: #93aeb6;
-}
-
-.chat__send {
-  background: #4f7c82;
-  border: none;
-  color: #ffffff;
-  padding: 0.85rem 1.2rem;
-  border-radius: 12px;
-  font-weight: 700;
+.chat__composer-actions button {
+  border-radius: 0.8rem;
+  border: 1px solid rgba(79, 124, 130, 0.35);
+  padding: 0.55rem 1rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  font-weight: 700;
 }
 
-.chat__send:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(79, 124, 130, 0.35);
+.chat__composer-actions button:last-child {
+  background: #0b2e33;
+  color: #fff;
+  border-color: #0b2e33;
 }
 
-.chat__send:active {
-  transform: translateY(0);
+.chat__editor {
+  display: grid;
+  gap: 0.5rem;
 }
 
-@media (max-width: 640px) {
-  .chat__header {
-    flex-direction: column;
-    align-items: flex-start;
+.chat__editor textarea {
+  width: 100%;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(79, 124, 130, 0.35);
+  padding: 0.65rem 0.75rem;
+  min-height: 60px;
+}
+
+.chat__editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.chat__editor-actions button {
+  border-radius: 0.8rem;
+  border: 1px solid rgba(79, 124, 130, 0.35);
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.chat__editor-actions button:last-child {
+  background: #0b2e33;
+  color: #fff;
+  border-color: #0b2e33;
+}
+
+@media (max-width: 768px) {
+  .chat {
+    padding: 1rem;
   }
 
-  .chat__badges {
-    width: 100%;
+  .chat__actions {
+    gap: 0.25rem;
   }
 
-  .chat__composer {
-    flex-direction: column;
-    align-items: stretch;
+  .chat__actions button {
+    padding: 0.3rem 0.5rem;
   }
 }
 </style>

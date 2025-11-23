@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import UserAvatar from '@/components/common/UserAvatar.vue'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { removeAccount, updateAccountAvatar } from '@/services/accountActions'
+import { signOutUser, useAuthStore } from '@/store/auth'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { updateAccountAvatar, removeAccount } from '@/services/accountActions'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { signOutUser, useAuthStore } from '@/store/auth'
 
 const router = useRouter()
 const { user, profile } = useAuthStore()
@@ -11,10 +12,7 @@ const { user, profile } = useAuthStore()
 const maskedPassword = '********'
 const profileJson = computed(() => JSON.stringify(profile.value ?? {}, null, 2))
 const avatarUrl = computed(() => profile.value?.avatarUrl || user.value?.photoURL || '')
-const initials = computed(() => {
-  const source = profile.value?.nickname || profile.value?.fullName || user.value?.email || ''
-  return source ? source.trim().slice(0, 2).toUpperCase() : 'NA'
-})
+
 
 const avatarUploading = ref(false)
 const avatarMessage = ref('')
@@ -76,10 +74,7 @@ const handleSignOut = async () => {
     </header>
 
     <section class="avatar-panel">
-      <div class="avatar-figure">
-        <img v-if="avatarUrl" :src="avatarUrl" alt="ユーザーアイコン" />
-        <span v-else>{{ initials }}</span>
-      </div>
+      <UserAvatar :src="avatarUrl" :name="profile?.nickname || profile?.fullName" :size="96" />
       <div class="avatar-panel__content">
         <p>画像ファイル（PNG / JPG / WEBP など）を選択してアイコンを変更できます。</p>
         <label class="upload-button">
@@ -190,25 +185,7 @@ const handleSignOut = async () => {
   flex: 1;
 }
 
-.avatar-figure {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1.5rem;
-  color: var(--primary-strong);
-}
 
-.avatar-figure img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 
 .upload-button {
   display: inline-flex;

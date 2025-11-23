@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
+import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { database } from '@/firebase/config'
+import { fetchProject } from '@/firebase/projectService'
 import {
-    addMessageReaction,
-    deleteProjectMessage,
-    listenProjectChat,
-    sendProjectMessage,
-    updateProjectMessage,
-    type ChatMessage,
+  addMessageReaction,
+  deleteProjectMessage,
+  listenProjectChat,
+  sendProjectMessage,
+  updateProjectMessage,
+  type ChatMessage,
 } from '@/services/projectChat'
+import { listenProjectMembers, type ProjectMember } from '@/services/projectMembers'
 import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
+import type { ProjectDoc } from '@/types/project'
 import { ref as dbRef, update } from 'firebase/database'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -21,11 +25,13 @@ type ChatChannel = {
   name: string
   description?: string
   type: 'general' | 'task'
+  assigneeId?: string
+  status?: string
 }
 
 const defaultChannel: ChatChannel = {
   id: 'general',
-  name: 'ジェネラル',
+  name: 'general',
   description: '全メンバーと共有するチャネル',
   type: 'general',
 }
@@ -36,6 +42,8 @@ const projectId = String(route.params.projectId)
 const messages = ref<ChatMessage[]>([])
 const input = ref('')
 const tasks = ref<TaskDoc[]>([])
+const project = ref<ProjectDoc | null>(null)
+const projectMembers = ref<ProjectMember[]>([])
 const taskMap = computed(() => Object.fromEntries(tasks.value.map((task) => [task.id, task.title])))
 const reactionOptions = ['👍', '🎉', '❤️', '🔥', '😄']
 const openReactionFor = ref<string | null>(null)
@@ -44,15 +52,18 @@ const chatContainer = ref<HTMLElement | null>(null)
 const editingMessageId = ref<string | null>(null)
 const editingText = ref('')
 const channelSearch = ref('')
+const filterAssigneeId = ref('')
 const activeChannelId = ref('general')
 const notificationsEnabled = ref(true)
 const newMessageBanner = ref(false)
 const newMessagePreview = ref('新着メッセージがあります')
 const unreadChannels = ref<Record<string, boolean>>({})
 const seenMessages = ref<Record<string, string>>({})
+const replyingTo = ref<ChatMessage | null>(null)
 
 let unsubscribeTasks: (() => void) | null = null
 let unsubscribeChat: (() => void) | null = null
+let unsubscribeMembers: (() => void) | null = null
 
 const keyword = computed(() => channelSearch.value.trim().toLowerCase())
 
@@ -62,18 +73,30 @@ const channels = computed<ChatChannel[]>(() => {
     name: task.title || '無題のタスク',
     description: task.description || 'タスクディスカッション',
     type: 'task',
+    assigneeId: task.assigneeId,
+    status: task.status,
   }))
   return [{ ...defaultChannel }, ...taskChannels]
 })
 
-const matchesSearch = (channel: ChatChannel) => {
-  if (!keyword.value) return true
-  const haystack = `${channel.name} ${channel.id}`.toLowerCase()
-  return haystack.includes(keyword.value)
-}
+const filteredTaskChannels = computed(() => {
+  return channels.value.filter((channel) => {
+    if (channel.type !== 'task') return false
+    
+    // Search filter
+    if (keyword.value) {
+      const haystack = `${channel.name} ${channel.id}`.toLowerCase()
+      if (!haystack.includes(keyword.value)) return false
+    }
 
-const generalChannels = computed(() => channels.value.filter((channel) => channel.type === 'general' && matchesSearch(channel)))
-const taskChannels = computed(() => channels.value.filter((channel) => channel.type === 'task' && matchesSearch(channel)))
+    // Assignee filter
+    if (filterAssigneeId.value) {
+      if (channel.assigneeId !== filterAssigneeId.value) return false
+    }
+
+    return true
+  })
+})
 
 const currentChannel = computed<ChatChannel>(() => {
   return channels.value.find((channel) => channel.id === activeChannelId.value) || defaultChannel
@@ -84,6 +107,39 @@ const composerPlaceholder = computed(() => `${currentChannel.value?.name || 'こ
 const currentChannelMessages = computed(() =>
   messages.value.filter((message) => (message.channelId || 'general') === currentChannel.value?.id),
 )
+
+const threadedMessages = computed(() => {
+  const all = currentChannelMessages.value
+  const map = new Map<string, ChatMessage & { replies: ChatMessage[] }>()
+  const roots: (ChatMessage & { replies: ChatMessage[] })[] = []
+
+  // Initialize map
+  all.forEach((msg) => {
+    map.set(msg.id, { ...msg, replies: [] })
+  })
+
+  // Build tree
+  all.forEach((msg) => {
+    const node = map.get(msg.id)!
+    if (msg.replyToId && map.has(msg.replyToId)) {
+      map.get(msg.replyToId)!.replies.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+
+  return roots
+})
+
+
+
+const memberMap = computed(() => {
+  const map = new Map<string, ProjectMember>()
+  projectMembers.value.forEach((member) => {
+    map.set(member.userId, member)
+  })
+  return map
+})
 
 const lastMessageMeta = computed(() => {
   const map: Record<string, { id: string; senderId?: string; preview: string }> = {}
@@ -127,6 +183,7 @@ watch(
 watch(activeChannelId, () => {
   openReactionFor.value = null
   newMessageBanner.value = false
+  replyingTo.value = null
   markChannelAsRead(activeChannelId.value)
   scrollToBottom()
 })
@@ -185,6 +242,12 @@ function watchTasks() {
   })
 }
 
+function watchMembers() {
+  unsubscribeMembers = listenProjectMembers(projectId, (list) => {
+    projectMembers.value = list
+  })
+}
+
 async function sendMessage() {
   if (!input.value.trim() || !user.value) return
   await sendProjectMessage(
@@ -193,8 +256,10 @@ async function sendMessage() {
     profile.value?.nickname || profile.value?.fullName || 'User',
     input.value.trim(),
     currentChannel.value?.id || 'general',
+    replyingTo.value?.id
   )
   input.value = ''
+  replyingTo.value = null
   markChannelAsRead(currentChannel.value?.id || 'general')
   newMessageBanner.value = false
   scrollToBottom()
@@ -241,743 +306,894 @@ async function deleteMessage(messageId: string) {
   await deleteProjectMessage(projectId, messageId)
 }
 
-onMounted(() => {
+function startReplying(message: ChatMessage) {
+  replyingTo.value = message
+  const inputEl = document.getElementById('messageInput')
+  if (inputEl) inputEl.focus()
+}
+
+function cancelReplying() {
+  replyingTo.value = null
+}
+
+// New helper functions for UI revamp
+function detectMessageType(text: string): 'important' | 'question' | 'announcement' | 'success' | 'normal' {
+  const lowerText = text.toLowerCase()
+  if (lowerText.includes('重要') || lowerText.includes('緊急') || lowerText.includes('注意')) {
+    return 'important'
+  }
+  if (lowerText.includes('?') || lowerText.includes('？') || lowerText.includes('質問') || lowerText.includes('教えて')) {
+    return 'question'
+  }
+  if (lowerText.includes('お知らせ') || lowerText.includes('告知') || lowerText.includes('開催')) {
+    return 'announcement'
+  }
+  if (lowerText.includes('完了') || lowerText.includes('成功') || lowerText.includes('✅')) {
+    return 'success'
+  }
+  return 'normal'
+}
+
+function getMessageTypeLabel(type: string) {
+  const labels: Record<string, { text: string; class: string }> = {
+    important: { text: '重要', class: 'badge-important' },
+    question: { text: '質問', class: 'badge-question' },
+    announcement: { text: '告知', class: 'badge-announcement' },
+  }
+  return labels[type] || null
+}
+
+onMounted(async () => {
   watchTasks()
   watchChat()
+  watchMembers()
+  if (projectId) {
+      project.value = await fetchProject(projectId)
+  }
 })
 
 onBeforeUnmount(() => {
   unsubscribeTasks?.()
   unsubscribeChat?.()
+  unsubscribeMembers?.()
 })
 </script>
 
 <template>
-  <div class="chat-layout">
-    <aside class="channel-panel">
-      <div class="channel-panel__header">
-        <div>
-          <p class="channel-panel__eyebrow">Team Channels</p>
-          <h2>チャットスペース</h2>
-          <p class="channel-panel__hint">タスクごとにチャネルを切り替えて議論できます。</p>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="workspace-header">
+        <router-link :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId } }" class="back-link">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </router-link>
+        <div class="workspace-name">{{ project?.name || 'プロジェクト' }}</div>
+      </div>
+      
+      <div class="channels-section">
+        <div class="section-title">チャンネル</div>
+        <div 
+          class="channel-item" 
+          :class="{ active: activeChannelId === 'general' }"
+          @click="selectChannel('general')"
+        >
+          <span class="channel-icon">#</span>
+          <span>general</span>
+          <span v-if="unreadChannels['general']" class="channel-badge"></span>
         </div>
-        <AppButton :to="{ name: ROUTE_NAMES.myTasks }" variant="outline">タスクを管理</AppButton>
-      </div>
-      <div class="channel-panel__search">
-        <input v-model="channelSearch" type="text" placeholder="チャネルを検索" />
-      </div>
-      <section class="channel-section">
-        <p class="channel-section__title">固定チャネル</p>
-        <button
-          v-for="channel in generalChannels"
+
+        <div class="section-title" style="margin-top: 2rem;">タスク</div>
+        <div class="search-box">
+          <input v-model="channelSearch" type="text" placeholder="タスクを検索..." />
+        </div>
+        
+        <div 
+          v-for="channel in filteredTaskChannels" 
           :key="channel.id"
-          type="button"
-          class="channel-pill"
-          :class="{ 'is-active': channel.id === currentChannel?.id }"
+          class="channel-item"
+          :class="{ active: channel.id === currentChannel?.id }"
           @click="selectChannel(channel.id)"
         >
-          <span># {{ channel.name }}</span>
-          <span v-if="unreadChannels[channel.id]" class="pill-indicator" aria-label="新着" />
-        </button>
-      </section>
-      <section class="channel-section">
-        <p class="channel-section__title">タスクチャンネル</p>
-        <p v-if="!taskChannels.length" class="channel-section__empty">
-          タスクを作成すると自動的にチャネルが追加されます。
-        </p>
-        <button
-          v-for="channel in taskChannels"
-          :key="channel.id"
-          type="button"
-          class="channel-pill"
-          :class="{ 'is-active': channel.id === currentChannel?.id }"
-          @click="selectChannel(channel.id)"
-        >
-          <span># {{ channel.name }}</span>
-          <span v-if="unreadChannels[channel.id]" class="pill-indicator" aria-label="新着" />
-        </button>
-      </section>
+          <span class="channel-icon">●</span>
+          <span>{{ channel.name }}</span>
+          <span v-if="unreadChannels[channel.id]" class="channel-badge"></span>
+        </div>
+        <p v-if="!filteredTaskChannels.length" class="empty-text">タスクが見つかりません</p>
+      </div>
+
+      <SidebarUserProfile />
     </aside>
 
-    <section class="chat-main">
-      <header class="chat-main__header">
-        <div>
-          <p class="chat-main__eyebrow">#{{ currentChannel?.name }}</p>
-          <h1>{{ currentChannel?.name }}</h1>
-          <p class="chat-main__description">
-            {{ currentChannel?.description || 'このチャネルで素早くディスカッションしましょう。' }}
-          </p>
-        </div>
-        <div class="chat-main__actions">
-          <button
-            type="button"
-            class="notify-toggle"
-            :class="{ 'is-active': notificationsEnabled }"
-            @click="toggleNotifications"
-          >
-            <span class="notify-dot" aria-hidden="true" />
-            通知 {{ notificationsEnabled ? 'ON' : 'OFF' }}
-          </button>
-          <AppButton :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId } }">
-            ダッシュボード
-          </AppButton>
+    <!-- Main Chat -->
+    <main class="main-chat">
+      <header class="chat-header">
+        <div class="channel-title">
+          <span>#</span>
+          <span>{{ currentChannel?.name }}</span>
         </div>
       </header>
 
-      <div v-if="newMessageBanner" class="chat-banner">
-        <div>
-          <strong>🔔 新着メッセージ</strong>
-          <p>{{ newMessagePreview }}</p>
+      <div class="messages-container" ref="chatContainer">
+        <div v-if="!threadedMessages.length" class="empty-state">
+          <p>まだメッセージがありません。会話を始めましょう！</p>
         </div>
-        <button type="button" @click="acknowledgeNotification">表示</button>
-      </div>
 
-      <div class="chat-thread" ref="chatContainer">
-        <p v-if="!currentChannelMessages.length" class="chat-thread__empty">
-          まだメッセージがありません。最初のメッセージを送信して会話を始めましょう。
-        </p>
-        <article
-          v-for="message in currentChannelMessages"
-          :key="message.id"
-          class="chat-card"
-        >
-          <div class="chat-card__avatar">{{ (message.author || 'U').charAt(0).toUpperCase() }}</div>
-          <div class="chat-card__body" @dblclick="reactToMessage(message.id, defaultReaction)">
-            
-            <!-- Hover Controls -->
-            <div class="chat-message__controls">
-              <button type="button" class="reaction-button" @click.stop="toggleReactionPicker(message.id)" title="リアクション">
-                ☺
-              </button>
-              
-              <div class="chat-card__actions">
-                <button type="button" @click="convertToTask(message.id, message.text)" title="タスク化">📋</button>
-                <div class="chat-card__link-task-wrapper">
-                  <button type="button" title="タスクに紐付け">🔗</button>
-                  <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)">
-                    <option value="">タスクを選択</option>
-                    <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="chat-card__actions" v-if="user && (message.senderId === user.uid || message.author === (profile?.nickname || profile?.fullName))">
-                <button type="button" @click="startEditing(message)" title="編集">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                </button>
-                <button type="button" @click="deleteMessage(message.id)" title="削除">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <header class="chat-card__header">
-              <div class="chat-card__meta">
-                <h3>{{ message.author }}</h3>
-                <time v-if="message.createdAt">
+        <div v-for="message in threadedMessages" :key="message.id" class="message-group">
+          <div 
+            class="message" 
+            :class="detectMessageType(message.text)"
+            @dblclick="reactToMessage(message.id, defaultReaction)"
+          >
+            <div class="message-header">
+              <UserAvatar 
+                :src="memberMap.get(message.senderId || '')?.avatarUrl" 
+                :name="message.author" 
+                :size="40" 
+                class="message-avatar"
+              />
+              <div class="message-info">
+                <span class="username">{{ message.author }}</span>
+                <span class="timestamp" v-if="message.createdAt">
                   {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
-                </time>
-              </div>
-            </header>
-
-            <div v-if="editingMessageId === message.id" class="chat-card__editor">
-              <input v-model="editingText" type="text" @keydown.enter="saveEditing" />
-              <div>
-                <button type="button" @click="saveEditing">保存</button>
-                <button type="button" @click="cancelEditing">キャンセル</button>
+                </span>
+                <span 
+                  v-if="getMessageTypeLabel(detectMessageType(message.text))" 
+                  class="message-badge"
+                  :class="getMessageTypeLabel(detectMessageType(message.text))?.class"
+                >
+                  {{ getMessageTypeLabel(detectMessageType(message.text))?.text }}
+                </span>
               </div>
             </div>
-            <p v-else class="chat-card__text">{{ message.text }}</p>
 
-            <div v-if="message.reactionSummary?.length" class="chat-card__reactions">
-              <button
-                v-for="reaction in message.reactionSummary"
+            <div v-if="editingMessageId === message.id" class="editor-area">
+              <input v-model="editingText" type="text" @keydown.enter="saveEditing" class="editor-input" />
+              <div class="editor-actions">
+                <button @click="saveEditing" class="save-btn">保存</button>
+                <button @click="cancelEditing" class="cancel-btn">キャンセル</button>
+              </div>
+            </div>
+            <div v-else class="message-text">{{ message.text }}</div>
+
+            <div v-if="message.reactionSummary?.length" class="reactions">
+              <div 
+                v-for="reaction in message.reactionSummary" 
                 :key="`${message.id}-${reaction.emoji}`"
-                type="button"
+                class="reaction"
                 @click="reactToMessage(message.id, reaction.emoji)"
               >
-                {{ reaction.emoji }} <span>{{ reaction.count }}</span>
+                <span>{{ reaction.emoji }}</span>
+                <span class="reaction-count">{{ reaction.count }}</span>
+              </div>
+            </div>
+
+            <!-- Hover Actions -->
+            <div class="message-actions">
+              <button class="action-btn" @click.stop="toggleReactionPicker(message.id)" title="リアクション">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+              </button>
+              <button class="action-btn" @click="startReplying(message)" title="返信">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+              </button>
+              <button class="action-btn" @click="convertToTask(message.id, message.text)" title="タスク化">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+              </button>
+              
+              <div class="link-task-wrapper">
+                <button class="action-btn" title="タスクに紐付け">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                </button>
+                <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)" class="link-task-select">
+                  <option value="">タスクを選択</option>
+                  <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+                </select>
+              </div>
+
+              <template v-if="user && (message.senderId === user.uid || message.author === (profile?.nickname || profile?.fullName))">
+                <button class="action-btn" @click="startEditing(message)" title="編集">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button class="action-btn" @click="deleteMessage(message.id)" title="削除">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </template>
+            </div>
+
+            <!-- Reaction Picker -->
+            <div v-if="openReactionFor === message.id" class="reaction-picker-popover">
+              <button
+                v-for="emoji in reactionOptions"
+                :key="`${message.id}-picker-${emoji}`"
+                @click="reactToMessage(message.id, emoji)"
+                class="picker-emoji"
+              >
+                {{ emoji }}
               </button>
             </div>
 
-            <div v-if="openReactionFor === message.id" class="chat-card__picker">
-              <p>リアクションを選択</p>
-              <div class="picker-grid">
+            <!-- Linked Task Info -->
+            <div v-if="message.linkedTaskId" class="linked-task-info">
+              <span class="linked-icon">🔗</span>
+              <span>紐付け: {{ taskMap[message.linkedTaskId] || message.linkedTaskId }}</span>
+            </div>
+          </div>
+
+          <!-- Thread Replies -->
+          <div v-if="message.replies && message.replies.length > 0" class="thread-container">
+            <div class="thread-line"></div>
+            <div v-for="reply in message.replies" :key="reply.id" class="thread-reply">
+              <div class="message-header">
+                <UserAvatar 
+                  :src="memberMap.get(reply.senderId || '')?.avatarUrl" 
+                  :name="reply.author" 
+                  :size="32" 
+                  class="reply-avatar"
+                />
+                <div class="message-info">
+                  <span class="username">{{ reply.author }}</span>
+                  <span class="timestamp" v-if="reply.createdAt">
+                    {{ new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                  </span>
+                </div>
+              </div>
+              <div class="message-text">{{ reply.text }}</div>
+              
+              <div class="message-actions">
+                <button class="action-btn" @click.stop="toggleReactionPicker(reply.id)" title="リアクション">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                </button>
+                <button class="action-btn" @click="startReplying(message)" title="返信">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                </button>
+                <template v-if="user && (reply.senderId === user.uid || reply.author === (profile?.nickname || profile?.fullName))">
+                  <button class="action-btn" @click="deleteMessage(reply.id)" title="削除">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </template>
+              </div>
+              
+              <div v-if="openReactionFor === reply.id" class="reaction-picker-popover">
                 <button
                   v-for="emoji in reactionOptions"
-                  :key="`${message.id}-picker-${emoji}`"
-                  type="button"
-                  @click="reactToMessage(message.id, emoji)"
+                  :key="`${reply.id}-picker-${emoji}`"
+                  @click="reactToMessage(reply.id, emoji)"
+                  class="picker-emoji"
                 >
                   {{ emoji }}
                 </button>
               </div>
-            </div>
-            
-            <div v-if="message.linkedTaskId" class="chat-card__linked-task-row">
-              <span class="chat-card__linked-task">
-                紐付け済み: {{ taskMap[message.linkedTaskId] || message.linkedTaskId }}
-              </span>
+              
+              <div v-if="reply.reactionSummary?.length" class="reactions">
+                <div 
+                  v-for="reaction in reply.reactionSummary" 
+                  :key="`${reply.id}-${reaction.emoji}`"
+                  class="reaction"
+                  @click="reactToMessage(reply.id, reaction.emoji)"
+                >
+                  <span>{{ reaction.emoji }}</span>
+                  <span class="reaction-count">{{ reaction.count }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </article>
+        </div>
       </div>
 
-      <form class="composer" @submit.prevent="sendMessage">
-        <div class="composer__info">
-          <p>#{{ currentChannel?.name }}</p>
-          <input v-model="input" type="text" :placeholder="composerPlaceholder" />
+      <div class="input-area">
+        <div v-if="replyingTo" class="reply-banner">
+          <span>返信中: <strong>{{ replyingTo.author }}</strong></span>
+          <button @click="cancelReplying" class="cancel-reply-btn">✕</button>
         </div>
-        <button type="submit">送信</button>
-      </form>
-    </section>
+        <div class="input-wrapper">
+          <input 
+            v-model="input" 
+            type="text" 
+            id="messageInput" 
+            :placeholder="composerPlaceholder"
+            @keydown.enter="sendMessage"
+          >
+          <button class="send-btn" type="button" @click="sendMessage">→</button>
+        </div>
+      </div>
+    </main>
   </div>
 </template>
 
 <style scoped>
-.chat-layout {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  background: linear-gradient(135deg, #f7fbfc, #edf4f6);
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.channel-panel {
+.app-container {
+  display: flex;
+  height: 100vh;
+  background: #f8fafc;
+  color: #1e293b;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
   background: #0b2e33;
-  color: #e9f4f7;
-  padding: 2rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 20px 0;
 }
 
-.channel-panel__header h2 {
-  margin: 0.3rem 0;
+.workspace-header {
+  padding: 0 20px 20px 20px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.channel-panel__eyebrow {
-  margin: 0;
+.back-link {
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #ffffff;
+}
+
+.workspace-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.channels-section {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.channels-section::-webkit-scrollbar {
+  width: 6px;
+}
+
+.channels-section::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.section-title {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.75rem;
+  letter-spacing: 1px;
+  margin: 0 0 12px 0;
+  padding: 0 20px;
+  font-weight: 600;
+}
+
+.search-box {
+  padding: 0 20px 12px;
+}
+
+.search-box input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.search-box input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.channel-item {
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  border-left: 3px solid transparent;
+  position: relative;
+}
+
+.channel-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.channel-item.active {
+  background: rgba(184, 227, 233, 0.15);
+  color: #ffffff;
+  border-left-color: #b8e3e9;
+  font-weight: 600;
+}
+
+.channel-icon {
+  font-size: 12px;
   opacity: 0.7;
 }
 
-.channel-panel__hint {
-  margin: 0.35rem 0 0;
-  color: rgba(233, 244, 247, 0.75);
-}
-
-.channel-panel__search input {
-  width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0.65rem 0.9rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f5fbfc;
-}
-
-.channel-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.channel-section__title {
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  color: rgba(233, 244, 247, 0.6);
-}
-
-.channel-section__empty {
-  margin: 0;
-  font-size: 0.85rem;
-  color: rgba(233, 244, 247, 0.7);
-}
-
-.channel-pill {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.55rem 0.9rem;
-  border-radius: 0.85rem;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.channel-pill:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.channel-pill.is-active {
-  border-color: rgba(184, 227, 233, 0.8);
-  background: rgba(184, 227, 233, 0.25);
-  color: #0b2e33;
-  font-weight: 600;
-}
-
-.pill-indicator {
-  width: 0.5rem;
-  height: 0.5rem;
+.channel-badge {
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
   border-radius: 50%;
-  background: #ffba08;
+  margin-left: auto;
 }
 
-.chat-main {
-  display: flex;
-  flex-direction: column;
-  padding: 2rem clamp(1rem, 4vw, 4rem);
-  gap: 1rem;
-}
-
-.chat-main__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1.5rem;
-  padding: 1.25rem 1.5rem;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 1rem;
-  border: 1px solid #e2edef;
-  box-shadow: 0 18px 26px rgba(11, 46, 51, 0.08);
-}
-
-.chat-main__eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.8rem;
-  color: #6d8a92;
-}
-
-.chat-main__description {
-  margin: 0.35rem 0 0;
-  color: #6d8a92;
-}
-
-.chat-main__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.notify-toggle {
-  border: 1px solid #d7e2ef;
-  border-radius: 999px;
-  padding: 0.45rem 0.9rem;
-  background: #fff;
-  color: #0b2e33;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.notify-toggle.is-active {
-  background: rgba(184, 227, 233, 0.4);
-  border-color: #4f7c82;
-}
-
-.notify-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: #4f7c82;
-}
-
-.chat-banner {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  border: 1px solid #ffd5a4;
-  background: #fff7ed;
-  border-radius: 0.9rem;
-  padding: 0.75rem 1rem;
-  color: #8c3b04;
-  align-items: center;
-}
-
-.chat-banner button {
-  border: none;
-  background: #ffba08;
-  color: #0b2e33;
-  padding: 0.45rem 0.9rem;
-  border-radius: 0.75rem;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.chat-thread {
-  flex: 1;
-  border: 1px solid #e2edef;
-  border-radius: 1rem;
-  padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.9);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  box-shadow: inset 0 0 0 1px rgba(230, 242, 244, 0.6);
-}
-
-.chat-thread__empty {
-  margin: 0;
-  color: #6d8a92;
+.empty-text {
+  padding: 0 20px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
   text-align: center;
 }
 
-.chat-card {
-  display: flex;
-  gap: 0.85rem;
-  position: relative;
-}
 
-.chat-card:hover .chat-message__controls {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.chat-card__avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: #4f7c82;
-  color: #ffffff;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.chat-card__body {
+/* Main Chat */
+.main-chat {
   flex: 1;
-  background: #fff;
-  border-radius: 12px;
-  padding: 0.85rem 1rem;
-  border: 1px solid #e2edef;
-  box-shadow: 0 2px 8px rgba(11, 46, 51, 0.06);
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.chat-card__body:hover {
-  box-shadow: 0 4px 12px rgba(11, 46, 51, 0.1);
-}
-
-.chat-card__header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
+  background: #f8fafc;
 }
 
-.chat-card__meta {
+.chat-header {
+  height: 60px;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
-  gap: 0.6rem;
-  align-items: baseline;
+  align-items: center;
+  padding: 0 25px;
+  background: #ffffff;
 }
 
-.chat-card__meta h3 {
-  margin: 0;
-  font-size: 0.95rem;
+.channel-title {
+  font-size: 16px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #0b2e33;
 }
 
-.chat-card__meta time {
-  font-size: 0.78rem;
-  color: #6d8a92;
+/* Messages */
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 25px;
 }
 
-.chat-message__controls {
-  position: absolute;
-  top: -12px;
-  right: 10px;
-  background: #ffffff;
-  border: 1px solid #e2edef;
-  border-radius: 8px;
-  padding: 0.25rem;
+.messages-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.empty-state {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+}
+
+.message-group {
+  margin-bottom: 4px;
+}
+
+.message {
+  padding: 8px 48px 8px 20px;
+  margin-bottom: 2px;
+  position: relative;
+  cursor: pointer;
+  background: transparent;
+  border-left: 3px solid transparent;
   transition: all 0.2s ease;
+}
+
+.message.important {
+  border-left-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.message.question {
+  border-left-color: #0b2e33;
+  background: rgba(184, 227, 233, 0.22);
+}
+
+.message.announcement {
+  border-left-color: #0b2e33;
+  background: rgba(184, 227, 233, 0.15);
+}
+
+.message.success {
+  border-left-color: #16a34a;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.message:hover {
+  background: rgba(11, 46, 51, 0.05);
+}
+
+.message:hover .message-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.message-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.username {
+  font-weight: 600;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.timestamp {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.message-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-important {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.badge-question {
+  background: rgba(11, 46, 51, 0.1);
+  color: #0b2e33;
+}
+
+.badge-announcement {
+  background: rgba(11, 46, 51, 0.1);
+  color: #0b2e33;
+}
+
+.message-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #334155;
+  word-wrap: break-word;
+}
+
+.message-actions {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
   z-index: 10;
 }
 
-.chat-card__actions {
-  display: flex;
-  gap: 0.25rem;
-  border-left: 1px solid #e2edef;
-  padding-left: 0.25rem;
-  margin-left: 0.25rem;
-}
-
-.chat-card__actions button,
-.reaction-button {
+.action-btn {
+  width: 32px;
+  height: 32px;
   border: none;
   background: transparent;
-  color: #54757c;
-  border-radius: 4px;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  font-size: 1rem;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  padding: 0;
-}
-
-.chat-card__actions button:hover,
-.reaction-button:hover {
-  background: #f0f7f8;
-  color: #0b2e33;
-}
-
-.chat-card__editor {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.chat-card__editor input {
-  border: 1px solid #d7e2ef;
-  border-radius: 8px;
-  padding: 0.6rem;
-  width: 100%;
-  font-size: 0.9rem;
-  background: #f7fbfc;
-}
-
-.chat-card__editor > div {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.chat-card__editor button {
-  border: none;
-  border-radius: 8px;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.chat-card__editor button:first-child {
-  background: #4f7c82;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.chat-card__editor button:first-child:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(79, 124, 130, 0.25);
-}
-
-.chat-card__editor button:last-child {
-  background: #f7fbfc;
-  color: #6d8a92;
-  border: 1px solid #d7e2ef;
-}
-
-.chat-card__text {
-  margin: 0.35rem 0 0;
-  line-height: 1.55;
-  color: #0b2e33;
-}
-
-.chat-card__link-task-wrapper {
-  position: relative;
-  width: 28px;
-  height: 28px;
-}
-
-.chat-card__link-task-wrapper select {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.chat-card__linked-task-row {
-  margin-top: 0.5rem;
-  font-size: 0.8rem;
-  color: #54757c;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s ease;
 }
 
-.chat-card__linked-task {
-  background: #f0f7f8;
-  padding: 0.2rem 0.6rem;
-  border-radius: 4px;
-  border: 1px solid #e2edef;
-}
-
-.chat-card__reactions {
-  margin-top: 0.65rem;
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.chat-card__reactions button {
-  border: 1px solid #d7e2ef;
-  background: rgba(184, 227, 233, 0.35);
-  border-radius: 999px;
-  padding: 0.15rem 0.5rem;
-  cursor: pointer;
-  color: #0b2e33;
-  display: inline-flex;
-  gap: 0.25rem;
-  align-items: center;
-  font-weight: 600;
-  font-size: 0.8rem;
-  transition: all 0.15s ease;
-}
-
-.chat-card__reactions button:hover {
-  background: rgba(184, 227, 233, 0.5);
-  transform: translateY(-1px);
-}
-
-.chat-card__picker {
-  margin-top: 0.5rem;
-  background: rgba(184, 227, 233, 0.2);
-  border: 1px solid #d7e2ef;
-  border-radius: 12px;
-  padding: 0.65rem;
-  box-shadow: 0 12px 22px rgba(11, 46, 51, 0.12);
-}
-
-.chat-card__picker p {
-  margin: 0 0 0.35rem;
-  color: #4f6b73;
-  font-size: 0.85rem;
-}
-
-.picker-grid {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.picker-grid button {
-  border: 1px solid #d7e2ef;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 8px;
-  padding: 0.4rem 0.6rem;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.picker-grid button:hover {
-  background: #fff;
+.action-btn:hover {
+  background: rgba(11, 46, 51, 0.1);
   transform: scale(1.1);
 }
 
-.composer {
-  border-top: 1px solid #e2edef;
-  padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
+.link-task-wrapper {
+  position: relative;
+  width: 32px;
+  height: 32px;
 }
 
-.composer__info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.composer__info p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #6d8a92;
-  font-weight: 600;
-}
-
-.composer__info input {
-  border: 1px solid #d7e2ef;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  background: #f7fbfc;
-  transition: all 0.2s ease;
-}
-
-.composer__info input:focus {
-  outline: none;
-  border-color: #4f7c82;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.1);
-}
-
-.composer button[type='submit'] {
-  border: none;
-  border-radius: 12px;
-  padding: 0.75rem 1.5rem;
-  background: #4f7c82;
-  color: #ffffff;
-  font-weight: 600;
+.link-task-select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
   cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+/* Thread */
+.thread-container {
+  margin-top: 2px;
+  margin-bottom: 4px;
+  position: relative;
+  padding-left: 30px;
+}
+
+.thread-line {
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, 
+    rgba(11, 46, 51, 0.3) 0%, 
+    rgba(11, 46, 51, 0.15) 50%,
+    rgba(11, 46, 51, 0) 100%);
+}
+
+.thread-reply {
+  padding: 6px 16px 6px 20px;
+  margin-bottom: 2px;
+  background: transparent;
+  border-left: 3px solid rgba(11, 46, 51, 0.3);
   transition: all 0.2s ease;
+  position: relative;
 }
 
-.composer button[type='submit']:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(79, 124, 130, 0.3);
+.thread-reply:hover {
+  background: rgba(184, 227, 233, 0.15);
+  border-left-color: rgba(11, 46, 51, 0.5);
 }
 
-.composer button[type='submit']:active {
+.thread-reply:hover .message-actions {
+  opacity: 1;
   transform: translateY(0);
 }
 
-@media (max-width: 1024px) {
-  .chat-layout {
-    grid-template-columns: 240px 1fr;
-  }
+.thread-reply .message-text {
+  font-size: 14px;
 }
 
-@media (max-width: 768px) {
-  .chat-layout {
-    grid-template-columns: 1fr;
-  }
+/* Reactions */
+.reactions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
 
-  .channel-panel {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-  }
+.reaction {
+  padding: 4px 10px;
+  background: rgba(11, 46, 51, 0.05);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+}
 
-  .chat-main__header {
-    flex-direction: column;
-  }
+.reaction:hover {
+  background: rgba(11, 46, 51, 0.1);
+  border-color: rgba(11, 46, 51, 0.2);
+  transform: scale(1.05);
+}
 
-  .composer {
-    flex-direction: column;
-  }
+.reaction-count {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.reaction-picker-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.picker-emoji {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.picker-emoji:hover {
+  background: rgba(11, 46, 51, 0.1);
+}
+
+/* Editor */
+.editor-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.editor-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-btn,
+.cancel-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.save-btn {
+  background: #0b2e33;
+  color: #fff;
+}
+
+.cancel-btn {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* Linked Task */
+.linked-task-info {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #0b2e33;
+  background: rgba(184, 227, 233, 0.3);
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Input Area */
+.input-area {
+  padding: 20px 25px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.reply-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(11, 46, 51, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #0b2e33;
+}
+
+.cancel-reply-btn {
+  background: transparent;
+  border: none;
+  color: #0b2e33;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 0 4px;
+}
+
+.input-wrapper {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: #0b2e33;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(184, 227, 233, 0.22);
+}
+
+.input-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 20px;
+  transition: all 0.2s ease;
+}
+
+.input-btn:hover {
+  background: rgba(11, 46, 51, 0.1);
+}
+
+#messageInput {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #0f172a;
+  font-size: 15px;
+  outline: none;
+}
+
+#messageInput::placeholder {
+  color: #94a3b8;
+}
+
+.send-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #0b2e33;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-btn:hover {
+  transform: scale(1.05);
+  background: #134e4a;
+  box-shadow: 0 4px 12px rgba(11, 46, 51, 0.3);
+}
+
+.send-btn:active {
+  transform: scale(0.95);
 }
 </style>
