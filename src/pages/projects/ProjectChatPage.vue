@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import CommandDropdown from '@/components/projects/CommandDropdown.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { database } from '@/firebase/config'
 import { fetchProject } from '@/firebase/projectService'
@@ -69,7 +70,12 @@ const mentionCaret = ref(0)
 const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
 const availableCommands = [
-  { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化', insert: '/newTask"' },
+  {
+    key: '/newTask',
+    label: '/newTask/"タイトル","担当者","説明"',
+    description: 'タスク名・担当者・説明をまとめて入力',
+    insert: '/newTask/"タスク名","担当者","説明"',
+  },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
   { key: '/news', label: '/news', description: '最新ニュースを返信' },
@@ -402,26 +408,43 @@ async function handleSlashCommand(text: string, mentions: { name: string; userId
     return true
   }
   if (lower.startsWith('/newtask')) {
-    const titleMatch = text.match(/\/newTask"([^"]*)"/i)
-    const title = titleMatch?.[1] || text.replace(/\/newTask/i, '').trim()
+    const match = text.match(/\/newTask\/"([^"]*)","([^"]*)","([^"]*)"/i)
+    const title = match?.[1]?.trim() || ''
+    const assigneeName = match?.[2]?.trim() || ''
+    const description = match?.[3]?.trim() || ''
+    if (!title) {
+      await sendBotMessage('newTask コマンドが正しくありません。タスク名を入力してください。')
+      return true
+    }
     const assignee = mentions.find((m) => m.userId)?.userId || null
+    const explicitAssignee =
+      assigneeName &&
+      projectMembers.value.find(
+        (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === assigneeName.toLowerCase(),
+      )?.userId
+    const finalAssignee = explicitAssignee || assignee || null
     const taskId = await createTask(
       projectId,
-      { title: title || '新規タスク', assigneeId: assignee, assigneeName: assignee ? memberNameById(assignee) : null },
+      {
+        title,
+        description: description || undefined,
+        assigneeId: finalAssignee,
+        assigneeName: finalAssignee ? memberNameById(finalAssignee) : null,
+      },
       user.value!.uid,
     )
     await sendProjectMessage(
       projectId,
       user.value!.uid,
       profile.value?.nickname || profile.value?.fullName || 'User',
-      title || text,
+      title,
       currentChannel.value?.id || 'general',
       undefined,
       { linkedTaskId: taskId, mentions: mentions.map((m) => m.userId || m.name), isTask: true },
     )
     await sendBotMessage(
       `${profile.value?.nickname || profile.value?.fullName || 'ユーザー'}さんが${
-        assignee ? memberNameById(assignee) || '担当者未設定' : '担当者未設定'
+        finalAssignee ? memberNameById(finalAssignee) || '担当者未設定' : '担当者未設定'
       }にタスクを割り当てました`,
     )
     return true
@@ -638,7 +661,7 @@ onBeforeUnmount(() => {
         <div v-for="message in threadedMessages" :key="message.id" class="message-group">
           <div 
             class="message" 
-            :class="detectMessageType(message.text)"
+            :class="[detectMessageType(message.text), { bot: message.isBot }]"
             @dblclick="reactToMessage(message.id, defaultReaction)"
           >
             <div class="message-header">
@@ -653,6 +676,7 @@ onBeforeUnmount(() => {
                 <span class="timestamp" v-if="message.createdAt">
                   {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                 </span>
+                <span v-if="message.isBot" class="bot-label">🤖 Bot</span>
                 <span v-if="message.linkedTaskId || message.isTask" class="message-badge badge-task">タスク</span>
                 <span 
                   v-if="getMessageTypeLabel(detectMessageType(message.text))" 
@@ -815,17 +839,11 @@ onBeforeUnmount(() => {
             </select>
           </label>
         </div>
-        <div v-if="slashDropdownOpen && commandCandidates.length" class="command-dropdown">
-          <button
-            v-for="cmd in commandCandidates"
-            :key="cmd.key"
-            type="button"
-            @click="insertCommand(cmd)"
-          >
-            <strong>{{ cmd.label }}</strong>
-            <span>{{ cmd.description }}</span>
-          </button>
-        </div>
+        <CommandDropdown
+          :open="slashDropdownOpen"
+          :commands="commandCandidates"
+          @select="insertCommand"
+        />
         <div class="input-wrapper">
           <input 
             v-model="input" 
@@ -1079,6 +1097,11 @@ onBeforeUnmount(() => {
   background: rgba(22, 163, 74, 0.05);
 }
 
+.message.bot {
+  border-left-color: #6b7280;
+  background: rgba(148, 163, 184, 0.12);
+}
+
 .message:hover {
   background: rgba(11, 46, 51, 0.05);
 }
@@ -1100,6 +1123,18 @@ onBeforeUnmount(() => {
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.bot-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(11, 46, 51, 0.12);
+  color: #0b2e33;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .username {
