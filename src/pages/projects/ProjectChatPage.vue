@@ -69,8 +69,8 @@ const mentionCaret = ref(0)
 const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
 const availableCommands = [
-  { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化' },
-  { key: '/who', label: '/who', description: '直前のタスクに担当者を設定' },
+  { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化', insert: '/newTask "' },
+  { key: '/who', label: '/who', description: '直前のタスクに担当者を設定', insert: '/who ' },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
   { key: '/news', label: '/news', description: '最新ニュースを返信' },
@@ -332,11 +332,20 @@ function insertMention(candidate: { id: string; name: string }) {
   })
 }
 
-const commandCandidates = computed(() =>
-  availableCommands.filter((cmd) =>
-    slashQuery.value ? cmd.key.toLowerCase().includes(slashQuery.value.toLowerCase()) : true,
-  ),
-)
+const commandCandidates = computed(() => {
+  const q = slashQuery.value.toLowerCase()
+  const list = availableCommands.filter((cmd) => (q ? cmd.key.toLowerCase().includes(q) : true))
+  const combined = {
+    key: '/newTask+who',
+    label: '/newTask + /who',
+    description: 'タスク化して担当者を指定',
+    insert: '/newTask "" /who ',
+  }
+  if (!q || '/newtask'.includes(q) || '/who'.includes(q)) {
+    list.push(combined)
+  }
+  return list
+})
 
 function insertCommand(cmd: { key: string }) {
   const start = mentionCaret.value
@@ -344,12 +353,13 @@ function insertCommand(cmd: { key: string }) {
   const match = textBefore.match(/\/([^\s/]{0,20})$/)
   const prefixLen = match ? match[0].length : 0
   const insertPos = start - prefixLen
-  input.value = `${input.value.slice(0, insertPos)}${cmd.key} ${input.value.slice(start)}`
+  const insertText = cmd.insert || `${cmd.key} `
+  input.value = `${input.value.slice(0, insertPos)}${insertText}${input.value.slice(start)}`
   slashDropdownOpen.value = false
   nextTick(() => {
     const el = composerInputEl.value
     if (el) {
-      const cursor = insertPos + cmd.key.length + 1
+      const cursor = insertPos + insertText.length
       el.focus()
       el.setSelectionRange(cursor, cursor)
     }
@@ -823,6 +833,17 @@ onBeforeUnmount(() => {
             </select>
           </label>
         </div>
+        <div v-if="slashDropdownOpen && commandCandidates.length" class="command-dropdown">
+          <button
+            v-for="cmd in commandCandidates"
+            :key="cmd.key"
+            type="button"
+            @click="insertCommand(cmd)"
+          >
+            <strong>{{ cmd.label }}</strong>
+            <span>{{ cmd.description }}</span>
+          </button>
+        </div>
         <div class="input-wrapper">
           <input 
             v-model="input" 
@@ -844,17 +865,6 @@ onBeforeUnmount(() => {
             @click="insertMention(candidate)"
           >
             @{{ candidate.name }}
-          </button>
-        </div>
-        <div v-if="slashDropdownOpen && commandCandidates.length" class="command-dropdown">
-          <button
-            v-for="cmd in commandCandidates"
-            :key="cmd.key"
-            type="button"
-            @click="insertCommand(cmd)"
-          >
-            <strong>{{ cmd.label }}</strong>
-            <span>{{ cmd.description }}</span>
           </button>
         </div>
       </div>
@@ -1512,6 +1522,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 0.35rem;
   padding: 0.5rem 0;
+  margin-bottom: 0.35rem;
 }
 
 .command-dropdown button {
