@@ -70,7 +70,6 @@ const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
 const availableCommands = [
   { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化', insert: '/newTask"' },
-  { key: '/who', label: '/who', description: '直前のタスクに担当者を設定', insert: '/who@' },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
   { key: '/news', label: '/news', description: '最新ニュースを返信' },
@@ -332,20 +331,11 @@ function insertMention(candidate: { id: string; name: string }) {
   })
 }
 
-const commandCandidates = computed(() => {
-  const q = slashQuery.value.toLowerCase()
-  const list = availableCommands.filter((cmd) => (q ? cmd.key.toLowerCase().includes(q) : true))
-  const combined = {
-    key: '/newTask+who',
-    label: '/newTask"/" + /who@',
-    description: 'タスク化して担当者を指定',
-    insert: '/newTask"" /who@',
-  }
-  if (!q || '/newtask'.includes(q) || '/who'.includes(q)) {
-    list.push(combined)
-  }
-  return list
-})
+const commandCandidates = computed(() =>
+  availableCommands.filter((cmd) =>
+    slashQuery.value ? cmd.key.toLowerCase().includes(slashQuery.value.toLowerCase()) : true,
+  ),
+)
 
 function insertCommand(cmd: { key: string }) {
   const start = mentionCaret.value
@@ -413,16 +403,8 @@ async function handleSlashCommand(text: string, mentions: { name: string; userId
   }
   if (lower.startsWith('/newtask')) {
     const titleMatch = text.match(/\/newTask"([^"]*)"/i)
-    const whoMatch = text.match(/\/who@([^\s/]+)/i)
     const title = titleMatch?.[1] || text.replace(/\/newTask/i, '').trim()
-    const assigneeName = whoMatch?.[1]
-    const assignee =
-      (assigneeName &&
-        projectMembers.value.find((m) =>
-          (m.nickname || m.fullName || m.displayName || '').toLowerCase() === assigneeName.toLowerCase(),
-        )?.userId) ||
-      mentions.find((m) => m.userId)?.userId ||
-      null
+    const assignee = mentions.find((m) => m.userId)?.userId || null
     const taskId = await createTask(
       projectId,
       { title: title || '新規タスク', assigneeId: assignee, assigneeName: assignee ? memberNameById(assignee) : null },
@@ -1041,6 +1023,9 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   padding: 20px 25px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -1379,6 +1364,9 @@ onBeforeUnmount(() => {
   padding: 20px 25px;
   border-top: 1px solid #e2e8f0;
   background: #ffffff;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .composer-options {
@@ -1396,6 +1384,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.35rem;
   font-weight: 600;
+  flex-shrink: 0;
+}
+
+.composer-options .option span {
+  white-space: nowrap;
 }
 
 .composer-options select {
@@ -1403,6 +1396,8 @@ onBeforeUnmount(() => {
   border: 1px solid #d1dae8;
   padding: 0.35rem 0.55rem;
   background: #fff;
+  width: 200px;
+  max-width: 300px;
 }
 
 .reply-banner {
