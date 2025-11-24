@@ -69,6 +69,7 @@ const mentionDropdownOpen = ref(false)
 const mentionCaret = ref(0)
 const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
+const messageSearch = ref('')
 const availableCommands = [
   {
     key: '/newTask',
@@ -128,8 +129,18 @@ const currentChannelMessages = computed(() =>
   messages.value.filter((message) => (message.channelId || 'general') === currentChannel.value?.id),
 )
 
+const visibleChannelMessages = computed(() =>
+  currentChannelMessages.value.filter((msg) => {
+    if (msg.privateFor && msg.privateFor !== user.value?.uid) return false
+    const q = messageSearch.value.trim().toLowerCase()
+    if (!q) return true
+    const haystack = `${msg.text || ''} ${msg.author || ''}`.toLowerCase()
+    return haystack.includes(q)
+  }),
+)
+
 const threadedMessages = computed(() => {
-  const all = currentChannelMessages.value
+  const all = visibleChannelMessages.value
   const map = new Map<string, ChatMessage & { replies: ChatMessage[] }>()
   const roots: (ChatMessage & { replies: ChatMessage[] })[] = []
 
@@ -374,7 +385,7 @@ function resetComposer() {
   openReactionFor.value = null
 }
 
-async function sendBotMessage(text: string) {
+async function sendBotMessage(text: string, options?: { privateFor?: string | null }) {
   await sendProjectMessage(
     projectId,
     'bot',
@@ -382,7 +393,7 @@ async function sendBotMessage(text: string) {
     text,
     currentChannel.value?.id || 'general',
     undefined,
-    { isBot: true },
+    { isBot: true, privateFor: options?.privateFor ?? null },
   )
 }
 
@@ -413,7 +424,9 @@ async function handleSlashCommand(text: string, mentions: { name: string; userId
     const assigneeName = match?.[2]?.trim() || ''
     const description = match?.[3]?.trim() || ''
     if (!title) {
-      await sendBotMessage('newTask コマンドが正しくありません。タスク名を入力してください。')
+      await sendBotMessage('newTask コマンドが正しくありません。タスク名を入力してください。', {
+        privateFor: user.value?.uid || null,
+      })
       return true
     }
     const assignee = mentions.find((m) => m.userId)?.userId || null
@@ -654,6 +667,13 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="messages-container" ref="chatContainer">
+        <div class="channel-search">
+          <input
+            v-model="messageSearch"
+            type="search"
+            placeholder="このチャンネル内を検索"
+          />
+        </div>
         <div v-if="!threadedMessages.length" class="empty-state">
           <p>まだメッセージがありません。会話を始めましょう！</p>
         </div>
@@ -1044,6 +1064,18 @@ onBeforeUnmount(() => {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+}
+
+.channel-search {
+  margin: 0 0 12px 0;
+}
+
+.channel-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .messages-container::-webkit-scrollbar {

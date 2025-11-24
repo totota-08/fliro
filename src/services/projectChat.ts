@@ -34,6 +34,7 @@ export interface ChatMessage {
   mentions?: string[]
   isBot?: boolean
   isTask?: boolean
+  privateFor?: string | null
 }
 
 function resolveTimestamp(value: any): number | undefined {
@@ -116,6 +117,7 @@ export function listenProjectChat(
           mentions: Array.isArray(data?.mentions) ? data.mentions : [],
           isBot: Boolean(data?.isBot),
           isTask: Boolean(data?.isTask),
+          privateFor: typeof data?.privateFor === 'string' ? data.privateFor : null,
         })
       })
       items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
@@ -136,7 +138,13 @@ export async function sendProjectMessage(
   text: string,
   channelId = 'general',
   replyToId?: string,
-  metadata?: { linkedTaskId?: string | null; mentions?: string[]; isBot?: boolean; isTask?: boolean },
+  metadata?: {
+    linkedTaskId?: string | null
+    mentions?: string[]
+    isBot?: boolean
+    isTask?: boolean
+    privateFor?: string | null
+  },
 ) {
   if (!metadata?.isBot) {
     await ensureRealtimeMember(projectId, senderId)
@@ -157,6 +165,7 @@ export async function sendProjectMessage(
   if (metadata?.mentions?.length) payload.mentions = metadata.mentions
   if (metadata?.isBot) payload.isBot = metadata.isBot
   if (metadata?.isTask) payload.isTask = metadata.isTask
+  if (metadata?.privateFor) payload.privateFor = metadata.privateFor
   await push(dbRef(database, `projects/${projectId}/realtimeChat`), payload)
 }
 
