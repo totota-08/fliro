@@ -66,6 +66,15 @@ const replyingTo = ref<ChatMessage | null>(null)
 const mentionQuery = ref('')
 const mentionDropdownOpen = ref(false)
 const mentionCaret = ref(0)
+const slashQuery = ref('')
+const slashDropdownOpen = ref(false)
+const availableCommands = [
+  { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化' },
+  { key: '/who', label: '/who', description: '直前のタスクに担当者を設定' },
+  { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
+  { key: '/time', label: '/time', description: '現在時刻を返信' },
+  { key: '/news', label: '/news', description: '最新ニュースを返信' },
+]
 
 let unsubscribeTasks: (() => void) | null = null
 let unsubscribeChat: (() => void) | null = null
@@ -294,6 +303,15 @@ function handleComposerInput(event: Event) {
     mentionDropdownOpen.value = false
     mentionQuery.value = ''
   }
+
+  const slashMatch = uptoCaret.match(/\/([^\s/]{0,20})$/)
+  if (slashMatch) {
+    slashQuery.value = slashMatch[1]
+    slashDropdownOpen.value = true
+  } else {
+    slashDropdownOpen.value = false
+    slashQuery.value = ''
+  }
 }
 
 function insertMention(candidate: { id: string; name: string }) {
@@ -314,6 +332,30 @@ function insertMention(candidate: { id: string; name: string }) {
   })
 }
 
+const commandCandidates = computed(() =>
+  availableCommands.filter((cmd) =>
+    slashQuery.value ? cmd.key.toLowerCase().includes(slashQuery.value.toLowerCase()) : true,
+  ),
+)
+
+function insertCommand(cmd: { key: string }) {
+  const start = mentionCaret.value
+  const textBefore = input.value.slice(0, start)
+  const match = textBefore.match(/\/([^\s/]{0,20})$/)
+  const prefixLen = match ? match[0].length : 0
+  const insertPos = start - prefixLen
+  input.value = `${input.value.slice(0, insertPos)}${cmd.key} ${input.value.slice(start)}`
+  slashDropdownOpen.value = false
+  nextTick(() => {
+    const el = composerInputEl.value
+    if (el) {
+      const cursor = insertPos + cmd.key.length + 1
+      el.focus()
+      el.setSelectionRange(cursor, cursor)
+    }
+  })
+}
+
 function resetComposer() {
   input.value = ''
   replyingTo.value = null
@@ -321,6 +363,8 @@ function resetComposer() {
   selectedTaskId.value = ''
   mentionDropdownOpen.value = false
   mentionQuery.value = ''
+  slashDropdownOpen.value = false
+  slashQuery.value = ''
   openReactionFor.value = null
 }
 
@@ -800,6 +844,17 @@ onBeforeUnmount(() => {
             @click="insertMention(candidate)"
           >
             @{{ candidate.name }}
+          </button>
+        </div>
+        <div v-if="slashDropdownOpen && commandCandidates.length" class="command-dropdown">
+          <button
+            v-for="cmd in commandCandidates"
+            :key="cmd.key"
+            type="button"
+            @click="insertCommand(cmd)"
+          >
+            <strong>{{ cmd.label }}</strong>
+            <span>{{ cmd.description }}</span>
           </button>
         </div>
       </div>
@@ -1451,5 +1506,31 @@ onBeforeUnmount(() => {
 
 .mention-dropdown button:hover {
   background: rgba(11, 46, 51, 0.08);
+}
+
+.command-dropdown {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0;
+}
+
+.command-dropdown button {
+  border: 1px solid #d1dae8;
+  background: #fff;
+  border-radius: 0.85rem;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  text-align: left;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.command-dropdown strong {
+  color: #0b2e33;
+}
+
+.command-dropdown span {
+  color: #64748b;
+  font-size: 0.85rem;
 }
 </style>
