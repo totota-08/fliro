@@ -2,6 +2,8 @@
 import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import CommandDropdown from '@/components/projects/CommandDropdown.vue'
+import { useUserDisplay } from '@/composables/useUserDisplay'
+import { useSlashCommands } from '@/composables/useSlashCommands'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { database } from '@/firebase/config'
 import { fetchProject } from '@/firebase/projectService'
@@ -17,7 +19,6 @@ import { listenProjectMembers, type ProjectMember } from '@/services/projectMemb
 import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
-import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ref as dbRef, update } from 'firebase/database'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -298,6 +299,15 @@ function memberNameById(id?: string | null) {
   return member?.nickname || member?.fullName || member?.displayName || getDisplayName(id) || ''
 }
 
+const { handleSlashCommand } = useSlashCommands({
+  projectId,
+  currentChannel,
+  user,
+  profile,
+  projectMembers,
+  memberNameById,
+})
+
 function extractMentions(text: string) {
   const matches = text.match(/@([^\s@]+)/g) || []
   return matches
@@ -396,119 +406,6 @@ function resetComposer() {
   slashDropdownOpen.value = false
   slashQuery.value = ''
   openReactionFor.value = null
-}
-
-async function sendBotMessage(text: string, options?: { privateFor?: string | null }) {
-  await sendProjectMessage(
-    projectId,
-    'bot',
-    'Teamie Bot',
-    text,
-    currentChannel.value?.id || 'general',
-    undefined,
-    { isBot: true, privateFor: options?.privateFor ?? null },
-  )
-}
-
-async function handleSlashCommand(text: string, mentions: { name: string; userId?: string | null }[]) {
-  const lower = text.toLowerCase()
-  if (lower.startsWith('/ping')) {
-    await sendBotMessage('pong')
-    return true
-  }
-  if (lower.startsWith('/private')) {
-    const match = text.match(/\/private\s+@?([^\s]+)\s+(.+)/i)
-    if (!match) {
-      await sendBotMessage('private コマンドの形式: /private @ユーザー 本文', { privateFor: user.value?.uid || null })
-      return true
-    }
-    const targetName = match[1]
-    const body = match[2]?.trim()
-    const targetUser = projectMembers.value.find(
-      (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === targetName.toLowerCase(),
-    )
-    if (!targetUser) {
-      await sendBotMessage(`${targetName} さんが見つかりません`, { privateFor: user.value?.uid || null })
-      return true
-    }
-    if (!body) {
-      await sendBotMessage('メッセージを入力してください', { privateFor: user.value?.uid || null })
-      return true
-    }
-    await sendProjectMessage(
-      projectId,
-      user.value!.uid,
-      profile.value?.nickname || profile.value?.fullName || 'User',
-      body,
-      currentChannel.value?.id || 'general',
-      undefined,
-      { privateFor: targetUser.userId, mentions: [targetUser.userId] },
-    )
-    await sendBotMessage(`${targetName} さんへのプライベートメッセージを送信しました`, {
-      privateFor: user.value?.uid || null,
-    })
-    return true
-  }
-  if (lower.startsWith('/time')) {
-    await sendBotMessage(new Date().toLocaleString())
-    return true
-  }
-  if (lower.startsWith('/news')) {
-    try {
-      const res = await fetch('https://hn.algolia.com/api/v1/search?tags=front_page')
-      const data = await res.json()
-      const items = (data?.hits || []).slice(0, 3).map((hit: any, idx: number) => `${idx + 1}. ${hit?.title}`)
-      await sendBotMessage(items.length ? `今日のニュース\n${items.join('\n')}` : 'ニュースを取得できませんでした')
-    } catch (error) {
-      await sendBotMessage('ニュースの取得に失敗しました')
-    }
-    return true
-  }
-  if (lower.startsWith('/newtask')) {
-    const match = text.match(/\/newTask\/"([^"]*)","([^"]*)","([^"]*)"/i)
-    const title = match?.[1]?.trim() || ''
-    const assigneeName = match?.[2]?.trim() || ''
-    const description = match?.[3]?.trim() || ''
-    if (!title) {
-      await sendBotMessage('newTask コマンドが正しくありません。タスク名を入力してください。', {
-        privateFor: user.value?.uid || null,
-      })
-      return true
-    }
-    const assignee = mentions.find((m) => m.userId)?.userId || null
-    const explicitAssignee =
-      assigneeName &&
-      projectMembers.value.find(
-        (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === assigneeName.toLowerCase(),
-      )?.userId
-    const finalAssignee = explicitAssignee || assignee || null
-    const taskId = await createTask(
-      projectId,
-      {
-        title,
-        description: description || undefined,
-        assigneeId: finalAssignee,
-        assigneeName: finalAssignee ? memberNameById(finalAssignee) : null,
-      },
-      user.value!.uid,
-    )
-    await sendProjectMessage(
-      projectId,
-      user.value!.uid,
-      profile.value?.nickname || profile.value?.fullName || 'User',
-      title,
-      currentChannel.value?.id || 'general',
-      undefined,
-      { linkedTaskId: taskId, mentions: mentions.map((m) => m.userId || m.name), isTask: true },
-    )
-    await sendBotMessage(
-      `${profile.value?.nickname || profile.value?.fullName || 'ユーザー'}さんが${
-        finalAssignee ? memberNameById(finalAssignee) || '担当者未設定' : '担当者未設定'
-      }にタスクを割り当てました`,
-    )
-    return true
-  }
-  return false
 }
 
 async function sendMessage() {
@@ -1121,15 +1018,34 @@ onBeforeUnmount(() => {
 }
 
 .channel-search {
-  margin: 0 0 12px 0;
+  flex: 1;
+  max-width: 400px;
 }
 
 .channel-search input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
+  padding: 10px 16px 10px 40px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 14px;
+  color: #0f172a;
+  transition: all 0.3s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cpath d='m21 21-4.35-4.35'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 18px;
+}
+
+.channel-search input::placeholder {
+  color: #94a3b8;
+}
+
+.channel-search input:focus {
+  outline: none;
+  border-color: #0b2e33;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(184, 227, 233, 0.22);
 }
 
 .messages-container::-webkit-scrollbar {
