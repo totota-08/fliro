@@ -40,7 +40,6 @@ const defaultChannel: ChatChannel = {
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
-const { getDisplayName } = useUserDisplay(projectMembers)
 const projectId = String(route.params.projectId)
 const messages = ref<ChatMessage[]>([])
 const input = ref('')
@@ -49,6 +48,7 @@ const selectedTaskId = ref('')
 const tasks = ref<TaskDoc[]>([])
 const project = ref<ProjectDoc | null>(null)
 const projectMembers = ref<ProjectMember[]>([])
+const { getDisplayName } = useUserDisplay(projectMembers)
 const taskMap = computed(() => Object.fromEntries(tasks.value.map((task) => [task.id, task.title])))
 const reactionOptions = ['👍', '🎉', '❤️', '🔥', '😄']
 const openReactionFor = ref<string | null>(null)
