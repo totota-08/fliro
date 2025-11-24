@@ -295,7 +295,7 @@ function watchMembers() {
 function memberNameById(id?: string | null) {
   if (!id) return ''
   const member = projectMembers.value.find((m) => m.userId === id)
-  return member?.nickname || member?.fullName || member?.displayName || ''
+  return member?.nickname || member?.fullName || member?.displayName || getDisplayName(id) || ''
 }
 
 function extractMentions(text: string) {
@@ -312,7 +312,7 @@ function extractMentions(text: string) {
 
 function displayNameFor(message: { senderId?: string | null; author?: string | null }) {
   const author = message.author || ''
-  if (author && author !== message.senderId) return author
+  if (author && author !== message.senderId && author.toLowerCase() !== 'unknown') return author
   if (message.senderId) {
     const name = getDisplayName(message.senderId)
     if (name) return name
