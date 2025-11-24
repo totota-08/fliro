@@ -77,6 +77,7 @@ const availableCommands = [
     description: 'タスク名・担当者・説明をまとめて入力',
     insert: '/newTask/"タスク名","担当者","説明"',
   },
+  { key: '/private', label: '/private @user メッセージ', description: '指定ユーザーにのみ送信', insert: '/private @' },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
   { key: '/news', label: '/news', description: '最新ニュースを返信' },
@@ -131,7 +132,7 @@ const currentChannelMessages = computed(() =>
 
 const visibleChannelMessages = computed(() =>
   currentChannelMessages.value.filter((msg) => {
-    if (msg.privateFor && msg.privateFor !== user.value?.uid) return false
+    if (msg.privateFor && msg.privateFor !== user.value?.uid && msg.senderId !== user.value?.uid) return false
     const q = messageSearch.value.trim().toLowerCase()
     if (!q) return true
     const haystack = `${msg.text || ''} ${msg.author || ''}`.toLowerCase()
@@ -401,6 +402,39 @@ async function handleSlashCommand(text: string, mentions: { name: string; userId
   const lower = text.toLowerCase()
   if (lower.startsWith('/ping')) {
     await sendBotMessage('pong')
+    return true
+  }
+  if (lower.startsWith('/private')) {
+    const match = text.match(/\/private\s+@?([^\s]+)\s+(.+)/i)
+    if (!match) {
+      await sendBotMessage('private コマンドの形式: /private @ユーザー 本文', { privateFor: user.value?.uid || null })
+      return true
+    }
+    const targetName = match[1]
+    const body = match[2]?.trim()
+    const targetUser = projectMembers.value.find(
+      (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === targetName.toLowerCase(),
+    )
+    if (!targetUser) {
+      await sendBotMessage(`${targetName} さんが見つかりません`, { privateFor: user.value?.uid || null })
+      return true
+    }
+    if (!body) {
+      await sendBotMessage('メッセージを入力してください', { privateFor: user.value?.uid || null })
+      return true
+    }
+    await sendProjectMessage(
+      projectId,
+      user.value!.uid,
+      profile.value?.nickname || profile.value?.fullName || 'User',
+      body,
+      currentChannel.value?.id || 'general',
+      undefined,
+      { privateFor: targetUser.userId, mentions: [targetUser.userId] },
+    )
+    await sendBotMessage(`${targetName} さんへのプライベートメッセージを送信しました`, {
+      privateFor: user.value?.uid || null,
+    })
     return true
   }
   if (lower.startsWith('/time')) {
