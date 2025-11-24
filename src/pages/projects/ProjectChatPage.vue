@@ -69,8 +69,8 @@ const mentionCaret = ref(0)
 const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
 const availableCommands = [
-  { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化', insert: '/newTask "' },
-  { key: '/who', label: '/who', description: '直前のタスクに担当者を設定', insert: '/who ' },
+  { key: '/newTask', label: '/newTask', description: '送信メッセージをそのままタスク化', insert: '/newTask"' },
+  { key: '/who', label: '/who', description: '直前のタスクに担当者を設定', insert: '/who@' },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
   { key: '/news', label: '/news', description: '最新ニュースを返信' },
@@ -337,9 +337,9 @@ const commandCandidates = computed(() => {
   const list = availableCommands.filter((cmd) => (q ? cmd.key.toLowerCase().includes(q) : true))
   const combined = {
     key: '/newTask+who',
-    label: '/newTask + /who',
+    label: '/newTask"/" + /who@',
     description: 'タスク化して担当者を指定',
-    insert: '/newTask "" /who ',
+    insert: '/newTask"" /who@',
   }
   if (!q || '/newtask'.includes(q) || '/who'.includes(q)) {
     list.push(combined)
@@ -412,14 +412,14 @@ async function handleSlashCommand(text: string, mentions: { name: string; userId
     return true
   }
   if (lower.startsWith('/newtask')) {
-    const titleMatch = text.match(/\/newTask\s*"([^"]+)"/i)
-    const whoMatch = text.match(/\/who\s+([^\s]+)/i)
+    const titleMatch = text.match(/\/newTask"([^"]*)"/i)
+    const whoMatch = text.match(/\/who@([^\s/]+)/i)
     const title = titleMatch?.[1] || text.replace(/\/newTask/i, '').trim()
     const assigneeName = whoMatch?.[1]
     const assignee =
       (assigneeName &&
         projectMembers.value.find((m) =>
-          (m.nickname || m.fullName || m.displayName || '').toLowerCase().includes(assigneeName.toLowerCase()),
+          (m.nickname || m.fullName || m.displayName || '').toLowerCase() === assigneeName.toLowerCase(),
         )?.userId) ||
       mentions.find((m) => m.userId)?.userId ||
       null
