@@ -708,11 +708,8 @@ onBeforeUnmount(() => {
       <header class="chat-header">
         <div class="channel-title">
           <span>#</span>
-          <span>{{ currentChannel?.name }}</span>
+          <span class="channel-name" :title="currentChannel?.name">{{ currentChannel?.name }}</span>
         </div>
-      </header>
-
-      <div class="messages-container" ref="chatContainer">
         <div class="channel-search">
           <input
             v-model="messageSearch"
@@ -720,6 +717,9 @@ onBeforeUnmount(() => {
             placeholder="このチャンネル内を検索"
           />
         </div>
+      </header>
+
+      <div class="messages-container" ref="chatContainer">
         <div v-if="!threadedMessages.length" class="empty-state">
           <p>まだメッセージがありません。会話を始めましょう！</p>
         </div>
@@ -1091,6 +1091,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 0 25px;
   background: #ffffff;
+  gap: 1rem;
 }
 
 .channel-title {
@@ -1100,6 +1101,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   color: #0b2e33;
+}
+
+.channel-name {
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Messages */
