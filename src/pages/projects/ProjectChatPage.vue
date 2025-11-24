@@ -17,6 +17,7 @@ import { listenProjectMembers, type ProjectMember } from '@/services/projectMemb
 import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
+import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ref as dbRef, update } from 'firebase/database'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -39,6 +40,7 @@ const defaultChannel: ChatChannel = {
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
+const { getDisplayName } = useUserDisplay(projectMembers)
 const projectId = String(route.params.projectId)
 const messages = ref<ChatMessage[]>([])
 const input = ref('')
@@ -135,7 +137,7 @@ const visibleChannelMessages = computed(() =>
     if (msg.privateFor && msg.privateFor !== user.value?.uid && msg.senderId !== user.value?.uid) return false
     const q = messageSearch.value.trim().toLowerCase()
     if (!q) return true
-    const haystack = `${msg.text || ''} ${msg.author || ''}`.toLowerCase()
+    const haystack = `${msg.text || ''} ${displayNameFor(msg)}`.toLowerCase()
     return haystack.includes(q)
   }),
 )
@@ -306,6 +308,16 @@ function extractMentions(text: string) {
       )
       return { name, userId: member?.userId }
     })
+}
+
+function displayNameFor(message: { senderId?: string | null; author?: string | null }) {
+  const author = message.author || ''
+  if (author && author !== message.senderId) return author
+  if (message.senderId) {
+    const name = getDisplayName(message.senderId)
+    if (name) return name
+  }
+  return author || 'User'
 }
 
 function handleComposerInput(event: Event) {
@@ -721,12 +733,12 @@ onBeforeUnmount(() => {
             <div class="message-header">
               <UserAvatar 
                 :src="memberMap.get(message.senderId || '')?.avatarUrl" 
-                :name="message.author" 
+                :name="displayNameFor(message)" 
                 :size="40" 
                 class="message-avatar"
               />
               <div class="message-info">
-                <span class="username">{{ message.author }}</span>
+                <span class="username">{{ displayNameFor(message) }}</span>
                 <span class="timestamp" v-if="message.createdAt">
                   {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                 </span>
@@ -826,7 +838,7 @@ onBeforeUnmount(() => {
                   class="reply-avatar"
                 />
                 <div class="message-info">
-                  <span class="username">{{ reply.author }}</span>
+                  <span class="username">{{ displayNameFor(reply) }}</span>
                   <span class="timestamp" v-if="reply.createdAt">
                     {{ new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                   </span>
@@ -875,11 +887,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="input-area">
-        <div v-if="replyingTo" class="reply-banner">
-          <span>返信中: <strong>{{ replyingTo.author }}</strong></span>
-          <button @click="cancelReplying" class="cancel-reply-btn">✕</button>
-        </div>
+        <div class="input-area">
+          <div v-if="replyingTo" class="reply-banner">
+            <span>返信中: <strong>{{ displayNameFor(replyingTo) }}</strong></span>
+            <button @click="cancelReplying" class="cancel-reply-btn">✕</button>
+          </div>
         <div class="composer-options">
           <label class="option">
             <input v-model="createTaskOnSend" type="checkbox" />
