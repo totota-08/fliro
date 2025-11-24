@@ -5,6 +5,7 @@ import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
+import { useUserDisplay } from '@/composables/useUserDisplay'
 import {
   addMessageReaction,
   deleteProjectMessage,
@@ -43,6 +44,7 @@ type MemberEntry = {
 const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
+const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
 const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
@@ -340,7 +342,7 @@ function closeTaskModal() {
 function getMemberNameById(id?: string | null) {
   if (!id) return ''
   const member = members.value.find((entry) => entry.id === id)
-  return member?.name || ''
+  return member?.name || getDisplayName(id) || ''
 }
 
 function displayAssignee(task: TaskDoc) {
