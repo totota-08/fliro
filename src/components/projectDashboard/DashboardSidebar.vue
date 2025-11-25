@@ -152,7 +152,7 @@ const handleNavigate = () => {
                   stroke-width="1.4"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'settings'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg v-else-if="item.icon === 'settings' || item.icon === 'debug'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path
                   d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
                   stroke-linecap="round"

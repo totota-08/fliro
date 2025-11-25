@@ -5,6 +5,7 @@ import AppButton from '@/components/ui/AppButton.vue'
 import { fetchProject } from '@/firebase/projectService'
 import { ROUTE_NAMES } from '@/constants/routes'
 import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
+import { useNotificationCenter } from '@/composables/useNotificationCenter'
 
 const route = useRoute()
 const projectId = String(route.params.projectId || '')
@@ -14,6 +15,9 @@ const errorMsg = ref('')
 const project = ref<any | null>(null)
 const latestLink = ref('')
 const inviteNotice = ref('')
+const notificationMessage = ref('')
+const notificationType = ref<'info' | 'warning' | 'critical'>('info')
+const { sendNotification } = useNotificationCenter()
 
 onMounted(async () => {
   try {
@@ -57,6 +61,12 @@ function handleLinkGenerated(link: string) {
   latestLink.value = link
   inviteNotice.value = 'リンクをコピーしてメンバーと共有してください。'
 }
+
+function sendDebugNotification() {
+  if (!notificationMessage.value.trim()) return
+  sendNotification(notificationType.value, notificationMessage.value.trim())
+  notificationMessage.value = ''
+}
 </script>
 
 <template>
@@ -87,6 +97,19 @@ function handleLinkGenerated(link: string) {
       <ProjectInviteForm :project-id="projectId" @generated="handleLinkGenerated" />
       <p v-if="latestLink" class="info">{{ latestLink }}</p>
       <p v-if="inviteNotice" class="info">{{ inviteNotice }}</p>
+    </section>
+
+    <section class="debug-panel">
+      <h2>通知送信テスト</h2>
+      <div class="notify-form">
+        <select v-model="notificationType">
+          <option value="info">通常</option>
+          <option value="warning">警告</option>
+          <option value="critical">重要</option>
+        </select>
+        <input v-model="notificationMessage" type="text" placeholder="通知メッセージを入力" />
+        <button type="button" @click="sendDebugNotification">送信</button>
+      </div>
     </section>
 
     <section v-if="!loading && !errorMsg" class="debug-panel">
@@ -175,6 +198,29 @@ pre {
 .info {
   color: #0b2e33;
   font-weight: 600;
+}
+
+.notify-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.notify-form input,
+.notify-form select {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid #d1d5db;
+}
+
+.notify-form button {
+  border: none;
+  background: #0b2e33;
+  color: #fff;
+  padding: 0.55rem 1rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
 }
 
 .error { color: #d64545; font-weight: 600; }
