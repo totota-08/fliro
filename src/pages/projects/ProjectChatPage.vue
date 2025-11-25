@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import CommandDropdown from '@/components/projects/CommandDropdown.vue'
+import { useUserDisplay } from '@/composables/useUserDisplay'
+import { useSlashCommands } from '@/composables/useSlashCommands'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { database } from '@/firebase/config'
 import { fetchProject } from '@/firebase/projectService'
@@ -16,7 +19,7 @@ import { listenProjectMembers, type ProjectMember } from '@/services/projectMemb
 import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
-import { ref as dbRef, update } from 'firebase/database'
+import { ref as dbRef, update, set, remove, onValue } from 'firebase/database'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -41,14 +44,18 @@ const { user, profile } = useAuthStore()
 const projectId = String(route.params.projectId)
 const messages = ref<ChatMessage[]>([])
 const input = ref('')
+const createTaskOnSend = ref(false)
+const selectedTaskId = ref('')
 const tasks = ref<TaskDoc[]>([])
 const project = ref<ProjectDoc | null>(null)
 const projectMembers = ref<ProjectMember[]>([])
+const { getDisplayName } = useUserDisplay(projectMembers)
 const taskMap = computed(() => Object.fromEntries(tasks.value.map((task) => [task.id, task.title])))
 const reactionOptions = ['👍', '🎉', '❤️', '🔥', '😄']
 const openReactionFor = ref<string | null>(null)
 const defaultReaction = '👍'
 const chatContainer = ref<HTMLElement | null>(null)
+const composerInputEl = ref<HTMLInputElement | null>(null)
 const editingMessageId = ref<string | null>(null)
 const editingText = ref('')
 const channelSearch = ref('')
@@ -60,10 +67,31 @@ const newMessagePreview = ref('新着メッセージがあります')
 const unreadChannels = ref<Record<string, boolean>>({})
 const seenMessages = ref<Record<string, string>>({})
 const replyingTo = ref<ChatMessage | null>(null)
+const mentionQuery = ref('')
+const mentionDropdownOpen = ref(false)
+const mentionCaret = ref(0)
+const slashQuery = ref('')
+const slashDropdownOpen = ref(false)
+const messageSearch = ref('')
+const typingUsers = ref<Record<string, { name: string }>>({})
+let typingTimeoutHandle: ReturnType<typeof setTimeout> | null = null
+const availableCommands = [
+  {
+    key: '/newTask',
+    label: '/newTask/"タイトル","担当者","説明"',
+    description: 'タスク名・担当者・説明をまとめて入力',
+    insert: '/newTask/"タスク名","担当者","説明"',
+  },
+  { key: '/private', label: '/private @user メッセージ', description: '指定ユーザーにのみ送信', insert: '/private @' },
+  { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
+  { key: '/time', label: '/time', description: '現在時刻を返信' },
+  { key: '/news', label: '/news', description: '最新ニュースを返信' },
+]
 
 let unsubscribeTasks: (() => void) | null = null
 let unsubscribeChat: (() => void) | null = null
 let unsubscribeMembers: (() => void) | null = null
+let unsubscribeTyping: (() => void) | null = null
 
 const keyword = computed(() => channelSearch.value.trim().toLowerCase())
 
@@ -108,8 +136,18 @@ const currentChannelMessages = computed(() =>
   messages.value.filter((message) => (message.channelId || 'general') === currentChannel.value?.id),
 )
 
+const visibleChannelMessages = computed(() =>
+  currentChannelMessages.value.filter((msg) => {
+    if (msg.privateFor && msg.privateFor !== user.value?.uid && msg.senderId !== user.value?.uid) return false
+    const q = messageSearch.value.trim().toLowerCase()
+    if (!q) return true
+    const haystack = `${msg.text || ''} ${displayNameFor(msg)}`.toLowerCase()
+    return haystack.includes(q)
+  }),
+)
+
 const threadedMessages = computed(() => {
-  const all = currentChannelMessages.value
+  const all = visibleChannelMessages.value
   const map = new Map<string, ChatMessage & { replies: ChatMessage[] }>()
   const roots: (ChatMessage & { replies: ChatMessage[] })[] = []
 
@@ -139,6 +177,16 @@ const memberMap = computed(() => {
     map.set(member.userId, member)
   })
   return map
+})
+
+const mentionCandidates = computed(() => {
+  const q = mentionQuery.value.trim().toLowerCase()
+  return projectMembers.value
+    .map((member) => ({
+      id: member.userId,
+      name: member.nickname || member.fullName || member.displayName || member.userId,
+    }))
+    .filter((entry) => (q ? entry.name.toLowerCase().includes(q) : true))
 })
 
 const lastMessageMeta = computed(() => {
@@ -248,18 +296,217 @@ function watchMembers() {
   })
 }
 
+function memberNameById(id?: string | null) {
+  if (!id) return ''
+  const member = projectMembers.value.find((m) => m.userId === id)
+  return member?.nickname || member?.fullName || member?.displayName || getDisplayName(id) || ''
+}
+
+const typingIndicator = computed(() => {
+  const entries = Object.entries(typingUsers.value).filter(([uid]) => uid !== user.value?.uid)
+  if (!entries.length) return ''
+  const names = entries.map(([, data]) => data.name || '誰か')
+  return `${names.join('、')}さんが入力中…`
+})
+
+function typingPath(uid: string) {
+  return dbRef(database, `projects/${projectId}/typing/${uid}`)
+}
+
+function markSelfTyping() {
+  if (!user.value) return
+  set(typingPath(user.value.uid), {
+    name: profile.value?.nickname || profile.value?.fullName || 'あなた',
+    updatedAt: Date.now(),
+  })
+  if (typingTimeoutHandle) window.clearTimeout(typingTimeoutHandle)
+  typingTimeoutHandle = window.setTimeout(() => {
+    if (user.value) remove(typingPath(user.value.uid))
+  }, 3000)
+}
+
+function setBotTyping(active: boolean) {
+  const ref = typingPath('bot')
+  if (active) {
+    set(ref, { name: 'Teamie Bot', updatedAt: Date.now() })
+  } else {
+    remove(ref)
+  }
+}
+
+function watchTyping() {
+  unsubscribeTyping?.()
+  const ref = dbRef(database, `projects/${projectId}/typing`)
+  unsubscribeTyping = onValue(ref, (snapshot) => {
+    const map: Record<string, { name: string }> = {}
+    snapshot.forEach((child) => {
+      const data = child.val()
+      map[child.key || ''] = { name: data?.name || 'ユーザー' }
+    })
+    typingUsers.value = map
+  })
+}
+
+const { handleSlashCommand } = useSlashCommands({
+  projectId,
+  currentChannel,
+  user,
+  profile,
+  projectMembers,
+  memberNameById,
+  setBotTyping,
+})
+
+function extractMentions(text: string) {
+  const matches = text.match(/@([^\s@]+)/g) || []
+  return matches
+    .map((tag) => tag.replace('@', ''))
+    .map((name) => {
+      const member = projectMembers.value.find(
+        (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === name.toLowerCase(),
+      )
+      return { name, userId: member?.userId }
+    })
+}
+
+function displayNameFor(message: { senderId?: string | null; author?: string | null }) {
+  const author = message.author || ''
+  if (author && author !== message.senderId && author.toLowerCase() !== 'unknown') return author
+  if (message.senderId) {
+    const name = getDisplayName(message.senderId)
+    if (name) return name
+  }
+  return author || 'User'
+}
+
+function handleComposerInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  mentionCaret.value = target.selectionStart ?? input.value.length
+  const uptoCaret = input.value.slice(0, mentionCaret.value)
+  const match = uptoCaret.match(/@([^\s@]{0,20})$/)
+  if (match) {
+    mentionQuery.value = match[1]
+    mentionDropdownOpen.value = true
+  } else {
+    mentionDropdownOpen.value = false
+    mentionQuery.value = ''
+  }
+
+  const slashMatch = uptoCaret.match(/\/([^\s/]{0,20})$/)
+  if (slashMatch) {
+    slashQuery.value = slashMatch[1]
+    slashDropdownOpen.value = true
+  } else {
+    slashDropdownOpen.value = false
+    slashQuery.value = ''
+  }
+  markSelfTyping()
+}
+
+function insertMention(candidate: { id: string; name: string }) {
+  const start = mentionCaret.value
+  const textBefore = input.value.slice(0, start)
+  const match = textBefore.match(/@([^\s@]{0,20})$/)
+  const prefixLen = match ? match[0].length : 0
+  const insertPos = start - prefixLen
+  input.value = `${input.value.slice(0, insertPos)}@${candidate.name} ${input.value.slice(start)}`
+  mentionDropdownOpen.value = false
+  nextTick(() => {
+    const el = composerInputEl.value
+    if (el) {
+      const cursor = insertPos + candidate.name.length + 2
+      el.focus()
+      el.setSelectionRange(cursor, cursor)
+    }
+  })
+}
+
+const commandCandidates = computed(() =>
+  availableCommands.filter((cmd) =>
+    slashQuery.value ? cmd.key.toLowerCase().includes(slashQuery.value.toLowerCase()) : true,
+  ),
+)
+
+function insertCommand(cmd: { key: string }) {
+  const start = mentionCaret.value
+  const textBefore = input.value.slice(0, start)
+  const match = textBefore.match(/\/([^\s/]{0,20})$/)
+  const prefixLen = match ? match[0].length : 0
+  const insertPos = start - prefixLen
+  const insertText = cmd.insert || `${cmd.key} `
+  input.value = `${input.value.slice(0, insertPos)}${insertText}${input.value.slice(start)}`
+  slashDropdownOpen.value = false
+  nextTick(() => {
+    const el = composerInputEl.value
+    if (el) {
+      const cursor = insertPos + insertText.length
+      el.focus()
+      el.setSelectionRange(cursor, cursor)
+    }
+  })
+}
+
+function resetComposer() {
+  input.value = ''
+  replyingTo.value = null
+  createTaskOnSend.value = false
+  selectedTaskId.value = ''
+  mentionDropdownOpen.value = false
+  mentionQuery.value = ''
+  slashDropdownOpen.value = false
+  slashQuery.value = ''
+  openReactionFor.value = null
+}
+
 async function sendMessage() {
   if (!input.value.trim() || !user.value) return
+  const text = input.value.trim()
+  const mentions = extractMentions(text)
+
+  if (text.startsWith('/')) {
+    const handled = await handleSlashCommand(text, mentions)
+    if (handled) {
+      resetComposer()
+      return
+    }
+  }
+
+  let linkedTaskId: string | null = null
+  if (createTaskOnSend.value) {
+    const assignee = mentions.find((m) => m.userId)?.userId || null
+    linkedTaskId = await createTask(
+      projectId,
+      {
+        title: text,
+        assigneeId: assignee,
+        assigneeName: assignee ? memberNameById(assignee) : null,
+      },
+      user.value.uid,
+    )
+  } else if (selectedTaskId.value) {
+    linkedTaskId = selectedTaskId.value
+  }
+
   await sendProjectMessage(
     projectId,
     user.value.uid,
     profile.value?.nickname || profile.value?.fullName || 'User',
-    input.value.trim(),
+    text,
     currentChannel.value?.id || 'general',
-    replyingTo.value?.id
+    replyingTo.value?.id,
+    {
+      linkedTaskId: linkedTaskId || undefined,
+      mentions: mentions.map((m) => m.userId || m.name),
+      isTask: createTaskOnSend.value || Boolean(linkedTaskId),
+    },
   )
-  input.value = ''
-  replyingTo.value = null
+  if (linkedTaskId) {
+    activeChannelId.value = linkedTaskId
+  }
+  if (user.value) {
+    remove(typingPath(user.value.uid))
+  }
+  resetComposer()
   markChannelAsRead(currentChannel.value?.id || 'general')
   newMessageBanner.value = false
   scrollToBottom()
@@ -347,6 +594,7 @@ onMounted(async () => {
   watchTasks()
   watchChat()
   watchMembers()
+  watchTyping()
   if (projectId) {
       project.value = await fetchProject(projectId)
   }
@@ -356,6 +604,10 @@ onBeforeUnmount(() => {
   unsubscribeTasks?.()
   unsubscribeChat?.()
   unsubscribeMembers?.()
+  unsubscribeTyping?.()
+  if (user.value) {
+    remove(typingPath(user.value.uid))
+  }
 })
 </script>
 
@@ -411,7 +663,14 @@ onBeforeUnmount(() => {
       <header class="chat-header">
         <div class="channel-title">
           <span>#</span>
-          <span>{{ currentChannel?.name }}</span>
+          <span class="channel-name" :title="currentChannel?.name">{{ currentChannel?.name }}</span>
+        </div>
+        <div class="channel-search">
+          <input
+            v-model="messageSearch"
+            type="search"
+            placeholder="このチャンネル内を検索"
+          />
         </div>
       </header>
 
@@ -423,21 +682,23 @@ onBeforeUnmount(() => {
         <div v-for="message in threadedMessages" :key="message.id" class="message-group">
           <div 
             class="message" 
-            :class="detectMessageType(message.text)"
+            :class="[detectMessageType(message.text), { bot: message.isBot }]"
             @dblclick="reactToMessage(message.id, defaultReaction)"
           >
             <div class="message-header">
               <UserAvatar 
                 :src="memberMap.get(message.senderId || '')?.avatarUrl" 
-                :name="message.author" 
+                :name="displayNameFor(message)" 
                 :size="40" 
                 class="message-avatar"
               />
               <div class="message-info">
-                <span class="username">{{ message.author }}</span>
+                <span class="username">{{ displayNameFor(message) }}</span>
                 <span class="timestamp" v-if="message.createdAt">
                   {{ new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                 </span>
+                <span v-if="message.isBot" class="bot-label">🤖 Bot</span>
+                <span v-if="message.linkedTaskId || message.isTask" class="message-badge badge-task">タスク</span>
                 <span 
                   v-if="getMessageTypeLabel(detectMessageType(message.text))" 
                   class="message-badge"
@@ -532,7 +793,7 @@ onBeforeUnmount(() => {
                   class="reply-avatar"
                 />
                 <div class="message-info">
-                  <span class="username">{{ reply.author }}</span>
+                  <span class="username">{{ displayNameFor(reply) }}</span>
                   <span class="timestamp" v-if="reply.createdAt">
                     {{ new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                   </span>
@@ -581,20 +842,52 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="input-area">
-        <div v-if="replyingTo" class="reply-banner">
-          <span>返信中: <strong>{{ replyingTo.author }}</strong></span>
-          <button @click="cancelReplying" class="cancel-reply-btn">✕</button>
+        <div class="input-area">
+          <div v-if="replyingTo" class="reply-banner">
+            <span>返信中: <strong>{{ displayNameFor(replyingTo) }}</strong></span>
+            <button @click="cancelReplying" class="cancel-reply-btn">✕</button>
+          </div>
+        <div class="composer-options">
+          <label class="option">
+            <input v-model="createTaskOnSend" type="checkbox" />
+            <span>このメッセージをタスク化</span>
+          </label>
+          <label class="option">
+            <span>既存タスクに紐付け</span>
+            <select v-model="selectedTaskId">
+              <option value="">なし</option>
+              <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+            </select>
+          </label>
         </div>
+        <p v-if="typingIndicator" class="typing-indicator">{{ typingIndicator }}</p>
+        <CommandDropdown
+          :open="slashDropdownOpen"
+          :commands="commandCandidates"
+          @select="insertCommand"
+        />
         <div class="input-wrapper">
           <input 
             v-model="input" 
             type="text" 
             id="messageInput" 
             :placeholder="composerPlaceholder"
+            ref="composerInputEl"
             @keydown.enter="sendMessage"
+            @input="handleComposerInput"
+            @keyup="handleComposerInput"
           >
           <button class="send-btn" type="button" @click="sendMessage">→</button>
+        </div>
+        <div v-if="mentionDropdownOpen && mentionCandidates.length" class="mention-dropdown">
+          <button
+            v-for="candidate in mentionCandidates"
+            :key="candidate.id"
+            type="button"
+            @click="insertMention(candidate)"
+          >
+            @{{ candidate.name }}
+          </button>
         </div>
       </div>
     </main>
@@ -754,6 +1047,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 0 25px;
   background: #ffffff;
+  gap: 1rem;
 }
 
 .channel-title {
@@ -765,11 +1059,52 @@ onBeforeUnmount(() => {
   color: #0b2e33;
 }
 
+.channel-name {
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Messages */
 .messages-container {
   flex: 1;
   overflow-y: auto;
   padding: 20px 25px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.channel-search {
+  flex: 1;
+  max-width: 400px;
+}
+
+.channel-search input {
+  width: 100%;
+  padding: 10px 16px 10px 40px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 14px;
+  color: #0f172a;
+  transition: all 0.3s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cpath d='m21 21-4.35-4.35'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 18px;
+}
+
+.channel-search input::placeholder {
+  color: #94a3b8;
+}
+
+.channel-search input:focus {
+  outline: none;
+  border-color: #0b2e33;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(184, 227, 233, 0.22);
 }
 
 .messages-container::-webkit-scrollbar {
@@ -823,6 +1158,11 @@ onBeforeUnmount(() => {
   background: rgba(22, 163, 74, 0.05);
 }
 
+.message.bot {
+  border-left-color: #6b7280;
+  background: rgba(148, 163, 184, 0.12);
+}
+
 .message:hover {
   background: rgba(11, 46, 51, 0.05);
 }
@@ -844,6 +1184,18 @@ onBeforeUnmount(() => {
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.bot-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(11, 46, 51, 0.12);
+  color: #0b2e33;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .username {
@@ -877,6 +1229,11 @@ onBeforeUnmount(() => {
 
 .badge-announcement {
   background: rgba(11, 46, 51, 0.1);
+  color: #0b2e33;
+}
+
+.badge-task {
+  background: rgba(79, 124, 130, 0.15);
   color: #0b2e33;
 }
 
@@ -1103,6 +1460,40 @@ onBeforeUnmount(() => {
   padding: 20px 25px;
   border-top: 1px solid #e2e8f0;
   background: #ffffff;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.composer-options {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  align-items: center;
+  color: #0b2e33;
+  font-weight: 600;
+}
+
+.composer-options .option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.composer-options .option span {
+  white-space: nowrap;
+}
+
+.composer-options select {
+  border-radius: 0.65rem;
+  border: 1px solid #d1dae8;
+  padding: 0.35rem 0.55rem;
+  background: #fff;
+  width: 200px;
+  max-width: 300px;
 }
 
 .reply-banner {
@@ -1195,5 +1586,59 @@ onBeforeUnmount(() => {
 
 .send-btn:active {
   transform: scale(0.95);
+}
+
+.mention-dropdown {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+.mention-dropdown button {
+  border: 1px solid #d1dae8;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.mention-dropdown button:hover {
+  background: rgba(11, 46, 51, 0.08);
+}
+
+.command-dropdown {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.35rem;
+}
+
+.command-dropdown button {
+  border: 1px solid #d1dae8;
+  background: #fff;
+  border-radius: 0.85rem;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  text-align: left;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.command-dropdown strong {
+  color: #0b2e33;
+}
+
+.command-dropdown span {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.typing-indicator {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0.35rem 0;
 }
 </style>

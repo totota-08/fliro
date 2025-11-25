@@ -14,5 +14,20 @@ onMounted(async () => {
 
 <template>
   <LoadingScreen :loading="isLoading" />
-  <RouterView />
+  <transition name="fade-slide" mode="out-in">
+    <RouterView />
+  </transition>
 </template>
+
+<style scoped>
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.25s ease, transform 0.3s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
+}
+</style>

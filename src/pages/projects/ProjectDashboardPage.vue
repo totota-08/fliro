@@ -2,9 +2,12 @@
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
+import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
+import DashboardProgressChart from '@/components/projectDashboard/DashboardProgressChart.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
+import { useUserDisplay } from '@/composables/useUserDisplay'
 import {
   addMessageReaction,
   deleteProjectMessage,
@@ -43,7 +46,10 @@ type MemberEntry = {
 const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
+const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
+const notificationsBar = ref<{ id: string; type: 'info' | 'warning' | 'critical'; message: string }[]>([])
+const taskView = ref<'all' | 'mine'>('all')
 const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
 const chatMessages = ref<ChatMessage[]>([])
@@ -134,6 +140,9 @@ const filteredTasks = computed(() => {
   if (showMyTasksOnly.value && user.value) {
     list = list.filter((task) => task.assigneeId === user.value?.uid)
   }
+  if (taskView.value === 'mine' && user.value) {
+    list = list.filter((task) => task.assigneeId === user.value.uid)
+  }
   return list
 })
 
@@ -179,6 +188,13 @@ const summaryCards = computed<SummaryCard[]>(() => {
   ]
 })
 
+const progressOverview = computed(() => {
+  const total = tasks.value.length
+  const done = tasks.value.filter((task) => task.status === 'done').length
+  const progress = total ? Math.round((done / total) * 100) : 0
+  return { total, done, progress }
+})
+
 function formatDueDate(task: TaskDoc) {
   if (!task.dueDate?.seconds) return '未設定'
   return new Date(task.dueDate.seconds * 1000).toLocaleDateString()
@@ -222,6 +238,7 @@ const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
     reactions: message.reactionSummary || [],
     senderId: message.senderId,
     linkedTaskId: message.linkedTaskId,
+    isTask: message.isTask,
   })),
 )
 
@@ -243,6 +260,23 @@ function evaluateNotifications() {
   if (userAssignments.length) alerts.push(`あなたに割り当てられたタスクが ${userAssignments.length} 件あります`)
   if (dueSoon.length) alerts.push(`期限が迫っているタスク: ${dueSoon.length} 件`)
   notifications.value = alerts
+}
+
+watch(
+  taskView,
+  (mode) => {
+    showMyTasksOnly.value = mode === 'mine'
+  },
+  { immediate: true },
+)
+
+watch(showMyTasksOnly, (flag) => {
+  taskView.value = flag ? 'mine' : 'all'
+})
+
+function sendNotion(type: 'info' | 'warning' | 'critical', message: string) {
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  notificationsBar.value.push({ id, type, message })
 }
 
 async function loadProjectList() {
@@ -339,7 +373,7 @@ function closeTaskModal() {
 function getMemberNameById(id?: string | null) {
   if (!id) return ''
   const member = members.value.find((entry) => entry.id === id)
-  return member?.name || ''
+  return member?.name || getDisplayName(id) || ''
 }
 
 function displayAssignee(task: TaskDoc) {
@@ -534,6 +568,7 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="demo__content">
+        <NotificationBar :notifications="notificationsBar" />
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
           :description="`${members.length} 人のメンバーと ${tasks.length} 件のタスク`"
@@ -541,8 +576,25 @@ onBeforeUnmount(() => {
           :rotate="false"
         />
 
+        <section class="progress-panel">
+          <div>
+            <p class="progress-panel__label">プロジェクト進捗</p>
+            <h3 class="progress-panel__title">{{ progressOverview.progress }}%</h3>
+            <p class="progress-panel__caption">完了 {{ progressOverview.done }} / {{ progressOverview.total }} 件</p>
+          </div>
+          <DashboardProgressChart
+            :progress="progressOverview.progress"
+            :total-tasks="progressOverview.total"
+            :done-tasks="progressOverview.done"
+          />
+        </section>
+
         <div class="filters">
           <button type="button" class="filters__new" @click="openTaskModal">＋ 新規タスク</button>
+          <div class="view-toggle">
+            <button type="button" :class="{ 'is-active': taskView === 'all' }" @click="taskView = 'all'">全体</button>
+            <button type="button" :class="{ 'is-active': taskView === 'mine' }" @click="taskView = 'mine'">自分</button>
+          </div>
           <input v-model="filters.search" type="search" placeholder="タスク検索" />
           <select v-model="filters.status">
             <option value="all">全て</option>
@@ -560,10 +612,6 @@ onBeforeUnmount(() => {
             <option value="week">今週</option>
             <option value="overdue">期限切れ</option>
           </select>
-          <label class="toggle">
-            <input type="checkbox" v-model="showMyTasksOnly" />
-            <span>自分のタスク</span>
-          </label>
         </div>
 
         <section v-if="notifications.length" class="dashboard__alerts">
@@ -838,11 +886,61 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
 }
 
+.progress-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 12px 20px rgba(11, 46, 51, 0.08);
+}
+
+.progress-panel__label {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.progress-panel__title {
+  margin: 0.15rem 0;
+  font-size: 1.6rem;
+  color: #0b2e33;
+}
+
+.progress-panel__caption {
+  margin: 0;
+  color: #4b5563;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
+}
+
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid #d1dae8;
+  border-radius: 0.8rem;
+  overflow: hidden;
+}
+
+.view-toggle button {
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.view-toggle button.is-active {
+  background: #0b2e33;
+  color: #fff;
 }
 
 .filters__new {

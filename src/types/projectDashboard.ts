@@ -21,6 +21,7 @@ export interface PreviewChatMessage {
   reactions?: ReactionSummary[]
   senderId?: string
   linkedTaskId?: string | null
+  isTask?: boolean
 }
 
 export type DashboardProjectItem = {
