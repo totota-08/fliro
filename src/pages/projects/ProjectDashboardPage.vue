@@ -3,7 +3,6 @@ import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
-import DashboardProgressChart from '@/components/projectDashboard/DashboardProgressChart.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
@@ -188,18 +187,11 @@ const summaryCards = computed<SummaryCard[]>(() => {
   const inProgress = tasks.value.filter((task) => task.status === 'in-progress').length
   const overdue = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now()).length
   return [
-    { id: 'progress', label: '進捗率', value: progress, caption: '完了タスク率' },
-    { id: 'done', label: '完了', value: String(done), caption: '完了済みタスク' },
-    { id: 'active', label: '進行中', value: String(inProgress), caption: '進行中のタスク' },
-    { id: 'overdue', label: '期限切れ', value: String(overdue), caption: '期限切れタスク', tone: overdue > 0 ? 'alert' : 'neutral' },
+    { id: 'progress', label: '進捗率', value: progress, caption: '' },
+    { id: 'done', label: '完了', value: String(done), caption: '' },
+    { id: 'active', label: '進行中', value: String(inProgress), caption: '' },
+    { id: 'overdue', label: '期限切れ', value: String(overdue), caption: '', tone: overdue > 0 ? 'alert' : 'neutral' },
   ]
-})
-
-const progressOverview = computed(() => {
-  const total = tasks.value.length
-  const done = tasks.value.filter((task) => task.status === 'done').length
-  const progress = total ? Math.round((done / total) * 100) : 0
-  return { total, done, progress }
 })
 
 function formatDueDate(task: TaskDoc) {
@@ -577,23 +569,10 @@ onBeforeUnmount(() => {
         <NotificationBar :notifications="notificationsBar" />
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
-          :description="`${members.length} 人のメンバーと ${tasks.length} 件のタスク`"
+          :description="''"
           :cards="summaryCards"
           :rotate="false"
         />
-
-        <section class="progress-panel">
-          <div>
-            <p class="progress-panel__label">プロジェクト進捗</p>
-            <h3 class="progress-panel__title">{{ progressOverview.progress }}%</h3>
-            <p class="progress-panel__caption">完了 {{ progressOverview.done }} / {{ progressOverview.total }} 件</p>
-          </div>
-          <DashboardProgressChart
-            :progress="progressOverview.progress"
-            :total-tasks="progressOverview.total"
-            :done-tasks="progressOverview.done"
-          />
-        </section>
 
         <div class="filters">
           <button type="button" class="filters__new" @click="openTaskModal">＋ 新規タスク</button>
@@ -890,35 +869,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-
-.progress-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.25rem;
-  background: #fff;
-  box-shadow: 0 12px 20px rgba(11, 46, 51, 0.08);
-}
-
-.progress-panel__label {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.progress-panel__title {
-  margin: 0.15rem 0;
-  font-size: 1.6rem;
-  color: #0b2e33;
-}
-
-.progress-panel__caption {
-  margin: 0;
-  color: #4b5563;
 }
 
 .filters {
