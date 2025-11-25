@@ -3,6 +3,7 @@ import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
+import TimelineBar from '@/components/projectDashboard/TimelineBar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
@@ -193,6 +194,16 @@ const summaryCards = computed<SummaryCard[]>(() => {
     { id: 'overdue', label: '期限切れ', value: String(overdue), caption: '', tone: overdue > 0 ? 'alert' : 'neutral' },
   ]
 })
+
+const timelineTasks = computed(() =>
+  tasks.value
+    .filter((task) => task.dueDate?.seconds)
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      dueDate: task.dueDate ? new Date(task.dueDate.seconds * 1000) : null,
+    })),
+)
 
 function formatDueDate(task: TaskDoc) {
   if (!task.dueDate?.seconds) return '未設定'
@@ -573,6 +584,12 @@ onBeforeUnmount(() => {
           :cards="summaryCards"
           :rotate="false"
           :show-header="false"
+        />
+        <TimelineBar
+          :project-name="project?.name"
+          :start-date="project?.startDate?.seconds ? new Date(project.startDate.seconds * 1000) : null"
+          :end-date="project?.dueDate?.seconds ? new Date(project.dueDate.seconds * 1000) : null"
+          :tasks="timelineTasks"
         />
 
         <div class="filters">
