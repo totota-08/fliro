@@ -7,6 +7,7 @@ import DashboardProgressChart from '@/components/projectDashboard/DashboardProgr
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
+import { useNotificationCenter } from '@/composables/useNotificationCenter'
 import { useUserDisplay } from '@/composables/useUserDisplay'
 import {
   addMessageReaction,
@@ -48,7 +49,7 @@ const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
-const notificationsBar = ref<{ id: string; type: 'info' | 'warning' | 'critical'; message: string }[]>([])
+const { notifications: notificationsBar, sendNotification } = useNotificationCenter()
 const taskView = ref<'all' | 'mine'>('all')
 const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
@@ -96,6 +97,12 @@ const navItems = computed<DashboardNavItem[]>(() =>
       label: '設定',
       to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
       icon: 'settings',
+    },
+    {
+      key: 'debug',
+      label: 'デバッグ',
+      to: { name: ROUTE_NAMES.projectDebug, params: { projectId: projectId.value } },
+      icon: 'debug',
     },
   ] satisfies DashboardNavItem[],
 )
@@ -275,8 +282,7 @@ watch(showMyTasksOnly, (flag) => {
 })
 
 function sendNotion(type: 'info' | 'warning' | 'critical', message: string) {
-  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
-  notificationsBar.value.push({ id, type, message })
+  sendNotification(type, message)
 }
 
 async function loadProjectList() {
