@@ -57,7 +57,7 @@ export function useSlashCommands({
       const targetName = match[1]
       const body = match[2]?.trim()
       const targetUser = projectMembers.value.find(
-        (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === targetName.toLowerCase(),
+        (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === targetName?.toLowerCase(),
       )
       if (!targetUser) {
         await sendBotMessage(`${targetName} さんが見つかりません`, { privateFor: user.value?.uid || null })
