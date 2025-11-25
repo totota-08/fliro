@@ -12,6 +12,7 @@ type Options = {
   profile: Ref<{ nickname?: string | null; fullName?: string | null } | null>
   projectMembers: Ref<ProjectMember[]>
   memberNameById: (id?: string | null) => string
+  setBotTyping?: (active: boolean) => void
 }
 
 export function useSlashCommands({
@@ -21,17 +22,24 @@ export function useSlashCommands({
   profile,
   projectMembers,
   memberNameById,
+  setBotTyping,
 }: Options) {
   async function sendBotMessage(text: string, options?: { privateFor?: string | null }) {
-    await sendProjectMessage(
-      projectId,
-      'bot',
-      'Teamie Bot',
-      text,
-      currentChannel.value?.id || 'general',
-      undefined,
-      { isBot: true, privateFor: options?.privateFor ?? null },
-    )
+    setBotTyping?.(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      await sendProjectMessage(
+        projectId,
+        'bot',
+        'Teamie Bot',
+        text,
+        currentChannel.value?.id || 'general',
+        undefined,
+        { isBot: true, privateFor: options?.privateFor ?? null },
+      )
+    } finally {
+      setBotTyping?.(false)
+    }
   }
 
   async function handleSlashCommand(text: string, mentions: Mention[]) {

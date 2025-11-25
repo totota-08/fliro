@@ -19,7 +19,7 @@ import { listenProjectMembers, type ProjectMember } from '@/services/projectMemb
 import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
-import { ref as dbRef, update } from 'firebase/database'
+import { ref as dbRef, update, set, remove, onValue } from 'firebase/database'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -73,6 +73,8 @@ const mentionCaret = ref(0)
 const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
 const messageSearch = ref('')
+const typingUsers = ref<Record<string, { name: string }>>({})
+let typingTimeoutHandle: ReturnType<typeof setTimeout> | null = null
 const availableCommands = [
   {
     key: '/newTask',
@@ -89,6 +91,7 @@ const availableCommands = [
 let unsubscribeTasks: (() => void) | null = null
 let unsubscribeChat: (() => void) | null = null
 let unsubscribeMembers: (() => void) | null = null
+let unsubscribeTyping: (() => void) | null = null
 
 const keyword = computed(() => channelSearch.value.trim().toLowerCase())
 
@@ -299,6 +302,51 @@ function memberNameById(id?: string | null) {
   return member?.nickname || member?.fullName || member?.displayName || getDisplayName(id) || ''
 }
 
+const typingIndicator = computed(() => {
+  const entries = Object.entries(typingUsers.value).filter(([uid]) => uid !== user.value?.uid)
+  if (!entries.length) return ''
+  const names = entries.map(([, data]) => data.name || '誰か')
+  return `${names.join('、')}さんが入力中…`
+})
+
+function typingPath(uid: string) {
+  return dbRef(database, `projects/${projectId}/typing/${uid}`)
+}
+
+function markSelfTyping() {
+  if (!user.value) return
+  set(typingPath(user.value.uid), {
+    name: profile.value?.nickname || profile.value?.fullName || 'あなた',
+    updatedAt: Date.now(),
+  })
+  if (typingTimeoutHandle) window.clearTimeout(typingTimeoutHandle)
+  typingTimeoutHandle = window.setTimeout(() => {
+    if (user.value) remove(typingPath(user.value.uid))
+  }, 3000)
+}
+
+function setBotTyping(active: boolean) {
+  const ref = typingPath('bot')
+  if (active) {
+    set(ref, { name: 'Teamie Bot', updatedAt: Date.now() })
+  } else {
+    remove(ref)
+  }
+}
+
+function watchTyping() {
+  unsubscribeTyping?.()
+  const ref = dbRef(database, `projects/${projectId}/typing`)
+  unsubscribeTyping = onValue(ref, (snapshot) => {
+    const map: Record<string, { name: string }> = {}
+    snapshot.forEach((child) => {
+      const data = child.val()
+      map[child.key || ''] = { name: data?.name || 'ユーザー' }
+    })
+    typingUsers.value = map
+  })
+}
+
 const { handleSlashCommand } = useSlashCommands({
   projectId,
   currentChannel,
@@ -306,6 +354,7 @@ const { handleSlashCommand } = useSlashCommands({
   profile,
   projectMembers,
   memberNameById,
+  setBotTyping,
 })
 
 function extractMentions(text: string) {
@@ -351,6 +400,7 @@ function handleComposerInput(event: Event) {
     slashDropdownOpen.value = false
     slashQuery.value = ''
   }
+  markSelfTyping()
 }
 
 function insertMention(candidate: { id: string; name: string }) {
@@ -453,6 +503,9 @@ async function sendMessage() {
   if (linkedTaskId) {
     activeChannelId.value = linkedTaskId
   }
+  if (user.value) {
+    remove(typingPath(user.value.uid))
+  }
   resetComposer()
   markChannelAsRead(currentChannel.value?.id || 'general')
   newMessageBanner.value = false
@@ -541,6 +594,7 @@ onMounted(async () => {
   watchTasks()
   watchChat()
   watchMembers()
+  watchTyping()
   if (projectId) {
       project.value = await fetchProject(projectId)
   }
@@ -550,6 +604,10 @@ onBeforeUnmount(() => {
   unsubscribeTasks?.()
   unsubscribeChat?.()
   unsubscribeMembers?.()
+  unsubscribeTyping?.()
+  if (user.value) {
+    remove(typingPath(user.value.uid))
+  }
 })
 </script>
 
@@ -802,6 +860,7 @@ onBeforeUnmount(() => {
             </select>
           </label>
         </div>
+        <p v-if="typingIndicator" class="typing-indicator">{{ typingIndicator }}</p>
         <CommandDropdown
           :open="slashDropdownOpen"
           :commands="commandCandidates"
@@ -1575,5 +1634,11 @@ onBeforeUnmount(() => {
 .command-dropdown span {
   color: #64748b;
   font-size: 0.85rem;
+}
+
+.typing-indicator {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0.35rem 0;
 }
 </style>
