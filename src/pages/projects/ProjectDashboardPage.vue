@@ -572,6 +572,7 @@ onBeforeUnmount(() => {
           :description="''"
           :cards="summaryCards"
           :rotate="false"
+          :show-header="false"
         />
 
         <div class="filters">

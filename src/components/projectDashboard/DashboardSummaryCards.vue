@@ -16,11 +16,13 @@ const props = withDefaults(
     note?: string
     cards?: SummaryCard[]
     rotate?: boolean
+    showHeader?: boolean
   }>(),
   {
     title: 'Webサイトリニューアル',
     description: '今週の状況をひと目で確認できます。',
     rotate: true,
+    showHeader: true,
   },
 )
 
@@ -66,7 +68,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="summary">
-    <header class="summary__header">
+    <header v-if="props.showHeader" class="summary__header">
       <div>
         <h2>{{ props.title }}</h2>
         <p>{{ props.description }}</p>
