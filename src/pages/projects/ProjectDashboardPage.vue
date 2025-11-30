@@ -7,11 +7,11 @@ import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import {
-  addMessageReaction,
-  deleteProjectMessage,
+  // addMessageReaction,
+  // deleteProjectMessage,
   listenProjectChat,
-  sendProjectMessage,
-  updateProjectMessage,
+  // sendProjectMessage,
+  // updateProjectMessage,
   type ChatMessage,
 } from '@/services/projectChat'
 import {
@@ -22,6 +22,7 @@ import {
   type TaskDoc,
   type TaskStatus,
 } from '@/services/taskService'
+import type { ProjectMember } from '@/services/projectMembers'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem, PreviewChatMessage } from '@/types/projectDashboard'
@@ -33,11 +34,9 @@ const route = useRoute()
 const { user, profile } = useAuthStore()
 const projectId = ref(String(route.params.projectId || ''))
 
-type MemberEntry = {
+type MemberEntry = ProjectMember & {
   id: string
   name: string
-  role?: string
-  email?: string
   lastAccessedAt?: { seconds: number; nanoseconds: number }
 }
 
@@ -64,7 +63,7 @@ const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all
 const showMyTasksOnly = ref(false)
 const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
-const secondaryTab = ref<'chat' | 'members'>('chat')
+// const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
 
 const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0 })
@@ -150,36 +149,20 @@ const filteredTasks = computed(() => {
   if (showMyTasksOnly.value && user.value) {
     list = list.filter((task) => task.assigneeId === user.value?.uid)
   }
-  if (taskView.value === 'mine' && user.value) {
-    list = list.filter((task) => task.assigneeId === user.value.uid)
-  }
-  return list
+if (taskView.value === 'mine' && user.value) {
+  list = list.filter((task) => task.assigneeId === user.value?.uid)
+}
+return list
 })
-
-
-
 
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length
   const done = tasks.value.filter((task) => task.status === 'done').length
   
-  // Calculate progress as average of all task progress rates
-  const totalProgress = tasks.value.reduce((sum, task) => {
-    return sum + (task.progress ?? (task.status === 'done' ? 100 : 0))
-  }, 0)
-  const progress = total ? Math.round(totalProgress / total) : 0
-  
   const inProgress = tasks.value.filter((task) => task.status === 'in-progress').length
   const overdue = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now()).length
   
   return [
-    { 
-      id: 'progress', 
-      label: 'プロジェクト進捗率', 
-      value: `${progress}%`, 
-      caption: `全${total}件のタスクの平均進捗状況`,
-      icon: 'chart'
-    },
     { 
       id: 'done', 
       label: '完了タスク', 
@@ -205,6 +188,82 @@ const summaryCards = computed<SummaryCard[]>(() => {
   ]
 })
 
+
+const gaugeRadius = 80
+const gaugeCircumference = Math.PI * gaugeRadius
+
+const overallProgress = computed(() => {
+  const total = tasks.value.length
+  if (!total) return 0
+  const totalProgress = tasks.value.reduce((sum, task) => {
+    return sum + (task.progress ?? (task.status === 'done' ? 100 : 0))
+  }, 0)
+  return Math.round(totalProgress / total)
+})
+
+const statusCounts = computed(() => {
+  const counts: Record<TaskStatus, number> = {
+    todo: 0,
+    'in-progress': 0,
+    review: 0,
+    done: 0,
+  }
+  tasks.value.forEach((task) => {
+    counts[task.status] = (counts[task.status] || 0) + 1
+  })
+  return counts
+})
+
+const maxStatusCount = computed(() => {
+  const values = Object.values(statusCounts.value)
+  return Math.max(1, ...values)
+})
+
+const healthScore = computed(() => {
+  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length
+  const now = Date.now()
+  const soonThreshold = 3 * 24 * 60 * 60 * 1000
+  const dueSoon = tasks.value.filter(
+    (task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 - now <= soonThreshold && task.dueDate.seconds * 1000 > now,
+  ).length
+  const progressPenalty = Math.max(0, 70 - overallProgress.value) * 0.4
+  let score = 100
+  score -= overdue * 12
+  score -= dueSoon * 5
+  score -= progressPenalty
+  return Math.max(0, Math.min(100, Math.round(score)))
+})
+
+const healthColor = computed(() => {
+  if (healthScore.value >= 80) return '#16a34a'
+  if (healthScore.value >= 60) return '#f59e0b'
+  if (healthScore.value >= 40) return '#f97316'
+  return '#ef4444'
+})
+
+const gaugeDashoffset = computed(() => gaugeCircumference * (1 - healthScore.value / 100))
+const healthNeedleRotation = computed(() => -90 + (healthScore.value / 100) * 180)
+
+const gaugeSegments = [
+  { id: 'danger', color: '#ef4444', size: 40 },
+  { id: 'warn', color: '#f97316', size: 20 },
+  { id: 'caution', color: '#f59e0b', size: 20 },
+  { id: 'good', color: '#16a34a', size: 20 },
+]
+
+const gaugeSegmentStyles = computed(() => {
+  let offset = 0
+  return gaugeSegments.map((segment) => {
+    const len = gaugeCircumference * (segment.size / 100)
+    const style = {
+      stroke: segment.color,
+      strokeDasharray: `${len} ${gaugeCircumference - len}`,
+      strokeDashoffset: `${-offset}`,
+    }
+    offset += len
+    return style
+  })
+})
 
 
 function formatDueDate(task: TaskDoc) {
@@ -368,7 +427,12 @@ function watchProject() {
       return {
         id: memberId,
         name: name || docSnap.id,
-        role: data.role,
+        userId: memberId,
+        role: (data.role as ProjectMember['role']) || 'member',
+        projectRole: (data.projectRole as ProjectMember['projectRole']) || 'member',
+        nickname: data.nickname,
+        fullName: data.fullName,
+        displayName: data.nickname || data.fullName || name || docSnap.id,
         email: data.email,
         lastAccessedAt: data.lastAccessedAt,
       }
@@ -631,21 +695,6 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="demo__content">
-        <NotificationBar :notifications="notificationsBar" />
-        <DashboardSummaryCards
-          :title="project?.name || 'ダッシュボード'"
-          :description="''"
-          :cards="summaryCards"
-          :rotate="false"
-          :show-header="false"
-        />
-
-
-        <div class="top-actions">
-          <button type="button" class="top-actions__new" @click="openTaskModal">＋ 新規タスク</button>
-        </div>
-
-
         <section v-if="notifications.length" class="dashboard__alerts">
           <div v-for="note in notifications" :key="note.id" class="dashboard__alert">
             <p>⚡ {{ note.message }}</p>
@@ -660,7 +709,147 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </section>
+        <NotificationBar :notifications="notificationsBar" />
+        <section class="dashboard__charts">
+          <div class="chart-card chart-card--donut">
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">全体の進捗</p>
+              <h3>プロジェクト進捗</h3>
+              <span class="chart-card__meta">{{ tasks.length }}件のタスク</span>
+            </header>
+            <span class="chart-card__metric">{{ overallProgress }}%</span>
+            <div class="progress-chart">
+              <div class="progress-chart__track">
+                <div class="progress-chart__fill" :style="{ width: `${overallProgress}%` }" />
+              </div>
+              <div class="progress-chart__labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
 
+          <div class="chart-card chart-card--bars">
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">タスクの状況</p>
+              <h3>ステータス別タスク数</h3>
+            </header>
+            <ul class="status-bars">
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>未着手</span>
+                  <strong>{{ statusCounts.todo }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--todo"
+                    :style="{ width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>進行中</span>
+                  <strong>{{ statusCounts['in-progress'] }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--progress"
+                    :style="{ width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>レビュー</span>
+                  <strong>{{ statusCounts.review }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--review"
+                    :style="{ width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>完了</span>
+                  <strong>{{ statusCounts.done }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--done"
+                    :style="{ width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="chart-card chart-card--gauge">
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">プロジェクトの危険度</p>
+              <h3>ヘルススコア</h3>
+              <span class="chart-card__meta">期限・進捗から算出</span>
+            </header>
+            <span class="chart-card__metric chart-card__metric--health">{{ healthScore }}%</span>
+            <div class="gauge-chart">
+              <svg viewBox="0 0 200 120">
+                <path class="gauge-chart__base" d="M20 120 A80 80 0 0 1 180 120" />
+                <path
+                  v-for="(segment, index) in gaugeSegments"
+                  :key="segment.id"
+                  class="gauge-chart__segment"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                  :style="gaugeSegmentStyles[index]"
+                />
+                <path
+                  class="gauge-chart__value-path"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                  :style="{ strokeDasharray: `${gaugeCircumference}`, strokeDashoffset: `${gaugeDashoffset}`, stroke: healthColor }"
+                />
+                <polygon
+                  class="gauge-chart__needle"
+                  points="100,28 96,120 104,120"
+                  :transform="`rotate(${healthNeedleRotation} 100 120)`"
+                />
+                <circle class="gauge-chart__needle-hub" cx="100" cy="120" r="6" />
+              </svg>
+              <div class="gauge-chart__legend">
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--danger" aria-hidden="true"></span>
+                  危険
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--warn" aria-hidden="true"></span>
+                  要対応
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--caution" aria-hidden="true"></span>
+                  注意
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--good" aria-hidden="true"></span>
+                  良好
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <DashboardSummaryCards
+          :title="project?.name || 'ダッシュボード'"
+          :description="''"
+          :cards="summaryCards"
+          :rotate="false"
+          :show-header="false"
+        />
+
+
+        <div class="top-actions">
+          <button type="button" class="top-actions__new" @click="openTaskModal">＋ 新規タスク</button>
+        </div>
         <div class="demo__grid">
           <section class="demo__primary">
             <div class="task-list">
@@ -980,6 +1169,232 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.dashboard__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.chart-card {
+  background: #fff;
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 1.1rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 16px 32px rgba(11, 46, 51, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  position: relative;
+}
+
+.chart-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chart-card__header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0b2e33;
+}
+
+.chart-card__eyebrow {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.chart-card__meta {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.chart-card__metric {
+  position: absolute;
+  top: 0.85rem;
+  right: 1rem;
+  background: #0b2e33;
+  color: #fff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 8px 16px rgba(11, 46, 51, 0.18);
+}
+
+.chart-card__metric--health {
+  background: #4f7c82;
+}
+
+.progress-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.progress-chart__track {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(11, 46, 51, 0.08);
+  overflow: hidden;
+}
+
+.progress-chart__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f7c82, #0b2e33);
+  transition: width 0.3s ease;
+}
+
+.progress-chart__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.status-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.status-bars__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.status-bars__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  color: #0b2e33;
+}
+
+.status-bars__label strong {
+  font-size: 1.05rem;
+}
+
+.status-bars__track {
+  background: rgba(11, 46, 51, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+  height: 0.6rem;
+}
+
+.status-bars__fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.status-bars__fill--todo {
+  background: rgba(11, 46, 51, 0.28);
+}
+
+.status-bars__fill--progress {
+  background: #4f7c82;
+}
+
+.status-bars__fill--review {
+  background: #f59e0b;
+}
+
+.status-bars__fill--done {
+  background: #16a34a;
+}
+
+.gauge-chart {
+  position: relative;
+  padding: 0.25rem 0.1rem;
+}
+
+.gauge-chart svg {
+  width: 100%;
+  height: 160px;
+}
+
+.gauge-chart__base {
+  fill: none;
+  stroke: rgba(11, 46, 51, 0.08);
+  stroke-width: 20;
+  stroke-linecap: round;
+}
+
+.gauge-chart__segment {
+  fill: none;
+  stroke-width: 20;
+  stroke-linecap: butt;
+  opacity: 0.25;
+}
+
+.gauge-chart__value-path {
+  fill: none;
+  stroke: #4f7c82;
+  stroke-width: 20;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.gauge-chart__needle {
+  fill: #000;
+  transition: transform 0.35s ease;
+}
+
+.gauge-chart__needle-hub {
+  fill: #fff;
+  stroke: #0b2e33;
+  stroke-width: 2;
+}
+
+.gauge-chart__legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.gauge-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.gauge-chart__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.gauge-chart__legend-dot--danger {
+  background: #ef4444;
+}
+
+.gauge-chart__legend-dot--warn {
+  background: #f97316;
+}
+
+.gauge-chart__legend-dot--caution {
+  background: #f59e0b;
+}
+
+.gauge-chart__legend-dot--good {
+  background: #16a34a;
 }
 
 .dashboard__alert {

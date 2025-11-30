@@ -60,14 +60,20 @@ onBeforeUnmount(() => {
         class="summary-card"
         :class="{ 'is-alert': card.tone === 'alert', 'is-active': index === activeCardIndex }"
       >
-        <p class="summary-card__label">{{ card.label }}</p>
-        <p class="summary-card__value">
-          {{ card.id === 'progress' ? `${progressValue}%` : card.value }}
-        </p>
-        <div v-if="card.id === 'progress'" class="summary-card__bar">
-          <div class="summary-card__bar-fill" :style="{ width: `${progressValue}%` }" />
+        <div class="summary-card__content">
+          <div class="summary-card__info">
+            <p class="summary-card__label">{{ card.label }}</p>
+            <p class="summary-card__caption">{{ card.caption }}</p>
+          </div>
+          <div class="summary-card__value-block">
+            <p class="summary-card__value">
+              {{ card.id === 'progress' ? `${progressValue}%` : card.value }}
+            </p>
+            <div v-if="card.id === 'progress'" class="summary-card__bar">
+              <div class="summary-card__bar-fill" :style="{ width: `${progressValue}%` }" />
+            </div>
+          </div>
         </div>
-        <p class="summary-card__caption">{{ card.caption }}</p>
       </article>
     </div>
   </section>
@@ -114,7 +120,7 @@ onBeforeUnmount(() => {
 
 .summary__grid {
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
@@ -122,30 +128,54 @@ onBeforeUnmount(() => {
   background: var(--surface-elevated);
   border: 1px solid var(--border-light);
   border-radius: 1.25rem;
-  padding: 1.25rem;
-  box-shadow: 0 16px 30px rgba(11, 46, 51, 0.08);
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 12px 22px rgba(11, 46, 51, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.15rem;
   transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.summary-card__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.summary-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.summary-card__value-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  min-width: 5.75rem;
 }
 
 .summary-card__label {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
 }
 
 .summary-card__value {
   margin: 0;
-  font-size: 1.85rem;
+  font-size: 2.1rem;
   font-weight: 700;
   color: var(--text-strong);
+  line-height: 1.1;
+  text-align: right;
 }
 
 .summary-card__caption {
-  margin: 0;
-  font-size: 0.85rem;
+  margin: 0.05rem 0 0;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -170,11 +200,11 @@ onBeforeUnmount(() => {
 
 .summary-card__bar {
   position: relative;
-  height: 0.4rem;
+  height: 0.32rem;
   border-radius: 999px;
   background: rgba(79, 124, 130, 0.18);
   overflow: hidden;
-  margin: 0.2rem 0 0.45rem;
+  margin: 0.08rem 0 0.2rem;
 }
 
 .summary-card__bar-fill {
