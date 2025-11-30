@@ -9,43 +9,41 @@ import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import {
-    addMessageReaction,
-    deleteProjectMessage,
-    listenProjectChat,
-    sendProjectMessage,
-    updateProjectMessage,
-    type ChatMessage,
+  addMessageReaction,
+  deleteProjectMessage,
+  listenProjectChat,
+  sendProjectMessage,
+  updateProjectMessage,
+  type ChatMessage,
 } from '@/services/projectChat'
 import {
-    createTask,
-    deleteTask,
-    listenTasks,
-    updateTask,
-    type TaskDoc,
-    type TaskStatus,
+  createTask,
+  deleteTask,
+  listenTasks,
+  updateTask,
+  type TaskDoc,
+  type TaskStatus,
 } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem, PreviewChatMessage } from '@/types/projectDashboard'
+import { getLogger } from '@logtape/logtape'
 import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+
+const logger = getLogger('app.pages.projectDashboard')
+
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
 const projectId = ref(String(route.params.projectId || ''))
 
-type MemberEntry = {
-  id: string
-  name: string
-  role?: string
-  email?: string
-  lastAccessedAt?: { seconds: number; nanoseconds: number }
-}
+import type { ProjectMember } from '@/services/projectMembers'
 
 const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
-const members = ref<MemberEntry[]>([])
+const members = ref<ProjectMember[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
 const { notifications: notificationsBar, sendNotification } = useNotificationCenter()
@@ -61,7 +59,6 @@ const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
 const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
-const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 20
 
 const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0 })
 
@@ -147,7 +144,7 @@ const filteredTasks = computed(() => {
     list = list.filter((task) => task.assigneeId === user.value?.uid)
   }
   if (taskView.value === 'mine' && user.value) {
-    list = list.filter((task) => task.assigneeId === user.value.uid)
+    list = list.filter((task) => task.assigneeId === user.value?.uid)
   }
   return list
 })
@@ -159,26 +156,7 @@ const statusLabels: Record<TaskStatus, string> = {
   done: '完了',
 }
 
-const wbsGroups = computed(() => {
-  const groups = members.value.map((member) => ({
-    id: member.id,
-    name: member.name,
-    tasks: filteredTasks.value.filter((task) => task.assigneeId === member.id),
-  }))
-  const unassignedTasks = filteredTasks.value.filter((task) => !task.assigneeId)
-  groups.push({ id: 'unassigned', name: '未割当', tasks: unassignedTasks })
 
-  return groups
-    .filter((group) => group.tasks.length)
-    .map((group) => {
-      const progressSum = group.tasks.reduce((sum, task) => sum + (task.progress ?? (task.status === 'done' ? 100 : 0)), 0)
-      const progress = group.tasks.length ? Math.round(progressSum / group.tasks.length) : 0
-      return {
-        ...group,
-        progress,
-      }
-    })
-})
 
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length
@@ -220,9 +198,7 @@ function statusClass(status: TaskStatus) {
   }
 }
 
-function taskPriority(task: TaskDoc) {
-  return ((task as any).priority as string) || '中'
-}
+
 
 function taskProgress(task: TaskDoc) {
   return normalizeProgress(task.progress ?? (task.status === 'done' ? 100 : 0))
@@ -275,9 +251,7 @@ watch(showMyTasksOnly, (flag) => {
   taskView.value = flag ? 'mine' : 'all'
 })
 
-function sendNotion(type: 'info' | 'warning' | 'critical', message: string) {
-  sendNotification(type, message)
-}
+
 
 async function loadProjectList() {
   if (!user.value) return
@@ -298,13 +272,13 @@ function watchProject() {
 
       if (!name) {
         try {
-          const profileSnap = await getDoc(doc(db, 'profiles', memberId))
-          if (profileSnap.exists()) {
-            const profile = profileSnap.data()
-            name = profile.nickname || profile.fullName
+          const userDoc = await getDoc(doc(db, 'users', memberId))
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            name = userData.nickname || userData.fullName
           }
         } catch (e) {
-          console.error('Failed to fetch profile for', memberId, e)
+          logger.warn`Failed to fetch user profile for ${memberId}: ${e}`
         }
       }
 
@@ -337,7 +311,7 @@ function watchChat() {
       chatLoading.value = false
     },
     (error) => {
-      console.error('Failed to load chat:', error)
+      logger.error`Failed to load chat: ${error}`
       chatLoading.value = false
     },
   )
@@ -386,19 +360,31 @@ async function submitTaskForm() {
   if (!user.value || !taskForm.title.trim()) return
   const assigneeId = taskForm.assigneeId || null
   const normalizedProgress = normalizeProgress(taskForm.progress)
-  await createTask(
-    projectId.value,
-    {
-      title: taskForm.title.trim(),
-      description: taskForm.description.trim(),
-      dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
-      assigneeId,
-      assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
-      progress: normalizedProgress,
-    },
-    user.value.uid,
-  )
-  closeTaskModal()
+  
+  let initialStatus: TaskStatus = 'todo'
+  if (normalizedProgress === 100) initialStatus = 'done'
+  else if (normalizedProgress > 0) initialStatus = 'in-progress'
+
+  try {
+    await createTask(
+      projectId.value,
+      {
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim(),
+        dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
+        assigneeId,
+        assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
+        progress: normalizedProgress,
+        status: initialStatus,
+      },
+      user.value.uid,
+    )
+    closeTaskModal()
+    sendNotification('info', 'タスクを作成しました')
+  } catch (error) {
+    logger.error`Failed to create task: ${error}`
+    sendNotification('critical', 'タスクの作成に失敗しました')
+  }
 }
 
 function openEditor(task: TaskDoc) {
@@ -593,7 +579,7 @@ onBeforeUnmount(() => {
           </select>
           <select v-model="filters.assignee">
             <option value="all">担当者</option>
-            <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+            <option v-for="member in members" :key="member.userId" :value="member.userId">{{ member.nickname || member.fullName }}</option>
           </select>
           <select v-model="filters.due">
             <option value="all">期限</option>
@@ -609,60 +595,33 @@ onBeforeUnmount(() => {
 
         <div class="demo__grid">
           <section class="demo__primary">
-            <div class="wbs">
-              <article v-for="group in wbsGroups" :key="group.id" class="wbs__group">
-                <header class="wbs__group-header">
-                  <div>
-                    <p class="wbs__eyebrow">担当者</p>
-                    <h3>{{ group.name }}</h3>
+            <div class="task-list">
+              <div class="task-list__header">
+                <span class="task-list__header-item">タスク名</span>
+                <span class="task-list__header-item">担当者</span>
+                <span class="task-list__header-item">期限</span>
+                <span class="task-list__header-item">ステータス</span>
+                <span class="task-list__header-item">進捗</span>
+              </div>
+              <div
+                v-for="task in filteredTasks"
+                :key="task.id"
+                class="task-row"
+                @click="openEditor(task)"
+              >
+                <div class="task-row__title">{{ task.title }}</div>
+                <div class="task-row__assignee">{{ displayAssignee(task) }}</div>
+                <div class="task-row__due">{{ formatDueDate(task) }}</div>
+                <div class="task-row__status">
+                  <span :class="statusClass(task.status)">{{ statusLabels[task.status] }}</span>
+                </div>
+                <div class="task-row__progress">
+                  <div class="progress-bar">
+                    <div class="progress-bar__fill" :style="{ width: `${taskProgress(task)}%` }" />
                   </div>
-                  <div class="wbs__progress">
-                    <span>{{ group.progress }}%</span>
-                    <div class="wbs__progress-track">
-                      <div class="wbs__progress-fill" :style="{ width: `${group.progress}%` }" />
-                    </div>
-                    <small>{{ group.tasks.length }}件</small>
-                  </div>
-                </header>
-                <ul class="wbs__tasks">
-                  <li
-                    v-for="task in group.tasks"
-                    :key="task.id"
-                    class="wbs-task"
-                    @click="selectTaskById(task.id)"
-                  >
-                    <div class="wbs-task__main">
-                      <p class="wbs-task__title">{{ task.title }}</p>
-                      <span :class="statusClass(task.status)">{{ statusLabels[task.status] }}</span>
-                    </div>
-                    <p class="wbs-task__description">{{ task.description || '説明なし' }}</p>
-                    <div class="wbs-task__meta">
-                      <span>担当: {{ displayAssignee(task) }}</span>
-                      <span>期限: {{ formatDueDate(task) }}</span>
-                      <span>優先度: {{ taskPriority(task) }}</span>
-                    </div>
-                    <div class="wbs-task__progress-row">
-                      <div class="wbs-task__progress-circle">
-                        <svg viewBox="0 0 48 48">
-                          <circle cx="24" cy="24" r="20" stroke="#B8E3E9" stroke-width="4" fill="none" />
-                          <circle
-                            cx="24"
-                            cy="24"
-                            r="20"
-                            :stroke="taskProgress(task) === 100 ? '#4F7C82' : '#93B1B5'"
-                            stroke-width="4"
-                            fill="none"
-                            :stroke-dasharray="PROGRESS_CIRCUMFERENCE"
-                            :stroke-dashoffset="PROGRESS_CIRCUMFERENCE * (1 - taskProgress(task) / 100)"
-                          />
-                        </svg>
-                        <span>{{ taskProgress(task) }}%</span>
-                      </div>
-                      <p class="wbs-task__progress-text">進捗状況</p>
-                    </div>
-                  </li>
-                </ul>
-              </article>
+                  <span class="progress-text">{{ taskProgress(task) }}%</span>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -733,11 +692,11 @@ onBeforeUnmount(() => {
               </div>
 
               <ul class="member-preview__list">
-                <li v-for="member in memberPreviewList" :key="member.id">
+                <li v-for="member in memberPreviewList" :key="member.userId">
                   <div class="member-chip">
-                    <div class="member-chip__avatar" aria-hidden="true">{{ getMemberInitials(member.name) }}</div>
+                    <div class="member-chip__avatar" aria-hidden="true">{{ getMemberInitials(member.nickname || member.fullName) }}</div>
                     <div>
-                      <p class="member-chip__name">{{ member.name }}</p>
+                      <p class="member-chip__name">{{ member.nickname || member.fullName }}</p>
                       <p class="member-chip__meta">{{ member.role || 'member' }}・{{ member.statusLabel }}</p>
                     </div>
                   </div>
@@ -773,8 +732,8 @@ onBeforeUnmount(() => {
             担当者
             <select v-model="taskForm.assigneeId">
               <option value="">未割当</option>
-              <option v-for="member in members" :key="member.id" :value="member.id">
-                {{ member.name }}
+              <option v-for="member in members" :key="member.userId" :value="member.userId">
+                {{ member.nickname || member.fullName }}
               </option>
             </select>
           </label>
@@ -826,7 +785,7 @@ onBeforeUnmount(() => {
             <p class="label">担当者</p>
             <select v-model="editor.assigneeId">
               <option value="">未割当</option>
-              <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+              <option v-for="member in members" :key="member.userId" :value="member.userId">{{ member.nickname || member.fullName }}</option>
             </select>
           </section>
         <section class="task-drawer__section">
@@ -1514,5 +1473,79 @@ onBeforeUnmount(() => {
 
 .task-drawer__footer .danger {
   background: #d64545;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.task-list__header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  padding: 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 0.8rem;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+  gap: 0.5rem;
+}
+
+.task-row:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.task-row__title {
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row__assignee,
+.task-row__due {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.task-row__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: #4f7c82;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  width: 3.5ch;
+  text-align: right;
 }
 </style>

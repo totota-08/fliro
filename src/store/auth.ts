@@ -1,15 +1,19 @@
-import { computed, ref, watch } from 'vue'
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
-import type { User } from 'firebase/auth'
-import { auth } from '@/firebase/config'
 import { fetchProfile } from '@/firebase/authService'
+import { auth } from '@/firebase/config'
 import type { UserProfile } from '@/types/auth'
+import type { User } from 'firebase/auth'
+import { signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth'
+import { computed, ref, watch } from 'vue'
 
 const currentUser = ref<User | null>(null)
 const profile = ref<UserProfile | null>(null)
 const authReady = ref(false)
 
 let initPromise: Promise<void> | null = null
+
+import { getLogger } from '@logtape/logtape'
+
+const logger = getLogger('app.store.auth')
 
 export function useAuthStore() {
   const isAuthenticated = computed(() => currentUser.value !== null)
@@ -39,7 +43,7 @@ export async function initAuthListener() {
         try {
           profile.value = await fetchProfile(user.uid)
         } catch (error) {
-          console.error('Failed to load profile', error)
+          logger.error`Failed to load profile: ${error}`
           profile.value = null
         }
       } else {

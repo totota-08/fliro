@@ -1,7 +1,10 @@
 import { db } from '@/firebase/config'
 import type { ProjectMember } from '@/services/projectMembers'
+import { getLogger } from '@logtape/logtape'
 import { doc, getDoc } from 'firebase/firestore'
 import type { Ref } from 'vue'
+
+const logger = getLogger('app.composables.useUserDisplay')
 
 const nameCache = new Map<string, string>()
 const fetching = new Set<string>()
@@ -19,7 +22,7 @@ async function fetchProfileName(userId: string) {
       }
     }
   } catch (error) {
-    console.warn('Failed to fetch profile for', userId, error)
+    logger.warn`Failed to fetch profile for ${userId}: ${error}`
   } finally {
     fetching.delete(userId)
   }
