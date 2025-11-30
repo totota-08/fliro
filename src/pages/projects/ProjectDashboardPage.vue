@@ -2,27 +2,25 @@
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
-import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
-import AppButton from '@/components/ui/AppButton.vue'
 import { useNotificationCenter } from '@/composables/useNotificationCenter'
 import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import {
-    addMessageReaction,
-    deleteProjectMessage,
-    listenProjectChat,
-    sendProjectMessage,
-    updateProjectMessage,
-    type ChatMessage,
+  addMessageReaction,
+  deleteProjectMessage,
+  listenProjectChat,
+  sendProjectMessage,
+  updateProjectMessage,
+  type ChatMessage,
 } from '@/services/projectChat'
 import {
-    createTask,
-    deleteTask,
-    listenTasks,
-    updateTask,
-    type TaskDoc,
-    type TaskStatus,
+  createTask,
+  deleteTask,
+  listenTasks,
+  updateTask,
+  type TaskDoc,
+  type TaskStatus,
 } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
@@ -61,7 +59,6 @@ const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
 const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
-const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 20
 
 const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0 })
 
@@ -152,33 +149,7 @@ const filteredTasks = computed(() => {
   return list
 })
 
-const statusLabels: Record<TaskStatus, string> = {
-  todo: '未着手',
-  'in-progress': '進行中',
-  review: 'レビュー',
-  done: '完了',
-}
 
-const wbsGroups = computed(() => {
-  const groups = members.value.map((member) => ({
-    id: member.id,
-    name: member.name,
-    tasks: filteredTasks.value.filter((task) => task.assigneeId === member.id),
-  }))
-  const unassignedTasks = filteredTasks.value.filter((task) => !task.assigneeId)
-  groups.push({ id: 'unassigned', name: '未割当', tasks: unassignedTasks })
-
-  return groups
-    .filter((group) => group.tasks.length)
-    .map((group) => {
-      const progressSum = group.tasks.reduce((sum, task) => sum + (task.progress ?? (task.status === 'done' ? 100 : 0)), 0)
-      const progress = group.tasks.length ? Math.round(progressSum / group.tasks.length) : 0
-      return {
-        ...group,
-        progress,
-      }
-    })
-})
 
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length
@@ -205,23 +176,6 @@ function normalizeProgress(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0
   const clamped = Math.min(100, Math.max(0, value))
   return Math.round(clamped / 25) * 25
-}
-
-function statusClass(status: TaskStatus) {
-  switch (status) {
-    case 'done':
-      return 'status-pill status-pill--done'
-    case 'in-progress':
-      return 'status-pill status-pill--progress'
-    case 'review':
-      return 'status-pill status-pill--review'
-    default:
-      return 'status-pill status-pill--todo'
-  }
-}
-
-function taskPriority(task: TaskDoc) {
-  return ((task as any).priority as string) || '中'
 }
 
 function taskProgress(task: TaskDoc) {
@@ -263,6 +217,13 @@ function evaluateNotifications() {
   notifications.value = alerts
 }
 
+function resetFilters() {
+  filters.search = ''
+  filters.status = 'all'
+  filters.assignee = 'all'
+  filters.due = 'all'
+}
+
 watch(
   taskView,
   (mode) => {
@@ -275,9 +236,7 @@ watch(showMyTasksOnly, (flag) => {
   taskView.value = flag ? 'mine' : 'all'
 })
 
-function sendNotion(type: 'info' | 'warning' | 'critical', message: string) {
-  sendNotification(type, message)
-}
+
 
 async function loadProjectList() {
   if (!user.value) return
@@ -578,30 +537,10 @@ onBeforeUnmount(() => {
         />
 
 
-        <div class="filters">
-          <button type="button" class="filters__new" @click="openTaskModal">＋ 新規タスク</button>
-          <div class="view-toggle">
-            <button type="button" :class="{ 'is-active': taskView === 'all' }" @click="taskView = 'all'">全体</button>
-            <button type="button" :class="{ 'is-active': taskView === 'mine' }" @click="taskView = 'mine'">自分</button>
-          </div>
-          <input v-model="filters.search" type="search" placeholder="タスク検索" />
-          <select v-model="filters.status">
-            <option value="all">全て</option>
-            <option value="todo">未着手</option>
-            <option value="in-progress">進行中</option>
-            <option value="done">完了</option>
-          </select>
-          <select v-model="filters.assignee">
-            <option value="all">担当者</option>
-            <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
-          </select>
-          <select v-model="filters.due">
-            <option value="all">期限</option>
-            <option value="today">今日</option>
-            <option value="week">今週</option>
-            <option value="overdue">期限切れ</option>
-          </select>
+        <div class="top-actions">
+          <button type="button" class="top-actions__new" @click="openTaskModal">＋ 新規タスク</button>
         </div>
+
 
         <section v-if="notifications.length" class="dashboard__alerts">
           <p v-for="note in notifications" :key="note">⚡ {{ note }}</p>
@@ -609,63 +548,63 @@ onBeforeUnmount(() => {
 
         <div class="demo__grid">
           <section class="demo__primary">
-            <div class="wbs">
-              <article v-for="group in wbsGroups" :key="group.id" class="wbs__group">
-                <header class="wbs__group-header">
-                  <div>
-                    <p class="wbs__eyebrow">担当者</p>
-                    <h3>{{ group.name }}</h3>
-                  </div>
-                  <div class="wbs__progress">
-                    <span>{{ group.progress }}%</span>
-                    <div class="wbs__progress-track">
-                      <div class="wbs__progress-fill" :style="{ width: `${group.progress}%` }" />
-                    </div>
-                    <small>{{ group.tasks.length }}件</small>
-                  </div>
-                </header>
-                <ul class="wbs__tasks">
-                  <li
-                    v-for="task in group.tasks"
-                    :key="task.id"
-                    class="wbs-task"
-                    @click="selectTaskById(task.id)"
-                  >
-                    <div class="wbs-task__main">
-                      <p class="wbs-task__title">{{ task.title }}</p>
-                      <span :class="statusClass(task.status)">{{ statusLabels[task.status] }}</span>
-                    </div>
-                    <p class="wbs-task__description">{{ task.description || '説明なし' }}</p>
-                    <div class="wbs-task__meta">
-                      <span>担当: {{ displayAssignee(task) }}</span>
-                      <span>期限: {{ formatDueDate(task) }}</span>
-                      <span>優先度: {{ taskPriority(task) }}</span>
-                    </div>
-                    <div class="wbs-task__progress-row">
-                      <div class="wbs-task__progress-circle">
-                        <svg viewBox="0 0 48 48">
-                          <circle cx="24" cy="24" r="20" stroke="#B8E3E9" stroke-width="4" fill="none" />
-                          <circle
-                            cx="24"
-                            cy="24"
-                            r="20"
-                            :stroke="taskProgress(task) === 100 ? '#4F7C82' : '#93B1B5'"
-                            stroke-width="4"
-                            fill="none"
-                            :stroke-dasharray="PROGRESS_CIRCUMFERENCE"
-                            :stroke-dashoffset="PROGRESS_CIRCUMFERENCE * (1 - taskProgress(task) / 100)"
-                          />
-                        </svg>
-                        <span>{{ taskProgress(task) }}%</span>
+            <div class="task-list">
+              <div class="task-list__header">
+                <div class="task-list__header-left">
+                  <h3>タスク一覧</h3>
+                  <p>{{ filteredTasks.length }}件のタスク</p>
+                </div>
+                <div class="task-list__filters">
+                  <select v-model="filters.status" class="task-filter-select">
+                    <option value="all">全て</option>
+                    <option value="todo">未着手</option>
+                    <option value="in-progress">進行中</option>
+                    <option value="done">完了</option>
+                  </select>
+                  <select v-model="filters.assignee" class="task-filter-select">
+                    <option value="all">担当者</option>
+                    <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+                  </select>
+                  <select v-model="filters.due" class="task-filter-select">
+                    <option value="all">期限</option>
+                    <option value="today">今日</option>
+                    <option value="week">今週</option>
+                    <option value="overdue">期限切れ</option>
+                  </select>
+                  <button type="button" class="filter-reset-btn" @click="resetFilters" title="フィルターをリセット">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                      <path d="M21 3v5h-5"></path>
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                      <path d="M3 21v-5h5"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <ul class="task-list__items">
+                <li
+                  v-for="task in filteredTasks"
+                  :key="task.id"
+                  class="task-row"
+                  @click="selectTaskById(task.id)"
+                >
+                  <div class="task-row__content">
+                    <p class="task-row__title">{{ task.title }}</p>
+                    <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
+                    <div class="task-row__progress">
+                      <div class="task-row__progress-bar">
+                        <div class="task-row__progress-fill" :style="{ width: `${taskProgress(task)}%` }" />
                       </div>
-                      <p class="wbs-task__progress-text">進捗状況</p>
+                      <span class="task-row__progress-value">{{ taskProgress(task) }}%</span>
                     </div>
-                  </li>
-                </ul>
-              </article>
+                    <span class="task-row__due">{{ formatDueDate(task) }}</span>
+                  </div>
+                </li>
+              </ul>
             </div>
           </section>
 
+          <!-- Temporarily commented out
           <aside class="demo__secondary">
             <div class="secondary-tabs">
               <button
@@ -746,6 +685,7 @@ onBeforeUnmount(() => {
               </ul>
             </div>
           </aside>
+          -->
         </div>
       </div>
     </div>
@@ -875,35 +815,19 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
 }
 
-.filters {
+.demo__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.75rem;
+}
+
+.top-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
 }
 
-.view-toggle {
-  display: inline-flex;
-  border: 1px solid #d1dae8;
-  border-radius: 0.8rem;
-  overflow: hidden;
-}
-
-.view-toggle button {
-  border: none;
-  background: transparent;
-  padding: 0.55rem 0.9rem;
-  font-weight: 600;
-  color: #4b5563;
-  cursor: pointer;
-}
-
-.view-toggle button.is-active {
-  background: #0b2e33;
-  color: #fff;
-}
-
-.filters__new {
+.top-actions__new {
   padding: 0.65rem 1rem;
   border-radius: 0.9rem;
   border: none;
@@ -915,25 +839,9 @@ onBeforeUnmount(() => {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.filters__new:hover {
+.top-actions__new:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 28px rgba(11, 46, 51, 0.25);
-}
-
-.filters input,
-.filters select {
-  padding: 0.65rem 0.85rem;
-  border-radius: 0.8rem;
-  border: 1px solid #d1dae8;
-  background: #fff;
-}
-
-.filters > button {
-  padding: 0.65rem 1rem;
-  border-radius: 0.8rem;
-  border: none;
-  background: #0b2e33;
-  color: #fff;
 }
 
 .toggle {
@@ -1095,142 +1003,190 @@ onBeforeUnmount(() => {
   color: #9da8b6;
 }
 
-.wbs {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.wbs__group {
+.task-list {
   border: 1px solid var(--border-light);
   border-radius: 1.5rem;
   background: var(--surface-elevated, #fff);
   padding: 1.25rem;
   box-shadow: 0 16px 28px rgba(11, 46, 51, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
-.wbs__group-header {
+.task-list__header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid rgba(11, 46, 51, 0.08);
+  gap: 1.5rem;
   flex-wrap: wrap;
 }
 
-.wbs__eyebrow {
-  margin: 0;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
+.task-list__header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.wbs__group-header h3 {
-  margin: 0.2rem 0 0;
-  font-size: 1.2rem;
+.task-list__header-left h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
   color: var(--text-strong);
 }
 
-.wbs__progress {
+.task-list__header-left p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.task-list__filters {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.task-filter-select {
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(11, 46, 51, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #0b2e33;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230b2e33' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 10px;
+  padding-right: 2.2rem;
+  min-width: 110px;
+}
+
+.task-filter-select:hover {
+  border-color: rgba(11, 46, 51, 0.25);
+  background-color: #fff;
+}
+
+.task-filter-select:focus {
+  outline: none;
+  border-color: #4f7c82;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.1);
+}
+
+.filter-reset-btn {
+  padding: 0.55rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(11, 46, 51, 0.15);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f7c82;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-reset-btn svg {
+  display: block;
+}
+
+.filter-reset-btn:hover {
+  border-color: #4f7c82;
+  background: rgba(79, 124, 130, 0.08);
+  color: #0b2e33;
+  transform: rotate(-15deg);
+}
+
+.filter-reset-btn:active {
+  transform: scale(0.95) rotate(-15deg);
+}
+
+.task-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.task-row {
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.task-row:hover {
+  border-color: rgba(11, 46, 51, 0.2);
+  background-color: rgba(184, 227, 233, 0.1);
+}
+
+.task-row__content {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.task-row__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row__assignee {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row__progress {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-weight: 600;
 }
 
-.wbs__progress-track {
-  width: 120px;
-  height: 0.4rem;
+.task-row__progress-bar {
+  flex: 1;
+  height: 0.5rem;
   background: rgba(11, 46, 51, 0.1);
   border-radius: 999px;
   overflow: hidden;
 }
 
-.wbs__progress-fill {
+.task-row__progress-fill {
   height: 100%;
   background: #4f7c82;
   border-radius: inherit;
+  transition: width 0.3s ease;
 }
 
-.wbs__tasks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.9rem;
-}
-
-.wbs-task {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1rem;
-  padding: 0.9rem 1rem;
-  display: grid;
-  gap: 0.35rem;
-  cursor: pointer;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.wbs-task:hover {
-  border-color: rgba(11, 46, 51, 0.35);
-  box-shadow: 0 12px 24px rgba(11, 46, 51, 0.15);
-}
-
-.wbs-task__main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.wbs-task__title {
-  margin: 0;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.wbs-task__description {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.wbs-task__meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  flex-wrap: wrap;
-}
-
-.wbs-task__progress-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 0.4rem;
-}
-
-.wbs-task__progress-circle {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.task-row__progress-value {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-strong);
+  min-width: 3rem;
+  text-align: right;
 }
 
-.wbs-task__progress-circle svg {
-  position: absolute;
-  inset: 0;
-  transform: rotate(-90deg);
-}
-
-.wbs-task__progress-text {
-  margin: 0;
-  font-size: 0.85rem;
+.task-row__due {
+  font-size: 0.9rem;
   color: var(--text-muted);
+  text-align: right;
 }
 
 .status-pill {
