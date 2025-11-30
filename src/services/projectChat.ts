@@ -1,4 +1,5 @@
 import { database, db } from '@/firebase/config'
+import { getLogger } from '@logtape/logtape'
 import {
   ref as dbRef,
   get as getValue,
@@ -13,6 +14,8 @@ import {
   update,
 } from 'firebase/database'
 import { doc, getDoc } from 'firebase/firestore'
+
+const logger = getLogger('app.services.projectChat')
 
 export interface ReactionSummary {
   emoji: string
@@ -78,7 +81,7 @@ async function ensureRealtimeMember(projectId: string, userId: string) {
         joinedAt: typeof joinedAt?.seconds === 'number' ? joinedAt.seconds * 1000 : Date.now(),
       })
     } catch (error) {
-      console.warn('Failed to ensure realtime member entry', error)
+      logger.warn`Failed to ensure realtime member entry: ${error}`
     }
   })()
 
