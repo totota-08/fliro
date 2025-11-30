@@ -239,6 +239,28 @@ const memberPreviewList = computed(() =>
   })),
 )
 
+
+watch(() => editor.progress, (newVal) => {
+  if (newVal > 0 && newVal < 100 && editor.status === 'todo') {
+    editor.status = 'in-progress'
+  }
+  if (newVal === 100 && editor.status !== 'done') {
+    editor.status = 'done'
+  }
+  if (newVal < 100 && editor.status === 'done') {
+    editor.status = 'in-progress'
+  }
+})
+
+watch(() => editor.status, (newVal) => {
+  if (newVal === 'done') {
+    editor.progress = 100
+  }
+  if (newVal === 'todo' && editor.progress > 0) {
+    editor.progress = 0
+  }
+})
+
 function evaluateNotifications() {
   const now = Date.now()
   const oneDay = 24 * 60 * 60 * 1000
@@ -378,6 +400,11 @@ async function submitTaskForm() {
   if (!user.value || !taskForm.title.trim()) return
   const assigneeId = taskForm.assigneeId || null
   const normalizedProgress = normalizeProgress(taskForm.progress)
+  
+  let initialStatus: TaskStatus = 'todo'
+  if (normalizedProgress === 100) initialStatus = 'done'
+  else if (normalizedProgress > 0) initialStatus = 'in-progress'
+
   await createTask(
     projectId.value,
     {
@@ -387,6 +414,7 @@ async function submitTaskForm() {
       assigneeId,
       assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
       progress: normalizedProgress,
+      status: initialStatus,
     },
     user.value.uid,
   )

@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
         <div v-if="card.id === 'progress'" class="summary-card__bar">
           <div
             class="summary-card__bar-fill"
-            :style="{ width: `${card.id === 'progress' ? (isDemo ? progressValue : Number(card.value) || 0) : 0}%` }"
+            :style="{ width: `${card.id === 'progress' ? (isDemo ? progressValue : parseFloat(String(card.value)) || 0) : 0}%` }"
           />
         </div>
         <p class="summary-card__caption">{{ card.caption }}</p>
