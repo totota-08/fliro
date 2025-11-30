@@ -7,6 +7,7 @@ export interface SummaryCard {
   value: number | string
   caption: string
   tone?: 'neutral' | 'alert'
+  icon?: 'chart' | 'check' | 'activity' | 'alert'
 }
 
 const props = withDefaults(
@@ -85,6 +86,25 @@ onBeforeUnmount(() => {
         class="summary-card"
         :class="{ 'is-alert': card.tone === 'alert', 'is-active': index === activeCardIndex }"
       >
+        <div v-if="card.icon" class="summary-card__icon">
+          <svg v-if="card.icon === 'chart'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <svg v-else-if="card.icon === 'check'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+          <svg v-else-if="card.icon === 'activity'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <svg v-else-if="card.icon === 'alert'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
         <p class="summary-card__label">{{ card.label }}</p>
         <p class="summary-card__value">
           <template v-if="card.id === 'progress' && isDemo">
@@ -161,6 +181,15 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.35rem;
   transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.summary-card__icon {
+  margin-bottom: 0.5rem;
+  color: #4f7c82;
+}
+
+.summary-card__icon svg {
+  display: block;
 }
 
 .summary-card__label {

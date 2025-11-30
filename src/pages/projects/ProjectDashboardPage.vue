@@ -151,17 +151,50 @@ const filteredTasks = computed(() => {
 
 
 
+
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length
   const done = tasks.value.filter((task) => task.status === 'done').length
-  const progress = total ? Math.round((done / total) * 100) : 0
+  
+  // Calculate progress as average of all task progress rates
+  const totalProgress = tasks.value.reduce((sum, task) => {
+    return sum + (task.progress ?? (task.status === 'done' ? 100 : 0))
+  }, 0)
+  const progress = total ? Math.round(totalProgress / total) : 0
+  
   const inProgress = tasks.value.filter((task) => task.status === 'in-progress').length
   const overdue = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now()).length
+  
   return [
-    { id: 'progress', label: '進捗率', value: progress, caption: '' },
-    { id: 'done', label: '完了', value: String(done), caption: '' },
-    { id: 'active', label: '進行中', value: String(inProgress), caption: '' },
-    { id: 'overdue', label: '期限切れ', value: String(overdue), caption: '', tone: overdue > 0 ? 'alert' : 'neutral' },
+    { 
+      id: 'progress', 
+      label: 'プロジェクト進捗率', 
+      value: `${progress}%`, 
+      caption: `全${total}件のタスクの平均進捗状況`,
+      icon: 'chart'
+    },
+    { 
+      id: 'done', 
+      label: '完了タスク', 
+      value: String(done), 
+      caption: `全${total}件中${done}件が完了`,
+      icon: 'check'
+    },
+    { 
+      id: 'active', 
+      label: '進行中', 
+      value: String(inProgress), 
+      caption: '現在作業中のタスク数',
+      icon: 'activity'
+    },
+    { 
+      id: 'overdue', 
+      label: '期限切れ', 
+      value: String(overdue), 
+      caption: '期限を超過したタスク', 
+      tone: overdue > 0 ? 'alert' : 'neutral',
+      icon: 'alert'
+    },
   ]
 })
 
