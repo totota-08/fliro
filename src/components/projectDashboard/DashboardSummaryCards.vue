@@ -175,11 +175,11 @@ onBeforeUnmount(() => {
   background: var(--surface-elevated);
   border: 1px solid var(--border-light);
   border-radius: 1.25rem;
-  padding: 1.5rem;
+  padding: 1.25rem;
   box-shadow: 0 16px 30px rgba(11, 46, 51, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
   transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
 }
 
@@ -194,20 +194,20 @@ onBeforeUnmount(() => {
 
 .summary-card__label {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--text-muted);
 }
 
 .summary-card__value {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.85rem;
   font-weight: 700;
   color: var(--text-strong);
 }
 
 .summary-card__caption {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -232,11 +232,11 @@ onBeforeUnmount(() => {
 
 .summary-card__bar {
   position: relative;
-  height: 0.45rem;
+  height: 0.4rem;
   border-radius: 999px;
   background: rgba(79, 124, 130, 0.18);
   overflow: hidden;
-  margin: 0.25rem 0 0.5rem;
+  margin: 0.2rem 0 0.45rem;
 }
 
 .summary-card__bar-fill {

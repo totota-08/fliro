@@ -41,6 +41,12 @@ type MemberEntry = {
   lastAccessedAt?: { seconds: number; nanoseconds: number }
 }
 
+type DashboardNotification = {
+  id: string
+  message: string
+  dismissible: boolean
+}
+
 const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
@@ -52,7 +58,8 @@ const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
 const chatMessages = ref<ChatMessage[]>([])
 const chatLoading = ref(true)
-const notifications = ref<string[]>([])
+const notifications = ref<DashboardNotification[]>([])
+const dismissedNotificationIds = ref<Set<string>>(new Set())
 const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all' })
 const showMyTasksOnly = ref(false)
 const isSidebarOpen = ref(true)
@@ -205,6 +212,24 @@ function formatDueDate(task: TaskDoc) {
   return new Date(task.dueDate.seconds * 1000).toLocaleDateString()
 }
 
+function isTaskOverdue(task: TaskDoc) {
+  if (!task.dueDate?.seconds) return false
+  const due = task.dueDate.seconds * 1000
+  return due < Date.now() && task.status !== 'done'
+}
+
+function taskStatusLabel(status: TaskStatus) {
+  if (status === 'in-progress') return '進行中'
+  if (status === 'review') return 'レビュー'
+  if (status === 'done') return '完了'
+  return '未着手'
+}
+
+function taskStatusClass(task: TaskDoc) {
+  const base = `task-row__status--${task.status}`
+  return [base, { 'is-overdue': isTaskOverdue(task) }]
+}
+
 function normalizeProgress(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0
   const clamped = Math.min(100, Math.max(0, value))
@@ -215,29 +240,29 @@ function taskProgress(task: TaskDoc) {
   return normalizeProgress(task.progress ?? (task.status === 'done' ? 100 : 0))
 }
 
-const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
-  chatMessages.value.map((message) => ({
-    id: message.id,
-    author: message.author || message.senderName || 'Unknown',
-    time: message.createdAt
-      ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : '--:--',
-    message: message.text,
-    reactions: message.reactionSummary || [],
-    senderId: message.senderId,
-    linkedTaskId: message.linkedTaskId,
-    isTask: message.isTask,
-  })),
-)
+// const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
+//   chatMessages.value.map((message) => ({
+//     id: message.id,
+//     author: message.author || message.senderName || 'Unknown',
+//     time: message.createdAt
+//       ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+//       : '--:--',
+//     message: message.text,
+//     reactions: message.reactionSummary || [],
+//     senderId: message.senderId,
+//     linkedTaskId: message.linkedTaskId,
+//     isTask: message.isTask,
+//   })),
+// )
 
-const onlineMemberCount = computed(() => members.value.filter((member) => isMemberRecentlyActive(member)).length)
-const memberPreviewList = computed(() =>
-  members.value.slice(0, 4).map((member) => ({
-    ...member,
-    statusLabel: memberStatusLabel(member),
-    statusClass: memberStatusClass(member),
-  })),
-)
+// const onlineMemberCount = computed(() => members.value.filter((member) => isMemberRecentlyActive(member)).length)
+// const memberPreviewList = computed(() =>
+//   members.value.slice(0, 4).map((member) => ({
+//     ...member,
+//     statusLabel: memberStatusLabel(member),
+//     statusClass: memberStatusClass(member),
+//   })),
+// )
 
 
 watch(() => editor.progress, (newVal) => {
@@ -266,10 +291,28 @@ function evaluateNotifications() {
   const oneDay = 24 * 60 * 60 * 1000
   const userAssignments = tasks.value.filter((task) => task.assigneeId === user.value?.uid)
   const dueSoon = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 - now <= oneDay && task.dueDate.seconds * 1000 > now)
-  const alerts: string[] = []
-  if (userAssignments.length) alerts.push(`あなたに割り当てられたタスクが ${userAssignments.length} 件あります`)
-  if (dueSoon.length) alerts.push(`期限が迫っているタスク: ${dueSoon.length} 件`)
+  const overdueCount = tasks.value.filter((task) => isTaskOverdue(task)).length
+
+  const alerts: DashboardNotification[] = []
+  if (userAssignments.length && !dismissedNotificationIds.value.has('assigned')) {
+    alerts.push({ id: 'assigned', message: `あなたに割り当てられたタスクが ${userAssignments.length} 件あります`, dismissible: true })
+  }
+  if (dueSoon.length && !dismissedNotificationIds.value.has('due-soon')) {
+    alerts.push({ id: 'due-soon', message: `期限が迫っているタスク: ${dueSoon.length} 件`, dismissible: true })
+  }
+  if (overdueCount) {
+    alerts.push({ id: 'overdue', message: `期限切れのタスクが ${overdueCount} 件あります`, dismissible: false })
+  }
   notifications.value = alerts
+}
+
+function dismissNotification(id: string) {
+  const note = notifications.value.find((entry) => entry.id === id)
+  if (!note || !note.dismissible) return
+  const next = new Set(dismissedNotificationIds.value)
+  next.add(id)
+  dismissedNotificationIds.value = next
+  notifications.value = notifications.value.filter((entry) => entry.id !== id)
 }
 
 function resetFilters() {
@@ -454,73 +497,73 @@ async function removeTask(taskId: string) {
   await deleteTask(projectId.value, taskId)
 }
 
-async function sendChatMessage(text: string) {
-  if (!user.value) return
-  await sendProjectMessage(
-    projectId.value,
-    user.value.uid,
-    profile.value?.nickname || profile.value?.fullName || 'User',
-    text,
-    'general',
-  )
-}
+// async function sendChatMessage(text: string) {
+//   if (!user.value) return
+//   await sendProjectMessage(
+//     projectId.value,
+//     user.value.uid,
+//     profile.value?.nickname || profile.value?.fullName || 'User',
+//     text,
+//     'general',
+//   )
+// }
 
-async function reactToChatMessage(payload: { messageId: string; emoji: string }) {
-  if (!user.value || !payload.messageId || !payload.emoji) return
-  await addMessageReaction(projectId.value, payload.messageId, payload.emoji, user.value.uid)
-}
+// async function reactToChatMessage(payload: { messageId: string; emoji: string }) {
+//   if (!user.value || !payload.messageId || !payload.emoji) return
+//   await addMessageReaction(projectId.value, payload.messageId, payload.emoji, user.value.uid)
+// }
 
-async function handleUpdateMessage(payload: { messageId: string; text: string }) {
-  if (!user.value || !payload.messageId || !payload.text) return
-  await updateProjectMessage(projectId.value, payload.messageId, payload.text)
-}
+// async function handleUpdateMessage(payload: { messageId: string; text: string }) {
+//   if (!user.value || !payload.messageId || !payload.text) return
+//   await updateProjectMessage(projectId.value, payload.messageId, payload.text)
+// }
 
-async function handleDeleteMessage(messageId: string) {
-  if (!user.value || !messageId) return
-  await deleteProjectMessage(projectId.value, messageId)
-}
+// async function handleDeleteMessage(messageId: string) {
+//   if (!user.value || !messageId) return
+//   await deleteProjectMessage(projectId.value, messageId)
+// }
 
-async function handleConvertToTask(payload: { messageId: string; text: string }) {
-  if (!user.value) return
-  const taskId = await createTask(projectId.value, { title: payload.text }, user.value.uid)
-  await updateProjectMessage(projectId.value, payload.messageId, undefined, taskId)
-}
+// async function handleConvertToTask(payload: { messageId: string; text: string }) {
+//   if (!user.value) return
+//   const taskId = await createTask(projectId.value, { title: payload.text }, user.value.uid)
+//   await updateProjectMessage(projectId.value, payload.messageId, undefined, taskId)
+// }
 
-async function handleLinkTask(payload: { messageId: string; taskId: string }) {
-  if (!user.value) return
-  await updateProjectMessage(projectId.value, payload.messageId, undefined, payload.taskId)
-}
+// async function handleLinkTask(payload: { messageId: string; taskId: string }) {
+//   if (!user.value) return
+//   await updateProjectMessage(projectId.value, payload.messageId, undefined, payload.taskId)
+// }
 
-function isMemberRecentlyActive(member: MemberEntry) {
-  if (!member.lastAccessedAt?.seconds) return false
-  const lastAccess = member.lastAccessedAt.seconds * 1000
-  return Date.now() - lastAccess < 1000 * 60 * 60 * 4
-}
+// function isMemberRecentlyActive(member: MemberEntry) {
+//   if (!member.lastAccessedAt?.seconds) return false
+//   const lastAccess = member.lastAccessedAt.seconds * 1000
+//   return Date.now() - lastAccess < 1000 * 60 * 60 * 4
+// }
 
-function memberStatusLabel(member: MemberEntry) {
-  if (!member.lastAccessedAt?.seconds) return 'オフライン'
-  const lastAccess = member.lastAccessedAt.seconds * 1000
-  const diff = Date.now() - lastAccess
-  if (diff < 1000 * 60 * 5) return 'オンライン'
-  if (diff < 1000 * 60 * 60) return '離席中'
-  return 'オフライン'
-}
+// function memberStatusLabel(member: MemberEntry) {
+//   if (!member.lastAccessedAt?.seconds) return 'オフライン'
+//   const lastAccess = member.lastAccessedAt.seconds * 1000
+//   const diff = Date.now() - lastAccess
+//   if (diff < 1000 * 60 * 5) return 'オンライン'
+//   if (diff < 1000 * 60 * 60) return '離席中'
+//   return 'オフライン'
+// }
 
-function memberStatusClass(member: MemberEntry) {
-  const status = memberStatusLabel(member)
-  if (status === 'オンライン') return 'online'
-  if (status === '離席中') return 'away'
-  return 'offline'
-}
+// function memberStatusClass(member: MemberEntry) {
+//   const status = memberStatusLabel(member)
+//   if (status === 'オンライン') return 'online'
+//   if (status === '離席中') return 'away'
+//   return 'offline'
+// }
 
-function getMemberInitials(name: string) {
-  if (!name) return '??'
-  const trimmed = name.trim()
-  if (trimmed.length <= 2) {
-    return trimmed
-  }
-  return trimmed.slice(0, 2).toUpperCase()
-}
+// function getMemberInitials(name: string) {
+//   if (!name) return '??'
+//   const trimmed = name.trim()
+//   if (trimmed.length <= 2) {
+//     return trimmed
+//   }
+//   return trimmed.slice(0, 2).toUpperCase()
+// }
 
 
 
@@ -604,7 +647,18 @@ onBeforeUnmount(() => {
 
 
         <section v-if="notifications.length" class="dashboard__alerts">
-          <p v-for="note in notifications" :key="note">⚡ {{ note }}</p>
+          <div v-for="note in notifications" :key="note.id" class="dashboard__alert">
+            <p>⚡ {{ note.message }}</p>
+            <button
+              v-if="note.dismissible"
+              type="button"
+              class="dashboard__alert-close"
+              aria-label="通知を閉じる"
+              @click.stop="dismissNotification(note.id)"
+            >
+              ×
+            </button>
+          </div>
         </section>
 
         <div class="demo__grid">
@@ -647,18 +701,24 @@ onBeforeUnmount(() => {
                   v-for="task in filteredTasks"
                   :key="task.id"
                   class="task-row"
+                  :class="{ 'is-overdue': isTaskOverdue(task) }"
                   @click="selectTaskById(task.id)"
                 >
                   <div class="task-row__content">
                     <p class="task-row__title">{{ task.title }}</p>
                     <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
+                    <span class="task-row__status" :class="taskStatusClass(task)">
+                      {{ taskStatusLabel(task.status) }}
+                    </span>
                     <div class="task-row__progress">
                       <div class="task-row__progress-bar">
                         <div class="task-row__progress-fill" :style="{ width: `${taskProgress(task)}%` }" />
                       </div>
                       <span class="task-row__progress-value">{{ taskProgress(task) }}%</span>
                     </div>
-                    <span class="task-row__due">{{ formatDueDate(task) }}</span>
+                    <span class="task-row__due" :class="{ 'task-row__due--overdue': isTaskOverdue(task) }">
+                      {{ formatDueDate(task) }}
+                    </span>
                   </div>
                 </li>
               </ul>
@@ -915,8 +975,43 @@ onBeforeUnmount(() => {
 .dashboard__alerts {
   background: #fef3c7;
   border-left: 4px solid #f59e0b;
-  padding: 0.85rem 1rem;
   border-radius: 1rem;
+  padding: 0.4rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard__alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.35rem 0.45rem 0.5rem;
+}
+
+.dashboard__alert p {
+  margin: 0;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.dashboard__alert-close {
+  border: none;
+  background: transparent;
+  color: #b45309;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+  line-height: 1;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dashboard__alert-close:hover {
+  background: rgba(244, 172, 67, 0.25);
+  color: #92400e;
 }
 
 .demo__primary {
@@ -1193,7 +1288,7 @@ onBeforeUnmount(() => {
 
 .task-row__content {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1fr;
+  grid-template-columns: 2fr 1fr 0.9fr 1.5fr 1fr;
   gap: 1rem;
   align-items: center;
 }
@@ -1213,6 +1308,41 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.task-row__status {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: auto;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: none;
+  background: transparent;
+  transition: color 0.2s ease;
+}
+
+.task-row__status--todo {
+  color: var(--text-muted);
+}
+
+.task-row__status--in-progress {
+  color: #0b2e33;
+}
+
+.task-row__status--review {
+  color: #8a5a00;
+}
+
+.task-row__status--done {
+  color: #166534;
+}
+
+.task-row__status.is-overdue {
+  color: #991b1b;
 }
 
 .task-row__progress {
@@ -1248,6 +1378,21 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
   color: var(--text-muted);
   text-align: right;
+}
+
+.task-row__due--overdue {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.task-row.is-overdue {
+  border-color: rgba(239, 68, 68, 0.25);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.task-row.is-overdue:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(239, 68, 68, 0.08);
 }
 
 .status-pill {
