@@ -1,29 +1,28 @@
 <script setup lang="ts">
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
-import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
-import TimelineBar from '@/components/projectDashboard/TimelineBar.vue'
+import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
 import { useNotificationCenter } from '@/composables/useNotificationCenter'
 import { useUserDisplay } from '@/composables/useUserDisplay'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { db } from '@/firebase/config'
 import {
-  addMessageReaction,
-  deleteProjectMessage,
-  listenProjectChat,
-  sendProjectMessage,
-  updateProjectMessage,
-  type ChatMessage,
+    addMessageReaction,
+    deleteProjectMessage,
+    listenProjectChat,
+    sendProjectMessage,
+    updateProjectMessage,
+    type ChatMessage,
 } from '@/services/projectChat'
 import {
-  createTask,
-  deleteTask,
-  listenTasks,
-  updateTask,
-  type TaskDoc,
-  type TaskStatus,
+    createTask,
+    deleteTask,
+    listenTasks,
+    updateTask,
+    type TaskDoc,
+    type TaskStatus,
 } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
@@ -195,15 +194,7 @@ const summaryCards = computed<SummaryCard[]>(() => {
   ]
 })
 
-const timelineTasks = computed(() =>
-  tasks.value
-    .filter((task) => task.dueDate?.seconds)
-    .map((task) => ({
-      id: task.id,
-      title: task.title,
-      dueDate: task.dueDate ? new Date(task.dueDate.seconds * 1000) : null,
-    })),
-)
+
 
 function formatDueDate(task: TaskDoc) {
   if (!task.dueDate?.seconds) return '未設定'
@@ -585,12 +576,7 @@ onBeforeUnmount(() => {
           :rotate="false"
           :show-header="false"
         />
-        <TimelineBar
-          :project-name="project?.name"
-          :start-date="project?.startDate?.seconds ? new Date(project.startDate.seconds * 1000) : null"
-          :end-date="project?.dueDate?.seconds ? new Date(project.dueDate.seconds * 1000) : null"
-          :tasks="timelineTasks"
-        />
+
 
         <div class="filters">
           <button type="button" class="filters__new" @click="openTaskModal">＋ 新規タスク</button>
