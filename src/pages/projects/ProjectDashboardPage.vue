@@ -2,18 +2,16 @@
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
-import TeamChatPreview from '@/components/projectDashboard/TeamChatPreview.vue'
-import AppButton from '@/components/ui/AppButton.vue'
 import { useNotificationCenter } from '@/composables/useNotificationCenter'
 import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import {
-  addMessageReaction,
-  deleteProjectMessage,
+  // addMessageReaction,
+  // deleteProjectMessage,
   listenProjectChat,
-  sendProjectMessage,
-  updateProjectMessage,
+  // sendProjectMessage,
+  // updateProjectMessage,
   type ChatMessage,
 } from '@/services/projectChat'
 import {
@@ -24,26 +22,33 @@ import {
   type TaskDoc,
   type TaskStatus,
 } from '@/services/taskService'
+import type { ProjectMember } from '@/services/projectMembers'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem, PreviewChatMessage } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
 import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-
-const logger = getLogger('app.pages.projectDashboard')
-
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
 const projectId = ref(String(route.params.projectId || ''))
 
-import type { ProjectMember } from '@/services/projectMembers'
+type MemberEntry = ProjectMember & {
+  id: string
+  name: string
+  lastAccessedAt?: { seconds: number; nanoseconds: number }
+}
+
+type DashboardNotification = {
+  id: string
+  message: string
+  dismissible: boolean
+}
 
 const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
-const members = ref<ProjectMember[]>([])
+const members = ref<MemberEntry[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
 const { notifications: notificationsBar, sendNotification } = useNotificationCenter()
@@ -52,12 +57,13 @@ const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
 const chatMessages = ref<ChatMessage[]>([])
 const chatLoading = ref(true)
-const notifications = ref<string[]>([])
+const notifications = ref<DashboardNotification[]>([])
+const dismissedNotificationIds = ref<Set<string>>(new Set())
 const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all' })
 const showMyTasksOnly = ref(false)
 const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
-const secondaryTab = ref<'chat' | 'members'>('chat')
+// const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
 
 const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0 })
@@ -143,40 +149,144 @@ const filteredTasks = computed(() => {
   if (showMyTasksOnly.value && user.value) {
     list = list.filter((task) => task.assigneeId === user.value?.uid)
   }
-  if (taskView.value === 'mine' && user.value) {
-    list = list.filter((task) => task.assigneeId === user.value?.uid)
-  }
-  return list
-})
-
-const statusLabels: Record<TaskStatus, string> = {
-  todo: '未着手',
-  'in-progress': '進行中',
-  review: 'レビュー',
-  done: '完了',
+if (taskView.value === 'mine' && user.value) {
+  list = list.filter((task) => task.assigneeId === user.value?.uid)
 }
-
-
+return list
+})
 
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length
   const done = tasks.value.filter((task) => task.status === 'done').length
-  const progress = total ? Math.round((done / total) * 100) : 0
+  
   const inProgress = tasks.value.filter((task) => task.status === 'in-progress').length
   const overdue = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now()).length
+  
   return [
-    { id: 'progress', label: '進捗率', value: progress, caption: '' },
-    { id: 'done', label: '完了', value: String(done), caption: '' },
-    { id: 'active', label: '進行中', value: String(inProgress), caption: '' },
-    { id: 'overdue', label: '期限切れ', value: String(overdue), caption: '', tone: overdue > 0 ? 'alert' : 'neutral' },
+    { 
+      id: 'done', 
+      label: '完了タスク', 
+      value: String(done), 
+      caption: `全${total}件中${done}件が完了`,
+      icon: 'check'
+    },
+    { 
+      id: 'active', 
+      label: '進行中', 
+      value: String(inProgress), 
+      caption: '現在作業中のタスク数',
+      icon: 'activity'
+    },
+    { 
+      id: 'overdue', 
+      label: '期限切れ', 
+      value: String(overdue), 
+      caption: '期限を超過したタスク', 
+      tone: overdue > 0 ? 'alert' : 'neutral',
+      icon: 'alert'
+    },
   ]
 })
 
+
+const gaugeRadius = 80
+const gaugeCircumference = Math.PI * gaugeRadius
+
+const overallProgress = computed(() => {
+  const total = tasks.value.length
+  if (!total) return 0
+  const totalProgress = tasks.value.reduce((sum, task) => {
+    return sum + (task.progress ?? (task.status === 'done' ? 100 : 0))
+  }, 0)
+  return Math.round(totalProgress / total)
+})
+
+const statusCounts = computed(() => {
+  const counts: Record<TaskStatus, number> = {
+    todo: 0,
+    'in-progress': 0,
+    review: 0,
+    done: 0,
+  }
+  tasks.value.forEach((task) => {
+    counts[task.status] = (counts[task.status] || 0) + 1
+  })
+  return counts
+})
+
+const maxStatusCount = computed(() => {
+  const values = Object.values(statusCounts.value)
+  return Math.max(1, ...values)
+})
+
+const healthScore = computed(() => {
+  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length
+  const now = Date.now()
+  const soonThreshold = 3 * 24 * 60 * 60 * 1000
+  const dueSoon = tasks.value.filter(
+    (task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 - now <= soonThreshold && task.dueDate.seconds * 1000 > now,
+  ).length
+  const progressPenalty = Math.max(0, 70 - overallProgress.value) * 0.4
+  let score = 100
+  score -= overdue * 12
+  score -= dueSoon * 5
+  score -= progressPenalty
+  return Math.max(0, Math.min(100, Math.round(score)))
+})
+
+const healthColor = computed(() => {
+  if (healthScore.value >= 80) return '#16a34a'
+  if (healthScore.value >= 60) return '#f59e0b'
+  if (healthScore.value >= 40) return '#f97316'
+  return '#ef4444'
+})
+
+const gaugeDashoffset = computed(() => gaugeCircumference * (1 - healthScore.value / 100))
+const healthNeedleRotation = computed(() => -90 + (healthScore.value / 100) * 180)
+
+const gaugeSegments = [
+  { id: 'danger', color: '#ef4444', size: 40 },
+  { id: 'warn', color: '#f97316', size: 20 },
+  { id: 'caution', color: '#f59e0b', size: 20 },
+  { id: 'good', color: '#16a34a', size: 20 },
+]
+
+const gaugeSegmentStyles = computed(() => {
+  let offset = 0
+  return gaugeSegments.map((segment) => {
+    const len = gaugeCircumference * (segment.size / 100)
+    const style = {
+      stroke: segment.color,
+      strokeDasharray: `${len} ${gaugeCircumference - len}`,
+      strokeDashoffset: `${-offset}`,
+    }
+    offset += len
+    return style
+  })
+})
 
 
 function formatDueDate(task: TaskDoc) {
   if (!task.dueDate?.seconds) return '未設定'
   return new Date(task.dueDate.seconds * 1000).toLocaleDateString()
+}
+
+function isTaskOverdue(task: TaskDoc) {
+  if (!task.dueDate?.seconds) return false
+  const due = task.dueDate.seconds * 1000
+  return due < Date.now() && task.status !== 'done'
+}
+
+function taskStatusLabel(status: TaskStatus) {
+  if (status === 'in-progress') return '進行中'
+  if (status === 'review') return 'レビュー'
+  if (status === 'done') return '完了'
+  return '未着手'
+}
+
+function taskStatusClass(task: TaskDoc) {
+  const base = `task-row__status--${task.status}`
+  return [base, { 'is-overdue': isTaskOverdue(task) }]
 }
 
 function normalizeProgress(value: number | null | undefined) {
@@ -185,58 +295,90 @@ function normalizeProgress(value: number | null | undefined) {
   return Math.round(clamped / 25) * 25
 }
 
-function statusClass(status: TaskStatus) {
-  switch (status) {
-    case 'done':
-      return 'status-pill status-pill--done'
-    case 'in-progress':
-      return 'status-pill status-pill--progress'
-    case 'review':
-      return 'status-pill status-pill--review'
-    default:
-      return 'status-pill status-pill--todo'
-  }
-}
-
-
-
 function taskProgress(task: TaskDoc) {
   return normalizeProgress(task.progress ?? (task.status === 'done' ? 100 : 0))
 }
 
-const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
-  chatMessages.value.map((message) => ({
-    id: message.id,
-    author: message.author || message.senderName || 'Unknown',
-    time: message.createdAt
-      ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : '--:--',
-    message: message.text,
-    reactions: message.reactionSummary || [],
-    senderId: message.senderId,
-    linkedTaskId: message.linkedTaskId,
-    isTask: message.isTask,
-  })),
-)
+// const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
+//   chatMessages.value.map((message) => ({
+//     id: message.id,
+//     author: message.author || message.senderName || 'Unknown',
+//     time: message.createdAt
+//       ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+//       : '--:--',
+//     message: message.text,
+//     reactions: message.reactionSummary || [],
+//     senderId: message.senderId,
+//     linkedTaskId: message.linkedTaskId,
+//     isTask: message.isTask,
+//   })),
+// )
 
-const onlineMemberCount = computed(() => members.value.filter((member) => isMemberRecentlyActive(member)).length)
-const memberPreviewList = computed(() =>
-  members.value.slice(0, 4).map((member) => ({
-    ...member,
-    statusLabel: memberStatusLabel(member),
-    statusClass: memberStatusClass(member),
-  })),
-)
+// const onlineMemberCount = computed(() => members.value.filter((member) => isMemberRecentlyActive(member)).length)
+// const memberPreviewList = computed(() =>
+//   members.value.slice(0, 4).map((member) => ({
+//     ...member,
+//     statusLabel: memberStatusLabel(member),
+//     statusClass: memberStatusClass(member),
+//   })),
+// )
+
+
+watch(() => editor.progress, (newVal) => {
+  if (newVal > 0 && newVal < 100 && editor.status === 'todo') {
+    editor.status = 'in-progress'
+  }
+  if (newVal === 100 && editor.status !== 'done') {
+    editor.status = 'done'
+  }
+  if (newVal < 100 && editor.status === 'done') {
+    editor.status = 'in-progress'
+  }
+})
+
+watch(() => editor.status, (newVal) => {
+  if (newVal === 'done') {
+    editor.progress = 100
+  }
+  if (newVal === 'todo' && editor.progress > 0) {
+    editor.progress = 0
+  }
+})
 
 function evaluateNotifications() {
   const now = Date.now()
   const oneDay = 24 * 60 * 60 * 1000
   const userAssignments = tasks.value.filter((task) => task.assigneeId === user.value?.uid)
   const dueSoon = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 - now <= oneDay && task.dueDate.seconds * 1000 > now)
-  const alerts: string[] = []
-  if (userAssignments.length) alerts.push(`あなたに割り当てられたタスクが ${userAssignments.length} 件あります`)
-  if (dueSoon.length) alerts.push(`期限が迫っているタスク: ${dueSoon.length} 件`)
+  const overdueCount = tasks.value.filter((task) => isTaskOverdue(task)).length
+
+  const alerts: DashboardNotification[] = []
+  if (userAssignments.length && !dismissedNotificationIds.value.has('assigned')) {
+    alerts.push({ id: 'assigned', message: `あなたに割り当てられたタスクが ${userAssignments.length} 件あります`, dismissible: true })
+  }
+  if (dueSoon.length && !dismissedNotificationIds.value.has('due-soon')) {
+    alerts.push({ id: 'due-soon', message: `期限が迫っているタスク: ${dueSoon.length} 件`, dismissible: true })
+  }
+  if (overdueCount) {
+    alerts.push({ id: 'overdue', message: `期限切れのタスクが ${overdueCount} 件あります`, dismissible: false })
+  }
   notifications.value = alerts
+}
+
+function dismissNotification(id: string) {
+  const note = notifications.value.find((entry) => entry.id === id)
+  if (!note || !note.dismissible) return
+  const next = new Set(dismissedNotificationIds.value)
+  next.add(id)
+  dismissedNotificationIds.value = next
+  notifications.value = notifications.value.filter((entry) => entry.id !== id)
+}
+
+function resetFilters() {
+  filters.search = ''
+  filters.status = 'all'
+  filters.assignee = 'all'
+  filters.due = 'all'
 }
 
 watch(
@@ -272,20 +414,25 @@ function watchProject() {
 
       if (!name) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', memberId))
-          if (userDoc.exists()) {
-            const userData = userDoc.data()
-            name = userData.nickname || userData.fullName
+          const profileSnap = await getDoc(doc(db, 'profiles', memberId))
+          if (profileSnap.exists()) {
+            const profile = profileSnap.data()
+            name = profile.nickname || profile.fullName
           }
         } catch (e) {
-          logger.warn`Failed to fetch user profile for ${memberId}: ${e}`
+          console.error('Failed to fetch profile for', memberId, e)
         }
       }
 
       return {
         id: memberId,
         name: name || docSnap.id,
-        role: data.role,
+        userId: memberId,
+        role: (data.role as ProjectMember['role']) || 'member',
+        projectRole: (data.projectRole as ProjectMember['projectRole']) || 'member',
+        nickname: data.nickname,
+        fullName: data.fullName,
+        displayName: data.nickname || data.fullName || name || docSnap.id,
         email: data.email,
         lastAccessedAt: data.lastAccessedAt,
       }
@@ -311,7 +458,7 @@ function watchChat() {
       chatLoading.value = false
     },
     (error) => {
-      logger.error`Failed to load chat: ${error}`
+      console.error('Failed to load chat:', error)
       chatLoading.value = false
     },
   )
@@ -365,26 +512,20 @@ async function submitTaskForm() {
   if (normalizedProgress === 100) initialStatus = 'done'
   else if (normalizedProgress > 0) initialStatus = 'in-progress'
 
-  try {
-    await createTask(
-      projectId.value,
-      {
-        title: taskForm.title.trim(),
-        description: taskForm.description.trim(),
-        dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
-        assigneeId,
-        assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
-        progress: normalizedProgress,
-        status: initialStatus,
-      },
-      user.value.uid,
-    )
-    closeTaskModal()
-    sendNotification('info', 'タスクを作成しました')
-  } catch (error) {
-    logger.error`Failed to create task: ${error}`
-    sendNotification('critical', 'タスクの作成に失敗しました')
-  }
+  await createTask(
+    projectId.value,
+    {
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim(),
+      dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
+      assigneeId,
+      assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
+      progress: normalizedProgress,
+      status: initialStatus,
+    },
+    user.value.uid,
+  )
+  closeTaskModal()
 }
 
 function openEditor(task: TaskDoc) {
@@ -420,73 +561,73 @@ async function removeTask(taskId: string) {
   await deleteTask(projectId.value, taskId)
 }
 
-async function sendChatMessage(text: string) {
-  if (!user.value) return
-  await sendProjectMessage(
-    projectId.value,
-    user.value.uid,
-    profile.value?.nickname || profile.value?.fullName || 'User',
-    text,
-    'general',
-  )
-}
+// async function sendChatMessage(text: string) {
+//   if (!user.value) return
+//   await sendProjectMessage(
+//     projectId.value,
+//     user.value.uid,
+//     profile.value?.nickname || profile.value?.fullName || 'User',
+//     text,
+//     'general',
+//   )
+// }
 
-async function reactToChatMessage(payload: { messageId: string; emoji: string }) {
-  if (!user.value || !payload.messageId || !payload.emoji) return
-  await addMessageReaction(projectId.value, payload.messageId, payload.emoji, user.value.uid)
-}
+// async function reactToChatMessage(payload: { messageId: string; emoji: string }) {
+//   if (!user.value || !payload.messageId || !payload.emoji) return
+//   await addMessageReaction(projectId.value, payload.messageId, payload.emoji, user.value.uid)
+// }
 
-async function handleUpdateMessage(payload: { messageId: string; text: string }) {
-  if (!user.value || !payload.messageId || !payload.text) return
-  await updateProjectMessage(projectId.value, payload.messageId, payload.text)
-}
+// async function handleUpdateMessage(payload: { messageId: string; text: string }) {
+//   if (!user.value || !payload.messageId || !payload.text) return
+//   await updateProjectMessage(projectId.value, payload.messageId, payload.text)
+// }
 
-async function handleDeleteMessage(messageId: string) {
-  if (!user.value || !messageId) return
-  await deleteProjectMessage(projectId.value, messageId)
-}
+// async function handleDeleteMessage(messageId: string) {
+//   if (!user.value || !messageId) return
+//   await deleteProjectMessage(projectId.value, messageId)
+// }
 
-async function handleConvertToTask(payload: { messageId: string; text: string }) {
-  if (!user.value) return
-  const taskId = await createTask(projectId.value, { title: payload.text }, user.value.uid)
-  await updateProjectMessage(projectId.value, payload.messageId, undefined, taskId)
-}
+// async function handleConvertToTask(payload: { messageId: string; text: string }) {
+//   if (!user.value) return
+//   const taskId = await createTask(projectId.value, { title: payload.text }, user.value.uid)
+//   await updateProjectMessage(projectId.value, payload.messageId, undefined, taskId)
+// }
 
-async function handleLinkTask(payload: { messageId: string; taskId: string }) {
-  if (!user.value) return
-  await updateProjectMessage(projectId.value, payload.messageId, undefined, payload.taskId)
-}
+// async function handleLinkTask(payload: { messageId: string; taskId: string }) {
+//   if (!user.value) return
+//   await updateProjectMessage(projectId.value, payload.messageId, undefined, payload.taskId)
+// }
 
-function isMemberRecentlyActive(member: MemberEntry) {
-  if (!member.lastAccessedAt?.seconds) return false
-  const lastAccess = member.lastAccessedAt.seconds * 1000
-  return Date.now() - lastAccess < 1000 * 60 * 60 * 4
-}
+// function isMemberRecentlyActive(member: MemberEntry) {
+//   if (!member.lastAccessedAt?.seconds) return false
+//   const lastAccess = member.lastAccessedAt.seconds * 1000
+//   return Date.now() - lastAccess < 1000 * 60 * 60 * 4
+// }
 
-function memberStatusLabel(member: MemberEntry) {
-  if (!member.lastAccessedAt?.seconds) return 'オフライン'
-  const lastAccess = member.lastAccessedAt.seconds * 1000
-  const diff = Date.now() - lastAccess
-  if (diff < 1000 * 60 * 5) return 'オンライン'
-  if (diff < 1000 * 60 * 60) return '離席中'
-  return 'オフライン'
-}
+// function memberStatusLabel(member: MemberEntry) {
+//   if (!member.lastAccessedAt?.seconds) return 'オフライン'
+//   const lastAccess = member.lastAccessedAt.seconds * 1000
+//   const diff = Date.now() - lastAccess
+//   if (diff < 1000 * 60 * 5) return 'オンライン'
+//   if (diff < 1000 * 60 * 60) return '離席中'
+//   return 'オフライン'
+// }
 
-function memberStatusClass(member: MemberEntry) {
-  const status = memberStatusLabel(member)
-  if (status === 'オンライン') return 'online'
-  if (status === '離席中') return 'away'
-  return 'offline'
-}
+// function memberStatusClass(member: MemberEntry) {
+//   const status = memberStatusLabel(member)
+//   if (status === 'オンライン') return 'online'
+//   if (status === '離席中') return 'away'
+//   return 'offline'
+// }
 
-function getMemberInitials(name: string) {
-  if (!name) return '??'
-  const trimmed = name.trim()
-  if (trimmed.length <= 2) {
-    return trimmed
-  }
-  return trimmed.slice(0, 2).toUpperCase()
-}
+// function getMemberInitials(name: string) {
+//   if (!name) return '??'
+//   const trimmed = name.trim()
+//   if (trimmed.length <= 2) {
+//     return trimmed
+//   }
+//   return trimmed.slice(0, 2).toUpperCase()
+// }
 
 
 
@@ -554,7 +695,149 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="demo__content">
+        <section v-if="notifications.length" class="dashboard__alerts">
+          <div v-for="note in notifications" :key="note.id" class="dashboard__alert">
+            <p>⚡ {{ note.message }}</p>
+            <button
+              v-if="note.dismissible"
+              type="button"
+              class="dashboard__alert-close"
+              aria-label="通知を閉じる"
+              @click.stop="dismissNotification(note.id)"
+            >
+              ×
+            </button>
+          </div>
+        </section>
         <NotificationBar :notifications="notificationsBar" />
+        <section class="dashboard__charts">
+          <div class="chart-card chart-card--donut">
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">全体の進捗</p>
+              <h3>プロジェクト進捗</h3>
+              <span class="chart-card__meta">{{ tasks.length }}件のタスク</span>
+            </header>
+            <span class="chart-card__metric">{{ overallProgress }}%</span>
+            <div class="progress-chart">
+              <div class="progress-chart__track">
+                <div class="progress-chart__fill" :style="{ width: `${overallProgress}%` }" />
+              </div>
+              <div class="progress-chart__labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card chart-card--bars">
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">タスクの状況</p>
+              <h3>ステータス別タスク数</h3>
+            </header>
+            <ul class="status-bars">
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>未着手</span>
+                  <strong>{{ statusCounts.todo }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--todo"
+                    :style="{ width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>進行中</span>
+                  <strong>{{ statusCounts['in-progress'] }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--progress"
+                    :style="{ width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>レビュー</span>
+                  <strong>{{ statusCounts.review }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--review"
+                    :style="{ width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>完了</span>
+                  <strong>{{ statusCounts.done }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--done"
+                    :style="{ width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%` }"
+                  />
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="chart-card chart-card--gauge">
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">プロジェクトの危険度</p>
+              <h3>ヘルススコア</h3>
+              <span class="chart-card__meta">期限・進捗から算出</span>
+            </header>
+            <span class="chart-card__metric chart-card__metric--health">{{ healthScore }}%</span>
+            <div class="gauge-chart">
+              <svg viewBox="0 0 200 120">
+                <path class="gauge-chart__base" d="M20 120 A80 80 0 0 1 180 120" />
+                <path
+                  v-for="(segment, index) in gaugeSegments"
+                  :key="segment.id"
+                  class="gauge-chart__segment"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                  :style="gaugeSegmentStyles[index]"
+                />
+                <path
+                  class="gauge-chart__value-path"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                  :style="{ strokeDasharray: `${gaugeCircumference}`, strokeDashoffset: `${gaugeDashoffset}`, stroke: healthColor }"
+                />
+                <polygon
+                  class="gauge-chart__needle"
+                  points="100,28 96,120 104,120"
+                  :transform="`rotate(${healthNeedleRotation} 100 120)`"
+                />
+                <circle class="gauge-chart__needle-hub" cx="100" cy="120" r="6" />
+              </svg>
+              <div class="gauge-chart__legend">
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--danger" aria-hidden="true"></span>
+                  危険
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--warn" aria-hidden="true"></span>
+                  要対応
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--caution" aria-hidden="true"></span>
+                  注意
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--good" aria-hidden="true"></span>
+                  良好
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
           :description="''"
@@ -564,67 +847,74 @@ onBeforeUnmount(() => {
         />
 
 
-        <div class="filters">
-          <button type="button" class="filters__new" @click="openTaskModal">＋ 新規タスク</button>
-          <div class="view-toggle">
-            <button type="button" :class="{ 'is-active': taskView === 'all' }" @click="taskView = 'all'">全体</button>
-            <button type="button" :class="{ 'is-active': taskView === 'mine' }" @click="taskView = 'mine'">自分</button>
-          </div>
-          <input v-model="filters.search" type="search" placeholder="タスク検索" />
-          <select v-model="filters.status">
-            <option value="all">全て</option>
-            <option value="todo">未着手</option>
-            <option value="in-progress">進行中</option>
-            <option value="done">完了</option>
-          </select>
-          <select v-model="filters.assignee">
-            <option value="all">担当者</option>
-            <option v-for="member in members" :key="member.userId" :value="member.userId">{{ member.nickname || member.fullName }}</option>
-          </select>
-          <select v-model="filters.due">
-            <option value="all">期限</option>
-            <option value="today">今日</option>
-            <option value="week">今週</option>
-            <option value="overdue">期限切れ</option>
-          </select>
+        <div class="top-actions">
+          <button type="button" class="top-actions__new" @click="openTaskModal">＋ 新規タスク</button>
         </div>
-
-        <section v-if="notifications.length" class="dashboard__alerts">
-          <p v-for="note in notifications" :key="note">⚡ {{ note }}</p>
-        </section>
-
         <div class="demo__grid">
           <section class="demo__primary">
             <div class="task-list">
               <div class="task-list__header">
-                <span class="task-list__header-item">タスク名</span>
-                <span class="task-list__header-item">担当者</span>
-                <span class="task-list__header-item">期限</span>
-                <span class="task-list__header-item">ステータス</span>
-                <span class="task-list__header-item">進捗</span>
-              </div>
-              <div
-                v-for="task in filteredTasks"
-                :key="task.id"
-                class="task-row"
-                @click="openEditor(task)"
-              >
-                <div class="task-row__title">{{ task.title }}</div>
-                <div class="task-row__assignee">{{ displayAssignee(task) }}</div>
-                <div class="task-row__due">{{ formatDueDate(task) }}</div>
-                <div class="task-row__status">
-                  <span :class="statusClass(task.status)">{{ statusLabels[task.status] }}</span>
+                <div class="task-list__header-left">
+                  <h3>タスク一覧</h3>
+                  <p>{{ filteredTasks.length }}件のタスク</p>
                 </div>
-                <div class="task-row__progress">
-                  <div class="progress-bar">
-                    <div class="progress-bar__fill" :style="{ width: `${taskProgress(task)}%` }" />
+                <div class="task-list__filters">
+                  <select v-model="filters.status" class="task-filter-select">
+                    <option value="all">全て</option>
+                    <option value="todo">未着手</option>
+                    <option value="in-progress">進行中</option>
+                    <option value="done">完了</option>
+                  </select>
+                  <select v-model="filters.assignee" class="task-filter-select">
+                    <option value="all">担当者</option>
+                    <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+                  </select>
+                  <select v-model="filters.due" class="task-filter-select">
+                    <option value="all">期限</option>
+                    <option value="today">今日</option>
+                    <option value="week">今週</option>
+                    <option value="overdue">期限切れ</option>
+                  </select>
+                  <button type="button" class="filter-reset-btn" @click="resetFilters" title="フィルターをリセット">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                      <path d="M21 3v5h-5"></path>
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                      <path d="M3 21v-5h5"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <ul class="task-list__items">
+                <li
+                  v-for="task in filteredTasks"
+                  :key="task.id"
+                  class="task-row"
+                  :class="{ 'is-overdue': isTaskOverdue(task) }"
+                  @click="selectTaskById(task.id)"
+                >
+                  <div class="task-row__content">
+                    <p class="task-row__title">{{ task.title }}</p>
+                    <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
+                    <span class="task-row__status" :class="taskStatusClass(task)">
+                      {{ taskStatusLabel(task.status) }}
+                    </span>
+                    <div class="task-row__progress">
+                      <div class="task-row__progress-bar">
+                        <div class="task-row__progress-fill" :style="{ width: `${taskProgress(task)}%` }" />
+                      </div>
+                      <span class="task-row__progress-value">{{ taskProgress(task) }}%</span>
+                    </div>
+                    <span class="task-row__due" :class="{ 'task-row__due--overdue': isTaskOverdue(task) }">
+                      {{ formatDueDate(task) }}
+                    </span>
                   </div>
-                  <span class="progress-text">{{ taskProgress(task) }}%</span>
-                </div>
-              </div>
+                </li>
+              </ul>
             </div>
           </section>
 
+          <!-- Temporarily commented out
           <aside class="demo__secondary">
             <div class="secondary-tabs">
               <button
@@ -692,11 +982,11 @@ onBeforeUnmount(() => {
               </div>
 
               <ul class="member-preview__list">
-                <li v-for="member in memberPreviewList" :key="member.userId">
+                <li v-for="member in memberPreviewList" :key="member.id">
                   <div class="member-chip">
-                    <div class="member-chip__avatar" aria-hidden="true">{{ getMemberInitials(member.nickname || member.fullName) }}</div>
+                    <div class="member-chip__avatar" aria-hidden="true">{{ getMemberInitials(member.name) }}</div>
                     <div>
-                      <p class="member-chip__name">{{ member.nickname || member.fullName }}</p>
+                      <p class="member-chip__name">{{ member.name }}</p>
                       <p class="member-chip__meta">{{ member.role || 'member' }}・{{ member.statusLabel }}</p>
                     </div>
                   </div>
@@ -705,6 +995,7 @@ onBeforeUnmount(() => {
               </ul>
             </div>
           </aside>
+          -->
         </div>
       </div>
     </div>
@@ -732,8 +1023,8 @@ onBeforeUnmount(() => {
             担当者
             <select v-model="taskForm.assigneeId">
               <option value="">未割当</option>
-              <option v-for="member in members" :key="member.userId" :value="member.userId">
-                {{ member.nickname || member.fullName }}
+              <option v-for="member in members" :key="member.id" :value="member.id">
+                {{ member.name }}
               </option>
             </select>
           </label>
@@ -785,7 +1076,7 @@ onBeforeUnmount(() => {
             <p class="label">担当者</p>
             <select v-model="editor.assigneeId">
               <option value="">未割当</option>
-              <option v-for="member in members" :key="member.userId" :value="member.userId">{{ member.nickname || member.fullName }}</option>
+              <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
             </select>
           </section>
         <section class="task-drawer__section">
@@ -834,35 +1125,19 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
 }
 
-.filters {
+.demo__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.75rem;
+}
+
+.top-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
 }
 
-.view-toggle {
-  display: inline-flex;
-  border: 1px solid #d1dae8;
-  border-radius: 0.8rem;
-  overflow: hidden;
-}
-
-.view-toggle button {
-  border: none;
-  background: transparent;
-  padding: 0.55rem 0.9rem;
-  font-weight: 600;
-  color: #4b5563;
-  cursor: pointer;
-}
-
-.view-toggle button.is-active {
-  background: #0b2e33;
-  color: #fff;
-}
-
-.filters__new {
+.top-actions__new {
   padding: 0.65rem 1rem;
   border-radius: 0.9rem;
   border: none;
@@ -874,25 +1149,9 @@ onBeforeUnmount(() => {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.filters__new:hover {
+.top-actions__new:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 28px rgba(11, 46, 51, 0.25);
-}
-
-.filters input,
-.filters select {
-  padding: 0.65rem 0.85rem;
-  border-radius: 0.8rem;
-  border: 1px solid #d1dae8;
-  background: #fff;
-}
-
-.filters > button {
-  padding: 0.65rem 1rem;
-  border-radius: 0.8rem;
-  border: none;
-  background: #0b2e33;
-  color: #fff;
 }
 
 .toggle {
@@ -905,8 +1164,269 @@ onBeforeUnmount(() => {
 .dashboard__alerts {
   background: #fef3c7;
   border-left: 4px solid #f59e0b;
-  padding: 0.85rem 1rem;
   border-radius: 1rem;
+  padding: 0.4rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.chart-card {
+  background: #fff;
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 1.1rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 16px 32px rgba(11, 46, 51, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  position: relative;
+}
+
+.chart-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chart-card__header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0b2e33;
+}
+
+.chart-card__eyebrow {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.chart-card__meta {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.chart-card__metric {
+  position: absolute;
+  top: 0.85rem;
+  right: 1rem;
+  background: #0b2e33;
+  color: #fff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 8px 16px rgba(11, 46, 51, 0.18);
+}
+
+.chart-card__metric--health {
+  background: #4f7c82;
+}
+
+.progress-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.progress-chart__track {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(11, 46, 51, 0.08);
+  overflow: hidden;
+}
+
+.progress-chart__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f7c82, #0b2e33);
+  transition: width 0.3s ease;
+}
+
+.progress-chart__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.status-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.status-bars__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.status-bars__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  color: #0b2e33;
+}
+
+.status-bars__label strong {
+  font-size: 1.05rem;
+}
+
+.status-bars__track {
+  background: rgba(11, 46, 51, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+  height: 0.6rem;
+}
+
+.status-bars__fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.status-bars__fill--todo {
+  background: rgba(11, 46, 51, 0.28);
+}
+
+.status-bars__fill--progress {
+  background: #4f7c82;
+}
+
+.status-bars__fill--review {
+  background: #f59e0b;
+}
+
+.status-bars__fill--done {
+  background: #16a34a;
+}
+
+.gauge-chart {
+  position: relative;
+  padding: 0.25rem 0.1rem;
+}
+
+.gauge-chart svg {
+  width: 100%;
+  height: 160px;
+}
+
+.gauge-chart__base {
+  fill: none;
+  stroke: rgba(11, 46, 51, 0.08);
+  stroke-width: 20;
+  stroke-linecap: round;
+}
+
+.gauge-chart__segment {
+  fill: none;
+  stroke-width: 20;
+  stroke-linecap: butt;
+  opacity: 0.25;
+}
+
+.gauge-chart__value-path {
+  fill: none;
+  stroke: #4f7c82;
+  stroke-width: 20;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.gauge-chart__needle {
+  fill: #000;
+  transition: transform 0.35s ease;
+}
+
+.gauge-chart__needle-hub {
+  fill: #fff;
+  stroke: #0b2e33;
+  stroke-width: 2;
+}
+
+.gauge-chart__legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.gauge-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.gauge-chart__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.gauge-chart__legend-dot--danger {
+  background: #ef4444;
+}
+
+.gauge-chart__legend-dot--warn {
+  background: #f97316;
+}
+
+.gauge-chart__legend-dot--caution {
+  background: #f59e0b;
+}
+
+.gauge-chart__legend-dot--good {
+  background: #16a34a;
+}
+
+.dashboard__alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.35rem 0.45rem 0.5rem;
+}
+
+.dashboard__alert p {
+  margin: 0;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.dashboard__alert-close {
+  border: none;
+  background: transparent;
+  color: #b45309;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+  line-height: 1;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dashboard__alert-close:hover {
+  background: rgba(244, 172, 67, 0.25);
+  color: #92400e;
 }
 
 .demo__primary {
@@ -1054,142 +1574,240 @@ onBeforeUnmount(() => {
   color: #9da8b6;
 }
 
-.wbs {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.wbs__group {
+.task-list {
   border: 1px solid var(--border-light);
   border-radius: 1.5rem;
   background: var(--surface-elevated, #fff);
   padding: 1.25rem;
   box-shadow: 0 16px 28px rgba(11, 46, 51, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
-.wbs__group-header {
+.task-list__header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid rgba(11, 46, 51, 0.08);
+  gap: 1.5rem;
   flex-wrap: wrap;
 }
 
-.wbs__eyebrow {
-  margin: 0;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
+.task-list__header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.wbs__group-header h3 {
-  margin: 0.2rem 0 0;
-  font-size: 1.2rem;
+.task-list__header-left h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
   color: var(--text-strong);
 }
 
-.wbs__progress {
+.task-list__header-left p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.task-list__filters {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.task-filter-select {
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(11, 46, 51, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #0b2e33;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230b2e33' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 10px;
+  padding-right: 2.2rem;
+  min-width: 110px;
+}
+
+.task-filter-select:hover {
+  border-color: rgba(11, 46, 51, 0.25);
+  background-color: #fff;
+}
+
+.task-filter-select:focus {
+  outline: none;
+  border-color: #4f7c82;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.1);
+}
+
+.filter-reset-btn {
+  padding: 0.55rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(11, 46, 51, 0.15);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f7c82;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-reset-btn svg {
+  display: block;
+}
+
+.filter-reset-btn:hover {
+  border-color: #4f7c82;
+  background: rgba(79, 124, 130, 0.08);
+  color: #0b2e33;
+  transform: rotate(-15deg);
+}
+
+.filter-reset-btn:active {
+  transform: scale(0.95) rotate(-15deg);
+}
+
+.task-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.task-row {
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.task-row:hover {
+  border-color: rgba(11, 46, 51, 0.2);
+  background-color: rgba(184, 227, 233, 0.1);
+}
+
+.task-row__content {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.9fr 1.5fr 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.task-row__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row__assignee {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row__status {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: auto;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: none;
+  background: transparent;
+  transition: color 0.2s ease;
+}
+
+.task-row__status--todo {
+  color: var(--text-muted);
+}
+
+.task-row__status--in-progress {
+  color: #0b2e33;
+}
+
+.task-row__status--review {
+  color: #8a5a00;
+}
+
+.task-row__status--done {
+  color: #166534;
+}
+
+.task-row__status.is-overdue {
+  color: #991b1b;
+}
+
+.task-row__progress {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-weight: 600;
 }
 
-.wbs__progress-track {
-  width: 120px;
-  height: 0.4rem;
+.task-row__progress-bar {
+  flex: 1;
+  height: 0.5rem;
   background: rgba(11, 46, 51, 0.1);
   border-radius: 999px;
   overflow: hidden;
 }
 
-.wbs__progress-fill {
+.task-row__progress-fill {
   height: 100%;
   background: #4f7c82;
   border-radius: inherit;
+  transition: width 0.3s ease;
 }
 
-.wbs__tasks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.9rem;
-}
-
-.wbs-task {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1rem;
-  padding: 0.9rem 1rem;
-  display: grid;
-  gap: 0.35rem;
-  cursor: pointer;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.wbs-task:hover {
-  border-color: rgba(11, 46, 51, 0.35);
-  box-shadow: 0 12px 24px rgba(11, 46, 51, 0.15);
-}
-
-.wbs-task__main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.wbs-task__title {
-  margin: 0;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.wbs-task__description {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.wbs-task__meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  flex-wrap: wrap;
-}
-
-.wbs-task__progress-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 0.4rem;
-}
-
-.wbs-task__progress-circle {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.task-row__progress-value {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-strong);
+  min-width: 3rem;
+  text-align: right;
 }
 
-.wbs-task__progress-circle svg {
-  position: absolute;
-  inset: 0;
-  transform: rotate(-90deg);
-}
-
-.wbs-task__progress-text {
-  margin: 0;
-  font-size: 0.85rem;
+.task-row__due {
+  font-size: 0.9rem;
   color: var(--text-muted);
+  text-align: right;
+}
+
+.task-row__due--overdue {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.task-row.is-overdue {
+  border-color: rgba(239, 68, 68, 0.25);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.task-row.is-overdue:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(239, 68, 68, 0.08);
 }
 
 .status-pill {
@@ -1473,79 +2091,5 @@ onBeforeUnmount(() => {
 
 .task-drawer__footer .danger {
   background: #d64545;
-}
-
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.task-list__header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-  padding: 0 1rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-bottom: 0.25rem;
-}
-
-.task-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  background: #fff;
-  border: 1px solid var(--border-light);
-  border-radius: 0.8rem;
-  cursor: pointer;
-  transition: box-shadow 0.15s ease;
-  gap: 0.5rem;
-}
-
-.task-row:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.task-row__title {
-  font-weight: 600;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.task-row__assignee,
-.task-row__due {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.task-row__progress {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 6px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progress-bar__fill {
-  height: 100%;
-  background: #4f7c82;
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  width: 3.5ch;
-  text-align: right;
 }
 </style>
