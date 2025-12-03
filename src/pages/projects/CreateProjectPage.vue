@@ -7,6 +7,7 @@ import { createProject } from '@/firebase/projectService'
 import { useAuthStore } from '@/store/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { fetchScaleStats } from '@/services/statsService'
+import { appName } from '@/constants/appMeta'
 
 const router = useRouter()
 const { user } = useAuthStore()
@@ -101,10 +102,10 @@ function prevStep() {
 <template>
   <div class="project-shell">
     <section class="project-hero">
-      <p class="hero-eyebrow">Teamie Projects</p>
+      <p class="hero-eyebrow">{{ appName }} Projects</p>
       <h1>メッセージ</h1>
       <!-- <p v-if="scaleStats" class="hero-scale">
-        現在 <strong>{{ scaleStats.users.toLocaleString() }}</strong> 人のユーザーが Teamie を利用し、
+        現在 <strong>{{ scaleStats.users.toLocaleString() }}</strong> 人のユーザーが {{ appName }} を利用し、
         <strong>{{ scaleStats.projects.toLocaleString() }}</strong> 件のプロジェクトが進行中です。
       </p> -->
       <ul class="hero-list">
@@ -154,7 +155,7 @@ function prevStep() {
           <div v-else-if="currentStep === 'appearance'" class="panel-section">
             <div class="form-block">
               <span>テーマカラー</span>
-              <p class="form-hint">Teamie のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。</p>
+              <p class="form-hint">{{ appName }} のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。</p>
               <div class="color-grid">
                 <button
                   v-for="c in homeColors"

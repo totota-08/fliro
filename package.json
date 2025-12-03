@@ -1,7 +1,7 @@
 {
   "name": "teamie",
   "private": true,
-  "version": "0.0.0",
+  "version": "alpha-0.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

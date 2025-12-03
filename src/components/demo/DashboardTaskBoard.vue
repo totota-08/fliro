@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appName } from '@/constants/appMeta'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 
 interface TaskItem {
@@ -215,7 +216,7 @@ onBeforeUnmount(() => {
             <dd>{{ activeTask.comments }}</dd>
           </div>
         </dl>
-        <p class="task-detail__hint">※ このデモではカードをクリックすると詳細が開きます。実際の Teamie ではさらにサブタスクやコメントを閲覧できます。</p>
+        <p class="task-detail__hint">※ このデモではカードをクリックすると詳細が開きます。実際の {{ appName }} ではさらにサブタスクやコメントを閲覧できます。</p>
       </div>
     </transition>
   </section>

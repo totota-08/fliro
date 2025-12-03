@@ -1,8 +1,12 @@
+<script setup lang="ts">
+import { appName } from '@/constants/appMeta'
+</script>
+
 <template>
   <section class="banner">
     <div class="banner__content">
-      <span class="banner__badge">Teamie デモ</span>
-      <h2>Teamie デモダッシュボード</h2>
+      <span class="banner__badge">{{ appName }} デモ</span>
+      <h2>{{ appName }} デモダッシュボード</h2>
       <p>
         少人数チームが毎日の働き方をどう最適化しているのかを、ハイライトに沿って体験しましょう。サイドバーで主要機能へ
         ナビゲートし、中央ではタスクの流れ、右側ではチームの気配をリアルタイムに確認できます。

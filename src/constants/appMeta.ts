@@ -1,7 +1,6 @@
-import settings from './settings.json'
 import packageInfo from '../../package.json'
 
-const appName = settings.appName || packageInfo.name || 'App'
-const appVersion = packageInfo.version || settings.version || ''
+const appName = packageInfo.name || 'App'
+const appVersion = packageInfo.version || ''
 
 export { appName, appVersion }

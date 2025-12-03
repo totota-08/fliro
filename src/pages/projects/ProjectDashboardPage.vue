@@ -4,8 +4,8 @@ import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDas
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
 import { useNotificationCenter } from '@/composables/useNotificationCenter'
 import { useUserDisplay } from '@/composables/useUserDisplay'
+import { appName, appVersion } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
-import settingsJson from '@/constants/settings.json'
 import { db } from '@/firebase/config'
 import {
   // addMessageReaction,
@@ -34,7 +34,6 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 const { user, profile } = useAuthStore()
 const projectId = ref(String(route.params.projectId || ''))
-const settings = settingsJson as { appName: string; version: string }
 
 type MemberEntry = ProjectMember & {
   id: string
@@ -53,8 +52,6 @@ const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
-const appName = computed(() => settings.appName || 'App')
-const appVersion = computed(() => settings.version || '')
 const { notifications: notificationsBar, sendNotification } = useNotificationCenter()
 const taskView = ref<'all' | 'mine'>('all')
 const selectedTask = ref<TaskDoc | null>(null)
@@ -123,7 +120,7 @@ const sidebarProjects = computed(() =>
 )
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
   email: profile.value?.email || '',
 }))
 
@@ -695,7 +692,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="demo__toolbar">
-          <span class="demo__version" v-if="appVersion">v{{ appVersion }}</span>
+          <span class="demo__version" v-if="appVersion">{{ appVersion }}</span>
         </div>
       </header>
 

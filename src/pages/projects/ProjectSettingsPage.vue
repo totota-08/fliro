@@ -7,6 +7,7 @@ import { deleteProject, fetchProject, updateProjectMetadata } from '@/firebase/p
 import { updateProjectSettings } from '@/services/projectSettings'
 import { listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
+import { appName } from '@/constants/appMeta'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
@@ -84,7 +85,7 @@ const sidebarProjects = computed(() =>
 )
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
   email: profile.value?.email || '',
 }))
 
@@ -203,7 +204,7 @@ async function askAi() {
     const body = {
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: 'You are a task assistant for the Teamie project.' },
+        { role: 'system', content: `You are a task assistant for the ${appName} project.` },
         { role: 'user', content: `Tasks:\n${summary}\nUser question: ${aiPrompt.value}` },
       ],
     }

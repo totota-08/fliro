@@ -15,7 +15,7 @@ const logger = getLogger('app.main')
 const app = createApp(App)
 
 if (typeof document !== 'undefined') {
-  document.title = appVersion ? `${appName} v${appVersion}` : appName
+  document.title = appVersion ? `${appName} ${appVersion}` : appName
 }
 
 initAuthListener()
