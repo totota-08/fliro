@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appName } from '@/constants/appMeta'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 interface ChatMessage {
@@ -36,7 +37,7 @@ const baseMessages: ChatMessage[] = [
 
 const demoQueue: ChatMessage[] = [
   {
-    author: 'Teamie Bot',
+    author: `${appName} Bot`,
     time: '11:32',
     type: 'update',
     message: '進捗レポートが更新されました。',
@@ -124,7 +125,7 @@ onBeforeUnmount(() => {
       <span class="chat__typing-dot" />
       <span class="chat__typing-dot" />
       <span class="chat__typing-dot" />
-      Teamie Bot がメッセージを入力しています…
+      {{ appName }} Bot がメッセージを入力しています…
     </div>
 
     <footer class="chat__footer">

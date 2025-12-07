@@ -99,6 +99,7 @@
 .demo__toolbar {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
 }
 
 .demo__toolbar button {

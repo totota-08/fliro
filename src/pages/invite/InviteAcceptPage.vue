@@ -5,6 +5,7 @@ import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/firebase/config'
+import { appName } from '@/constants/appMeta'
 import { redeemInvite } from '@/services/projectInvites'
 import { useAuthStore } from '@/store/auth'
 import { loginWithEmail, registerCredentials } from '@/firebase/authService'
@@ -158,7 +159,7 @@ async function handleJoin() {
   <div class="invite-shell">
     <section class="invite-card">
       <p class="invite-eyebrow">Project Invitation</p>
-      <h1>Teamie プロジェクトへの招待</h1>
+      <h1>{{ appName }} プロジェクトへの招待</h1>
 
       <div v-if="loading">読み込み中...</div>
       <p v-else-if="errorMsg" class="error">{{ errorMsg }}</p>

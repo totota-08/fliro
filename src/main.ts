@@ -3,6 +3,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import './assets/reset.css'
 import './assets/style.css'
+import { appName, appVersion } from '@/constants/appMeta'
 import router from './router'
 
 import { initLogger } from '@/utils/logger'
@@ -12,6 +13,10 @@ import { getLogger } from '@logtape/logtape'
 const logger = getLogger('app.main')
 
 const app = createApp(App)
+
+if (typeof document !== 'undefined') {
+  document.title = appVersion ? `${appName} ${appVersion}` : appName
+}
 
 initAuthListener()
   .catch((error) => {

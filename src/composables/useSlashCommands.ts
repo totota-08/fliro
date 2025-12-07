@@ -1,3 +1,4 @@
+import { appName } from '@/constants/appMeta'
 import { sendProjectMessage } from '@/services/projectChat'
 import { createTask } from '@/services/taskService'
 import type { ProjectMember } from '@/services/projectMembers'
@@ -31,7 +32,7 @@ export function useSlashCommands({
       await sendProjectMessage(
         projectId,
         'bot',
-        'Teamie Bot',
+        `${appName} Bot`,
         text,
         currentChannel.value?.id || 'general',
         undefined,

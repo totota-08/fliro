@@ -2,6 +2,9 @@
 import { RouterLink } from "vue-router";
 import AppButton from "@/components/ui/AppButton.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { useAppMeta } from "@/composables/useAppMeta";
+
+const { appName } = useAppMeta();
 
 const featureCards = [
   {
@@ -88,7 +91,7 @@ const pricingPlans = [
               />
             </svg>
           </span>
-          <span class="landing__title">Teamie</span>
+          <span class="landing__title">{{ appName }}</span>
         </div>
         <div class="landing__links">
           <a href="#features">機能</a>
@@ -116,7 +119,7 @@ const pricingPlans = [
           </p>
           <h1>チームのタスク管理とコミュニケーションを一つに</h1>
           <p>
-            Teamieは、タスク管理とチャットを統合した新しいコラボレーションツールです。
+            {{ appName }}は、タスク管理とチャットを統合した新しいコラボレーションツールです。
             シンプルで直感的なインターフェースで、チームの生産性を最大化します。
           </p>
           <div class="hero__actions">
@@ -221,7 +224,7 @@ const pricingPlans = [
 
       <section class="cta">
         <div class="cta__inner">
-          <h2>今すぐTeamieを始めましょう</h2>
+          <h2>今すぐ{{ appName }}を始めましょう</h2>
           <p>
             14日間の無料トライアルで、すべての機能をお試しいただけます。
             クレジットカードの登録は不要です。
@@ -244,7 +247,7 @@ const pricingPlans = [
                 />
               </svg>
             </span>
-            <span class="landing__title">Teamie</span>
+          <span class="landing__title">{{ appName }}</span>
           </div>
           <p>チームのタスク管理とコミュニケーションを一つに。</p>
         </div>
@@ -268,7 +271,7 @@ const pricingPlans = [
         </ul>
       </div>
       <p class="landing__copyright">
-        © {{ new Date().getFullYear() }} Teamie. All rights reserved.
+        © {{ new Date().getFullYear() }} {{ appName }}. All rights reserved.
       </p>
     </footer>
   </div>

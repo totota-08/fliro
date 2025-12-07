@@ -4,6 +4,7 @@ import UserAvatar from '@/components/common/UserAvatar.vue'
 import CommandDropdown from '@/components/projects/CommandDropdown.vue'
 import { useUserDisplay } from '@/composables/useUserDisplay'
 import { useSlashCommands } from '@/composables/useSlashCommands'
+import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { database } from '@/firebase/config'
 import { fetchProject } from '@/firebase/projectService'
@@ -328,7 +329,7 @@ function markSelfTyping() {
 function setBotTyping(active: boolean) {
   const ref = typingPath('bot')
   if (active) {
-    set(ref, { name: 'Teamie Bot', updatedAt: Date.now() })
+    set(ref, { name: `${appName} Bot`, updatedAt: Date.now() })
   } else {
     remove(ref)
   }
