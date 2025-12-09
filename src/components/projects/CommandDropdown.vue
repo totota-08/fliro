@@ -6,7 +6,7 @@ interface CommandItem {
   insert?: string
 }
 
-const props = defineProps<{
+defineProps<{
   open: boolean
   commands: CommandItem[]
 }>()

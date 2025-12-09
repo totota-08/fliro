@@ -24,11 +24,17 @@ import {
     type TaskDoc,
     type TaskStatus,
 } from '@/services/taskService'
+<<<<<<< Updated upstream
 import { listenTaskCategories, type TaskCategory } from '@/services/taskCategoryService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
 import { getLogger } from '@logtape/logtape'
+=======
+import { useAuthStore } from '@/store/auth'
+import type { ProjectDoc } from '@/types/project'
+import type { DashboardNavItem } from '@/types/projectDashboard'
+>>>>>>> Stashed changes
 import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -56,7 +62,10 @@ const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
+<<<<<<< Updated upstream
 const categories = ref<TaskCategory[]>([])
+=======
+>>>>>>> Stashed changes
 const { notifications: notificationsBar } = useNotificationCenter()
 const taskView = ref<'all' | 'mine'>('all')
 const selectedTask = ref<TaskDoc | null>(null)

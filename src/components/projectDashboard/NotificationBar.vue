@@ -1,7 +1,7 @@
 <script setup lang="ts">
 type NotificationType = 'info' | 'warning' | 'critical'
 
-const props = defineProps<{
+defineProps<{
   notifications: { id: string; type: NotificationType; message: string }[]
 }>()
 
