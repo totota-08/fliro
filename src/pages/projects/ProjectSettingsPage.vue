@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import { deleteProject, fetchProject, updateProjectMetadata } from '@/firebase/projectService'
 import { updateProjectSettings } from '@/services/projectSettings'
 import { listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
-import { appName } from '@/constants/appMeta'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
+import { getLogger } from '@logtape/logtape'
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+
+const logger = getLogger('app.pages.projects.ProjectSettings')
 
 const route = useRoute()
 const router = useRouter()
@@ -141,7 +144,7 @@ async function loadProject() {
     aiKey.value = fetched.settings?.aiApiKey ?? ''
     await evaluatePermissions()
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to load project settings: ${error}`
     errorMessage.value = '設定情報の取得に失敗しました。'
   } finally {
     loading.value = false
@@ -162,7 +165,7 @@ async function evaluatePermissions() {
     const data = memberSnap.data() as any
     canManage.value = data.projectRole === 'owner'
   } catch (error) {
-    console.error('Failed to evaluate permissions', error)
+    logger.error`Failed to evaluate permissions: ${error}`
     canManage.value = false
   }
 }
@@ -182,7 +185,7 @@ async function saveAiSettings() {
       successMessage.value = ''
     }, 3000)
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to save AI settings: ${error}`
     errorMessage.value = 'AI設定の保存に失敗しました。'
   }
 }
@@ -252,7 +255,7 @@ async function handleSave() {
     })
     successMessage.value = '設定を保存しました。'
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to save project settings: ${error}`
     errorMessage.value = '設定の保存に失敗しました。'
   } finally {
     saving.value = false
@@ -277,7 +280,7 @@ async function handleDelete() {
     await deleteProject(projectId.value)
     await router.push({ name: ROUTE_NAMES.myPage })
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to delete project: ${error}`
     deleteError.value = 'プロジェクトの削除に失敗しました。'
   } finally {
     deleting.value = false

@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { collection, getDocs } from 'firebase/firestore'
-import { db } from '@/firebase/config'
-import { useAuthStore } from '@/store/auth'
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import { deleteTask, updateTask, type TaskDoc } from '@/services/taskService'
-import { ROUTE_NAMES } from '@/constants/routes'
 import { appName } from '@/constants/appMeta'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { db } from '@/firebase/config'
+import { deleteTask, updateTask, type TaskDoc } from '@/services/taskService'
+import { useAuthStore } from '@/store/auth'
 import type { DashboardNavItem } from '@/types/projectDashboard'
+import { getLogger } from '@logtape/logtape'
+import { collection, getDocs } from 'firebase/firestore'
+import { computed, onMounted, ref } from 'vue'
+
+const logger = getLogger('app.pages.tasks.MyTasks')
 
 const { user, profile } = useAuthStore()
 
@@ -111,7 +114,7 @@ async function loadTasks() {
     projects.value = projectEntries
     tasks.value = items.filter((task) => task.assigneeId === user.value?.uid)
   } catch (error) {
-    console.error('Failed to load tasks', error)
+    logger.error`Failed to load tasks: ${error}`
     errorMessage.value =
       'タスクを取得できませんでした。アクセス権限をご確認ください。'
   } finally {

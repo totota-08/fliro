@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import AppButton from '@/components/ui/AppButton.vue'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AuthFormField from '@/components/ui/AuthFormField.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { finalizePasswordReset } from '@/services/accountActions'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { finalizePasswordReset } from '@/services/accountActions'
+import { getLogger } from '@logtape/logtape'
+import { computed, reactive, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+
+const logger = getLogger('app.pages.auth.ResetPasswordConfirm')
 
 const router = useRouter()
 const route = useRoute()
@@ -41,7 +44,7 @@ const handleSubmit = async () => {
     await finalizePasswordReset(oobCode.value, form.password)
     success.value = true
   } catch (error) {
-    console.error(error)
+    logger.error`Password reset failed: ${error}`
     errorMessage.value = '再設定に失敗しました。リンクの有効期限が切れている可能性があります。'
   } finally {
     loading.value = false

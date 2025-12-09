@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useAuthStore } from '@/store/auth'
 import { createProjectInvite } from '@/services/projectInvites'
+import { useAuthStore } from '@/store/auth'
+import { getLogger } from '@logtape/logtape'
+import { ref } from 'vue'
+
+const logger = getLogger('app.components.projects.ProjectInviteForm')
 
 const props = withDefaults(
   defineProps<{
@@ -70,7 +73,7 @@ async function handleGenerate() {
       password.value = ''
     }
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to generate invite link: ${error}`
     errorMessage.value = 'リンクの生成に失敗しました。時間をおいてもう一度お試しください。'
   } finally {
     generating.value = false
@@ -86,7 +89,7 @@ async function copyLink() {
     await navigator.clipboard.writeText(generatedLink.value)
     successMessage.value = 'リンクをコピーしました。'
   } catch (error) {
-    console.warn('Failed to copy link', error)
+    logger.warn`Failed to copy link: ${error}`
     const fallbackSuccess = tryFallbackCopy(generatedLink.value)
     if (fallbackSuccess) {
       successMessage.value = 'リンクをコピーしました。'
