@@ -1,4 +1,5 @@
 import { database, db } from '@/firebase/config'
+import { buildPermissionsFromRoles } from '@/constants/roles'
 import { ref, remove, set } from 'firebase/database'
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 
@@ -6,11 +7,13 @@ export interface ProjectMember {
   userId: string
   role: 'owner' | 'admin' | 'member' | 'viewer'
   projectRole: 'owner' | 'member'
+  roles?: string[]
   nickname?: string
   fullName?: string
   email?: string
   avatarUrl?: string
   displayName?: string // Computed property for display
+  permissions?: ReturnType<typeof buildPermissionsFromRoles>
 }
 
 interface AddProjectMemberOptions {
@@ -18,6 +21,7 @@ interface AddProjectMemberOptions {
   userId: string
   role?: 'owner' | 'admin' | 'member' | 'viewer'
   projectRole?: 'owner' | 'member'
+  roles?: string[]
   invitedBy: string
   projectName?: string
   profile?: {
@@ -44,14 +48,18 @@ export function listenProjectMembers(projectId: string, callback: (members: Proj
     const members: ProjectMember[] = []
     snapshot.forEach((doc) => {
       const data = doc.data()
+      const roles = (data.roles as string[] | undefined) ?? [data.role || 'member']
+      const permissions = data.permissions ?? buildPermissionsFromRoles(roles)
       members.push({
         userId: doc.id,
         role: data.role,
         projectRole: data.projectRole,
+        roles,
         nickname: data.nickname,
         fullName: data.fullName,
         email: data.email,
         avatarUrl: data.avatarUrl,
+        permissions,
         displayName: data.nickname || data.fullName || 'Unknown User',
       })
     })
@@ -64,18 +72,22 @@ export async function addProjectMember({
   userId,
   role = 'member',
   projectRole = 'member',
+  roles,
   invitedBy,
   projectName,
   profile,
 }: AddProjectMemberOptions) {
   const timestamp = serverTimestamp()
   const profileData = profile ?? {}
+  const grantedRoles = roles && roles.length ? roles : [role === 'owner' ? 'admin' : role]
+  const permissions = buildPermissionsFromRoles(grantedRoles)
   await setDoc(
     doc(db, 'projects', projectId, 'members', userId),
     {
       userId,
       role,
       projectRole,
+      roles: grantedRoles,
       invitedBy,
       nickname: profileData.nickname ?? null,
       fullName: profileData.fullName ?? null,
@@ -138,5 +150,5 @@ export async function updateProjectMemberRole(projectId: string, userId: string,
   await set(rtdbRef, {
     role,
     joinedAt: Date.now(),
-  })
+  }
 }

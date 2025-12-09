@@ -4,6 +4,7 @@ import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { buildPermissionsFromRoles } from '@/constants/roles'
 import { db } from '@/firebase/config'
 import { removeProjectMember, updateProjectMemberRole } from '@/services/projectMembers'
 import { useAuthStore } from '@/store/auth'
@@ -20,12 +21,14 @@ type MemberDisplay = {
   id: string
   userId: string
   role: MemberRole
+  roles: string[]
   displayName: string
   email?: string
   avatarUrl?: string
   statusLabel: string
   statusClass: 'online' | 'away' | 'offline'
   lastAccessedAt?: { seconds: number; nanoseconds: number }
+  permissions: ReturnType<typeof buildPermissionsFromRoles>
 }
 
 const route = useRoute()
@@ -101,7 +104,14 @@ const currentRole = computed<MemberRole | null>(() => {
   if (!currentId) return null
   return members.value.find((member) => member.userId === currentId)?.role ?? null
 })
-const canManageMembers = computed(() => currentRole.value === 'owner' || currentRole.value === 'admin')
+const currentPermissions = computed(() => {
+  const currentId = user.value?.uid
+  if (!currentId) return buildPermissionsFromRoles([])
+  return members.value.find((member) => member.userId === currentId)?.permissions ?? buildPermissionsFromRoles([])
+})
+const canManageMembers = computed(
+  () => currentPermissions.value.canEditRoles || currentPermissions.value.canInviteMembers || currentPermissions.value.canManageMembers,
+)
 
 async function loadProjectList() {
   if (!user.value) return
@@ -123,17 +133,21 @@ function watchProject() {
       const data = docSnap.data() as any
       const userId = data.userId || docSnap.id
       const role: MemberRole = data.role || 'member'
+      const roles = (data.roles as string[] | undefined) ?? [role]
+      const permissions = data.permissions ?? buildPermissionsFromRoles(roles)
       const statusLabel = getStatusLabel(data.lastAccessedAt)
       return {
         id: docSnap.id,
         userId,
         role,
+        roles,
         displayName: data.nickname || data.fullName || `メンバー ${userId.slice(-4)}`,
         email: data.email || null,
         avatarUrl: data.avatarUrl || null,
         statusLabel,
         statusClass: getStatusClass(statusLabel),
         lastAccessedAt: data.lastAccessedAt,
+        permissions,
       } satisfies MemberDisplay
     })
     const rank: Record<MemberRole, number> = { owner: 0, admin: 1, member: 2, viewer: 3 }
