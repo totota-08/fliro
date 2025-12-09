@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
-import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AuthFormField from '@/components/ui/AuthFormField.vue'
-import {
-  authenticateWithEmail,
-  authenticateWithProvider,
-} from '@/services/accountActions'
+import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
-import type { SocialProvider } from '@/types/auth'
 import { fetchProfile } from '@/firebase/authService'
 import { auth } from '@/firebase/config'
+import {
+    authenticateWithEmail,
+    authenticateWithProvider,
+} from '@/services/accountActions'
+import type { SocialProvider } from '@/types/auth'
+import { computed, reactive, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+
+import { getLogger } from '@logtape/logtape'
+
+const logger = getLogger('app.pages.auth.Login')
 
 const router = useRouter()
 const route = useRoute()
@@ -56,7 +60,7 @@ const handleSubmit = async () => {
     await authenticateWithEmail({ ...form })
     await checksetUp()
   } catch (error) {
-    console.error(error)
+    logger.error`Login failed: ${error}`
     errorMessage.value = mapFirebaseError(error)
   } finally {
     loading.value = false
@@ -73,7 +77,7 @@ const handleProvider = async (provider: SocialProvider) => {
     await authenticateWithProvider(provider)
     await checksetUp()
   } catch (error) {
-    console.error(error)
+    logger.error`Provider login failed: ${error}`
     errorMessage.value = mapFirebaseError(error)
   } finally {
     providerLoading.value = null
