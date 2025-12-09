@@ -109,11 +109,13 @@ export const router = createRouter({
       component: ProjectCategoriesPage,
       meta: { requiresAuth: true, section: 'settings' },
     },
+    {
       path: '/projects/:projectId/activity',
       name: ROUTE_NAMES.projectActivity,
       component: ProjectActivityLogPage,
       meta: { requiresAuth: true, section: 'activity' },
     },
+    {
       path: '/projects/:projectId/timeline',
       name: ROUTE_NAMES.projectTimeline,
       component: ProjectTimelinePage,
