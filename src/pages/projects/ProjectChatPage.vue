@@ -48,7 +48,7 @@ const defaultChannel: ChatChannel = {
   type: 'general',
 }
 
-const ALPHA_NOTICE_KEY = 'teamie_threads_alpha_notice'
+const ALPHA_NOTICE_KEY = 'fliro_threads_alpha_notice'
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
@@ -144,7 +144,7 @@ const sidebarProjects = computed(() =>
 )
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  name: profile.value?.nickname || profile.value?.fullName || 'Fliro User',
   email: profile.value?.email || '',
 }))
 let typingTimeoutHandle: ReturnType<typeof setTimeout> | null = null
