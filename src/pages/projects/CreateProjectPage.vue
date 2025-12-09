@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import AuthFormField from '@/components/ui/AuthFormField.vue'
-import { createProject } from '@/firebase/projectService'
-import { useAuthStore } from '@/store/auth'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { fetchScaleStats } from '@/services/statsService'
 import { appName } from '@/constants/appMeta'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { createProject } from '@/firebase/projectService'
+import { fetchScaleStats } from '@/services/statsService'
+import { useAuthStore } from '@/store/auth'
+import { getLogger } from '@logtape/logtape'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const logger = getLogger('app.pages.projects.CreateProject')
 
 const router = useRouter()
 const { user } = useAuthStore()
@@ -43,7 +46,7 @@ onMounted(async () => {
   try {
     scaleStats.value = await fetchScaleStats()
   } catch (error) {
-    console.warn('Failed to fetch stats', error)
+    logger.warn`Failed to fetch stats: ${error}`
   }
 })
 
@@ -76,7 +79,7 @@ async function handleSubmit() {
 
     await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId: id } })
   } catch (e) {
-    console.error(e)
+    logger.error`Failed to create project: ${e}`
     errorMsg.value = 'プロジェクトの作成に失敗しました。再度お試しください。'
   } finally {
     submitting.value = false
