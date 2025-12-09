@@ -43,7 +43,7 @@ const navItems = computed<DashboardNavItem[]>(() => {
       key: 'team' as const,
       label: 'チャット',
       icon: 'team',
-      to: firstProjectId ? { name: ROUTE_NAMES.projectChat, params: { projectId: firstProjectId } } : undefined,
+      to: firstProjectId ? { name: ROUTE_NAMES.projectThreads, params: { projectId: firstProjectId } } : undefined,
       disabled: !firstProjectId,
       tooltip: firstProjectId ? undefined : 'プロジェクトを選択してください',
     },

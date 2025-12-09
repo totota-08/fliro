@@ -1,10 +1,7 @@
 import { appName } from '@/constants/appMeta'
 import { sendProjectMessage } from '@/services/projectChat'
-import { createTask } from '@/services/taskService'
 import type { ProjectMember } from '@/services/projectMembers'
 import type { Ref, ComputedRef } from 'vue'
-
-type Mention = { name: string; userId?: string | null }
 
 type Options = {
   projectId: string
@@ -12,7 +9,6 @@ type Options = {
   user: Ref<{ uid: string } | null>
   profile: Ref<{ nickname?: string | null; fullName?: string | null } | null>
   projectMembers: Ref<ProjectMember[]>
-  memberNameById: (id?: string | null) => string
   setBotTyping?: (active: boolean) => void
 }
 
@@ -22,7 +18,6 @@ export function useSlashCommands({
   user,
   profile,
   projectMembers,
-  memberNameById,
   setBotTyping,
 }: Options) {
   async function sendBotMessage(text: string, options?: { privateFor?: string | null }) {
@@ -43,7 +38,7 @@ export function useSlashCommands({
     }
   }
 
-  async function handleSlashCommand(text: string, mentions: Mention[]) {
+  async function handleSlashCommand(text: string) {
     const lower = text.toLowerCase()
     if (lower.startsWith('/ping')) {
       await sendBotMessage('pong')
@@ -96,51 +91,6 @@ export function useSlashCommands({
       } catch (error) {
         await sendBotMessage('ニュースの取得に失敗しました')
       }
-      return true
-    }
-    if (lower.startsWith('/newtask')) {
-      const match = text.match(/\/newTask\/"([^\"]*)","([^\"]*)","([^\"]*)"/i)
-      const title = match?.[1]?.trim() || ''
-      const assigneeName = match?.[2]?.trim() || ''
-      const description = match?.[3]?.trim() || ''
-      if (!title) {
-        await sendBotMessage('newTask コマンドが正しくありません。タスク名を入力してください。', {
-          privateFor: user.value?.uid || null,
-        })
-        return true
-      }
-      const assignee = mentions.find((m) => m.userId)?.userId || null
-      const explicitAssignee =
-        assigneeName &&
-        projectMembers.value.find(
-          (m) => (m.nickname || m.fullName || m.displayName || '').toLowerCase() === assigneeName.toLowerCase(),
-        )?.userId
-      const finalAssignee = explicitAssignee || assignee || null
-      if (!user.value) return true
-      const taskId = await createTask(
-        projectId,
-        {
-          title,
-          description: description || undefined,
-          assigneeId: finalAssignee,
-          assigneeName: finalAssignee ? memberNameById(finalAssignee) : null,
-        },
-        user.value.uid,
-      )
-      await sendProjectMessage(
-        projectId,
-        user.value.uid,
-        profile.value?.nickname || profile.value?.fullName || 'User',
-        title,
-        currentChannel.value?.id || 'general',
-        undefined,
-        { linkedTaskId: taskId, mentions: mentions.map((m) => m.userId || m.name), isTask: true },
-      )
-      await sendBotMessage(
-        `${profile.value?.nickname || profile.value?.fullName || 'ユーザー'}さんが${
-          finalAssignee ? memberNameById(finalAssignee) || '担当者未設定' : '担当者未設定'
-        }にタスクを割り当てました`,
-      )
       return true
     }
     return false
