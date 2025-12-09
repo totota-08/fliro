@@ -56,6 +56,14 @@ function toMillis(value: any): number | null {
 }
 
 onMounted(async () => {
+  await loadInviteDetails()
+})
+
+async function loadInviteDetails() {
+  loading.value = true
+  errorMsg.value = ''
+  successMsg.value = ''
+
   try {
     const inviteSnap = await getDoc(doc(db, 'projectInvites', token))
     if (!inviteSnap.exists()) {
@@ -95,7 +103,7 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
 
 async function ensureAuthenticatedUser() {
   if (user.value) return user.value
@@ -131,6 +139,11 @@ async function handleJoin() {
   errorMsg.value = ''
   try {
     const inviteUser = await ensureAuthenticatedUser()
+    await loadInviteDetails()
+    if (!canJoin.value) {
+      errorMsg.value = '再確認の結果、この招待リンクは利用できません。'
+      return
+    }
     const projectId = await redeemInvite(token, inviteUser.uid, inviteUser.email ?? emailInput.value.trim(), {
       password: passwordInput.value.trim() || undefined,
     })
