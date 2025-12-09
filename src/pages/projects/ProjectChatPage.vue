@@ -1246,7 +1246,9 @@ onBeforeUnmount(() => {
   border-right: 1px solid #e2e8f0;
   height: 100vh;
   min-height: 100vh;
-  overflow: hidden
+  overflow: hidden;
+  min-width: 260px;
+  flex-shrink: 0;
 }
 
 .threads-header {
@@ -1513,11 +1515,15 @@ onBeforeUnmount(() => {
   }
 
   .content-wrapper {
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 240px 1fr;
   }
 
   .threads-panel {
     min-height: 200px;
+    max-height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
   }
 }
 
@@ -1527,11 +1533,17 @@ onBeforeUnmount(() => {
   }
 
   .content-wrapper {
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 1fr;
   }
 
   .threads-panel {
-    min-height: 100vh;
+    min-height: auto;
+    max-height: 320px;
+    position: sticky;
+    top: 0;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-y: auto;
   }
 
   .chat-header {
