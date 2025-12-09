@@ -21,6 +21,8 @@ export interface TaskDoc {
   title: string
   description?: string
   status: TaskStatus
+  categoryId?: string | null
+  categoryName?: string | null
   dueDate?: { seconds: number; nanoseconds: number }
   assigneeId?: string
   assigneeName?: string
@@ -38,6 +40,7 @@ export interface CreateTaskPayload {
   description?: string
   status?: TaskStatus
   dueDate?: Date | null
+  categoryId?: string | null
   assigneeId?: string | null
   assigneeName?: string | null
   progress?: number
@@ -71,6 +74,7 @@ export async function createTask(projectId: string, payload: CreateTaskPayload, 
       description: payload.description ?? '',
       status: payload.status ?? 'todo',
       dueDate: payload.dueDate ?? null,
+      categoryId: payload.categoryId ?? null,
       assigneeId: payload.assigneeId ?? null,
       assigneeName: payload.assigneeName ?? null,
       progress: payload.progress ?? 0,
