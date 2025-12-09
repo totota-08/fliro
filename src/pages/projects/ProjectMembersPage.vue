@@ -4,8 +4,9 @@ import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { buildPermissionsFromRoles } from '@/constants/roles'
 import { db } from '@/firebase/config'
-import { removeProjectMember } from '@/services/projectMembers'
+import { removeProjectMember, updateProjectMemberRole } from '@/services/projectMembers'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
@@ -20,12 +21,14 @@ type MemberDisplay = {
   id: string
   userId: string
   role: MemberRole
+  roles: string[]
   displayName: string
   email?: string
   avatarUrl?: string
   statusLabel: string
   statusClass: 'online' | 'away' | 'offline'
   lastAccessedAt?: { seconds: number; nanoseconds: number }
+  permissions: ReturnType<typeof buildPermissionsFromRoles>
 }
 
 const route = useRoute()
@@ -35,10 +38,12 @@ const project = ref<ProjectDoc | null>(null)
 const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberDisplay[]>([])
 const removingMemberId = ref('')
+const updatingRoleId = ref('')
 const isSidebarOpen = ref(true)
 const latestInviteLink = ref('')
 const inviteNotification = ref('')
 const memberActionError = ref('')
+const roleOptions: MemberRole[] = ['admin', 'member', 'viewer']
 
 let stopProject: (() => void) | null = null
 let stopMembers: (() => void) | null = null
@@ -99,7 +104,14 @@ const currentRole = computed<MemberRole | null>(() => {
   if (!currentId) return null
   return members.value.find((member) => member.userId === currentId)?.role ?? null
 })
-const canManageMembers = computed(() => currentRole.value === 'owner' || currentRole.value === 'admin')
+const currentPermissions = computed(() => {
+  const currentId = user.value?.uid
+  if (!currentId) return buildPermissionsFromRoles([])
+  return members.value.find((member) => member.userId === currentId)?.permissions ?? buildPermissionsFromRoles([])
+})
+const canManageMembers = computed(
+  () => currentPermissions.value.canEditRoles || currentPermissions.value.canInviteMembers || currentPermissions.value.canManageMembers,
+)
 
 async function loadProjectList() {
   if (!user.value) return
@@ -121,17 +133,21 @@ function watchProject() {
       const data = docSnap.data() as any
       const userId = data.userId || docSnap.id
       const role: MemberRole = data.role || 'member'
+      const roles = (data.roles as string[] | undefined) ?? [role]
+      const permissions = data.permissions ?? buildPermissionsFromRoles(roles)
       const statusLabel = getStatusLabel(data.lastAccessedAt)
       return {
         id: docSnap.id,
         userId,
         role,
+        roles,
         displayName: data.nickname || data.fullName || `メンバー ${userId.slice(-4)}`,
         email: data.email || null,
         avatarUrl: data.avatarUrl || null,
         statusLabel,
         statusClass: getStatusClass(statusLabel),
         lastAccessedAt: data.lastAccessedAt,
+        permissions,
       } satisfies MemberDisplay
     })
     const rank: Record<MemberRole, number> = { owner: 0, admin: 1, member: 2, viewer: 3 }
@@ -177,6 +193,32 @@ async function handleRemoveMember(member: MemberDisplay) {
   } finally {
     removingMemberId.value = ''
   }
+}
+
+async function handleChangeRole(member: MemberDisplay, nextRole: MemberRole) {
+  if (!canManageMembers.value) return
+  if (member.role === 'owner') return
+  if (member.userId === user.value?.uid && nextRole !== member.role) {
+    if (!confirm('自分のロールを変更すると管理権限を失う可能性があります。続行しますか？')) {
+      return
+    }
+  }
+  updatingRoleId.value = member.userId
+  try {
+    await updateProjectMemberRole(projectId.value, member.userId, nextRole)
+    memberActionError.value = ''
+  } catch (error) {
+    logger.error`Failed to update role: ${error}`
+    memberActionError.value = 'ロールの更新に失敗しました。'
+  } finally {
+    updatingRoleId.value = ''
+  }
+}
+
+function onRoleChange(member: MemberDisplay, event: Event) {
+  const target = event.target as HTMLSelectElement
+  const value = (target?.value as MemberRole) || member.role
+  void handleChangeRole(member, value)
 }
 
 function getStatusLabel(timestamp?: { seconds: number }) {
@@ -292,9 +334,23 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
+              <div class="team-member__role">
+                <label class="sr-only" :for="`role-${member.userId}`">ロール</label>
+                <select
+                  v-if="canManageMembers && member.role !== 'owner'"
+                  :id="`role-${member.userId}`"
+                  :value="member.role"
+                  :disabled="updatingRoleId === member.userId"
+                  @change="onRoleChange(member, $event)"
+                >
+                  <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+                </select>
+                <span v-else class="badge" :class="`role-${member.role}`">{{ member.role }}</span>
+              </div>
+
               <div class="team-member__details">
-                <span class="badge" :class="`role-${member.role}`">{{ member.role }}</span>
                 <span class="status-indicator" :class="`status-${member.statusClass}`">{{ member.statusLabel }}</span>
+                <span class="badge badge--muted">role: {{ member.role }}</span>
               </div>
 
               <div class="team-member__actions">
@@ -415,8 +471,8 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(11, 46, 51, 0.08);
   border-radius: 1.25rem;
   padding: 1rem;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) 200px 1fr auto;
   gap: 1rem;
   align-items: center;
   background: #fff;
@@ -431,8 +487,6 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  min-width: 240px;
-  flex: 1;
 }
 
 .avatar {
@@ -465,6 +519,13 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.team-member__role select {
+  min-width: 160px;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(11, 46, 51, 0.1);
+  padding: 0.55rem 0.75rem;
+}
+
 .badge {
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
@@ -487,6 +548,12 @@ onBeforeUnmount(() => {
 .badge.role-viewer {
   background: rgba(11, 46, 51, 0.05);
   color: #496167;
+}
+
+.badge--muted {
+  background: rgba(11, 46, 51, 0.04);
+  color: #496167;
+  border: 1px solid rgba(11, 46, 51, 0.08);
 }
 
 .status-indicator {
@@ -519,6 +586,18 @@ onBeforeUnmount(() => {
   margin: 0.5rem 0 0;
   color: #d64545;
   font-weight: 600;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .invite-panel {
@@ -565,14 +644,14 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .team-page__header {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .team-member {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: flex-start;
   }
 
