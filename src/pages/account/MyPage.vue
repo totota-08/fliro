@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { collection, getDocs, query } from 'firebase/firestore'
-import { useRouter } from 'vue-router'
+import AppButton from '@/components/ui/AppButton.vue'
+import { appName } from '@/constants/appMeta'
+import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import { useAuthStore } from '@/store/auth'
-import AppButton from '@/components/ui/AppButton.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { appName } from '@/constants/appMeta'
+import { getLogger } from '@logtape/logtape'
+import { collection, getDocs, query } from 'firebase/firestore'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const logger = getLogger('app.pages.account.MyPage')
 
 interface TaskDoc {
   title: string
@@ -52,7 +55,7 @@ async function fetchTasks() {
     taskList.value = items
     projects.value = projectItems
   } catch (error) {
-    console.error('Failed to load tasks', error)
+    logger.error`Failed to load tasks: ${error}`
   } finally {
     loading.value = false
   }

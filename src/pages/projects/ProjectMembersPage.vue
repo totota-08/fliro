@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { collection, doc, getDocs, onSnapshot } from 'firebase/firestore'
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import { db } from '@/firebase/config'
-import { useAuthStore } from '@/store/auth'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { appName } from '@/constants/appMeta'
-import type { ProjectDoc } from '@/types/project'
-import type { DashboardNavItem } from '@/types/projectDashboard'
 import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import { appName } from '@/constants/appMeta'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { db } from '@/firebase/config'
 import { removeProjectMember } from '@/services/projectMembers'
+import { useAuthStore } from '@/store/auth'
+import type { ProjectDoc } from '@/types/project'
+import type { DashboardNavItem } from '@/types/projectDashboard'
+import { getLogger } from '@logtape/logtape'
+import { collection, doc, getDocs, onSnapshot } from 'firebase/firestore'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+
+const logger = getLogger('app.pages.projects.ProjectMembers')
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer'
 type MemberDisplay = {
   id: string
@@ -169,7 +172,7 @@ async function handleRemoveMember(member: MemberDisplay) {
     await removeProjectMember(projectId.value, member.userId)
     memberActionError.value = ''
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to remove member: ${error}`
     memberActionError.value = 'メンバーの削除に失敗しました。'
   } finally {
     removingMemberId.value = ''
