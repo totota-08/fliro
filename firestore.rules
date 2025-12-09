@@ -62,9 +62,21 @@ service cloud.firestore {
         && request.resource.data.updatedAt is timestamp;
     }
 
+    function isValidInviteToken(token, projectId) {
+      let invite = get(/databases/$(database)/documents/projectInvites/$(token));
+      return invite.data.projectId == projectId
+        && invite.data.status == 'pending'
+        && (invite.data.expiresAt == null || invite.data.expiresAt > request.time)
+        && (invite.data.maxUses == null || invite.data.usedCount < invite.data.maxUses);
+    }
+
     match /projects/{projectId} {
       allow create: if isCreatingOwnProject() && isValidProjectCreate();
-      allow read: if resource.data.settings.isPublic == true || isProjectMember(projectId);
+      
+      allow read: if resource.data.settings.isPublic == true 
+                  || isProjectMember(projectId)
+                  || (resource.data.settings.allowGuestView == true);
+      
       allow update: if (isProjectOwner(projectId) || canManageSettings(projectId))
                     && request.resource.data.ownerUserId == resource.data.ownerUserId;
       allow delete: if isProjectOwner(projectId);
@@ -79,6 +91,20 @@ service cloud.firestore {
                       && request.resource.data.invitedBy is string
                       && (request.resource.data.email == null || request.resource.data.email is string)
                       && (request.resource.data.avatarUrl == null || request.resource.data.avatarUrl is string);
+        
+        allow create: if isSignedIn()
+                      && memberId == request.auth.uid
+                      && request.resource.data.userId == request.auth.uid
+                      && request.resource.data.role in ['owner','admin','member','viewer']
+                      && request.resource.data.permissions is map
+                      && request.resource.data.joinedAt is timestamp
+                      && request.resource.data.lastAccessedAt is timestamp
+                      && request.resource.data.invitedBy is string
+                      && (request.resource.data.email == null || request.resource.data.email is string)
+                      && (request.resource.data.avatarUrl == null || request.resource.data.avatarUrl is string)
+                      && request.resource.data.inviteToken is string
+                      && isValidInviteToken(request.resource.data.inviteToken, projectId);
+        
         allow read: if isProjectMember(projectId);
         allow update, delete: if isProjectOwner(projectId)
                               || (isSignedIn() && request.auth.uid == memberId)
@@ -105,6 +131,33 @@ service cloud.firestore {
                     || resource.parent().parent().data.settings.isPublic == true;
         allow update, delete: if isProjectMember(projectId);
       }
+
+      match /threads/{threadId} {
+        allow create: if isProjectMember(projectId)
+                      && request.resource.data.name is string
+                      && request.resource.data.createdBy == request.auth.uid
+                      && request.resource.data.userId == request.auth.uid
+                      && request.resource.data.createdAt is timestamp
+                      && request.resource.data.updatedAt is timestamp
+                      && (request.resource.data.description == null || request.resource.data.description is string)
+                      && (request.resource.data.isPublic == null || request.resource.data.isPublic is bool)
+                      && (request.resource.data.allowedUserIds == null || request.resource.data.allowedUserIds is list);
+
+        allow read: if isProjectMember(projectId)
+                    || resource.parent().parent().data.settings.isPublic == true;
+        
+        allow update: if isProjectMember(projectId)
+                      && request.auth.uid == resource.data.createdBy
+                      && request.resource.data.createdBy == resource.data.createdBy
+                      && request.resource.data.userId == resource.data.userId
+                      && request.resource.data.createdAt == resource.data.createdAt
+                      && request.resource.data.name is string
+                      && (request.resource.data.description == null || request.resource.data.description is string)
+                      && request.resource.data.updatedAt is timestamp;
+        
+        allow delete: if isProjectMember(projectId)
+                      && request.auth.uid == resource.data.createdBy;
+      }
     }
 
     match /userProjects/{userId}/projects/{projectId} {
@@ -113,6 +166,25 @@ service cloud.firestore {
                     && request.resource.data.role is string
                     && request.resource.data.lastAccessedAt is timestamp;
       allow read, update, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /pendingInvites/{inviteId} {
+      allow create: if request.resource.data.inviteToken is string
+                    && request.resource.data.email is string
+                    && request.resource.data.projectId is string
+                    && request.resource.data.createdAt is timestamp
+                    && request.resource.data.status == 'pending';
+      
+      allow read: if true;
+      
+      allow update: if isSignedIn()
+                    && (request.resource.data.userId == request.auth.uid
+                        || request.resource.data.email == request.auth.token.email)
+                    && request.resource.data.status in ['pending', 'completed'];
+      
+      allow delete: if isSignedIn()
+                    && (resource.data.userId == request.auth.uid
+                        || resource.data.email == request.auth.token.email);
     }
 
     match /projectInvites/{token} {
@@ -130,17 +202,19 @@ service cloud.firestore {
                     && (request.resource.data.usedCount == null
                         || request.resource.data.usedCount == 0);
 
-      // 招待リンクは誰でも読み取り可
       allow read: if true;
 
-      allow update: if isSignedIn()
+      allow update: if true
                     && request.resource.data.projectId == resource.data.projectId
                     && request.resource.data.createdBy == resource.data.createdBy
-                    && request.resource.data.acceptedBy == request.auth.uid
-                    && request.resource.data.acceptedAt is timestamp
-                    && request.resource.data.status in ['pending','accepted']
-                    && request.resource.data.usedCount is int
-                    && request.resource.data.usedCount >= resource.data.usedCount;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && (resource.data.expiresAt == null 
+                        || resource.data.expiresAt > request.time)
+                    && (resource.data.maxUses == null 
+                        || resource.data.usedCount < resource.data.maxUses)
+                    && resource.data.status == 'pending'
+                    && request.resource.data.usedCount == resource.data.usedCount + 1
+                    && request.resource.data.status == resource.data.status;
     }
   }
 }
