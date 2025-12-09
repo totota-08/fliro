@@ -8,28 +8,31 @@ import { appName, appVersion } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import {
-  // addMessageReaction,
-  // deleteProjectMessage,
-  listenProjectChat,
-  // sendProjectMessage,
-  // updateProjectMessage,
-  type ChatMessage,
+    // addMessageReaction,
+    // deleteProjectMessage,
+    listenProjectChat,
+    // sendProjectMessage,
+    // updateProjectMessage,
+    type ChatMessage,
 } from '@/services/projectChat'
-import {
-  createTask,
-  deleteTask,
-  listenTasks,
-  updateTask,
-  type TaskDoc,
-  type TaskStatus,
-} from '@/services/taskService'
 import type { ProjectMember } from '@/services/projectMembers'
+import {
+    createTask,
+    deleteTask,
+    listenTasks,
+    updateTask,
+    type TaskDoc,
+    type TaskStatus,
+} from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
-import type { DashboardNavItem, PreviewChatMessage } from '@/types/projectDashboard'
+import type { DashboardNavItem } from '@/types/projectDashboard'
+import { getLogger } from '@logtape/logtape'
 import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+
+const logger = getLogger('app.pages.projects.ProjectDashboard')
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
@@ -66,6 +69,8 @@ const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
 // const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
+
+
 
 const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0, addToThread: false })
 const threadNameDraft = ref('')
@@ -434,7 +439,7 @@ function watchProject() {
             name = profile.nickname || profile.fullName
           }
         } catch (e) {
-          console.error('Failed to fetch profile for', memberId, e)
+          logger.error`Failed to fetch profile for ${memberId}: ${e}`
         }
       }
 
@@ -472,7 +477,7 @@ function watchChat() {
       chatLoading.value = false
     },
     (error) => {
-      console.error('Failed to load chat:', error)
+      logger.error`Failed to load chat: ${error}`
       chatLoading.value = false
     },
   )
