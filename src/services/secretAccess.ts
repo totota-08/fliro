@@ -1,10 +1,13 @@
+import { getLogger } from '@logtape/logtape'
+
+const logger = getLogger('app.services.secretAccess')
 const STORAGE_KEY = 'teamie_secret_access'
 
 export function grantSecretAccess(code: string) {
   try {
     sessionStorage.setItem(STORAGE_KEY, code)
   } catch (error) {
-    console.warn('Failed to save secret access', error)
+    logger.warn`Failed to save secret access: ${error}`
   }
 }
 
@@ -16,7 +19,7 @@ export function consumeSecretAccess() {
     }
     return value
   } catch (error) {
-    console.warn('Failed to read secret access', error)
+    logger.warn`Failed to read secret access: ${error}`
     return null
   }
 }
