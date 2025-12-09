@@ -42,15 +42,18 @@ export interface ChatMessage {
 
 function resolveTimestamp(value: any): number | undefined {
   if (typeof value === 'number') return value
-  if (value?.seconds) return value.seconds * 1000
+  if (value && typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') {
+    return value.seconds * 1000
+  }
   return undefined
 }
 
 function summarizeReactions(reactions: any): ReactionSummary[] {
-  if (!reactions) return []
+  if (!reactions || typeof reactions !== 'object') return []
   const counts: Record<string, number> = {}
   Object.values(reactions).forEach((entry: any) => {
-    const emoji = typeof entry?.emoji === 'string' ? entry.emoji : ''
+    if (!entry || typeof entry !== 'object') return
+    const emoji = typeof entry.emoji === 'string' ? entry.emoji : ''
     if (!emoji) return
     counts[emoji] = (counts[emoji] || 0) + 1
   })
@@ -127,7 +130,7 @@ export function listenProjectChat(
       callback(items)
     },
     (error) => {
-      console.error('Chat listener error:', error)
+      logger.error`Chat listener error: ${error}`
       if (onError) onError(error)
     },
   )
@@ -149,6 +152,10 @@ export async function sendProjectMessage(
     privateFor?: string | null
   },
 ) {
+  if (!projectId || !senderId || !text.trim()) {
+    logger.warn`Invalid message parameters: projectId=${projectId}, senderId=${senderId}`
+    return
+  }
   if (!metadata?.isBot) {
     await ensureRealtimeMember(projectId, senderId)
   }
