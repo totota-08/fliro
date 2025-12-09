@@ -1,25 +1,27 @@
 <script setup lang="ts">
-import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import CommandDropdown from '@/components/projects/CommandDropdown.vue'
-import { useUserDisplay } from '@/composables/useUserDisplay'
 import { useSlashCommands } from '@/composables/useSlashCommands'
+import { useUserDisplay } from '@/composables/useUserDisplay'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { database } from '@/firebase/config'
+import { database, db } from '@/firebase/config'
 import { fetchProject } from '@/firebase/projectService'
 import {
-  addMessageReaction,
-  deleteProjectMessage,
-  listenProjectChat,
-  sendProjectMessage,
-  updateProjectMessage,
-  type ChatMessage,
+    addMessageReaction,
+    deleteProjectMessage,
+    listenProjectChat,
+    sendProjectMessage,
+    updateProjectMessage,
+    type ChatMessage,
 } from '@/services/projectChat'
 import { listenProjectMembers, type ProjectMember } from '@/services/projectMembers'
-import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
+import { createTask, listenTasks, updateTask, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
-import { ref as dbRef, update, set, remove, onValue } from 'firebase/database'
+import type { DashboardNavItem } from '@/types/projectDashboard'
+import { ref as dbRef, onValue, remove, set, update } from 'firebase/database'
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -27,9 +29,12 @@ type ChatChannel = {
   id: string
   name: string
   description?: string
-  type: 'general' | 'task'
+  type: 'general' | 'task' | 'custom'
   assigneeId?: string
   status?: string
+  isPublic?: boolean
+  allowedUserIds?: string[]
+  createdBy?: string | null
 }
 
 const defaultChannel: ChatChannel = {
@@ -39,9 +44,11 @@ const defaultChannel: ChatChannel = {
   type: 'general',
 }
 
+const ALPHA_NOTICE_KEY = 'teamie_threads_alpha_notice'
+
 const route = useRoute()
 const { user, profile } = useAuthStore()
-const projectId = String(route.params.projectId)
+const projectId = ref(String(route.params.projectId || ''))
 const messages = ref<ChatMessage[]>([])
 const input = ref('')
 const createTaskOnSend = ref(false)
@@ -49,17 +56,19 @@ const selectedTaskId = ref('')
 const tasks = ref<TaskDoc[]>([])
 const project = ref<ProjectDoc | null>(null)
 const projectMembers = ref<ProjectMember[]>([])
+const customChannels = ref<ChatChannel[]>([])
 const { getDisplayName } = useUserDisplay(projectMembers)
-const taskMap = computed(() => Object.fromEntries(tasks.value.map((task) => [task.id, task.title])))
+const taskMap = computed(() =>
+  Object.fromEntries(
+    tasks.value.map((task) => [task.id, task.threadName || task.title || '無題のタスク']),
+  ),
+)
 const reactionOptions = ['👍', '🎉', '❤️', '🔥', '😄']
 const openReactionFor = ref<string | null>(null)
-const defaultReaction = '👍'
 const chatContainer = ref<HTMLElement | null>(null)
 const composerInputEl = ref<HTMLInputElement | null>(null)
 const editingMessageId = ref<string | null>(null)
 const editingText = ref('')
-const channelSearch = ref('')
-const filterAssigneeId = ref('')
 const activeChannelId = ref('general')
 const notificationsEnabled = ref(true)
 const newMessageBanner = ref(false)
@@ -67,6 +76,7 @@ const newMessagePreview = ref('新着メッセージがあります')
 const unreadChannels = ref<Record<string, boolean>>({})
 const seenMessages = ref<Record<string, string>>({})
 const replyingTo = ref<ChatMessage | null>(null)
+const sidebarOpen = ref(true)
 const mentionQuery = ref('')
 const mentionDropdownOpen = ref(false)
 const mentionCaret = ref(0)
@@ -74,14 +84,67 @@ const slashQuery = ref('')
 const slashDropdownOpen = ref(false)
 const messageSearch = ref('')
 const typingUsers = ref<Record<string, { name: string }>>({})
+const newThreadModalOpen = ref(false)
+const newThreadForm = ref<{ name: string; description: string }>({
+  name: '',
+  description: '',
+})
+const threadSettingsOpen = ref(false)
+const threadSettingsTargetId = ref<string | null>(null)
+const threadSettingsForm = ref<{ name: string; description: string }>({ name: '', description: '' })
+const showAlphaNotice = ref(false)
+const projectList = ref<{ id: string; name: string }[]>([])
+const navItems = computed<DashboardNavItem[]>(() =>
+  [
+    {
+      key: 'dashboard',
+      label: 'ダッシュボード',
+      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
+      icon: 'dashboard',
+    },
+    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
+    {
+      key: 'team',
+      label: 'スレッド',
+      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
+      icon: 'team',
+    },
+    {
+      key: 'members',
+      label: 'メンバー',
+      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
+      icon: 'members',
+    },
+    {
+      key: 'settings',
+      label: '設定',
+      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
+      icon: 'settings',
+    },
+    {
+      key: 'debug',
+      label: 'デバッグ',
+      to: { name: ROUTE_NAMES.projectDebug, params: { projectId: projectId.value } },
+      icon: 'debug',
+    },
+  ] satisfies DashboardNavItem[],
+)
+
+const sidebarProjects = computed(() =>
+  projectList.value.map((entry, index) => ({
+    key: entry.id,
+    label: entry.name,
+    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
+    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+  })),
+)
+
+const profileInfo = computed(() => ({
+  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  email: profile.value?.email || '',
+}))
 let typingTimeoutHandle: ReturnType<typeof setTimeout> | null = null
 const availableCommands = [
-  {
-    key: '/newTask',
-    label: '/newTask/"タイトル","担当者","説明"',
-    description: 'タスク名・担当者・説明をまとめて入力',
-    insert: '/newTask/"タスク名","担当者","説明"',
-  },
   { key: '/private', label: '/private @user メッセージ', description: '指定ユーザーにのみ送信', insert: '/private @' },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
@@ -92,43 +155,30 @@ let unsubscribeTasks: (() => void) | null = null
 let unsubscribeChat: (() => void) | null = null
 let unsubscribeMembers: (() => void) | null = null
 let unsubscribeTyping: (() => void) | null = null
-
-const keyword = computed(() => channelSearch.value.trim().toLowerCase())
+let unsubscribeCustomChannels: (() => void) | null = null
 
 const channels = computed<ChatChannel[]>(() => {
-  const taskChannels: ChatChannel[] = tasks.value.map((task) => ({
-    id: task.id,
-    name: task.title || '無題のタスク',
-    description: task.description || 'タスクディスカッション',
-    type: 'task',
-    assigneeId: task.assigneeId,
-    status: task.status,
-  }))
-  return [{ ...defaultChannel }, ...taskChannels]
-})
-
-const filteredTaskChannels = computed(() => {
-  return channels.value.filter((channel) => {
-    if (channel.type !== 'task') return false
-    
-    // Search filter
-    if (keyword.value) {
-      const haystack = `${channel.name} ${channel.id}`.toLowerCase()
-      if (!haystack.includes(keyword.value)) return false
-    }
-
-    // Assignee filter
-    if (filterAssigneeId.value) {
-      if (channel.assigneeId !== filterAssigneeId.value) return false
-    }
-
-    return true
-  })
+  const taskChannels: ChatChannel[] = tasks.value
+    .filter((task) => task.hasThread !== false)
+    .map((task) => ({
+      id: task.id,
+      name: task.threadName || task.title || '無題のタスク',
+      description: task.description || 'タスクディスカッション',
+      type: 'task',
+      assigneeId: task.assigneeId,
+      status: task.status,
+    }))
+  const custom = customChannels.value
+  const list = [{ ...defaultChannel }, ...custom, ...taskChannels]
+  return list.filter(canAccessChannel)
 })
 
 const currentChannel = computed<ChatChannel>(() => {
   return channels.value.find((channel) => channel.id === activeChannelId.value) || defaultChannel
 })
+
+const filteredTaskChannels = computed(() => channels.value.filter((channel) => channel.type === 'task'))
+const customThreadChannels = computed(() => channels.value.filter((channel) => channel.type === 'custom'))
 
 const composerPlaceholder = computed(() => `${currentChannel.value?.name || 'このチャネル'}にメッセージを送信`)
 
@@ -237,6 +287,17 @@ watch(activeChannelId, () => {
 })
 
 watch(
+  currentChannel,
+  (channel) => {
+    if (!channel || channel.type !== 'custom' || !canManageCurrentThread.value) {
+      threadSettingsOpen.value = false
+      threadSettingsTargetId.value = null
+    }
+  },
+  { flush: 'post' },
+)
+
+watch(
   lastMessageMeta,
   (meta) => {
     Object.entries(meta).forEach(([channelId, info]) => {
@@ -279,21 +340,151 @@ function acknowledgeNotification() {
 }
 
 function watchChat() {
-  unsubscribeChat = listenProjectChat(projectId, (list) => {
+  unsubscribeChat = listenProjectChat(projectId.value, (list) => {
     messages.value = list
   })
 }
 
 function watchTasks() {
-  unsubscribeTasks = listenTasks(projectId, (list) => {
+  unsubscribeTasks = listenTasks(projectId.value, (list) => {
     tasks.value = list
   })
 }
 
 function watchMembers() {
-  unsubscribeMembers = listenProjectMembers(projectId, (list) => {
+  unsubscribeMembers = listenProjectMembers(projectId.value, (list) => {
     projectMembers.value = list
   })
+}
+
+function watchCustomChannels() {
+  unsubscribeCustomChannels?.()
+  if (!projectId.value) return
+  const ref = query(collection(db, 'projects', projectId.value, 'threads'), orderBy('createdAt', 'asc'))
+  unsubscribeCustomChannels = onSnapshot(ref, (snapshot) => {
+    const list: { channel: ChatChannel; createdAt: number }[] = []
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as any
+      list.push({
+        channel: {
+          id: docSnap.id,
+          name: data?.name || '未命名スレッド',
+          description: data?.description || '',
+          type: 'custom',
+          isPublic: data?.isPublic !== false,
+          allowedUserIds: Array.isArray(data?.allowedUserIds) ? data.allowedUserIds : undefined,
+          createdBy: typeof data?.createdBy === 'string'
+            ? data.createdBy
+            : typeof data?.userId === 'string'
+              ? data.userId
+              : null,
+        },
+        createdAt: toMillis(data?.createdAt) || 0,
+      })
+    })
+    list.sort((a, b) => a.createdAt - b.createdAt)
+    customChannels.value = list.map((entry) => entry.channel)
+  })
+}
+
+function resetNewThreadForm() {
+  newThreadForm.value = {
+    name: '',
+    description: '',
+  }
+}
+
+function openNewThreadModal() {
+  resetNewThreadForm()
+  newThreadModalOpen.value = true
+}
+
+function closeNewThreadModal() {
+  newThreadModalOpen.value = false
+}
+
+async function submitNewThread() {
+  if (!projectId.value || !user.value) return
+  const name = newThreadForm.value.name.trim()
+  if (!name) return
+  try {
+    const docRef = await addDoc(collection(db, 'projects', projectId.value, 'threads'), {
+      name,
+      description: newThreadForm.value.description.trim() || '',
+      createdBy: user.value.uid,
+      userId: user.value.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    activeChannelId.value = docRef.id
+    closeNewThreadModal()
+    resetNewThreadForm()
+  } catch (error) {
+    console.error('Failed to create new thread', error)
+  }
+}
+
+const canManageCurrentThread = computed(() => {
+  const channel = currentChannel.value
+  if (!channel || channel.type !== 'custom') return false
+  if (!user.value?.uid) return false
+  return channel.createdBy === user.value.uid
+})
+
+function openThreadSettings() {
+  if (!canManageCurrentThread.value) return
+  const channel = currentChannel.value
+  if (!channel) return
+  threadSettingsTargetId.value = channel.id
+  threadSettingsForm.value = {
+    name: channel.name,
+    description: channel.description || '',
+  }
+  threadSettingsOpen.value = true
+}
+
+function closeThreadSettings() {
+  threadSettingsOpen.value = false
+  threadSettingsTargetId.value = null
+}
+
+async function saveThreadSettings() {
+  if (!threadSettingsTargetId.value || !projectId.value) return
+  const name = threadSettingsForm.value.name.trim()
+  if (!name) return
+  try {
+    await updateDoc(doc(db, 'projects', projectId.value, 'threads', threadSettingsTargetId.value), {
+      name,
+      description: threadSettingsForm.value.description.trim() || '',
+      updatedAt: serverTimestamp(),
+    })
+    closeThreadSettings()
+  } catch (error) {
+    console.error('Failed to update thread', error)
+  }
+}
+
+async function deleteCurrentThread() {
+  if (!threadSettingsTargetId.value || !projectId.value) return
+  if (!confirm('このスレッドを削除してもよろしいですか？')) return
+  try {
+    await deleteDoc(doc(db, 'projects', projectId.value, 'threads', threadSettingsTargetId.value))
+    if (activeChannelId.value === threadSettingsTargetId.value) {
+      activeChannelId.value = 'general'
+    }
+    closeThreadSettings()
+  } catch (error) {
+    console.error('Failed to delete thread', error)
+  }
+}
+
+function dismissAlphaNotice() {
+  showAlphaNotice.value = false
+  try {
+    localStorage.setItem(ALPHA_NOTICE_KEY, '1')
+  } catch (error) {
+    console.warn('Failed to persist alpha notice dismissal', error)
+  }
 }
 
 function memberNameById(id?: string | null) {
@@ -310,7 +501,7 @@ const typingIndicator = computed(() => {
 })
 
 function typingPath(uid: string) {
-  return dbRef(database, `projects/${projectId}/typing/${uid}`)
+  return dbRef(database, `projects/${projectId.value}/typing/${uid}`)
 }
 
 function markSelfTyping() {
@@ -336,7 +527,7 @@ function setBotTyping(active: boolean) {
 
 function watchTyping() {
   unsubscribeTyping?.()
-  const ref = dbRef(database, `projects/${projectId}/typing`)
+  const ref = dbRef(database, `projects/${projectId.value}/typing`)
   unsubscribeTyping = onValue(ref, (snapshot) => {
     const map: Record<string, { name: string }> = {}
     snapshot.forEach((child) => {
@@ -348,12 +539,11 @@ function watchTyping() {
 }
 
 const { handleSlashCommand } = useSlashCommands({
-  projectId,
+  projectId: projectId.value,
   currentChannel,
   user,
   profile,
   projectMembers,
-  memberNameById,
   setBotTyping,
 })
 
@@ -377,6 +567,58 @@ function displayNameFor(message: { senderId?: string | null; author?: string | n
     if (name) return name
   }
   return author || 'User'
+}
+
+function canAccessChannel(channel: ChatChannel) {
+  if (channel.type === 'general' || channel.type === 'task') return true
+  if (channel.isPublic !== false) return true
+  if (!user.value?.uid) return false
+  return Boolean(channel.allowedUserIds?.includes(user.value.uid))
+}
+
+function toMillis(value: ChatMessage['createdAt'] | number | null | undefined): number | null {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    return Number.isNaN(parsed) ? null : parsed
+  }
+  const seconds = (value as any)?.seconds
+  if (typeof seconds === 'number') return seconds * 1000
+  return null
+}
+
+function formatClock(value: ChatMessage['createdAt'] | number | null | undefined) {
+  const ms = toMillis(value)
+  if (!ms) return '--:--'
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatRelativeTime(timestamp: number | null | undefined) {
+  if (!timestamp) return '---'
+  const diff = Date.now() - timestamp
+  const minutes = Math.round(diff / 60000)
+  if (minutes < 1) return 'たった今'
+  if (minutes < 60) return `${minutes}分前`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}時間前`
+  const days = Math.round(hours / 24)
+  if (days === 1) return '昨日'
+  if (days < 7) return `${days}日前`
+  const date = new Date(timestamp)
+  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
+}
+
+function formatDayBucket(timestamp: number | null) {
+  if (!timestamp) return { label: 'EARLIER', order: 0 }
+  const date = new Date(timestamp)
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const diffDays = Math.floor((todayStart.getTime() - dayStart) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return { label: 'TODAY', order: dayStart }
+  if (diffDays === 1) return { label: 'YESTERDAY', order: dayStart }
+  const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
+  return { label: formatter.format(date), order: dayStart }
 }
 
 function handleComposerInput(event: Event) {
@@ -464,7 +706,7 @@ async function sendMessage() {
   const mentions = extractMentions(text)
 
   if (text.startsWith('/')) {
-    const handled = await handleSlashCommand(text, mentions)
+    const handled = await handleSlashCommand(text)
     if (handled) {
       resetComposer()
       return
@@ -475,11 +717,13 @@ async function sendMessage() {
   if (createTaskOnSend.value) {
     const assignee = mentions.find((m) => m.userId)?.userId || null
     linkedTaskId = await createTask(
-      projectId,
+      projectId.value,
       {
         title: text,
         assigneeId: assignee,
         assigneeName: assignee ? memberNameById(assignee) : null,
+        hasThread: true,
+        threadName: text,
       },
       user.value.uid,
     )
@@ -488,7 +732,7 @@ async function sendMessage() {
   }
 
   await sendProjectMessage(
-    projectId,
+    projectId.value,
     user.value.uid,
     profile.value?.nickname || profile.value?.fullName || 'User',
     text,
@@ -514,18 +758,18 @@ async function sendMessage() {
 
 async function convertToTask(messageId: string, text: string) {
   if (!user.value) return
-  const taskId = await createTask(projectId, { title: text }, user.value.uid)
-  await update(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`), { linkedTaskId: taskId })
+  const taskId = await createTask(projectId.value, { title: text, hasThread: true, threadName: text }, user.value.uid)
+  await update(dbRef(database, `projects/${projectId.value}/realtimeChat/${messageId}`), { linkedTaskId: taskId })
   activeChannelId.value = taskId
 }
 
 async function linkTask(messageId: string, taskId: string) {
-  await update(dbRef(database, `projects/${projectId}/realtimeChat/${messageId}`), { linkedTaskId: taskId })
+  await update(dbRef(database, `projects/${projectId.value}/realtimeChat/${messageId}`), { linkedTaskId: taskId })
 }
 
 async function reactToMessage(messageId: string, emoji: string) {
   if (!user.value || !messageId || !emoji) return
-  await addMessageReaction(projectId, messageId, emoji, user.value.uid)
+  await addMessageReaction(projectId.value, messageId, emoji, user.value.uid)
 }
 
 function toggleReactionPicker(messageId: string) {
@@ -544,13 +788,13 @@ function cancelEditing() {
 
 async function saveEditing() {
   if (!editingMessageId.value || !editingText.value.trim()) return
-  await updateProjectMessage(projectId, editingMessageId.value, editingText.value)
+  await updateProjectMessage(projectId.value, editingMessageId.value, editingText.value)
   cancelEditing()
 }
 
 async function deleteMessage(messageId: string) {
   if (!confirm('このメッセージを削除してもよろしいですか？')) return
-  await deleteProjectMessage(projectId, messageId)
+  await deleteProjectMessage(projectId.value, messageId)
 }
 
 function startReplying(message: ChatMessage) {
@@ -595,8 +839,19 @@ onMounted(async () => {
   watchChat()
   watchMembers()
   watchTyping()
-  if (projectId) {
-      project.value = await fetchProject(projectId)
+  watchCustomChannels()
+  try {
+    const dismissed = localStorage.getItem(ALPHA_NOTICE_KEY)
+    if (!dismissed) {
+      setTimeout(() => {
+        showAlphaNotice.value = true
+      }, 600)
+    }
+  } catch (error) {
+    console.warn('Alpha notice state unavailable', error)
+  }
+  if (projectId.value) {
+    project.value = await fetchProject(projectId.value)
   }
 })
 
@@ -605,6 +860,7 @@ onBeforeUnmount(() => {
   unsubscribeChat?.()
   unsubscribeMembers?.()
   unsubscribeTyping?.()
+  unsubscribeCustomChannels?.()
   if (user.value) {
     remove(typingPath(user.value.uid))
   }
@@ -613,49 +869,75 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-container">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="workspace-header">
-        <router-link :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId } }" class="back-link">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 18l-6-6 6-6"/>
-          </svg>
-        </router-link>
+    <!-- Main Sidebar -->
+    <DashboardSidebar
+      :open="true"
+      :nav-items="navItems"
+      :projects="sidebarProjects"
+      :profile="profileInfo"
+      brand-subtitle="プロジェクト"
+    />
+    
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+    <!-- Threads Panel -->
+    <aside class="threads-panel">
+      <div class="threads-header">
         <div class="workspace-name">{{ project?.name || 'プロジェクト' }}</div>
       </div>
       
-      <div class="channels-section">
-        <div class="section-title">チャンネル</div>
+      <div class="threads-section">
+        <div class="section-title">
+          <span>Threads</span>
+          <button class="new-thread-btn" type="button" @click="openNewThreadModal">+ 新規スレッド</button>
+        </div>
+        
+        <div class="section-subtitle">Channels</div>
         <div 
-          class="channel-item" 
+          class="thread-item" 
           :class="{ active: activeChannelId === 'general' }"
           @click="selectChannel('general')"
         >
-          <span class="channel-icon">#</span>
-          <span>general</span>
-          <span v-if="unreadChannels['general']" class="channel-badge"></span>
+          <span class="thread-icon">#</span>
+          <span class="thread-name">general</span>
+          <span v-if="unreadChannels['general']" class="thread-badge">3</span>
         </div>
 
-        <div class="section-title" style="margin-top: 2rem;">タスク</div>
-        <div class="search-box">
-          <input v-model="channelSearch" type="text" placeholder="タスクを検索..." />
-        </div>
-        
+        <div class="section-subtitle">Task Threads</div>
         <div 
           v-for="channel in filteredTaskChannels" 
           :key="channel.id"
-          class="channel-item"
+          class="thread-item"
           :class="{ active: channel.id === currentChannel?.id }"
           @click="selectChannel(channel.id)"
         >
-          <span class="channel-icon">●</span>
-          <span>{{ channel.name }}</span>
-          <span v-if="unreadChannels[channel.id]" class="channel-badge"></span>
+          <UserAvatar 
+            :name="channel.name" 
+            :size="24" 
+            class="thread-avatar"
+          />
+          <span class="thread-name">{{ channel.name }}</span>
+          <span v-if="unreadChannels[channel.id]" class="thread-badge">{{ unreadChannels[channel.id] ? '1' : '' }}</span>
         </div>
-        <p v-if="!filteredTaskChannels.length" class="empty-text">タスクが見つかりません</p>
-      </div>
+        <p v-if="!filteredTaskChannels.length" class="empty-text">No tasks found</p>
 
-      <SidebarUserProfile />
+        <div class="section-subtitle">Custom Threads</div>
+        <div 
+          v-for="channel in customThreadChannels" 
+          :key="channel.id"
+          class="thread-item"
+          :class="{ active: channel.id === currentChannel?.id }"
+          @click="selectChannel(channel.id)"
+        >
+          <span class="thread-icon">#</span>
+          <div class="thread-info">
+            <span class="thread-name">{{ channel.name }}</span>
+            <span v-if="channel.description" class="thread-meta">{{ channel.description }}</span>
+          </div>
+          <span v-if="unreadChannels[channel.id]" class="thread-badge">{{ unreadChannels[channel.id] ? '1' : '' }}</span>
+        </div>
+        <p v-if="!customThreadChannels.length" class="empty-text">No custom threads</p>
+      </div>
     </aside>
 
     <!-- Main Chat -->
@@ -665,12 +947,22 @@ onBeforeUnmount(() => {
           <span>#</span>
           <span class="channel-name" :title="currentChannel?.name">{{ currentChannel?.name }}</span>
         </div>
-        <div class="channel-search">
-          <input
-            v-model="messageSearch"
-            type="search"
-            placeholder="このチャンネル内を検索"
-          />
+        <div class="channel-controls">
+          <div class="channel-search">
+            <input
+              v-model="messageSearch"
+              type="search"
+              placeholder="このチャンネル内を検索"
+            />
+          </div>
+          <button
+            v-if="canManageCurrentThread"
+            type="button"
+            class="thread-settings-btn"
+            @click="openThreadSettings"
+          >
+            スレッド設定
+          </button>
         </div>
       </header>
 
@@ -683,7 +975,7 @@ onBeforeUnmount(() => {
           <div 
             class="message" 
             :class="[detectMessageType(message.text), { bot: message.isBot }]"
-            @dblclick="reactToMessage(message.id, defaultReaction)"
+            @dblclick="reactToMessage(message.id, '👍')"
           >
             <div class="message-header">
               <UserAvatar 
@@ -748,7 +1040,9 @@ onBeforeUnmount(() => {
                 </button>
                 <select @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)" class="link-task-select">
                   <option value="">タスクを選択</option>
-                  <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+                  <option v-for="task in tasks" :key="task.id" :value="task.id">
+                    {{ task.threadName || task.title }}
+                  </option>
                 </select>
               </div>
 
@@ -856,7 +1150,9 @@ onBeforeUnmount(() => {
             <span>既存タスクに紐付け</span>
             <select v-model="selectedTaskId">
               <option value="">なし</option>
-              <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
+              <option v-for="task in tasks" :key="task.id" :value="task.id">
+                {{ task.threadName || task.title }}
+              </option>
             </select>
           </label>
         </div>
@@ -891,6 +1187,63 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </main>
+
+    <div v-if="newThreadModalOpen" class="thread-modal-overlay">
+      <div class="thread-modal">
+        <header>
+          <h3>新しいスレッド</h3>
+          <button type="button" @click="closeNewThreadModal">×</button>
+        </header>
+        <form class="thread-modal__form" @submit.prevent="submitNewThread">
+          <label>
+            スレッド名
+            <input v-model="newThreadForm.name" type="text" placeholder="デザインレビュー" required />
+          </label>
+          <label>
+            説明 (任意)
+            <textarea v-model="newThreadForm.description" rows="3" placeholder="スレッドの背景を入力"></textarea>
+          </label>
+          
+          <footer>
+            <button type="button" class="ghost" @click="closeNewThreadModal">キャンセル</button>
+            <button type="submit" :disabled="!newThreadForm.name.trim()">作成</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <div v-if="threadSettingsOpen" class="thread-modal-overlay">
+      <div class="thread-modal">
+        <header>
+          <h3>スレッド設定</h3>
+          <button type="button" @click="closeThreadSettings">×</button>
+        </header>
+        <form class="thread-modal__form" @submit.prevent="saveThreadSettings">
+          <label>
+            スレッド名
+            <input v-model="threadSettingsForm.name" type="text" required />
+          </label>
+          <label>
+            説明
+            <textarea v-model="threadSettingsForm.description" rows="3" placeholder="スレッドの説明"></textarea>
+          </label>
+          <footer>
+            <button type="button" class="ghost" @click="closeThreadSettings">キャンセル</button>
+            <button type="submit" :disabled="!threadSettingsForm.name.trim()">保存</button>
+          </footer>
+        </form>
+        <div class="thread-settings__danger">
+          <p>このスレッドを削除すると、メッセージ履歴は保持されますがチャネル一覧からは消えます。</p>
+          <button type="button" class="danger" @click="deleteCurrentThread">スレッドを削除</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showAlphaNotice" class="alpha-notice">
+      <p>スレッド体験は現在アルファ版です。ご意見をお待ちしています！</p>
+      <button type="button" @click="dismissAlphaNotice">了解</button>
+    </div>
+    </div><!-- end content-wrapper -->
   </div>
 </template>
 
@@ -902,142 +1255,185 @@ onBeforeUnmount(() => {
 }
 
 .app-container {
-  display: flex;
-  height: 100vh;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
   background: #f8fafc;
   color: #1e293b;
   font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.content-wrapper {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
   overflow: hidden;
 }
 
-/* Sidebar */
-.sidebar {
-  width: 240px;
-  background: #0b2e33;
+/* Threads Panel (Middle Column) */
+.threads-panel {
+  background: #f8f9fa;
   display: flex;
   flex-direction: column;
-  padding: 20px 0;
+  border-right: 1px solid #e2e8f0;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden
 }
 
-.workspace-header {
-  padding: 0 20px 20px 20px;
-  color: #ffffff;
+.threads-header {
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.back-link {
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
-.back-link:hover {
-  color: #ffffff;
+  justify-content: flex-start;
 }
 
 .workspace-name {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
+  color: #0f172a;
 }
 
-.channels-section {
+
+.threads-section {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  max-height: calc(100vh - 80px);
 }
 
-.channels-section::-webkit-scrollbar {
+.threads-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.threads-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.channels-section::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+.threads-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
   border-radius: 3px;
 }
 
 .section-title {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 0 0 12px 0;
-  padding: 0 20px;
-  font-weight: 600;
+  font-size: 20px;
+  color: #0f172a;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.search-box {
-  padding: 0 20px 12px;
-}
-
-.search-box input {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.new-thread-btn {
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  padding: 6px 12px;
   border-radius: 6px;
-  padding: 8px 12px;
-  color: #ffffff;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
 
-.search-box input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+.new-thread-btn:hover {
+  background: #1d4ed8;
 }
 
-.channel-item {
-  padding: 8px 20px;
+.section-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  margin: 20px 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.thread-item {
+  padding: 10px 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  gap: 12px;
+  color: #475569;
   font-size: 14px;
-  border-left: 3px solid transparent;
+  border-radius: 8px;
   position: relative;
+  margin-bottom: 2px;
 }
 
-.channel-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+.thread-item:hover {
+  background: #ffffff;
+  color: #0f172a;
 }
 
-.channel-item.active {
-  background: rgba(184, 227, 233, 0.15);
-  color: #ffffff;
-  border-left-color: #b8e3e9;
+.thread-item.active {
+  background: #e0f2f1;
+  color: #0f172a;
   font-weight: 600;
 }
 
-.channel-icon {
-  font-size: 12px;
-  opacity: 0.7;
+.thread-icon {
+  font-size: 16px;
+  color: #64748b;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.channel-badge {
-  width: 8px;
-  height: 8px;
-  background: #ef4444;
-  border-radius: 50%;
-  margin-left: auto;
+.thread-avatar {
+  flex-shrink: 0;
+}
+
+.thread-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-badge {
+  background: #0b2e33;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
 }
 
 .empty-text {
-  padding: 0 20px;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 12px;
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 13px;
   text-align: center;
 }
 
 
 /* Main Chat */
 .main-chat {
-  flex: 1;
   display: flex;
   flex-direction: column;
   background: #f8fafc;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -1081,6 +1477,28 @@ onBeforeUnmount(() => {
   max-width: 400px;
 }
 
+.channel-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.thread-settings-btn {
+  border: 1px solid #d1dae8;
+  background: #fff;
+  color: #0f172a;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.thread-settings-btn:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
 .channel-search input {
   width: 100%;
   padding: 10px 16px 10px 40px;
@@ -1114,6 +1532,43 @@ onBeforeUnmount(() => {
 .messages-container::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 4px;
+}
+
+@media (max-width: 1200px) {
+  .app-container {
+    grid-template-columns: 200px 1fr;
+  }
+
+  .content-wrapper {
+    grid-template-columns: 280px 1fr;
+  }
+
+  .threads-panel {
+    min-height: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    grid-template-columns: 60px 1fr;
+  }
+
+  .content-wrapper {
+    grid-template-columns: 200px 1fr;
+  }
+
+  .threads-panel {
+    min-height: 100vh;
+  }
+
+  .chat-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .channel-search {
+    width: 100%;
+  }
 }
 
 .empty-state {
@@ -1322,6 +1777,158 @@ onBeforeUnmount(() => {
   border-left: 3px solid rgba(11, 46, 51, 0.3);
   transition: all 0.2s ease;
   position: relative;
+}
+
+.thread-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.thread-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.thread-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.thread-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  width: 360px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.thread-modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.thread-modal header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.thread-modal header button {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.thread-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.thread-modal__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.thread-modal__form input,
+.thread-modal__form textarea,
+.thread-modal__form select {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.thread-modal__form textarea {
+  resize: vertical;
+}
+
+.thread-modal__form footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.thread-modal__form footer button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.thread-modal__form footer .ghost {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.thread-modal__form footer button:last-child {
+  background: #2563eb;
+  color: #fff;
+}
+
+.thread-modal__form footer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.thread-settings__danger {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.thread-settings__danger .danger {
+  align-self: flex-start;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  background: #dc2626;
+  color: #fff;
+  cursor: pointer;
+}
+
+.alpha-notice {
+  position: fixed;
+  bottom: 24px;
+  right: 32px;
+  background: #0b2e33;
+  color: #fff;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 60;
+}
+
+.alpha-notice button {
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-radius: 20px;
+  padding: 0.2rem 0.9rem;
+  cursor: pointer;
 }
 
 .thread-reply:hover {
@@ -1641,4 +2248,5 @@ onBeforeUnmount(() => {
   color: #64748b;
   margin: 0.35rem 0;
 }
+
 </style>
