@@ -48,7 +48,7 @@ const defaultChannel: ChatChannel = {
   type: 'general',
 }
 
-const ALPHA_NOTICE_KEY = 'teamie_threads_alpha_notice'
+const ALPHA_NOTICE_KEY = 'fliro_threads_alpha_notice'
 
 const route = useRoute()
 const { user, profile } = useAuthStore()
@@ -144,7 +144,7 @@ const sidebarProjects = computed(() =>
 )
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  name: profile.value?.nickname || profile.value?.fullName || 'Fliro User',
   email: profile.value?.email || '',
 }))
 let typingTimeoutHandle: ReturnType<typeof setTimeout> | null = null
@@ -197,6 +197,27 @@ const composerPlaceholder = computed(() => `${currentChannel.value?.name || 'こ
 const currentChannelMessages = computed(() =>
   messages.value.filter((message) => (message.channelId || 'general') === currentChannel.value?.id),
 )
+
+const currentThreadMessageCount = computed(() => currentChannelMessages.value.length)
+
+const currentTaskDetail = computed(() => {
+  if (!currentChannel.value || currentChannel.value.type !== 'task') return null
+  return tasks.value.find((task) => task.id === currentChannel.value.id) || null
+})
+
+const currentTaskAssignee = computed(() => {
+  const assigneeId = currentTaskDetail.value?.assigneeId
+  if (!assigneeId) return ''
+  return getDisplayName(assigneeId) || currentTaskDetail.value?.assigneeName || ''
+})
+
+const currentTaskDue = computed(() => {
+  const due = currentTaskDetail.value?.dueDate
+  if (due && 'seconds' in due) {
+    return new Date(due.seconds * 1000).toLocaleDateString()
+  }
+  return '未設定'
+})
 
 const visibleChannelMessages = computed(() =>
   currentChannelMessages.value.filter((msg) => {
@@ -1156,6 +1177,35 @@ onBeforeUnmount(() => {
       </div>
     </main>
 
+    <aside class="task-panel">
+      <div v-if="currentTaskDetail" class="task-panel__card">
+        <p class="task-panel__eyebrow">タスク詳細</p>
+        <h3 class="task-panel__title">{{ currentTaskDetail.title }}</h3>
+        <p class="task-panel__desc">{{ currentTaskDetail.description || '説明が設定されていません。' }}</p>
+        <dl class="task-panel__meta">
+          <div>
+            <dt>ステータス</dt>
+            <dd class="status-pill">{{ currentTaskDetail.status || '未設定' }}</dd>
+          </div>
+          <div>
+            <dt>担当</dt>
+            <dd>{{ currentTaskAssignee || '未アサイン' }}</dd>
+          </div>
+          <div>
+            <dt>期限</dt>
+            <dd>{{ currentTaskDue }}</dd>
+          </div>
+          <div>
+            <dt>メッセージ</dt>
+            <dd>{{ currentThreadMessageCount }}件</dd>
+          </div>
+        </dl>
+      </div>
+      <div v-else class="task-panel__empty">
+        タスクスレッドを選択すると詳細が表示されます。
+      </div>
+    </aside>
+
     <div v-if="newThreadModalOpen" class="thread-modal-overlay">
       <div class="thread-modal">
         <header>
@@ -1233,7 +1283,7 @@ onBeforeUnmount(() => {
 
 .content-wrapper {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 320px 1fr 320px;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -1246,7 +1296,9 @@ onBeforeUnmount(() => {
   border-right: 1px solid #e2e8f0;
   height: 100vh;
   min-height: 100vh;
-  overflow: hidden
+  overflow: hidden;
+  min-width: 260px;
+  flex-shrink: 0;
 }
 
 .threads-header {
@@ -1451,6 +1503,77 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.task-panel {
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-panel__card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-panel__empty {
+  color: #94a3b8;
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.task-panel__eyebrow {
+  margin: 0;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.task-panel__title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.task-panel__desc {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.task-panel__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.task-panel__meta dt {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.task-panel__meta dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+
+.status-pill {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0ea5e9;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
 .thread-settings-btn {
   border: 1px solid #d1dae8;
   background: #fff;
@@ -1513,11 +1636,19 @@ onBeforeUnmount(() => {
   }
 
   .content-wrapper {
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 260px 1fr;
+  }
+
+  .task-panel {
+    display: none;
   }
 
   .threads-panel {
     min-height: 200px;
+    max-height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
   }
 }
 
@@ -1527,11 +1658,17 @@ onBeforeUnmount(() => {
   }
 
   .content-wrapper {
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 1fr;
   }
 
   .threads-panel {
-    min-height: 100vh;
+    min-height: auto;
+    max-height: 320px;
+    position: sticky;
+    top: 0;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-y: auto;
   }
 
   .chat-header {
