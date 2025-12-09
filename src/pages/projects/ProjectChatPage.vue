@@ -80,7 +80,7 @@ const newMessagePreview = ref('新着メッセージがあります')
 const unreadChannels = ref<Record<string, boolean>>({})
 const seenMessages = ref<Record<string, string>>({})
 const replyingTo = ref<ChatMessage | null>(null)
-const sidebarOpen = ref(true)
+// const sidebarOpen = ref(true)
 const mentionQuery = ref('')
 const mentionDropdownOpen = ref(false)
 const mentionCaret = ref(0)
@@ -148,7 +148,15 @@ const profileInfo = computed(() => ({
   email: profile.value?.email || '',
 }))
 let typingTimeoutHandle: ReturnType<typeof setTimeout> | null = null
-const availableCommands = [
+
+type SlashCommand = {
+  key: string
+  label: string
+  description?: string
+  insert?: string
+}
+
+const availableCommands: SlashCommand[] = [
   { key: '/private', label: '/private @user メッセージ', description: '指定ユーザーにのみ送信', insert: '/private @' },
   { key: '/ping', label: '/ping', description: 'Botがpongと返信' },
   { key: '/time', label: '/time', description: '現在時刻を返信' },
@@ -330,18 +338,6 @@ function selectChannel(channelId: string) {
   activeChannelId.value = channelId
 }
 
-function toggleNotifications() {
-  notificationsEnabled.value = !notificationsEnabled.value
-  if (!notificationsEnabled.value) {
-    newMessageBanner.value = false
-  }
-}
-
-function acknowledgeNotification() {
-  newMessageBanner.value = false
-  markChannelAsRead(activeChannelId.value)
-  scrollToBottom()
-}
 
 function watchChat() {
   unsubscribeChat = listenProjectChat(projectId.value, (list) => {
@@ -591,39 +587,7 @@ function toMillis(value: ChatMessage['createdAt'] | number | null | undefined): 
   return null
 }
 
-function formatClock(value: ChatMessage['createdAt'] | number | null | undefined) {
-  const ms = toMillis(value)
-  if (!ms) return '--:--'
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 
-function formatRelativeTime(timestamp: number | null | undefined) {
-  if (!timestamp) return '---'
-  const diff = Date.now() - timestamp
-  const minutes = Math.round(diff / 60000)
-  if (minutes < 1) return 'たった今'
-  if (minutes < 60) return `${minutes}分前`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}時間前`
-  const days = Math.round(hours / 24)
-  if (days === 1) return '昨日'
-  if (days < 7) return `${days}日前`
-  const date = new Date(timestamp)
-  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
-}
-
-function formatDayBucket(timestamp: number | null) {
-  if (!timestamp) return { label: 'EARLIER', order: 0 }
-  const date = new Date(timestamp)
-  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const diffDays = Math.floor((todayStart.getTime() - dayStart) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return { label: 'TODAY', order: dayStart }
-  if (diffDays === 1) return { label: 'YESTERDAY', order: dayStart }
-  const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
-  return { label: formatter.format(date), order: dayStart }
-}
 
 function handleComposerInput(event: Event) {
   const target = event.target as HTMLInputElement
@@ -631,7 +595,7 @@ function handleComposerInput(event: Event) {
   const uptoCaret = input.value.slice(0, mentionCaret.value)
   const match = uptoCaret.match(/@([^\s@]{0,20})$/)
   if (match) {
-    mentionQuery.value = match[1]
+    mentionQuery.value = match[1] || ''
     mentionDropdownOpen.value = true
   } else {
     mentionDropdownOpen.value = false
@@ -640,7 +604,7 @@ function handleComposerInput(event: Event) {
 
   const slashMatch = uptoCaret.match(/\/([^\s/]{0,20})$/)
   if (slashMatch) {
-    slashQuery.value = slashMatch[1]
+    slashQuery.value = slashMatch[1] || ''
     slashDropdownOpen.value = true
   } else {
     slashDropdownOpen.value = false
@@ -673,7 +637,7 @@ const commandCandidates = computed(() =>
   ),
 )
 
-function insertCommand(cmd: { key: string }) {
+function insertCommand(cmd: SlashCommand) {
   const start = mentionCaret.value
   const textBefore = input.value.slice(0, start)
   const match = textBefore.match(/\/([^\s/]{0,20})$/)
@@ -1542,6 +1506,11 @@ onBeforeUnmount(() => {
   .app-container {
     grid-template-columns: 200px 1fr;
   }
+  
+  /* Prevent sidebar from shrinking too much */
+  .sidebar {
+    min-width: 200px;
+  }
 
   .content-wrapper {
     grid-template-columns: 280px 1fr;
@@ -1572,6 +1541,23 @@ onBeforeUnmount(() => {
 
   .channel-search {
     width: 100%;
+  }
+
+  /* Mobile: Message Actions always visible or easier to access */
+  .message-actions {
+    opacity: 1;
+    transform: translateY(0);
+    top: -20px;
+    right: 10px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border: 1px solid #cbd5e1;
+  }
+
+  .action-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
   }
 }
 

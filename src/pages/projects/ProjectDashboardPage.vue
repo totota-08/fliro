@@ -55,7 +55,7 @@ const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
-const { notifications: notificationsBar, sendNotification } = useNotificationCenter()
+const { notifications: notificationsBar } = useNotificationCenter()
 const taskView = ref<'all' | 'mine'>('all')
 const selectedTask = ref<TaskDoc | null>(null)
 const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
@@ -1801,6 +1801,30 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+@media (max-width: 768px) {
+  .task-row__content {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .task-row__title {
+    font-size: 1.1rem;
+  }
+  
+  .task-row__status {
+    justify-content: flex-start;
+  }
+  
+  .task-row__progress {
+    margin-top: 0.25rem;
+  }
+  
+  .task-row__due {
+    text-align: left;
+    font-size: 0.85rem;
+  }
+}
+
 .task-row__title {
   margin: 0;
   font-weight: 600;
@@ -2142,7 +2166,7 @@ onBeforeUnmount(() => {
 }
 
 .task-drawer__panel {
-  width: clamp(280px, 35vw, 420px);
+  width: clamp(280px, 85vw, 420px);
   background: #fff;
   box-shadow: -12px 0 28px rgba(11, 46, 51, 0.18);
   display: flex;
