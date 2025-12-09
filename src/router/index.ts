@@ -22,6 +22,7 @@ import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
 import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
 import ProjectMembersPage from '@/pages/projects/ProjectMembersPage.vue'
 import ProjectSettingsPage from '@/pages/projects/ProjectSettingsPage.vue'
+import ProjectNotificationsPage from '@/pages/projects/ProjectNotificationsPage.vue'
 import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
 export const router = createRouter({
@@ -104,6 +105,12 @@ export const router = createRouter({
       name: ROUTE_NAMES.projectSettings,
       component: ProjectSettingsPage,
       meta: { requiresAuth: true, section: 'settings' },
+    },
+    {
+      path: '/projects/:projectId/notifications',
+      name: ROUTE_NAMES.projectNotifications,
+      component: ProjectNotificationsPage,
+      meta: { requiresAuth: true, section: 'notifications' },
     },
     {
       path: '/tasks',
