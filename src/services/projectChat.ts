@@ -127,7 +127,7 @@ export function listenProjectChat(
       callback(items)
     },
     (error) => {
-      console.error('Chat listener error:', error)
+      logger.error`Chat listener error: ${error}`
       if (onError) onError(error)
     },
   )
