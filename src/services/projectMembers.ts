@@ -93,7 +93,7 @@ export async function addProjectMember({
       fullName: profileData.fullName ?? null,
       email: profileData.email ?? null,
       avatarUrl: profileData.avatarUrl ?? null,
-      permissions: getPermissionsFromRole(role),
+      permissions,
       joinedAt: timestamp,
       lastAccessedAt: timestamp,
     },

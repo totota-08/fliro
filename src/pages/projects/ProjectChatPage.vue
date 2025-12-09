@@ -359,22 +359,6 @@ function selectChannel(channelId: string) {
   activeChannelId.value = channelId
 }
 
-<<<<<<< Updated upstream
-=======
-// function toggleNotifications() {
-//   notificationsEnabled.value = !notificationsEnabled.value
-//   if (!notificationsEnabled.value) {
-//     newMessageBanner.value = false
-//   }
-// }
-
-// function acknowledgeNotification() {
-//   newMessageBanner.value = false
-//   markChannelAsRead(activeChannelId.value)
-//   scrollToBottom()
-// }
->>>>>>> Stashed changes
-
 function watchChat() {
   unsubscribeChat = listenProjectChat(projectId.value, (list) => {
     messages.value = list
@@ -623,44 +607,6 @@ function toMillis(value: ChatMessage['createdAt'] | number | null | undefined): 
   return null
 }
 
-<<<<<<< Updated upstream
-
-=======
-// function formatClock(value: ChatMessage['createdAt'] | number | null | undefined) {
-//   const ms = toMillis(value)
-//   if (!ms) return '--:--'
-//   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-// }
-
-// function formatRelativeTime(timestamp: number | null | undefined) {
-//   if (!timestamp) return '---'
-//   const diff = Date.now() - timestamp
-//   const minutes = Math.round(diff / 60000)
-//   if (minutes < 1) return 'たった今'
-//   if (minutes < 60) return `${minutes}分前`
-//   const hours = Math.round(minutes / 60)
-//   if (hours < 24) return `${hours}時間前`
-//   const days = Math.round(hours / 24)
-//   if (days === 1) return '昨日'
-//   if (days < 7) return `${days}日前`
-//   const date = new Date(timestamp)
-//   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`
-// }
-
-// function formatDayBucket(timestamp: number | null) {
-//   if (!timestamp) return { label: 'EARLIER', order: 0 }
-//   const date = new Date(timestamp)
-//   const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-//   const todayStart = new Date()
-//   todayStart.setHours(0, 0, 0, 0)
-//   const diffDays = Math.floor((todayStart.getTime() - dayStart) / (1000 * 60 * 60 * 24))
-//   if (diffDays === 0) return { label: 'TODAY', order: dayStart }
-//   if (diffDays === 1) return { label: 'YESTERDAY', order: dayStart }
-//   const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
-//   return { label: formatter.format(date), order: dayStart }
-// }
->>>>>>> Stashed changes
-
 function handleComposerInput(event: Event) {
   const target = event.target as HTMLInputElement
   mentionCaret.value = target.selectionStart ?? input.value.length
@@ -709,18 +655,7 @@ const commandCandidates = computed(() =>
   ),
 )
 
-<<<<<<< Updated upstream
 function insertCommand(cmd: SlashCommand) {
-=======
-type CommandItem = {
-  key: string
-  label: string
-  description?: string
-  insert?: string
-}
-
-function insertCommand(cmd: CommandItem) {
->>>>>>> Stashed changes
   const start = mentionCaret.value
   const textBefore = input.value.slice(0, start)
   const match = textBefore.match(/\/([^\s/]{0,20})$/)
