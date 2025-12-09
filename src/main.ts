@@ -18,7 +18,7 @@ if (typeof document !== 'undefined') {
   document.title = appVersion ? `${appName} ${appVersion}` : appName
 }
 
-// Initialize logger first, before any code that might use it
+// Initialize logger first before any code that might use it
 await initLogger()
 
 initAuthListener()
@@ -28,4 +28,3 @@ initAuthListener()
   .finally(() => {
     app.use(router).mount('#app')
   })
-
