@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
+import { getLogger } from '@logtape/logtape'
+
+const logger = getLogger('app.components.errorPage.404')
 const route = useRoute()
 const advice = ref('')
 const isLoading = ref(true)
@@ -16,7 +19,7 @@ onMounted(async () => {
         })
         advice.value = data.slip?.advice ?? advice.value
     } catch (err) {
-        console.error('アドバイス取得失敗', err)
+        logger.error`アドバイス取得失敗: ${err}`
     } finally {
         isLoading.value = false
     }
