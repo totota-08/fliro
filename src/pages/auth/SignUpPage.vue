@@ -1,24 +1,28 @@
 <script setup lang="ts">
-import { computed, reactive, ref, onMounted } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AuthFormField from '@/components/ui/AuthFormField.vue'
 import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
-import {
-  authenticateWithProvider,
-  completeProfileSetup,
-  updateAccountAvatar,
-} from '@/services/accountActions'
-import {
-  fetchProfile,
-  refreshCurrentUser,
-  registerCredentials,
-  resendVerificationEmail,
-} from '@/firebase/authService'
 import { ROUTE_NAMES } from '@/constants/routes'
-import type { SocialProvider } from '@/types/auth'
+import {
+    fetchProfile,
+    refreshCurrentUser,
+    registerCredentials,
+    resendVerificationEmail,
+} from '@/firebase/authService'
 import { auth } from '@/firebase/config'
+import {
+    authenticateWithProvider,
+    completeProfileSetup,
+    updateAccountAvatar,
+} from '@/services/accountActions'
+import type { SocialProvider } from '@/types/auth'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+
+import { getLogger } from '@logtape/logtape'
+
+const logger = getLogger('app.pages.auth.SignUp')
 
 const router = useRouter()
 const route = useRoute()
@@ -139,7 +143,7 @@ const handleCredentialSubmit = async () => {
     verificationMessage.value = '認証メールを送信しました。受信ボックスをご確認ください。'
     currentStep.value = 'verify'
   } catch (error) {
-    console.error(error)
+    logger.error`Credential registration failed: ${error}`
     credentialError.value = mapFirebaseError(error)
   } finally {
     credentialLoading.value = false
@@ -159,7 +163,7 @@ const handleProviderSelect = async (provider: SocialProvider) => {
     hydrateProfileFromUser()
     currentStep.value = 'profile'
   } catch (error) {
-    console.error(error)
+    logger.error`Provider auth failed: ${error}`
     credentialError.value = mapFirebaseError(error)
   } finally {
     providerLoading.value = null
@@ -176,7 +180,7 @@ const handleResend = async () => {
     await resendVerificationEmail()
     verificationMessage.value = '認証メールを再送しました。'
   } catch (error) {
-    console.error(error)
+    logger.error`Resend verification failed: ${error}`
     verificationError.value = '認証メールの再送に失敗しました。'
   } finally {
     resendLoading.value = false
@@ -197,7 +201,7 @@ const checkVerificationStatus = async () => {
     }
     verificationError.value = 'まだメール認証が確認できません。確認後に再度お試しください。'
   } catch (error) {
-    console.error(error)
+    logger.error`Verification check failed: ${error}`
     verificationError.value = '認証状態を確認できませんでした。'
   } finally {
     verificationChecking.value = false
@@ -226,7 +230,7 @@ const handleProfileSubmit = async () => {
 
     await router.push(redirectPath.value)
   } catch (error) {
-    console.error(error)
+    logger.error`Profile submission failed: ${error}`
     profileError.value = 'プロフィールの保存に失敗しました。'
   } finally {
     profileLoading.value = false
