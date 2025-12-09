@@ -720,23 +720,24 @@ onMounted(() => {
 
 .tasks-tabs__content {
   display: grid;
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
 }
 
 .task-card {
   display: grid;
-  gap: 1rem;
-  padding: 1.6rem;
-  border-radius: 1.25rem;
-  background: rgba(245, 252, 255, 0.95);
+  gap: 0.75rem;
+  padding: 1.1rem;
+  border-radius: 1rem;
+  background: rgba(245, 252, 255, 0.9);
   border: 1px solid rgba(11, 46, 51, 0.12);
-  box-shadow: 0 20px 34px rgba(11, 46, 51, 0.14);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 10px 20px rgba(11, 46, 51, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .task-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 24px 40px rgba(11, 46, 51, 0.16);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(11, 46, 51, 0.14);
   border-color: rgba(79, 124, 130, 0.4);
 }
 
@@ -773,7 +774,7 @@ onMounted(() => {
 
 .task-card h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-strong);
 }
@@ -781,14 +782,15 @@ onMounted(() => {
 .task-card p {
   margin: 0;
   color: var(--text-muted);
-  line-height: 1.6;
+  line-height: 1.4;
+  font-size: 0.95rem;
 }
 
 .task-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
-  font-size: 0.9rem;
+  gap: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .task-card__meta-item {
