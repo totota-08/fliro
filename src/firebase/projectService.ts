@@ -39,6 +39,7 @@ export async function createProject(payload: CreateProjectPayload, currentUserId
     userId: currentUserId,
     role: 'owner',
     projectRole: 'owner',
+    roles: ['admin'],
     invitedBy: currentUserId,
     projectName: projectBase.name,
   })
