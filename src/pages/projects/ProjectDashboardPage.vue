@@ -66,7 +66,10 @@ const isTaskModalOpen = ref(false)
 // const secondaryTab = ref<'chat' | 'members'>('chat')
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
 
-const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0 })
+const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0, addToThread: false })
+const threadNameDraft = ref('')
+const isThreadFormOpen = ref(false)
+const threadCreationLoading = ref(false)
 
 let stopTasks: (() => void) | null = null
 let stopProject: (() => void) | null = null
@@ -199,6 +202,16 @@ const overallProgress = computed(() => {
     return sum + (task.progress ?? (task.status === 'done' ? 100 : 0))
   }, 0)
   return Math.round(totalProgress / total)
+})
+
+watch(selectedTask, (task) => {
+  if (task) {
+    threadNameDraft.value = task.threadName || task.title || ''
+  } else {
+    threadNameDraft.value = ''
+  }
+  isThreadFormOpen.value = false
+  threadCreationLoading.value = false
 })
 
 const statusCounts = computed(() => {
@@ -480,6 +493,7 @@ function resetTaskForm() {
   taskForm.dueDate = ''
   taskForm.assigneeId = ''
   taskForm.progress = 0
+  taskForm.addToThread = false
 }
 
 function openTaskModal() {
@@ -522,6 +536,8 @@ async function submitTaskForm() {
       assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
       progress: normalizedProgress,
       status: initialStatus,
+      hasThread: taskForm.addToThread,
+      threadName: taskForm.addToThread ? taskForm.title.trim() : null,
     },
     user.value.uid,
   )
@@ -559,6 +575,30 @@ async function saveTask() {
 
 async function removeTask(taskId: string) {
   await deleteTask(projectId.value, taskId)
+}
+
+function startTaskThreadForm() {
+  if (!selectedTask.value) return
+  threadNameDraft.value = selectedTask.value.threadName || selectedTask.value.title || ''
+  isThreadFormOpen.value = true
+}
+
+function cancelTaskThreadForm() {
+  isThreadFormOpen.value = false
+}
+
+async function createThreadForSelectedTask() {
+  if (!selectedTask.value) return
+  const name = threadNameDraft.value.trim()
+  if (!name) return
+  threadCreationLoading.value = true
+  try {
+    await updateTask(projectId.value, selectedTask.value.id, { hasThread: true, threadName: name })
+    selectedTask.value = { ...selectedTask.value, hasThread: true, threadName: name }
+    isThreadFormOpen.value = false
+  } finally {
+    threadCreationLoading.value = false
+  }
 }
 
 // async function sendChatMessage(text: string) {
@@ -1045,6 +1085,17 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </section>
+          <section class="task-modal__thread-toggle">
+            <label class="thread-toggle">
+              <input v-model="taskForm.addToThread" type="checkbox" />
+              <div>
+                <p class="thread-toggle__title">チャットスレッドを作成</p>
+                <p class="thread-toggle__description">
+                  チェックするとこのタスク専用のチャットチャネルを作成します
+                </p>
+              </div>
+            </label>
+          </section>
           <footer>
             <button type="button" class="ghost" @click="closeTaskModal">キャンセル</button>
             <button type="submit">作成</button>
@@ -1102,6 +1153,31 @@ onBeforeUnmount(() => {
               @click="editor.progress = option"
             >
               {{ option }}%
+            </button>
+          </div>
+        </section>
+        <section class="task-drawer__section thread-section">
+          <p class="label">スレッド</p>
+          <div v-if="selectedTask.hasThread" class="thread-status created">
+            <p>このタスクにはスレッドがあります。</p>
+            <p class="thread-name">{{ selectedTask.threadName || selectedTask.title }}</p>
+          </div>
+          <div v-else>
+            <div v-if="isThreadFormOpen" class="thread-form">
+              <input v-model="threadNameDraft" type="text" placeholder="スレッド名" />
+              <div class="thread-actions">
+                <button type="button" class="ghost" @click="cancelTaskThreadForm">キャンセル</button>
+                <button
+                  type="button"
+                  :disabled="!threadNameDraft.trim() || threadCreationLoading"
+                  @click="createThreadForSelectedTask"
+                >
+                  作成
+                </button>
+              </div>
+            </div>
+            <button v-else type="button" class="thread-create-btn" @click="startTaskThreadForm">
+              スレッドを作成
             </button>
           </div>
         </section>
@@ -1990,6 +2066,35 @@ onBeforeUnmount(() => {
   border-color: #4f7c82;
 }
 
+.task-modal__thread-toggle {
+  border: 1px solid #d1dae8;
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  background: #f7f9fc;
+}
+
+.thread-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.thread-toggle input {
+  margin-top: 0.35rem;
+}
+
+.thread-toggle__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.thread-toggle__description {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .task-drawer-enter-active,
 .task-drawer-leave-active {
   transition: opacity 0.2s ease;
@@ -2068,6 +2173,60 @@ onBeforeUnmount(() => {
   border: 1px solid #d1dae8;
   border-radius: 0.8rem;
   padding: 0.65rem 0.85rem;
+}
+
+.thread-section .thread-create-btn {
+  border: 1px dashed #4f7c82;
+  background: rgba(79, 124, 130, 0.08);
+  color: #0b2e33;
+  padding: 0.5rem 1rem;
+  border-radius: 0.8rem;
+  cursor: pointer;
+}
+
+.thread-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.thread-form input {
+  border-radius: 0.8rem;
+}
+
+.thread-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.thread-actions button {
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.thread-actions .ghost {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.thread-actions button:last-child {
+  background: #4f7c82;
+  color: #fff;
+}
+
+.thread-status {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+}
+
+.thread-status .thread-name {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
 }
 
 .task-drawer__footer {

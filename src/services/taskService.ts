@@ -29,6 +29,8 @@ export interface TaskDoc {
   createdAt?: { seconds: number; nanoseconds: number }
   updatedAt?: { seconds: number; nanoseconds: number }
   progress?: number
+  hasThread?: boolean
+  threadName?: string | null
 }
 
 export interface CreateTaskPayload {
@@ -39,6 +41,8 @@ export interface CreateTaskPayload {
   assigneeId?: string | null
   assigneeName?: string | null
   progress?: number
+  hasThread?: boolean
+  threadName?: string | null
 }
 
 export function listenTasks(projectId: string, callback: (tasks: TaskDoc[]) => void) {
@@ -59,6 +63,9 @@ export function listenTasks(projectId: string, callback: (tasks: TaskDoc[]) => v
 export async function createTask(projectId: string, payload: CreateTaskPayload, userId: string) {
   logger.info`Creating task in project ${projectId}: ${payload.title}`
   try {
+    const hasThread = payload.hasThread ?? false
+    const providedThreadName = (payload.threadName || '').trim()
+    const threadName = hasThread ? providedThreadName || payload.title : null
     const docRef = await addDoc(collection(db, 'projects', projectId, 'tasks'), {
       title: payload.title,
       description: payload.description ?? '',
@@ -70,6 +77,8 @@ export async function createTask(projectId: string, payload: CreateTaskPayload, 
       createdBy: userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      hasThread,
+      threadName,
     })
     logger.info`Task created successfully. ID: ${docRef.id}`
     return docRef.id
