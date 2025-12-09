@@ -1,6 +1,7 @@
 import { getLogger } from '@logtape/logtape'
 
 const logger = getLogger('app.services.secretAccess')
+
 const STORAGE_KEY = 'teamie_secret_access'
 
 export function grantSecretAccess(code: string) {
