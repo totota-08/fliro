@@ -17,14 +17,17 @@ import {
     type ChatMessage,
 } from '@/services/projectChat'
 import { listenProjectMembers, type ProjectMember } from '@/services/projectMembers'
-import { createTask, listenTasks, updateTask, type TaskDoc } from '@/services/taskService'
+import { createTask, listenTasks, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
+import { getLogger } from '@logtape/logtape'
 import { ref as dbRef, onValue, remove, set, update } from 'firebase/database'
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+
+const logger = getLogger('app.pages.projects.ProjectChat')
 
 type ChatChannel = {
   id: string
@@ -421,7 +424,7 @@ async function submitNewThread() {
     closeNewThreadModal()
     resetNewThreadForm()
   } catch (error) {
-    console.error('Failed to create new thread', error)
+    logger.error`Failed to create new thread: ${error}`
   }
 }
 
@@ -461,7 +464,7 @@ async function saveThreadSettings() {
     })
     closeThreadSettings()
   } catch (error) {
-    console.error('Failed to update thread', error)
+    logger.error`Failed to update thread: ${error}`
   }
 }
 
@@ -475,7 +478,7 @@ async function deleteCurrentThread() {
     }
     closeThreadSettings()
   } catch (error) {
-    console.error('Failed to delete thread', error)
+    logger.error`Failed to delete thread: ${error}`
   }
 }
 
@@ -484,7 +487,7 @@ function dismissAlphaNotice() {
   try {
     localStorage.setItem(ALPHA_NOTICE_KEY, '1')
   } catch (error) {
-    console.warn('Failed to persist alpha notice dismissal', error)
+    logger.warn`Failed to persist alpha notice dismissal: ${error}`
   }
 }
 
@@ -849,7 +852,7 @@ onMounted(async () => {
       }, 600)
     }
   } catch (error) {
-    console.warn('Alpha notice state unavailable', error)
+    logger.warn`Alpha notice state unavailable: ${error}`
   }
   if (projectId.value) {
     project.value = await fetchProject(projectId.value)
