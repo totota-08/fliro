@@ -163,7 +163,12 @@ async function evaluatePermissions() {
       return
     }
     const data = memberSnap.data() as any
-    canManage.value = data.projectRole === 'owner'
+    const permissions = data.permissions
+    if (permissions && typeof permissions.canManageSettings === 'boolean') {
+      canManage.value = permissions.canManageSettings
+    } else {
+      canManage.value = data.projectRole === 'owner'
+    }
   } catch (error) {
     logger.error`Failed to evaluate permissions: ${error}`
     canManage.value = false
