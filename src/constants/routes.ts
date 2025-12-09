@@ -13,6 +13,7 @@ export const ROUTE_NAMES = {
   projectMembers: 'project-members',
   projectTimeline: 'project-timeline',
   projectSettings: 'project-settings',
+  projectActivity: 'project-activity',
   projectNotifications: 'project-notifications',
   inviteAccept: 'invite-accept',
   myPage: 'my-page',

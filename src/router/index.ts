@@ -23,6 +23,7 @@ import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
 import ProjectMembersPage from '@/pages/projects/ProjectMembersPage.vue'
 import ProjectTimelinePage from '@/pages/projects/ProjectTimelinePage.vue'
 import ProjectSettingsPage from '@/pages/projects/ProjectSettingsPage.vue'
+import ProjectActivityLogPage from '@/pages/projects/ProjectActivityLogPage.vue'
 import ProjectNotificationsPage from '@/pages/projects/ProjectNotificationsPage.vue'
 import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
@@ -102,6 +103,11 @@ export const router = createRouter({
       meta: { requiresAuth: true, section: 'members' },
     },
     {
+      path: '/projects/:projectId/activity',
+      name: ROUTE_NAMES.projectActivity,
+      component: ProjectActivityLogPage,
+      meta: { requiresAuth: true, section: 'activity' },
+    },
       path: '/projects/:projectId/timeline',
       name: ROUTE_NAMES.projectTimeline,
       component: ProjectTimelinePage,
