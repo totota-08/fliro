@@ -12,6 +12,7 @@ export const ROUTE_NAMES = {
   projectThreads: 'project-threads',
   projectMembers: 'project-members',
   projectSettings: 'project-settings',
+  projectActivity: 'project-activity',
   inviteAccept: 'invite-accept',
   myPage: 'my-page',
   myTasks: 'my-tasks',

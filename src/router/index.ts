@@ -22,6 +22,7 @@ import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
 import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
 import ProjectMembersPage from '@/pages/projects/ProjectMembersPage.vue'
 import ProjectSettingsPage from '@/pages/projects/ProjectSettingsPage.vue'
+import ProjectActivityLogPage from '@/pages/projects/ProjectActivityLogPage.vue'
 import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
 export const router = createRouter({
@@ -98,6 +99,12 @@ export const router = createRouter({
       name: ROUTE_NAMES.projectMembers,
       component: ProjectMembersPage,
       meta: { requiresAuth: true, section: 'members' },
+    },
+    {
+      path: '/projects/:projectId/activity',
+      name: ROUTE_NAMES.projectActivity,
+      component: ProjectActivityLogPage,
+      meta: { requiresAuth: true, section: 'activity' },
     },
     {
       path: '/projects/:projectId/settings',
