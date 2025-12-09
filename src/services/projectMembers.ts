@@ -150,5 +150,5 @@ export async function updateProjectMemberRole(projectId: string, userId: string,
   await set(rtdbRef, {
     role,
     joinedAt: Date.now(),
-  }
+  })
 }
