@@ -1438,6 +1438,7 @@ onBeforeUnmount(() => {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  background: #f8fafc;
 }
 
 .channel-search {
@@ -1570,27 +1571,28 @@ onBeforeUnmount(() => {
 }
 
 .message-group {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .message {
-  padding: 8px 48px 8px 20px;
-  margin-bottom: 2px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
   position: relative;
   cursor: pointer;
-  background: transparent;
-  border-left: 3px solid transparent;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .message.important {
   border-left-color: #dc2626;
-  background: rgba(220, 38, 38, 0.05);
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .message.question {
   border-left-color: #0b2e33;
-  background: rgba(184, 227, 233, 0.22);
+  background: rgba(184, 227, 233, 0.2);
 }
 
 .message.announcement {
@@ -1600,16 +1602,17 @@ onBeforeUnmount(() => {
 
 .message.success {
   border-left-color: #16a34a;
-  background: rgba(22, 163, 74, 0.05);
+  background: rgba(22, 163, 74, 0.08);
 }
 
 .message.bot {
   border-left-color: #6b7280;
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(148, 163, 184, 0.16);
 }
 
 .message:hover {
-  background: rgba(11, 46, 51, 0.05);
+  background: rgba(11, 46, 51, 0.06);
+  border-color: #4f7c82;
 }
 
 .message:hover .message-actions {
