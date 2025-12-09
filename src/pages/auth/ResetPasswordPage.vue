@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import AppButton from '@/components/ui/AppButton.vue'
 import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AuthFormField from '@/components/ui/AuthFormField.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { requestPasswordReset } from '@/services/accountActions'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { requestPasswordReset } from '@/services/accountActions'
+import { getLogger } from '@logtape/logtape'
+import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+
+const logger = getLogger('app.pages.auth.ResetPassword')
 
 const email = ref('')
 const loading = ref(false)
@@ -25,7 +28,7 @@ const handleSubmit = async () => {
     await requestPasswordReset(email.value)
     successMessage.value = 'パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。'
   } catch (error) {
-    console.error(error)
+    logger.error`Password reset request failed: ${error}`
     errorMessage.value = 'メールを送信できませんでした。時間を置いて再度お試しください。'
   } finally {
     loading.value = false
