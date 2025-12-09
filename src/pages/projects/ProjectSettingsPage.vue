@@ -55,8 +55,8 @@ const navItems = computed<DashboardNavItem[]>(() =>
     { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
     {
       key: 'team',
-      label: 'チャット',
-      to: { name: ROUTE_NAMES.projectChat, params: { projectId: projectId.value } },
+      label: 'スレッド',
+      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
       icon: 'team',
     },
     {

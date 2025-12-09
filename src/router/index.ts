@@ -88,8 +88,8 @@ export const router = createRouter({
       meta: { requiresAuth: true, section: 'dashboard' },
     },
     {
-      path: '/projects/:projectId/chat',
-      name: ROUTE_NAMES.projectChat,
+      path: '/projects/:projectId/threads',
+      name: ROUTE_NAMES.projectThreads,
       component: ProjectChatPage,
       meta: { requiresAuth: true, section: 'team' },
     },

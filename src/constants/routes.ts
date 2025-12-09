@@ -9,7 +9,7 @@ export const ROUTE_NAMES = {
   projectCreate: 'project-create',
   projectDebug: 'project-debug',
   projectDashboard: 'project-dashboard',
-  projectChat: 'project-chat',
+  projectThreads: 'project-threads',
   projectMembers: 'project-members',
   projectSettings: 'project-settings',
   inviteAccept: 'invite-accept',
