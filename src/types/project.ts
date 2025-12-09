@@ -37,11 +37,15 @@ export interface ProjectMemberDoc {
   userId: string
   role: 'owner' | 'admin' | 'member' | 'viewer'
   projectRole: 'owner' | 'member'
+  roles?: string[]
   permissions: {
     canEditProject: boolean
     canDeleteTasks: boolean
     canInviteMembers: boolean
     canManageSettings: boolean
+    canEditRoles: boolean
+    canManageTasks: boolean
+    canManageMembers: boolean
   }
   invitedBy: string
   joinedAt: Date
