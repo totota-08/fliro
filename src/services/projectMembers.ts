@@ -32,6 +32,16 @@ interface AddProjectMemberOptions {
   }
 }
 
+function getPermissionsFromRole(role: ProjectMember['role']) {
+  const isAdmin = role === 'owner' || role === 'admin'
+  return {
+    canEditProject: isAdmin,
+    canDeleteTasks: isAdmin,
+    canInviteMembers: isAdmin,
+    canManageSettings: role === 'owner',
+  }
+}
+
 export function listenProjectMembers(projectId: string, callback: (members: ProjectMember[]) => void) {
   const membersRef = collection(db, 'projects', projectId, 'members')
   return onSnapshot(membersRef, (snapshot) => {
@@ -83,7 +93,7 @@ export async function addProjectMember({
       fullName: profileData.fullName ?? null,
       email: profileData.email ?? null,
       avatarUrl: profileData.avatarUrl ?? null,
-      permissions,
+      permissions: getPermissionsFromRole(role),
       joinedAt: timestamp,
       lastAccessedAt: timestamp,
     },
@@ -117,15 +127,28 @@ export async function removeProjectMember(projectId: string, userId: string) {
   await remove(rtdbRef)
 }
 
-export async function updateProjectMemberRoles(projectId: string, userId: string, roles: string[]) {
-  const grantedRoles = roles.length ? roles : ['member']
-  const permissions = buildPermissionsFromRoles(grantedRoles)
+export async function updateProjectMemberRole(projectId: string, userId: string, role: ProjectMember['role']) {
+  const permissions = getPermissionsFromRole(role)
   await setDoc(
     doc(db, 'projects', projectId, 'members', userId),
     {
-      roles: grantedRoles,
+      role,
       permissions,
     },
     { merge: true },
   )
+  await setDoc(
+    doc(db, 'userProjects', userId, 'projects', projectId),
+    {
+      role,
+      lastAccessedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+
+  const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`)
+  await set(rtdbRef, {
+    role,
+    joinedAt: Date.now(),
+  }
 }
