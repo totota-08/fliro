@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { useAuthStore } from '@/store/auth'
 import { computed } from 'vue'
@@ -29,7 +30,7 @@ const profileInfo = computed(() => {
     provided?.fullName ||
     store?.nickname ||
     store?.fullName ||
-    'Teamie User'
+    `${appName} User`
 
   const email = provided?.email || store?.email || ''
   const avatarUrl = provided?.avatarUrl ?? provided?.avatar ?? store?.avatarUrl ?? user.value?.photoURL ?? null

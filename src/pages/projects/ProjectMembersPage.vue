@@ -6,6 +6,7 @@ import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue
 import { db } from '@/firebase/config'
 import { useAuthStore } from '@/store/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { appName } from '@/constants/appMeta'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
 import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
@@ -79,7 +80,7 @@ const sidebarProjects = computed(() =>
 )
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
   email: profile.value?.email || '',
 }))
 

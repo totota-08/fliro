@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
+import { appName } from '@/constants/appMeta'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -83,7 +84,7 @@ const handleNavigate = () => {
   <aside :class="rootClasses">
     <div class="sidebar__header">
       <div class="sidebar__brand">
-        <div class="sidebar__logo">Teamie</div>
+        <div class="sidebar__logo">{{ appName }}</div>
         <p class="sidebar__subtitle">デモ体験</p>
       </div>
       <button type="button" class="sidebar__toggle" @click="handleClose">

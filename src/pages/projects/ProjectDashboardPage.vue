@@ -4,6 +4,7 @@ import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDas
 import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
 import { useNotificationCenter } from '@/composables/useNotificationCenter'
 import { useUserDisplay } from '@/composables/useUserDisplay'
+import { appName, appVersion } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { db } from '@/firebase/config'
 import {
@@ -122,7 +123,7 @@ const sidebarProjects = computed(() =>
 )
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || 'Teamie User',
+  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
   email: profile.value?.email || '',
 }))
 
@@ -726,11 +727,12 @@ onBeforeUnmount(() => {
             </svg>
           </button>
           <div>
-            <p class="demo__breadcrumb">プロジェクト &gt; ダッシュボード</p>
+            <p class="demo__breadcrumb">{{ appName }} &gt; ダッシュボード</p>
             <h1 class="demo__heading">{{ project?.name || 'プロジェクト' }}</h1>
           </div>
         </div>
         <div class="demo__toolbar">
+          <span class="demo__version" v-if="appVersion">{{ appVersion }}</span>
         </div>
       </header>
 
@@ -1194,6 +1196,16 @@ onBeforeUnmount(() => {
 
 <style scoped>
 @import '@/pages/demo/styles/demo-shell.css';
+
+.demo__version {
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(11, 46, 51, 0.12);
+  background: rgba(11, 46, 51, 0.05);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0b2e33;
+}
 
 .demo__content {
   display: flex;

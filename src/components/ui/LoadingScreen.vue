@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { appName } from '@/constants/appMeta'
+
 defineProps<{
   loading: boolean
 }>()
@@ -9,7 +11,7 @@ defineProps<{
     <div v-if="loading" class="loading-screen">
       <div class="loading-content">
         <div class="spinner"></div>
-        <p class="loading-text">Teamie</p>
+        <p class="loading-text">{{ appName }}</p>
       </div>
     </div>
   </transition>

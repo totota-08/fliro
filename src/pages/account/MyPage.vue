@@ -6,6 +6,7 @@ import { db } from '@/firebase/config'
 import { useAuthStore } from '@/store/auth'
 import AppButton from '@/components/ui/AppButton.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { appName } from '@/constants/appMeta'
 
 interface TaskDoc {
   title: string
@@ -21,7 +22,7 @@ const taskList = ref<TaskDoc[]>([])
 const projectCount = ref(0)
 const projects = ref<{ id: string; name: string; role?: string }[]>([])
 const keyBuffer = ref('')
-const SECRET = 'teamie'
+const SECRET = appName.toLowerCase()
 const router = useRouter()
 
 async function fetchTasks() {
@@ -94,7 +95,7 @@ onBeforeUnmount(() => {
     <section class="profile-card">
       <div>
         <p class="eyebrow">My Page</p>
-        <h1>{{ profile?.nickname || profile?.fullName || 'Teamie ユーザー' }}</h1>
+        <h1>{{ profile?.nickname || profile?.fullName || `${appName} ユーザー` }}</h1>
         <p>{{ profile?.email }}</p>
         <div class="profile-actions">
           <AppButton :to="{ name: ROUTE_NAMES.authDebug }" variant="outline">アカウント設定</AppButton>

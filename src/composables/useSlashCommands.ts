@@ -1,3 +1,4 @@
+import { appName } from '@/constants/appMeta'
 import { sendProjectMessage } from '@/services/projectChat'
 import type { ProjectMember } from '@/services/projectMembers'
 import type { Ref, ComputedRef } from 'vue'
@@ -26,7 +27,7 @@ export function useSlashCommands({
       await sendProjectMessage(
         projectId,
         'bot',
-        'Teamie Bot',
+        `${appName} Bot`,
         text,
         currentChannel.value?.id || 'general',
         undefined,
