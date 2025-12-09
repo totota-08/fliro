@@ -24,6 +24,7 @@ import {
     type TaskDoc,
     type TaskStatus,
 } from '@/services/taskService'
+import { listenTaskCategories, type TaskCategory } from '@/services/taskCategoryService'
 import { useAuthStore } from '@/store/auth'
 import type { ProjectDoc } from '@/types/project'
 import type { DashboardNavItem } from '@/types/projectDashboard'
@@ -55,6 +56,7 @@ const projectList = ref<{ id: string; name: string }[]>([])
 const members = ref<MemberEntry[]>([])
 const { getDisplayName } = useUserDisplay(members)
 const tasks = ref<TaskDoc[]>([])
+const categories = ref<TaskCategory[]>([])
 const { notifications: notificationsBar } = useNotificationCenter()
 const taskView = ref<'all' | 'mine'>('all')
 const selectedTask = ref<TaskDoc | null>(null)
@@ -63,7 +65,7 @@ const chatMessages = ref<ChatMessage[]>([])
 const chatLoading = ref(true)
 const notifications = ref<DashboardNotification[]>([])
 const dismissedNotificationIds = ref<Set<string>>(new Set())
-const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all' })
+const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all', category: 'all' })
 const showMyTasksOnly = ref(false)
 const isSidebarOpen = ref(true)
 const isTaskModalOpen = ref(false)
@@ -72,7 +74,15 @@ const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
 
 
 
-const taskForm = reactive({ title: '', description: '', dueDate: '', assigneeId: '', progress: 0, addToThread: false })
+const taskForm = reactive({
+  title: '',
+  description: '',
+  dueDate: '',
+  assigneeId: '',
+  categoryId: '',
+  progress: 0,
+  addToThread: false,
+})
 const threadNameDraft = ref('')
 const isThreadFormOpen = ref(false)
 const threadCreationLoading = ref(false)
@@ -81,6 +91,7 @@ let stopTasks: (() => void) | null = null
 let stopProject: (() => void) | null = null
 let stopMembers: (() => void) | null = null
 let stopChat: (() => void) | null = null
+let stopCategories: (() => void) | null = null
 
 const navItems = computed<DashboardNavItem[]>(() =>
   [
@@ -154,6 +165,9 @@ const filteredTasks = computed(() => {
       if (filters.due === 'overdue') return due < now
       return true
     })
+  }
+  if (filters.category !== 'all') {
+    list = list.filter((task) => (task.categoryId || 'none') === filters.category)
   }
   if (showMyTasksOnly.value && user.value) {
     list = list.filter((task) => task.assigneeId === user.value?.uid)
@@ -398,6 +412,7 @@ function resetFilters() {
   filters.status = 'all'
   filters.assignee = 'all'
   filters.due = 'all'
+  filters.category = 'all'
 }
 
 watch(
@@ -468,6 +483,12 @@ function watchTasks() {
   })
 }
 
+function watchCategories() {
+  stopCategories = listenTaskCategories(projectId.value, (list) => {
+    categories.value = list
+  })
+}
+
 function watchChat() {
   chatLoading.value = true
   stopChat = listenProjectChat(
@@ -488,8 +509,10 @@ function resetWatchers() {
   stopProject?.()
   stopMembers?.()
   stopChat?.()
+  stopCategories?.()
   watchProject()
   watchTasks()
+  watchCategories()
   watchChat()
 }
 
@@ -498,6 +521,7 @@ function resetTaskForm() {
   taskForm.description = ''
   taskForm.dueDate = ''
   taskForm.assigneeId = ''
+  taskForm.categoryId = ''
   taskForm.progress = 0
   taskForm.addToThread = false
 }
@@ -523,6 +547,11 @@ function displayAssignee(task: TaskDoc) {
   return memberName || task.assigneeId || '未割当'
 }
 
+function getCategoryName(categoryId?: string | null) {
+  if (!categoryId) return '未分類'
+  return categories.value.find((category) => category.id === categoryId)?.name || '未分類'
+}
+
 async function submitTaskForm() {
   if (!user.value || !taskForm.title.trim()) return
   const assigneeId = taskForm.assigneeId || null
@@ -538,6 +567,7 @@ async function submitTaskForm() {
       title: taskForm.title.trim(),
       description: taskForm.description.trim(),
       dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
+      categoryId: taskForm.categoryId || null,
       assigneeId,
       assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
       progress: normalizedProgress,
@@ -707,6 +737,7 @@ onBeforeUnmount(() => {
   stopProject?.()
   stopMembers?.()
   stopChat?.()
+  stopCategories?.()
 })
 </script>
 
@@ -922,6 +953,11 @@ onBeforeUnmount(() => {
                     <option value="week">今週</option>
                     <option value="overdue">期限切れ</option>
                   </select>
+                  <select v-model="filters.category" class="task-filter-select">
+                    <option value="all">カテゴリ</option>
+                    <option value="none">未分類</option>
+                    <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                  </select>
                   <button type="button" class="filter-reset-btn" @click="resetFilters" title="フィルターをリセット">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
@@ -942,6 +978,7 @@ onBeforeUnmount(() => {
                 >
                   <div class="task-row__content">
                     <p class="task-row__title">{{ task.title }}</p>
+                    <span class="task-row__category">{{ getCategoryName(task.categoryId) }}</span>
                     <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
                     <span class="task-row__status" :class="taskStatusClass(task)">
                       {{ taskStatusLabel(task.status) }}
@@ -1065,6 +1102,13 @@ onBeforeUnmount(() => {
           <label>
             期限
             <input v-model="taskForm.dueDate" type="date" />
+          </label>
+          <label>
+            カテゴリ
+            <select v-model="taskForm.categoryId">
+              <option value="">カテゴリなし</option>
+              <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+            </select>
           </label>
           <label>
             担当者
@@ -1796,7 +1840,7 @@ onBeforeUnmount(() => {
 
 .task-row__content {
   display: grid;
-  grid-template-columns: 2fr 1fr 0.9fr 1.5fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 0.9fr 1.5fr 1fr;
   gap: 1rem;
   align-items: center;
 }
@@ -1840,6 +1884,18 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.task-row__category {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(11, 46, 51, 0.06);
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .task-row__status {

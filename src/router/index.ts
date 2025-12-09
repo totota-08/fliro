@@ -21,6 +21,7 @@ import SecretAccessPage from '@/pages/secret/SecretAccessPage.vue'
 import ProjectDashboardPage from '@/pages/projects/ProjectDashboardPage.vue'
 import ProjectChatPage from '@/pages/projects/ProjectChatPage.vue'
 import ProjectMembersPage from '@/pages/projects/ProjectMembersPage.vue'
+import ProjectCategoriesPage from '@/pages/projects/ProjectCategoriesPage.vue'
 import ProjectTimelinePage from '@/pages/projects/ProjectTimelinePage.vue'
 import ProjectSettingsPage from '@/pages/projects/ProjectSettingsPage.vue'
 import ProjectActivityLogPage from '@/pages/projects/ProjectActivityLogPage.vue'
@@ -103,6 +104,11 @@ export const router = createRouter({
       meta: { requiresAuth: true, section: 'members' },
     },
     {
+      path: '/projects/:projectId/categories',
+      name: ROUTE_NAMES.projectCategories,
+      component: ProjectCategoriesPage,
+      meta: { requiresAuth: true, section: 'settings' },
+    },
       path: '/projects/:projectId/activity',
       name: ROUTE_NAMES.projectActivity,
       component: ProjectActivityLogPage,
