@@ -415,8 +415,8 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(11, 46, 51, 0.08);
   border-radius: 1.25rem;
   padding: 1rem;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) 1fr auto;
   gap: 1rem;
   align-items: center;
   background: #fff;
@@ -431,8 +431,6 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  min-width: 240px;
-  flex: 1;
 }
 
 .avatar {
@@ -572,7 +570,7 @@ onBeforeUnmount(() => {
   }
 
   .team-member {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: flex-start;
   }
 
