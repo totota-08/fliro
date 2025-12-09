@@ -14,9 +14,11 @@ onMounted(async () => {
 
 <template>
   <LoadingScreen :loading="isLoading" />
-  <transition name="fade-slide" mode="out-in">
-    <RouterView />
-  </transition>
+  <RouterView v-slot="{ Component }">
+    <transition name="fade-slide" mode="out-in">
+      <component :is="Component" />
+    </transition>
+  </RouterView>
 </template>
 
 <style scoped>
