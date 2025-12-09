@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { doc, getDoc } from 'firebase/firestore'
-import { auth, db } from '@/firebase/config'
 import { appName } from '@/constants/appMeta'
+import { ROUTE_NAMES } from '@/constants/routes'
+import { loginWithEmail, registerCredentials } from '@/firebase/authService'
+import { auth, db } from '@/firebase/config'
 import { redeemInvite } from '@/services/projectInvites'
 import { useAuthStore } from '@/store/auth'
-import { loginWithEmail, registerCredentials } from '@/firebase/authService'
+import { getLogger } from '@logtape/logtape'
+import { doc, getDoc } from 'firebase/firestore'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+const logger = getLogger('app.pages.invite.InviteAccept')
 
 const route = useRoute()
 const router = useRouter()
@@ -133,7 +136,7 @@ async function handleJoin() {
     })
     await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId } })
   } catch (error) {
-    console.error(error)
+    logger.error`Failed to accept invite: ${error}`
     if (error instanceof Error) {
       if (error.message === 'invite-password-invalid') {
         errorMsg.value = 'パスワードが正しくありません。'

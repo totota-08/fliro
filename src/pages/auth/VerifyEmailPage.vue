@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
-import AuthBrand from '@/components/ui/AuthBrand.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import { verifyEmailWithCode } from '@/services/accountActions'
+import AuthBrand from '@/components/ui/AuthBrand.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { verifyEmailWithCode } from '@/services/accountActions'
+import { getLogger } from '@logtape/logtape'
+import { onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+
+const logger = getLogger('app.pages.auth.VerifyEmail')
 
 const route = useRoute()
 const router = useRouter()
@@ -43,7 +46,7 @@ onMounted(async () => {
     await verifyEmailWithCode(code)
     success.value = true
   } catch (error) {
-    console.error(error)
+    logger.error`Email verification failed: ${error}`
     errorMessage.value = '認証に失敗しました。リンクの有効期限が切れている可能性があります。'
   } finally {
     loading.value = false
