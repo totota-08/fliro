@@ -1,6 +1,16 @@
 import type { RouteLocationRaw } from 'vue-router'
 
-export type DashboardNavKey = 'dashboard' | 'tasks' | 'team' | 'members' | 'settings' | 'debug'
+export type DashboardNavKey =
+  | 'dashboard'
+  | 'tasks'
+  | 'team'
+  | 'members'
+  | 'settings'
+  | 'debug'
+  | 'activity'
+  | 'categories'
+  | 'timeline'
+  | 'notifications'
 
 export type DashboardNavItem = {
   key: DashboardNavKey

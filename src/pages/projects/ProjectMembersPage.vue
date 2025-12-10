@@ -99,11 +99,6 @@ const memberStats = computed(() => {
   return { total, adminCount, online }
 })
 
-const currentRole = computed<MemberRole | null>(() => {
-  const currentId = user.value?.uid
-  if (!currentId) return null
-  return members.value.find((member) => member.userId === currentId)?.role ?? null
-})
 const currentPermissions = computed(() => {
   const currentId = user.value?.uid
   if (!currentId) return buildPermissionsFromRoles([])
