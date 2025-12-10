@@ -95,13 +95,14 @@ const notifications = computed<NotificationItem[]>(() => {
   const list: NotificationItem[] = []
   const now = Date.now()
   const windowMs = 1000 * 60 * 60 * 48
+  const settings = notificationSettings.value
 
   // Deadline alerts
   tasks.value
     .filter((task) => task.dueDate?.seconds)
     .forEach((task) => {
       const due = task.dueDate!.seconds * 1000
-      if (due >= now && due - now <= windowMs) {
+      if (due >= now && due - now <= windowMs && settings.deadline) {
         list.push({
           id: `deadline-${task.id}`,
           title: '締切が近いタスク',
@@ -118,6 +119,7 @@ const notifications = computed<NotificationItem[]>(() => {
     .filter((task) => me && task.assigneeId === me)
     .forEach((task) => {
       const ts = (task.updatedAt && 'seconds' in task.updatedAt ? task.updatedAt.seconds * 1000 : now) ?? now
+      if (!settings.assignment) return
       list.push({
         id: `assignment-${task.id}`,
         title: 'タスクがアサインされました',
@@ -131,7 +133,7 @@ const notifications = computed<NotificationItem[]>(() => {
   // Timeline mentions
   timeline.value.forEach((post) => {
     const mentionTarget = displayName ? `@${displayName}` : ''
-    if (mentionTarget && post.body?.includes(mentionTarget)) {
+    if (mentionTarget && post.body?.includes(mentionTarget) && settings.mention) {
       const ts = post.createdAt && 'seconds' in post.createdAt ? post.createdAt.seconds * 1000 : now
       list.push({
         id: `timeline-${post.id}`,
@@ -150,7 +152,7 @@ const notifications = computed<NotificationItem[]>(() => {
     const mentionTexts = [displayName].filter(Boolean).map((name) => `@${name}`)
     const hasMention =
       (me && mentionIds.includes(me)) || mentionTexts.some((text) => (msg.text || '').includes(text))
-    if (hasMention) {
+    if (hasMention && settings.mention) {
       list.push({
         id: `chat-${msg.id}`,
         title: 'スレッドであなたがメンションされました',
@@ -178,6 +180,35 @@ function requestPushPermission() {
   Notification.requestPermission().then((permission) => {
     permissionState.value = permission
   })
+}
+
+type NotificationSettings = {
+  mention: boolean
+  deadline: boolean
+  assignment: boolean
+}
+
+const NOTIFICATION_SETTINGS_KEY = 'fliro_notification_settings'
+
+const notificationSettings = ref<NotificationSettings>({ mention: true, deadline: true, assignment: true })
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_SETTINGS_KEY)
+    if (raw) {
+      notificationSettings.value = { ...notificationSettings.value, ...(JSON.parse(raw) as NotificationSettings) }
+    }
+  } catch (error) {
+    logger.warn`Failed to load notification settings: ${error}`
+  }
+}
+
+function persistSettings() {
+  try {
+    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(notificationSettings.value))
+  } catch (error) {
+    logger.warn`Failed to save notification settings: ${error}`
+  }
 }
 
 function openNotification(item: NotificationItem) {
@@ -221,6 +252,7 @@ onMounted(() => {
   if (window.matchMedia('(max-width: 1200px)').matches) {
     isSidebarOpen.value = false
   }
+  loadSettings()
   loadProjectList()
   resetWatchers()
 })
@@ -276,6 +308,39 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="notify-content">
+        <section class="notify-settings">
+          <header class="notify-settings__header">
+            <div>
+              <p class="eyebrow">設定</p>
+              <h2>通知の種類</h2>
+              <p class="muted">バックログ風にON/OFFを切り替えられます。</p>
+            </div>
+          </header>
+          <div class="notify-settings__toggles">
+            <label class="toggle">
+              <input v-model="notificationSettings.mention" type="checkbox" @change="persistSettings" />
+              <div>
+                <p>メンション通知</p>
+                <p class="muted">スレッド/タイムラインの@メンションを通知</p>
+              </div>
+            </label>
+            <label class="toggle">
+              <input v-model="notificationSettings.deadline" type="checkbox" @change="persistSettings" />
+              <div>
+                <p>締切通知</p>
+                <p class="muted">48時間以内のタスク締切を通知</p>
+              </div>
+            </label>
+            <label class="toggle">
+              <input v-model="notificationSettings.assignment" type="checkbox" @change="persistSettings" />
+              <div>
+                <p>アサイン通知</p>
+                <p class="muted">自分に割り当てられたタスクの通知</p>
+              </div>
+            </label>
+          </div>
+        </section>
+
         <section class="notify-card">
           <header class="notify-card__header">
             <div>
@@ -428,6 +493,35 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.notify-settings {
+  background: #fff;
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.notify-settings__toggles {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.toggle {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  border-radius: 0.85rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
 }
 
 .notify-card__header {
