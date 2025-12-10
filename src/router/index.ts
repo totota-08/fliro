@@ -26,6 +26,7 @@ import ProjectTimelinePage from '@/pages/projects/ProjectTimelinePage.vue'
 import ProjectSettingsPage from '@/pages/projects/ProjectSettingsPage.vue'
 import ProjectActivityLogPage from '@/pages/projects/ProjectActivityLogPage.vue'
 import ProjectNotificationsPage from '@/pages/projects/ProjectNotificationsPage.vue'
+import ProjectRolesPage from '@/pages/projects/ProjectRolesPage.vue'
 import MyTasksPage from '@/pages/tasks/MyTasksPage.vue'
 
 export const router = createRouter({
@@ -101,6 +102,12 @@ export const router = createRouter({
       path: '/projects/:projectId/members',
       name: ROUTE_NAMES.projectMembers,
       component: ProjectMembersPage,
+      meta: { requiresAuth: true, section: 'members' },
+    },
+    {
+      path: '/projects/:projectId/roles',
+      name: ROUTE_NAMES.projectRoles,
+      component: ProjectRolesPage,
       meta: { requiresAuth: true, section: 'members' },
     },
     {
