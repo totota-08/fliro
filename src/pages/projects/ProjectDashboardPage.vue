@@ -109,6 +109,12 @@ const navItems = computed<DashboardNavItem[]>(() =>
       icon: 'team',
     },
     {
+      key: 'timeline',
+      label: 'タイムライン',
+      to: { name: ROUTE_NAMES.projectTimeline, params: { projectId: projectId.value } },
+      icon: 'tasks',
+    },
+    {
       key: 'members',
       label: 'メンバー',
       to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
