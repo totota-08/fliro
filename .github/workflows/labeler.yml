@@ -1,0 +1,47 @@
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ensure-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'frontend', color: '1d76db', description: 'Frontend or UI changes' },
+              { name: 'tests', color: '5319e7', description: 'Test updates' },
+              { name: 'docs', color: '0e8a16', description: 'Documentation changes' },
+              { name: 'ci', color: 'fbca04', description: 'CI/CD and automation' },
+              { name: 'config', color: 'fef2c0', description: 'Build/config changes' },
+              { name: 'bug', color: 'd73a4a', description: 'Bug reports' },
+              { name: 'enhancement', color: 'a2eeef', description: 'Feature requests / enhancements' }
+            ];
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const existing = await github.paginate(github.rest.issues.listLabelsForRepo, { owner, repo, per_page: 100 });
+            const existingMap = new Map(existing.map(l => [l.name.toLowerCase(), l]));
+
+            for (const label of labels) {
+              if (existingMap.has(label.name.toLowerCase())) continue;
+              await github.rest.issues.createLabel({ owner, repo, ...label });
+            }
+
+  label:
+    needs: ensure-labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels
+        uses: actions/labeler@v5
+        with:
+          configuration-path: .github/labeler.yml
