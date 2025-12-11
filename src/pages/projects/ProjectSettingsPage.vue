@@ -163,7 +163,12 @@ async function evaluatePermissions() {
       return
     }
     const data = memberSnap.data() as any
-    canManage.value = data.projectRole === 'owner'
+    const permissions = data.permissions
+    if (permissions && typeof permissions.canManageSettings === 'boolean') {
+      canManage.value = permissions.canManageSettings
+    } else {
+      canManage.value = data.projectRole === 'owner' || data.role === 'admin'
+    }
   } catch (error) {
     logger.error`Failed to evaluate permissions: ${error}`
     canManage.value = false
@@ -344,6 +349,11 @@ watch(
           </div>
         </div>
       </header>
+
+      <div v-if="!canEdit" class="admin-guard">
+        <p class="admin-guard__title">管理者限定</p>
+        <p class="admin-guard__desc">この設定は管理者のみが編集できます。現在は閲覧専用モードです。</p>
+      </div>
 
       <div class="settings-container">
         <div v-if="loading" class="loading-state">
@@ -573,35 +583,45 @@ watch(
 @import '@/pages/demo/styles/demo-shell.css';
 
 /* Layout & Container */
+.admin-guard {
+  max-width: 760px;
+  margin: 0 auto 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #f59e0b33;
+  background: #fff7ed;
+}
+
+.admin-guard__title {
+  margin: 0;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.admin-guard__desc {
+  margin: 0.15rem 0 0;
+  color: #92400e;
+}
+
 .settings-container {
-  max-width: 1200px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1.5rem;
   animation: fadeIn 0.3s ease-out;
 }
 
 .settings-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 2rem;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
   align-items: start;
-}
-
-@media (max-width: 900px) {
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .settings-sidebar {
-    order: -1;
-  }
 }
 
 /* Cards */
 .card {
   background: #ffffff;
   border-radius: 16px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb;
   overflow: hidden;
   margin-bottom: 2rem;

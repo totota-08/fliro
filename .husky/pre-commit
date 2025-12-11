@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# Run staged formatting and linting before commit
+npx lint-staged

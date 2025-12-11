@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a bug or regression
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ありがとうございます！必要事項の記入をお願いします。
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: バグの概要
+      placeholder: 何が起きているかを簡潔に
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: 再現手順を番号付きで記載してください
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: 本来どうあるべきか
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / screenshots
+      description: 実際の挙動やスクリーンショット
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: ブラウザ / OS / デバイス / バージョンなど
+      placeholder: Chrome 130 / macOS 15.1 / desktop
+    validations:
+      required: false
