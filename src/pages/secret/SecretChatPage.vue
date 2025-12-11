@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { consumeSecretAccess } from '@/services/secretAccess'
+import { onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { consumeSecretAccess } from "@/services/secretAccess";
 
-const router = useRouter()
+const router = useRouter();
 
 onMounted(() => {
-  const access = consumeSecretAccess()
-  if (access !== 'chat') {
-    router.replace({ name: ROUTE_NAMES.myPage })
+  const access = consumeSecretAccess();
+  if (access !== "chat") {
+    router.replace({ name: ROUTE_NAMES.myPage });
   }
-})
+});
 
 function goBack() {
-  router.push({ name: ROUTE_NAMES.myPage })
+  router.push({ name: ROUTE_NAMES.myPage });
 }
 </script>
 
@@ -22,9 +22,7 @@ function goBack() {
   <div class="placeholder-shell">
     <div class="placeholder-card">
       <p class="eyebrow">secret page</p>
-      <p>
-        何にしよう....
-      </p>
+      <p>何にしよう....</p>
       <button type="button" @click="goBack">マイページへ戻る</button>
     </div>
   </div>

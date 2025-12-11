@@ -1,44 +1,55 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from "vue";
 
 interface SummaryCard {
-  id: string
-  label: string
-  value: string
-  caption: string
-  tone?: 'neutral' | 'alert'
+  id: string;
+  label: string;
+  value: string;
+  caption: string;
+  tone?: "neutral" | "alert";
 }
 
 const cards: SummaryCard[] = [
-  { id: 'progress', label: '進捗率', value: '68%', caption: '計画タスクの達成率' },
-  { id: 'done', label: '完了', value: '24', caption: '完了済みタスク数' },
-  { id: 'active', label: '進行中', value: '8', caption: '現在進行中のタスク' },
-  { id: 'overdue', label: '期限切れ', value: '3', caption: '期限超過タスク', tone: 'alert' },
-]
+  {
+    id: "progress",
+    label: "進捗率",
+    value: "68%",
+    caption: "計画タスクの達成率",
+  },
+  { id: "done", label: "完了", value: "24", caption: "完了済みタスク数" },
+  { id: "active", label: "進行中", value: "8", caption: "現在進行中のタスク" },
+  {
+    id: "overdue",
+    label: "期限切れ",
+    value: "3",
+    caption: "期限超過タスク",
+    tone: "alert",
+  },
+];
 
-const activeCardIndex = ref(0)
-const progressValue = ref(68)
-let highlightTimer: number | undefined
-let progressTimer: number | undefined
-let progressDirection = 1
+const activeCardIndex = ref(0);
+const progressValue = ref(68);
+let highlightTimer: number | undefined;
+let progressTimer: number | undefined;
+let progressDirection = 1;
 
 onMounted(() => {
   highlightTimer = window.setInterval(() => {
-    activeCardIndex.value = (activeCardIndex.value + 1) % cards.length
-  }, 3800)
+    activeCardIndex.value = (activeCardIndex.value + 1) % cards.length;
+  }, 3800);
 
   progressTimer = window.setInterval(() => {
-    progressValue.value += progressDirection
+    progressValue.value += progressDirection;
     if (progressValue.value >= 72 || progressValue.value <= 62) {
-      progressDirection = -progressDirection
+      progressDirection = -progressDirection;
     }
-  }, 1200)
-})
+  }, 1200);
+});
 
 onBeforeUnmount(() => {
-  if (highlightTimer) window.clearInterval(highlightTimer)
-  if (progressTimer) window.clearInterval(progressTimer)
-})
+  if (highlightTimer) window.clearInterval(highlightTimer);
+  if (progressTimer) window.clearInterval(progressTimer);
+});
 </script>
 
 <template>
@@ -58,7 +69,10 @@ onBeforeUnmount(() => {
         v-for="(card, index) in cards"
         :key="card.id"
         class="summary-card"
-        :class="{ 'is-alert': card.tone === 'alert', 'is-active': index === activeCardIndex }"
+        :class="{
+          'is-alert': card.tone === 'alert',
+          'is-active': index === activeCardIndex,
+        }"
       >
         <div class="summary-card__content">
           <div class="summary-card__info">
@@ -67,10 +81,13 @@ onBeforeUnmount(() => {
           </div>
           <div class="summary-card__value-block">
             <p class="summary-card__value">
-              {{ card.id === 'progress' ? `${progressValue}%` : card.value }}
+              {{ card.id === "progress" ? `${progressValue}%` : card.value }}
             </p>
             <div v-if="card.id === 'progress'" class="summary-card__bar">
-              <div class="summary-card__bar-fill" :style="{ width: `${progressValue}%` }" />
+              <div
+                class="summary-card__bar-fill"
+                :style="{ width: `${progressValue}%` }"
+              />
             </div>
           </div>
         </div>
@@ -133,7 +150,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+  transition:
+    transform 240ms ease,
+    box-shadow 240ms ease,
+    border-color 240ms ease;
 }
 
 .summary-card__content {

@@ -1,141 +1,171 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/firebase/config";
 import {
   addTaskCategory,
   deleteTaskCategory,
   listenTaskCategories,
   renameTaskCategory,
   type TaskCategory,
-} from '@/services/taskCategoryService'
-import { useAuthStore } from '@/store/auth'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { doc, getDoc } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+} from "@/services/taskCategoryService";
+import { useAuthStore } from "@/store/auth";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { doc, getDoc } from "firebase/firestore";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 
-const route = useRoute()
-const { user, profile } = useAuthStore()
-const projectId = ref(String(route.params.projectId || ''))
-const categories = ref<TaskCategory[]>([])
-const newCategory = ref('')
-const isSidebarOpen = ref(true)
-const canEdit = ref(false)
+const route = useRoute();
+const { user, profile } = useAuthStore();
+const projectId = ref(String(route.params.projectId || ""));
+const categories = ref<TaskCategory[]>([]);
+const newCategory = ref("");
+const isSidebarOpen = ref(true);
+const canEdit = ref(false);
 
-let stopCategories: (() => void) | null = null
+let stopCategories: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'categories',
-      label: 'カテゴリ',
-      to: { name: ROUTE_NAMES.projectCategories, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "categories",
+        label: "カテゴリ",
+        to: {
+          name: ROUTE_NAMES.projectCategories,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
 async function evaluatePermissions() {
   if (!user.value) {
-    canEdit.value = false
-    return
+    canEdit.value = false;
+    return;
   }
-  const memberSnap = await getDoc(doc(db, 'projects', projectId.value, 'members', user.value.uid))
-  const data = memberSnap.data()
-  canEdit.value = Boolean(data?.role === 'admin' || data?.projectRole === 'owner')
+  const memberSnap = await getDoc(
+    doc(db, "projects", projectId.value, "members", user.value.uid),
+  );
+  const data = memberSnap.data();
+  canEdit.value = Boolean(
+    data?.role === "admin" || data?.projectRole === "owner",
+  );
 }
 
 function watchCategories() {
   stopCategories = listenTaskCategories(projectId.value, (list) => {
-    categories.value = list
-  })
+    categories.value = list;
+  });
 }
 
 async function createCategory() {
-  if (!canEdit.value || !newCategory.value.trim()) return
-  await addTaskCategory(projectId.value, newCategory.value.trim())
-  newCategory.value = ''
+  if (!canEdit.value || !newCategory.value.trim()) return;
+  await addTaskCategory(projectId.value, newCategory.value.trim());
+  newCategory.value = "";
 }
 
 async function renameCategoryInline(category: TaskCategory) {
-  if (!canEdit.value) return
-  const name = prompt('カテゴリ名を変更', category.name)
-  if (!name || name.trim() === category.name) return
-  await renameTaskCategory(projectId.value, category.id, name.trim())
+  if (!canEdit.value) return;
+  const name = prompt("カテゴリ名を変更", category.name);
+  if (!name || name.trim() === category.name) return;
+  await renameTaskCategory(projectId.value, category.id, name.trim());
 }
 
 async function removeCategory(category: TaskCategory) {
-  if (!canEdit.value) return
-  if (!confirm(`「${category.name}」を削除しますか？`)) return
-  await deleteTaskCategory(projectId.value, category.id)
+  if (!canEdit.value) return;
+  if (!confirm(`「${category.name}」を削除しますか？`)) return;
+  await deleteTaskCategory(projectId.value, category.id);
 }
 
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  evaluatePermissions()
-  watchCategories()
-})
+  evaluatePermissions();
+  watchCategories();
+});
 
 watch(
   () => route.params.projectId,
   (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    evaluatePermissions()
-    stopCategories?.()
-    watchCategories()
+    if (!newId) return;
+    projectId.value = String(newId);
+    evaluatePermissions();
+    stopCategories?.();
+    watchCategories();
   },
-)
+);
 
 onBeforeUnmount(() => {
-  stopCategories?.()
-})
+  stopCategories?.();
+});
 </script>
 
 <template>
-  <div :class="['category-shell', { 'category-shell--sidebar-collapsed': !isSidebarOpen }]">
+  <div
+    :class="[
+      'category-shell',
+      { 'category-shell--sidebar-collapsed': !isSidebarOpen },
+    ]"
+  >
     <DashboardSidebar
       :open="isSidebarOpen"
       :nav-items="navItems"
@@ -144,15 +174,34 @@ onBeforeUnmount(() => {
       brand-subtitle="カテゴリ"
       @close="closeSidebar"
     />
-    <div v-if="isSidebarOpen" class="category-shell__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="category-shell__overlay"
+      @click="closeSidebar"
+    />
 
     <main class="category-shell__main">
       <header class="category-shell__topbar">
         <div class="category-shell__topbar-left">
-          <button type="button" class="category-shell__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="category-shell__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="category-shell__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="category-shell__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
@@ -165,7 +214,9 @@ onBeforeUnmount(() => {
       <div class="category-content">
         <div class="guard" v-if="!canEdit">
           <p class="guard__title">管理者のみ編集できます</p>
-          <p class="guard__desc">閲覧はできますが、追加・編集・削除はできません。</p>
+          <p class="guard__desc">
+            閲覧はできますが、追加・編集・削除はできません。
+          </p>
         </div>
 
         <section class="category-card">
@@ -175,23 +226,55 @@ onBeforeUnmount(() => {
               <h2>タスクカテゴリの追加・編集</h2>
             </div>
             <div class="category-card__actions">
-              <input v-model="newCategory" type="text" placeholder="カテゴリ名" :disabled="!canEdit" />
-              <button type="button" :disabled="!canEdit || !newCategory.trim()" @click="createCategory">追加</button>
+              <input
+                v-model="newCategory"
+                type="text"
+                placeholder="カテゴリ名"
+                :disabled="!canEdit"
+              />
+              <button
+                type="button"
+                :disabled="!canEdit || !newCategory.trim()"
+                @click="createCategory"
+              >
+                追加
+              </button>
             </div>
           </header>
 
           <ul class="category-list">
-            <li v-for="category in categories" :key="category.id" class="category-item">
+            <li
+              v-for="category in categories"
+              :key="category.id"
+              class="category-item"
+            >
               <div>
                 <p class="category-item__name">{{ category.name }}</p>
                 <p class="category-item__meta">ID: {{ category.id }}</p>
               </div>
               <div class="category-item__actions" v-if="canEdit">
-                <button type="button" class="ghost" @click="renameCategoryInline(category)">名称変更</button>
-                <button type="button" class="danger" @click="removeCategory(category)">削除</button>
+                <button
+                  type="button"
+                  class="ghost"
+                  @click="renameCategoryInline(category)"
+                >
+                  名称変更
+                </button>
+                <button
+                  type="button"
+                  class="danger"
+                  @click="removeCategory(category)"
+                >
+                  削除
+                </button>
               </div>
             </li>
-            <li v-if="!categories.length" class="category-item category-item--empty">カテゴリがまだありません。</li>
+            <li
+              v-if="!categories.length"
+              class="category-item category-item--empty"
+            >
+              カテゴリがまだありません。
+            </li>
           </ul>
         </section>
       </div>
@@ -200,7 +283,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .category-shell {
   display: flex;

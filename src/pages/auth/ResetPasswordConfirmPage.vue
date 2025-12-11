@@ -1,69 +1,76 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import AuthBrand from '@/components/ui/AuthBrand.vue'
-import AuthFormField from '@/components/ui/AuthFormField.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { finalizePasswordReset } from '@/services/accountActions'
-import { getLogger } from '@logtape/logtape'
-import { computed, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import AppButton from "@/components/ui/AppButton.vue";
+import AuthBrand from "@/components/ui/AuthBrand.vue";
+import AuthFormField from "@/components/ui/AuthFormField.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { finalizePasswordReset } from "@/services/accountActions";
+import { getLogger } from "@logtape/logtape";
+import { computed, reactive, ref } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
-const logger = getLogger('app.pages.auth.ResetPasswordConfirm')
+const logger = getLogger("app.pages.auth.ResetPasswordConfirm");
 
-const router = useRouter()
-const route = useRoute()
+const router = useRouter();
+const route = useRoute();
 
 const form = reactive({
-  password: '',
-  confirmPassword: '',
-})
+  password: "",
+  confirmPassword: "",
+});
 
-const loading = ref(false)
-const success = ref(false)
-const errorMessage = ref('')
-const oobCode = computed(() => (typeof route.query.oobCode === 'string' ? route.query.oobCode : ''))
-const continueUrl = computed(() => (typeof route.query.continueUrl === 'string' ? route.query.continueUrl : null))
-const mode = computed(() => route.query.mode)
-
+const loading = ref(false);
+const success = ref(false);
+const errorMessage = ref("");
+const oobCode = computed(() =>
+  typeof route.query.oobCode === "string" ? route.query.oobCode : "",
+);
+const continueUrl = computed(() =>
+  typeof route.query.continueUrl === "string" ? route.query.continueUrl : null,
+);
+const mode = computed(() => route.query.mode);
 
 const isValid = computed(() => {
-  return form.password.length >= 6 && form.password === form.confirmPassword
-})
+  return form.password.length >= 6 && form.password === form.confirmPassword;
+});
 
 const handleSubmit = async () => {
-  if (!isValid.value || loading.value) return
-  if (!oobCode.value || mode.value !== 'resetPassword') {
-    errorMessage.value = 'パスワード再設定リンクが無効です。'
-    return
+  if (!isValid.value || loading.value) return;
+  if (!oobCode.value || mode.value !== "resetPassword") {
+    errorMessage.value = "パスワード再設定リンクが無効です。";
+    return;
   }
 
-  loading.value = true
-  errorMessage.value = ''
+  loading.value = true;
+  errorMessage.value = "";
 
   try {
-    await finalizePasswordReset(oobCode.value, form.password)
-    success.value = true
+    await finalizePasswordReset(oobCode.value, form.password);
+    success.value = true;
   } catch (error) {
-    logger.error`Password reset failed: ${error}`
-    errorMessage.value = '再設定に失敗しました。リンクの有効期限が切れている可能性があります。'
+    logger.error`Password reset failed: ${error}`;
+    errorMessage.value =
+      "再設定に失敗しました。リンクの有効期限が切れている可能性があります。";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const continueAfterReset = () => {
   if (continueUrl.value) {
-    window.location.assign(continueUrl.value)
+    window.location.assign(continueUrl.value);
   } else {
-    router.push({ name: ROUTE_NAMES.login })
+    router.push({ name: ROUTE_NAMES.login });
   }
-}
+};
 </script>
 
 <template>
   <div class="reset-shell">
     <div class="reset-card">
-      <AuthBrand title="パスワード再設定" description="新しいパスワードを入力してください。" />
+      <AuthBrand
+        title="パスワード再設定"
+        description="新しいパスワードを入力してください。"
+      />
 
       <form v-if="!success" class="reset-form" @submit.prevent="handleSubmit">
         <AuthFormField
@@ -87,7 +94,13 @@ const continueAfterReset = () => {
 
         <p v-if="errorMessage" class="reset-error">{{ errorMessage }}</p>
 
-        <AppButton type="submit" variant="primary" block :disabled="!isValid || loading" :loading="loading">
+        <AppButton
+          type="submit"
+          variant="primary"
+          block
+          :disabled="!isValid || loading"
+          :loading="loading"
+        >
           パスワードを更新
         </AppButton>
       </form>
@@ -95,16 +108,22 @@ const continueAfterReset = () => {
       <div v-else class="reset-success">
         <p>
           パスワードを更新しました。
-          {{ continueUrl ? '続行先に移動してください。' : '新しいパスワードでログインしてください。' }}
+          {{
+            continueUrl
+              ? "続行先に移動してください。"
+              : "新しいパスワードでログインしてください。"
+          }}
         </p>
         <AppButton variant="primary" @click="continueAfterReset">
-          {{ continueUrl ? '続行する' : 'ログインへ戻る' }}
+          {{ continueUrl ? "続行する" : "ログインへ戻る" }}
         </AppButton>
       </div>
 
       <p class="reset-helper">
         リンクが無効な場合は
-        <RouterLink :to="{ name: ROUTE_NAMES.passwordReset }">再度メールを送信する</RouterLink>
+        <RouterLink :to="{ name: ROUTE_NAMES.passwordReset }"
+          >再度メールを送信する</RouterLink
+        >
       </p>
     </div>
   </div>
@@ -113,7 +132,12 @@ const continueAfterReset = () => {
 <style scoped>
 .reset-shell {
   min-height: calc(100vh - 4rem);
-  background: linear-gradient(135deg, rgba(184, 227, 233, 0.35), #fff, rgba(147, 177, 181, 0.35));
+  background: linear-gradient(
+    135deg,
+    rgba(184, 227, 233, 0.35),
+    #fff,
+    rgba(147, 177, 181, 0.35)
+  );
   display: flex;
   align-items: center;
   justify-content: center;

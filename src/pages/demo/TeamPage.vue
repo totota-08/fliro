@@ -1,146 +1,155 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import DashboardSidebar from '@/components/demo/DashboardSidebar.vue'
+import { computed, onMounted, ref } from "vue";
+import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
 
 type TeamMember = {
-  id: number
-  familyName: string
-  givenName: string
-  email: string
-  role: 'オーナー' | '管理者' | 'メンバー'
-  avatar?: string
-  initials: string
-  tasksCount: number
-  completedTasks: number
-  status: 'オンライン' | 'オフライン' | '離席中'
-}
+  id: number;
+  familyName: string;
+  givenName: string;
+  email: string;
+  role: "オーナー" | "管理者" | "メンバー";
+  avatar?: string;
+  initials: string;
+  tasksCount: number;
+  completedTasks: number;
+  status: "オンライン" | "オフライン" | "離席中";
+};
 
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(true);
 
 const teamMembers = ref<TeamMember[]>([
   {
     id: 1,
-    familyName: '田中',
-    givenName: '太郎',
-    email: 'tanaka@example.com',
-    role: 'オーナー',
-    avatar: '',
-    initials: '田中',
+    familyName: "田中",
+    givenName: "太郎",
+    email: "tanaka@example.com",
+    role: "オーナー",
+    avatar: "",
+    initials: "田中",
     tasksCount: 8,
     completedTasks: 5,
-    status: 'オンライン',
+    status: "オンライン",
   },
   {
     id: 2,
-    familyName: '佐藤',
-    givenName: '花子',
-    email: 'sato@example.com',
-    role: '管理者',
-    avatar: '',
-    initials: '佐藤',
+    familyName: "佐藤",
+    givenName: "花子",
+    email: "sato@example.com",
+    role: "管理者",
+    avatar: "",
+    initials: "佐藤",
     tasksCount: 12,
     completedTasks: 9,
-    status: 'オンライン',
+    status: "オンライン",
   },
   {
     id: 3,
-    familyName: '鈴木',
-    givenName: '一郎',
-    email: 'suzuki@example.com',
-    role: 'メンバー',
-    avatar: '',
-    initials: '鈴木',
+    familyName: "鈴木",
+    givenName: "一郎",
+    email: "suzuki@example.com",
+    role: "メンバー",
+    avatar: "",
+    initials: "鈴木",
     tasksCount: 6,
     completedTasks: 4,
-    status: 'オフライン',
+    status: "オフライン",
   },
   {
     id: 4,
-    familyName: '高橋',
-    givenName: '美咲',
-    email: 'takahashi@example.com',
-    role: 'メンバー',
-    avatar: '',
-    initials: '高橋',
+    familyName: "高橋",
+    givenName: "美咲",
+    email: "takahashi@example.com",
+    role: "メンバー",
+    avatar: "",
+    initials: "高橋",
     tasksCount: 10,
     completedTasks: 7,
-    status: 'オンライン',
+    status: "オンライン",
   },
   {
     id: 5,
-    familyName: '伊藤',
-    givenName: '健太',
-    email: 'ito@example.com',
-    role: 'メンバー',
-    avatar: '',
-    initials: '伊藤',
+    familyName: "伊藤",
+    givenName: "健太",
+    email: "ito@example.com",
+    role: "メンバー",
+    avatar: "",
+    initials: "伊藤",
     tasksCount: 5,
     completedTasks: 3,
-    status: '離席中',
+    status: "離席中",
   },
   {
     id: 6,
-    familyName: '渡辺',
-    givenName: 'さくら',
-    email: 'watanabe@example.com',
-    role: 'メンバー',
-    avatar: '',
-    initials: '渡辺',
+    familyName: "渡辺",
+    givenName: "さくら",
+    email: "watanabe@example.com",
+    role: "メンバー",
+    avatar: "",
+    initials: "渡辺",
     tasksCount: 9,
     completedTasks: 6,
-    status: 'オンライン',
+    status: "オンライン",
   },
-])
+]);
 
 const closeSidebar = () => {
-  isSidebarOpen.value = false
-}
+  isSidebarOpen.value = false;
+};
 
 const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-}
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-})
+});
 
 const stats = computed(() => ({
   members: teamMembers.value.length,
-  online: teamMembers.value.filter((member) => member.status === 'オンライン').length,
-  inProgress: teamMembers.value.reduce((sum, member) => sum + (member.tasksCount - member.completedTasks), 0),
-}))
+  online: teamMembers.value.filter((member) => member.status === "オンライン")
+    .length,
+  inProgress: teamMembers.value.reduce(
+    (sum, member) => sum + (member.tasksCount - member.completedTasks),
+    0,
+  ),
+}));
 
-const roleClass = (role: TeamMember['role']) => {
+const roleClass = (role: TeamMember["role"]) => {
   switch (role) {
-    case 'オーナー':
-      return 'badge role-owner'
-    case '管理者':
-      return 'badge role-admin'
+    case "オーナー":
+      return "badge role-owner";
+    case "管理者":
+      return "badge role-admin";
     default:
-      return 'badge role-member'
+      return "badge role-member";
   }
-}
+};
 
-const statusClass = (status: TeamMember['status']) => {
+const statusClass = (status: TeamMember["status"]) => {
   switch (status) {
-    case 'オンライン':
-      return 'status-indicator status-online'
-    case '離席中':
-      return 'status-indicator status-away'
+    case "オンライン":
+      return "status-indicator status-online";
+    case "離席中":
+      return "status-indicator status-away";
     default:
-      return 'status-indicator status-offline'
+      return "status-indicator status-offline";
   }
-}
+};
 
 const getCompletionPercent = (member: TeamMember) =>
-  member.tasksCount === 0 ? 0 : Math.round((member.completedTasks / member.tasksCount) * 100)
+  member.tasksCount === 0
+    ? 0
+    : Math.round((member.completedTasks / member.tasksCount) * 100);
 
 const getCompletionWidth = (member: TeamMember) =>
-  member.tasksCount === 0 ? '0%' : `${((member.completedTasks / member.tasksCount) * 100).toFixed(1)}%`
+  member.tasksCount === 0
+    ? "0%"
+    : `${((member.completedTasks / member.tasksCount) * 100).toFixed(1)}%`;
 
-const formatFullName = (member: TeamMember) => `${member.familyName} ${member.givenName}`
+const formatFullName = (member: TeamMember) =>
+  `${member.familyName} ${member.givenName}`;
 </script>
 
 <template>
@@ -151,7 +160,11 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
     <div class="demo__main">
       <header class="demo__topbar">
         <div class="demo__topbar-left">
-          <button type="button" class="demo__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="demo__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
             <svg
               v-if="!isSidebarOpen"
@@ -162,7 +175,11 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
               stroke="currentColor"
               stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
             <svg
               v-else
@@ -173,7 +190,11 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
               stroke="currentColor"
               stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 6l12 12M18 6l-12 12"
+              />
             </svg>
           </button>
           <div>
@@ -226,24 +247,39 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
             <div class="team-page__search-input">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <circle cx="11" cy="11" r="6" stroke-width="1.7" />
-                <path d="m20 20-3.5-3.5" stroke-width="1.7" stroke-linecap="round" />
+                <path
+                  d="m20 20-3.5-3.5"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                />
               </svg>
               <input type="search" placeholder="メンバーを検索…" />
             </div>
           </div>
 
           <section class="team-grid">
-            <article v-for="member in teamMembers" :key="member.id" class="team-card">
+            <article
+              v-for="member in teamMembers"
+              :key="member.id"
+              class="team-card"
+            >
               <header class="team-card__header">
                 <div class="team-card__identity">
                   <div class="team-card__avatar">
                     <span>{{ member.initials }}</span>
-                    <span :class="statusClass(member.status)" aria-hidden="true"></span>
+                    <span
+                      :class="statusClass(member.status)"
+                      aria-hidden="true"
+                    ></span>
                   </div>
                   <div>
                     <h3>{{ formatFullName(member) }}</h3>
                     <div class="team-card__contact">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <path
                           d="M4 4h16v16H4z"
                           stroke-width="1.4"
@@ -260,7 +296,11 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
                     </div>
                   </div>
                 </div>
-                <button type="button" class="team-card__menu" aria-label="メンバーアクション">
+                <button
+                  type="button"
+                  class="team-card__menu"
+                  aria-label="メンバーアクション"
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="12" cy="5" r="1.5" />
                     <circle cx="12" cy="12" r="1.5" />
@@ -281,7 +321,9 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
                 </div>
                 <div>
                   <p>完了タスク</p>
-                  <strong class="tone-online">{{ member.completedTasks }}</strong>
+                  <strong class="tone-online">{{
+                    member.completedTasks
+                  }}</strong>
                 </div>
               </div>
 
@@ -302,7 +344,9 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
 
           <section class="team-table">
             <h3>メンバー名簿</h3>
-            <p class="team-table__description">テーブルに登録されている苗字・名前を分割して表示しています。</p>
+            <p class="team-table__description">
+              テーブルに登録されている苗字・名前を分割して表示しています。
+            </p>
             <div class="team-table__scroll">
               <table>
                 <thead>
@@ -331,7 +375,7 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .demo__content--condensed {
   padding: 2rem;
@@ -373,7 +417,10 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
   color: var(--surface-elevated, #f5fcff);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .team-page__invite:hover {
@@ -467,7 +514,10 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
   background: rgba(245, 252, 255, 0.95);
   border: 1px solid rgba(11, 46, 51, 0.12);
   box-shadow: 0 18px 32px rgba(11, 46, 51, 0.14);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .team-card:hover {
@@ -549,7 +599,10 @@ const formatFullName = (member: TeamMember) => `${member.familyName} ${member.gi
   background: transparent;
   color: var(--primary-strong);
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .team-card__menu:hover {

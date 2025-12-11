@@ -1,95 +1,95 @@
 <script setup lang="ts">
-import type { TaskDoc } from '@/services/taskService';
-import type { PreviewChatMessage } from '@/types/projectDashboard';
-import { computed, reactive, ref, toRefs } from 'vue';
+import type { TaskDoc } from "@/services/taskService";
+import type { PreviewChatMessage } from "@/types/projectDashboard";
+import { computed, reactive, ref, toRefs } from "vue";
 
 const props = defineProps<{
-  messages: PreviewChatMessage[]
-  onlineCount?: number
-  showComposer?: boolean
-  loading?: boolean
-  currentUserId?: string | null
-  currentUserName?: string | null
-  tasks?: TaskDoc[]
-}>()
+  messages: PreviewChatMessage[];
+  onlineCount?: number;
+  showComposer?: boolean;
+  loading?: boolean;
+  currentUserId?: string | null;
+  currentUserName?: string | null;
+  tasks?: TaskDoc[];
+}>();
 
 const emit = defineEmits<{
-  (e: 'send', text: string): void
-  (e: 'react', payload: { messageId: string; emoji: string }): void
-  (e: 'update', payload: { messageId: string; text: string }): void
-  (e: 'delete', messageId: string): void
-  (e: 'convert-task', payload: { messageId: string; text: string }): void
-  (e: 'link-task', payload: { messageId: string; taskId: string }): void
-}>()
+  (e: "send", text: string): void;
+  (e: "react", payload: { messageId: string; emoji: string }): void;
+  (e: "update", payload: { messageId: string; text: string }): void;
+  (e: "delete", messageId: string): void;
+  (e: "convert-task", payload: { messageId: string; text: string }): void;
+  (e: "link-task", payload: { messageId: string; taskId: string }): void;
+}>();
 
-const chatMessages = computed(() => props.messages || [])
-const availableTasks = computed(() => props.tasks || [])
-const composerEnabled = computed(() => props.showComposer !== false)
-const { onlineCount, loading, currentUserName } = toRefs(props)
+const chatMessages = computed(() => props.messages || []);
+const availableTasks = computed(() => props.tasks || []);
+const composerEnabled = computed(() => props.showComposer !== false);
+const { onlineCount, loading, currentUserName } = toRefs(props);
 
-const input = ref('')
-const editingMessageId = ref<string | null>(null)
-const editingText = ref('')
-const reactionPalette = ['👍', '🎉', '🔥', '❤️', '💡']
-const linkSelections = reactive<Record<string, string>>({})
+const input = ref("");
+const editingMessageId = ref<string | null>(null);
+const editingText = ref("");
+const reactionPalette = ["👍", "🎉", "🔥", "❤️", "💡"];
+const linkSelections = reactive<Record<string, string>>({});
 
 function send() {
-  const text = input.value.trim()
-  if (!text) return
-  emit('send', text)
-  input.value = ''
+  const text = input.value.trim();
+  if (!text) return;
+  emit("send", text);
+  input.value = "";
 }
 
 function startEdit(message: PreviewChatMessage) {
-  editingMessageId.value = message.id
-  editingText.value = message.message
+  editingMessageId.value = message.id;
+  editingText.value = message.message;
 }
 
 function saveEdit() {
-  if (!editingMessageId.value) return
-  const text = editingText.value.trim()
+  if (!editingMessageId.value) return;
+  const text = editingText.value.trim();
   if (!text) {
-    cancelEdit()
-    return
+    cancelEdit();
+    return;
   }
-  emit('update', { messageId: editingMessageId.value, text })
-  cancelEdit()
+  emit("update", { messageId: editingMessageId.value, text });
+  cancelEdit();
 }
 
 function cancelEdit() {
-  editingMessageId.value = null
-  editingText.value = ''
+  editingMessageId.value = null;
+  editingText.value = "";
 }
 
 function reactTo(messageId: string, emoji: string) {
-  if (!emoji) return
-  emit('react', { messageId, emoji })
+  if (!emoji) return;
+  emit("react", { messageId, emoji });
 }
 
 function deleteMessage(messageId: string) {
-  emit('delete', messageId)
+  emit("delete", messageId);
 }
 
 function convertToTask(message: PreviewChatMessage) {
-  emit('convert-task', { messageId: message.id, text: message.message })
+  emit("convert-task", { messageId: message.id, text: message.message });
 }
 
 function linkTask(messageId: string, taskId: string) {
-  if (!taskId) return
-  linkSelections[messageId] = taskId
-  emit('link-task', { messageId, taskId })
+  if (!taskId) return;
+  linkSelections[messageId] = taskId;
+  emit("link-task", { messageId, taskId });
 }
 
 function taskTitle(taskId?: string | null) {
-  if (!taskId) return ''
-  const match = availableTasks.value.find((task) => task.id === taskId)
-  return match?.title || ''
+  if (!taskId) return "";
+  const match = availableTasks.value.find((task) => task.id === taskId);
+  return match?.title || "";
 }
 
 function canEdit(message: PreviewChatMessage) {
-  if (!props.currentUserId) return false
-  if (!message.senderId) return true
-  return message.senderId === props.currentUserId
+  if (!props.currentUserId) return false;
+  if (!message.senderId) return true;
+  return message.senderId === props.currentUserId;
 }
 </script>
 
@@ -119,7 +119,9 @@ function canEdit(message: PreviewChatMessage) {
         <div v-if="editingMessageId === message.id" class="chat__editor">
           <textarea v-model="editingText" rows="2" />
           <div class="chat__editor-actions">
-            <button type="button" class="ghost" @click="cancelEdit">キャンセル</button>
+            <button type="button" class="ghost" @click="cancelEdit">
+              キャンセル
+            </button>
             <button type="button" @click="saveEdit">保存</button>
           </div>
         </div>
@@ -148,21 +150,46 @@ function canEdit(message: PreviewChatMessage) {
             >
               {{ emoji }}
             </button>
-            <button type="button" class="ghost" @click="convertToTask(message)">タスク化</button>
+            <button type="button" class="ghost" @click="convertToTask(message)">
+              タスク化
+            </button>
             <label v-if="availableTasks.length" class="chat__task-linker">
               <span>リンク</span>
               <select
-                :value="message.linkedTaskId || linkSelections[message.id] || ''"
-                @change="linkTask(message.id, ($event.target as HTMLSelectElement).value)"
+                :value="
+                  message.linkedTaskId || linkSelections[message.id] || ''
+                "
+                @change="
+                  linkTask(
+                    message.id,
+                    ($event.target as HTMLSelectElement).value,
+                  )
+                "
               >
                 <option value="">未リンク</option>
-                <option v-for="task in availableTasks" :key="task.id" :value="task.id">
+                <option
+                  v-for="task in availableTasks"
+                  :key="task.id"
+                  :value="task.id"
+                >
                   {{ task.title }}
                 </option>
               </select>
             </label>
-            <button v-if="canEdit(message)" type="button" class="ghost" @click="startEdit(message)">編集</button>
-            <button v-if="canEdit(message)" type="button" class="ghost danger" @click="deleteMessage(message.id)">
+            <button
+              v-if="canEdit(message)"
+              type="button"
+              class="ghost"
+              @click="startEdit(message)"
+            >
+              編集
+            </button>
+            <button
+              v-if="canEdit(message)"
+              type="button"
+              class="ghost danger"
+              @click="deleteMessage(message.id)"
+            >
               削除
             </button>
           </div>
@@ -177,7 +204,11 @@ function canEdit(message: PreviewChatMessage) {
       <textarea
         v-model="input"
         rows="2"
-        :placeholder="currentUserName ? `${currentUserName}として送信` : 'メッセージを入力...'"
+        :placeholder="
+          currentUserName
+            ? `${currentUserName}として送信`
+            : 'メッセージを入力...'
+        "
         @keyup.enter.exact.prevent="send"
       />
       <div class="chat__composer-actions">

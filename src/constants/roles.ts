@@ -1,14 +1,14 @@
-export type RoleKey = 'admin' | 'member' | 'viewer'
+export type RoleKey = "admin" | "member" | "viewer";
 
 export type RolePermissions = {
-  canEditProject: boolean
-  canDeleteTasks: boolean
-  canInviteMembers: boolean
-  canManageSettings: boolean
-  canEditRoles: boolean
-  canManageTasks: boolean
-  canManageMembers: boolean
-}
+  canEditProject: boolean;
+  canDeleteTasks: boolean;
+  canInviteMembers: boolean;
+  canManageSettings: boolean;
+  canEditRoles: boolean;
+  canManageTasks: boolean;
+  canManageMembers: boolean;
+};
 
 const defaultPermissions: RolePermissions = {
   canEditProject: false,
@@ -18,12 +18,14 @@ const defaultPermissions: RolePermissions = {
   canEditRoles: false,
   canManageTasks: false,
   canManageMembers: false,
-}
+};
 
-export function buildPermissionsFromRoles(roles: string[] = []): RolePermissions {
-  const normalized = roles.map((role) => role.toLowerCase())
-  const isAdmin = normalized.includes('admin') || normalized.includes('owner')
-  const isMember = normalized.includes('member')
+export function buildPermissionsFromRoles(
+  roles: string[] = [],
+): RolePermissions {
+  const normalized = roles.map((role) => role.toLowerCase());
+  const isAdmin = normalized.includes("admin") || normalized.includes("owner");
+  const isMember = normalized.includes("member");
 
   return {
     ...defaultPermissions,
@@ -34,5 +36,5 @@ export function buildPermissionsFromRoles(roles: string[] = []): RolePermissions
     canEditRoles: isAdmin,
     canManageTasks: isAdmin || isMember,
     canManageMembers: isAdmin,
-  }
+  };
 }

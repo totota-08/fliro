@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { useAttrs } from 'vue'
+import { useAttrs } from "vue";
 
-defineOptions({ inheritAttrs: false })
+defineOptions({ inheritAttrs: false });
 
-const model = defineModel<string | number | undefined>()
+const model = defineModel<string | number | undefined>();
 
 const props = defineProps<{
-  label: string
-  hint?: string
-}>()
+  label: string;
+  hint?: string;
+}>();
 
-const attrs = useAttrs()
+const attrs = useAttrs();
 </script>
 
 <template>
@@ -35,7 +35,9 @@ const attrs = useAttrs()
   border-radius: 0.85rem;
   padding: 0.85rem 1rem;
   font-size: 1rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
   background: #fdfefe;
 }
 

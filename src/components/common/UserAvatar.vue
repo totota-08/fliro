@@ -1,32 +1,33 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from "vue";
 
 interface Props {
-  src?: string | null
-  name?: string | null
-  size?: number | string
-  alt?: string
+  src?: string | null;
+  name?: string | null;
+  size?: number | string;
+  alt?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   src: null,
-  name: '',
+  name: "",
   size: 32,
-  alt: 'User Avatar',
-})
+  alt: "User Avatar",
+});
 
 const initials = computed(() => {
-  return (props.name || 'U').charAt(0).toUpperCase()
-})
+  return (props.name || "U").charAt(0).toUpperCase();
+});
 
 const style = computed(() => {
-  const sizeVal = typeof props.size === 'number' ? `${props.size}px` : props.size
+  const sizeVal =
+    typeof props.size === "number" ? `${props.size}px` : props.size;
   return {
     width: sizeVal,
     height: sizeVal,
     fontSize: `calc(${sizeVal} * 0.4)`,
-  }
-})
+  };
+});
 </script>
 
 <template>

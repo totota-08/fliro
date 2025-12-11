@@ -1,320 +1,367 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
-import { deleteProject, fetchProject, updateProjectMetadata } from '@/firebase/projectService'
-import { updateProjectSettings } from '@/services/projectSettings'
-import { listenTasks, type TaskDoc } from '@/services/taskService'
-import { useAuthStore } from '@/store/auth'
-import type { ProjectDoc } from '@/types/project'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/firebase/config";
+import {
+  deleteProject,
+  fetchProject,
+  updateProjectMetadata,
+} from "@/firebase/projectService";
+import { updateProjectSettings } from "@/services/projectSettings";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
+import { useAuthStore } from "@/store/auth";
+import type { ProjectDoc } from "@/types/project";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { getLogger } from "@logtape/logtape";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
-const logger = getLogger('app.pages.projects.ProjectSettings')
+const logger = getLogger("app.pages.projects.ProjectSettings");
 
-const route = useRoute()
-const router = useRouter()
-const { user, profile } = useAuthStore()
-const projectId = ref(String(route.params.projectId || ''))
-const project = ref<ProjectDoc | null>(null)
-const projectList = ref<{ id: string; name: string }[]>([])
-const loading = ref(true)
-const saving = ref(false)
-const deleting = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-const deleteError = ref('')
-const deleteConfirmInput = ref('')
-const isSidebarOpen = ref(true)
-const canManage = ref(false)
+const route = useRoute();
+const router = useRouter();
+const { user, profile } = useAuthStore();
+const projectId = ref(String(route.params.projectId || ""));
+const project = ref<ProjectDoc | null>(null);
+const projectList = ref<{ id: string; name: string }[]>([]);
+const loading = ref(true);
+const saving = ref(false);
+const deleting = ref(false);
+const errorMessage = ref("");
+const successMessage = ref("");
+const deleteError = ref("");
+const deleteConfirmInput = ref("");
+const isSidebarOpen = ref(true);
+const canManage = ref(false);
 
-const aiEnabled = ref(false)
-const aiKey = ref('')
-const aiPrompt = ref('')
-const aiResponse = ref('')
-const aiLoading = ref(false)
-const tasks = ref<TaskDoc[]>([])
-let stopTasks: (() => void) | null = null
+const aiEnabled = ref(false);
+const aiKey = ref("");
+const aiPrompt = ref("");
+const aiResponse = ref("");
+const aiLoading = ref(false);
+const tasks = ref<TaskDoc[]>([]);
+let stopTasks: (() => void) | null = null;
 
 const form = ref({
-  name: '',
-  description: '',
+  name: "",
+  description: "",
   isPublic: false,
   allowGuestView: false,
-})
+});
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
     key: entry.id,
     label: entry.name,
     to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
-const confirmEmail = computed(() => user.value?.email ?? '')
+const confirmEmail = computed(() => user.value?.email ?? "");
 const canDeleteProject = computed(
-  () => Boolean(confirmEmail.value) && deleteConfirmInput.value.trim() === confirmEmail.value,
-)
+  () =>
+    Boolean(confirmEmail.value) &&
+    deleteConfirmInput.value.trim() === confirmEmail.value,
+);
 
-const canEdit = computed(() => canManage.value)
+const canEdit = computed(() => canManage.value);
 
 const summaryInfo = computed(() => {
-  const created = project.value?.createdAt
+  const created = project.value?.createdAt;
   const createdLabel =
-    created && typeof created === 'object' && 'seconds' in created
-      ? new Date((created as { seconds: number }).seconds * 1000).toLocaleDateString()
+    created && typeof created === "object" && "seconds" in created
+      ? new Date(
+          (created as { seconds: number }).seconds * 1000,
+        ).toLocaleDateString()
       : created
-      ? new Date(created as string | number | Date).toLocaleDateString()
-      : '-'
+        ? new Date(created as string | number | Date).toLocaleDateString()
+        : "-";
   return {
     created: createdLabel,
-    ownerId: project.value?.ownerUserId ?? '-',
-    members: project.value?.stats?.totalMembers ?? '-',
-  }
-})
+    ownerId: project.value?.ownerUserId ?? "-",
+    members: project.value?.stats?.totalMembers ?? "-",
+  };
+});
 
 async function loadProjectList() {
-  if (!user.value) return
-  const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
+  if (!user.value) return;
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
   projectList.value = snap.docs.map((docSnap, index) => ({
     id: docSnap.id,
     name: (docSnap.data().projectName as string) || `Project ${index + 1}`,
-  }))
+  }));
 }
 
 async function loadProject() {
-  loading.value = true
-  errorMessage.value = ''
+  loading.value = true;
+  errorMessage.value = "";
   try {
-    const fetched = await fetchProject(projectId.value)
+    const fetched = await fetchProject(projectId.value);
     if (!fetched) {
-      errorMessage.value = 'プロジェクトが見つかりません。'
-      project.value = null
-      return
+      errorMessage.value = "プロジェクトが見つかりません。";
+      project.value = null;
+      return;
     }
-    project.value = fetched
+    project.value = fetched;
     form.value = {
       name: fetched.name,
-      description: fetched.description ?? '',
+      description: fetched.description ?? "",
       isPublic: Boolean(fetched.settings?.isPublic),
       allowGuestView: Boolean(fetched.settings?.allowGuestView),
-    }
-    aiEnabled.value = Boolean(fetched.settings?.aiChatEnabled)
-    aiKey.value = fetched.settings?.aiApiKey ?? ''
-    await evaluatePermissions()
+    };
+    aiEnabled.value = Boolean(fetched.settings?.aiChatEnabled);
+    aiKey.value = fetched.settings?.aiApiKey ?? "";
+    await evaluatePermissions();
   } catch (error) {
-    logger.error`Failed to load project settings: ${error}`
-    errorMessage.value = '設定情報の取得に失敗しました。'
+    logger.error`Failed to load project settings: ${error}`;
+    errorMessage.value = "設定情報の取得に失敗しました。";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function evaluatePermissions() {
   if (!user.value) {
-    canManage.value = false
-    return
+    canManage.value = false;
+    return;
   }
   try {
-    const memberSnap = await getDoc(doc(db, 'projects', projectId.value, 'members', user.value.uid))
+    const memberSnap = await getDoc(
+      doc(db, "projects", projectId.value, "members", user.value.uid),
+    );
     if (!memberSnap.exists()) {
-      canManage.value = false
-      return
+      canManage.value = false;
+      return;
     }
-    const data = memberSnap.data() as any
-    const permissions = data.permissions
-    if (permissions && typeof permissions.canManageSettings === 'boolean') {
-      canManage.value = permissions.canManageSettings
+    const data = memberSnap.data() as any;
+    const permissions = data.permissions;
+    if (permissions && typeof permissions.canManageSettings === "boolean") {
+      canManage.value = permissions.canManageSettings;
     } else {
-      canManage.value = data.projectRole === 'owner' || data.role === 'admin'
+      canManage.value = data.projectRole === "owner" || data.role === "admin";
     }
   } catch (error) {
-    logger.error`Failed to evaluate permissions: ${error}`
-    canManage.value = false
+    logger.error`Failed to evaluate permissions: ${error}`;
+    canManage.value = false;
   }
 }
 
 function watchTasks() {
   stopTasks = listenTasks(projectId.value, (list) => {
-    tasks.value = list
-  })
+    tasks.value = list;
+  });
 }
 
 async function saveAiSettings() {
-  if (!canEdit.value) return
+  if (!canEdit.value) return;
   try {
-    await updateProjectSettings(projectId.value, { aiChatEnabled: aiEnabled.value, aiApiKey: aiKey.value })
-    successMessage.value = 'AI設定を保存しました。'
+    await updateProjectSettings(projectId.value, {
+      aiChatEnabled: aiEnabled.value,
+      aiApiKey: aiKey.value,
+    });
+    successMessage.value = "AI設定を保存しました。";
     setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
+      successMessage.value = "";
+    }, 3000);
   } catch (error) {
-    logger.error`Failed to save AI settings: ${error}`
-    errorMessage.value = 'AI設定の保存に失敗しました。'
+    logger.error`Failed to save AI settings: ${error}`;
+    errorMessage.value = "AI設定の保存に失敗しました。";
   }
 }
 
 async function askAi() {
   if (!aiEnabled.value) {
-    aiResponse.value = 'AI チャットは無効化されています。'
-    return
+    aiResponse.value = "AI チャットは無効化されています。";
+    return;
   }
   if (!aiKey.value) {
-    aiResponse.value = '先に API キーを設定してください。'
-    return
+    aiResponse.value = "先に API キーを設定してください。";
+    return;
   }
-  if (!aiPrompt.value.trim()) return
-  aiLoading.value = true
-  aiResponse.value = ''
+  if (!aiPrompt.value.trim()) return;
+  aiLoading.value = true;
+  aiResponse.value = "";
   try {
-    const summary = tasks.value.slice(0, 10).map((task) => `- ${task.title} [${task.status}]`).join('\n')
+    const summary = tasks.value
+      .slice(0, 10)
+      .map((task) => `- ${task.title} [${task.status}]`)
+      .join("\n");
     const body = {
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
-        { role: 'system', content: `You are a task assistant for the ${appName} project.` },
-        { role: 'user', content: `Tasks:\n${summary}\nUser question: ${aiPrompt.value}` },
+        {
+          role: "system",
+          content: `You are a task assistant for the ${appName} project.`,
+        },
+        {
+          role: "user",
+          content: `Tasks:\n${summary}\nUser question: ${aiPrompt.value}`,
+        },
       ],
-    }
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    };
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${aiKey.value}`,
       },
       body: JSON.stringify(body),
-    })
-    if (!response.ok) throw new Error('AI API エラー')
-    const data = await response.json()
-    aiResponse.value = data.choices?.[0]?.message?.content || '回答を取得できませんでした。'
+    });
+    if (!response.ok) throw new Error("AI API エラー");
+    const data = await response.json();
+    aiResponse.value =
+      data.choices?.[0]?.message?.content || "回答を取得できませんでした。";
   } catch (error: any) {
-    aiResponse.value = error?.message || 'AI 応答に失敗しました。'
+    aiResponse.value = error?.message || "AI 応答に失敗しました。";
   } finally {
-    aiLoading.value = false
+    aiLoading.value = false;
   }
 }
 
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 async function handleSave() {
-  if (!canEdit.value || !project.value) return
+  if (!canEdit.value || !project.value) return;
   if (!form.value.name.trim()) {
-    errorMessage.value = 'プロジェクト名は必須です。'
-    return
+    errorMessage.value = "プロジェクト名は必須です。";
+    return;
   }
-  saving.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  saving.value = true;
+  errorMessage.value = "";
+  successMessage.value = "";
   try {
     await updateProjectMetadata(projectId.value, {
       name: form.value.name,
       description: form.value.description,
       isPublic: form.value.isPublic,
       allowGuestView: form.value.allowGuestView,
-    })
-    successMessage.value = '設定を保存しました。'
+    });
+    successMessage.value = "設定を保存しました。";
   } catch (error) {
-    logger.error`Failed to save project settings: ${error}`
-    errorMessage.value = '設定の保存に失敗しました。'
+    logger.error`Failed to save project settings: ${error}`;
+    errorMessage.value = "設定の保存に失敗しました。";
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 
 async function handleDelete() {
-  deleteError.value = ''
+  deleteError.value = "";
   if (!canEdit.value || !project.value) {
-    deleteError.value = '設定を変更する権限がありません。'
-    return
+    deleteError.value = "設定を変更する権限がありません。";
+    return;
   }
   if (!canDeleteProject.value) {
-    deleteError.value = '本人確認のため、メールアドレスを正しく入力してください。'
-    return
+    deleteError.value =
+      "本人確認のため、メールアドレスを正しく入力してください。";
+    return;
   }
-  if (!confirm('このプロジェクトを完全に削除します。よろしいですか？')) {
-    return
+  if (!confirm("このプロジェクトを完全に削除します。よろしいですか？")) {
+    return;
   }
-  deleting.value = true
+  deleting.value = true;
   try {
-    await deleteProject(projectId.value)
-    await router.push({ name: ROUTE_NAMES.myPage })
+    await deleteProject(projectId.value);
+    await router.push({ name: ROUTE_NAMES.myPage });
   } catch (error) {
-    logger.error`Failed to delete project: ${error}`
-    deleteError.value = 'プロジェクトの削除に失敗しました。'
+    logger.error`Failed to delete project: ${error}`;
+    deleteError.value = "プロジェクトの削除に失敗しました。";
   } finally {
-    deleting.value = false
+    deleting.value = false;
   }
 }
 
 onMounted(async () => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  await loadProjectList()
-  await loadProject()
-  watchTasks()
-})
+  await loadProjectList();
+  await loadProject();
+  watchTasks();
+});
 
 onBeforeUnmount(() => {
-  stopTasks?.()
-})
+  stopTasks?.();
+});
 
 watch(
   () => route.params.projectId,
   async (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    stopTasks?.()
-    await loadProject()
-    watchTasks()
+    if (!newId) return;
+    projectId.value = String(newId);
+    stopTasks?.();
+    await loadProject();
+    watchTasks();
   },
-)
+);
 </script>
 
 <template>
@@ -332,10 +379,25 @@ watch(
     <div class="demo__main">
       <header class="demo__topbar">
         <div class="demo__topbar-left">
-          <button type="button" class="demo__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="demo__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="demo__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="demo__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
@@ -345,14 +407,16 @@ watch(
                 <li>設定</li>
               </ol>
             </nav>
-            <h1 class="demo__heading">{{ project?.name || '設定' }}</h1>
+            <h1 class="demo__heading">{{ project?.name || "設定" }}</h1>
           </div>
         </div>
       </header>
 
       <div v-if="!canEdit" class="admin-guard">
         <p class="admin-guard__title">管理者限定</p>
-        <p class="admin-guard__desc">この設定は管理者のみが編集できます。現在は閲覧専用モードです。</p>
+        <p class="admin-guard__desc">
+          この設定は管理者のみが編集できます。現在は閲覧専用モードです。
+        </p>
       </div>
 
       <div class="settings-container">
@@ -372,9 +436,22 @@ watch(
               <section class="card" :class="{ 'is-disabled': !canEdit }">
                 <header class="card-header">
                   <div class="card-header__icon">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <svg
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
                     </svg>
                   </div>
                   <div>
@@ -382,16 +459,16 @@ watch(
                     <p>プロジェクトの基本情報を管理します</p>
                   </div>
                 </header>
-                
+
                 <form @submit.prevent="handleSave" class="form-stack">
                   <div class="form-group">
                     <label for="projectName">プロジェクト名</label>
-                    <input 
+                    <input
                       id="projectName"
-                      v-model="form.name" 
-                      type="text" 
-                      :disabled="!canEdit" 
-                      required 
+                      v-model="form.name"
+                      type="text"
+                      :disabled="!canEdit"
+                      required
                       class="form-input"
                       placeholder="プロジェクト名を入力"
                     />
@@ -399,11 +476,11 @@ watch(
 
                   <div class="form-group">
                     <label for="projectDesc">説明</label>
-                    <textarea 
+                    <textarea
                       id="projectDesc"
-                      v-model="form.description" 
-                      rows="4" 
-                      :disabled="!canEdit" 
+                      v-model="form.description"
+                      rows="4"
+                      :disabled="!canEdit"
                       class="form-textarea"
                       placeholder="プロジェクトの目的や概要を入力してください"
                     ></textarea>
@@ -411,32 +488,60 @@ watch(
 
                   <div class="form-toggles">
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="form.isPublic" :disabled="!canEdit" />
+                      <input
+                        type="checkbox"
+                        v-model="form.isPublic"
+                        :disabled="!canEdit"
+                      />
                       <span class="toggle-slider"></span>
                       <span class="toggle-label">
                         <span class="toggle-title">公開プロジェクト</span>
-                        <span class="toggle-desc">誰でもこのプロジェクトを閲覧できるようになります</span>
+                        <span class="toggle-desc"
+                          >誰でもこのプロジェクトを閲覧できるようになります</span
+                        >
                       </span>
                     </label>
 
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="form.allowGuestView" :disabled="!canEdit" />
+                      <input
+                        type="checkbox"
+                        v-model="form.allowGuestView"
+                        :disabled="!canEdit"
+                      />
                       <span class="toggle-slider"></span>
                       <span class="toggle-label">
                         <span class="toggle-title">ゲスト閲覧を許可</span>
-                        <span class="toggle-desc">アカウントを持たないユーザーも閲覧可能にします</span>
+                        <span class="toggle-desc"
+                          >アカウントを持たないユーザーも閲覧可能にします</span
+                        >
                       </span>
                     </label>
                   </div>
 
                   <div class="form-actions">
-                    <AppButton type="submit" :loading="saving" :disabled="!canEdit" variant="primary">
+                    <AppButton
+                      type="submit"
+                      :loading="saving"
+                      :disabled="!canEdit"
+                      variant="primary"
+                    >
                       変更を保存
                     </AppButton>
                     <transition name="fade">
                       <span v-if="successMessage" class="success-badge">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        <svg
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          width="16"
+                          height="16"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                         {{ successMessage }}
                       </span>
@@ -448,8 +553,17 @@ watch(
               <section class="card" :class="{ 'is-disabled': !canEdit }">
                 <header class="card-header">
                   <div class="card-header__icon">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    <svg
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
                     </svg>
                   </div>
                   <div>
@@ -461,11 +575,19 @@ watch(
                 <div class="form-stack">
                   <div class="form-toggles">
                     <label class="toggle-switch">
-                      <input type="checkbox" v-model="aiEnabled" :disabled="!canEdit" />
+                      <input
+                        type="checkbox"
+                        v-model="aiEnabled"
+                        :disabled="!canEdit"
+                      />
                       <span class="toggle-slider"></span>
                       <span class="toggle-label">
-                        <span class="toggle-title">AI アシスタントを有効化</span>
-                        <span class="toggle-desc">タスクの内容に基づいてAIが回答します</span>
+                        <span class="toggle-title"
+                          >AI アシスタントを有効化</span
+                        >
+                        <span class="toggle-desc"
+                          >タスクの内容に基づいてAIが回答します</span
+                        >
                       </span>
                     </label>
                   </div>
@@ -483,7 +605,12 @@ watch(
                   </div>
 
                   <div class="form-actions">
-                    <AppButton type="button" :disabled="!canEdit" variant="primary" @click="saveAiSettings">
+                    <AppButton
+                      type="button"
+                      :disabled="!canEdit"
+                      variant="primary"
+                      @click="saveAiSettings"
+                    >
                       設定を保存
                     </AppButton>
                   </div>
@@ -496,8 +623,12 @@ watch(
                       placeholder="タスクについて質問してください"
                     ></textarea>
                     <div class="form-actions">
-                      <AppButton type="button" :disabled="aiLoading || !aiKey" @click="askAi">
-                        {{ aiLoading ? '応答中...' : 'AIに聞く' }}
+                      <AppButton
+                        type="button"
+                        :disabled="aiLoading || !aiKey"
+                        @click="askAi"
+                      >
+                        {{ aiLoading ? "応答中..." : "AIに聞く" }}
                       </AppButton>
                     </div>
                     <div v-if="aiResponse" class="ai-response">
@@ -510,23 +641,38 @@ watch(
               <section class="card card--danger">
                 <header class="card-header">
                   <div class="card-header__icon danger-icon">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <svg
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </div>
                   <div>
                     <h2>プロジェクトの削除</h2>
-                    <p>この操作は取り消すことができません。慎重に操作してください。</p>
+                    <p>
+                      この操作は取り消すことができません。慎重に操作してください。
+                    </p>
                   </div>
                 </header>
 
                 <div class="danger-content">
                   <div class="danger-warning">
-                    <p>プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。</p>
+                    <p>
+                      プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。
+                    </p>
                   </div>
-                  
+
                   <div class="form-group">
-                    <label for="deleteConfirm">確認のため、メールアドレスを入力してください</label>
+                    <label for="deleteConfirm"
+                      >確認のため、メールアドレスを入力してください</label
+                    >
                     <input
                       id="deleteConfirm"
                       v-model="deleteConfirmInput"
@@ -546,7 +692,9 @@ watch(
                     >
                       プロジェクトを削除
                     </AppButton>
-                    <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
+                    <p v-if="deleteError" class="error-message">
+                      {{ deleteError }}
+                    </p>
                   </div>
                 </div>
               </section>
@@ -563,7 +711,9 @@ watch(
                   </div>
                   <div class="info-item">
                     <dt>オーナー</dt>
-                    <dd class="truncate" :title="summaryInfo.ownerId">{{ summaryInfo.ownerId }}</dd>
+                    <dd class="truncate" :title="summaryInfo.ownerId">
+                      {{ summaryInfo.ownerId }}
+                    </dd>
                   </div>
                   <div class="info-item">
                     <dt>メンバー数</dt>
@@ -580,7 +730,7 @@ watch(
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 /* Layout & Container */
 .admin-guard {
@@ -753,7 +903,7 @@ watch(
   background-color: white;
   border-radius: 50%;
   transition: 0.3s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .toggle-switch input:checked + .toggle-slider {
@@ -860,7 +1010,7 @@ watch(
   border-radius: 16px;
   padding: 1.5rem;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .info-card h3 {
@@ -943,12 +1093,20 @@ watch(
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fade-enter-active,
