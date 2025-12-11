@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { appName } from '@/constants/appMeta'
+import { appName } from "@/constants/appMeta";
 </script>
 
 <template>
@@ -37,7 +37,11 @@ import { appName } from '@/constants/appMeta'
   align-items: stretch;
   border-radius: 1.5rem;
   padding: 2rem;
-  background: linear-gradient(135deg, rgba(184, 227, 233, 0.55), rgba(245, 252, 255, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(184, 227, 233, 0.55),
+    rgba(245, 252, 255, 0.95)
+  );
   color: #0b2e33;
   border: 1px solid rgba(11, 46, 51, 0.12);
   box-shadow: 0 20px 40px rgba(11, 46, 51, 0.12);

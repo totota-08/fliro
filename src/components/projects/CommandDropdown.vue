@@ -1,19 +1,19 @@
 <script setup lang="ts">
 interface CommandItem {
-  key: string
-  label: string
-  description?: string
-  insert?: string
+  key: string;
+  label: string;
+  description?: string;
+  insert?: string;
 }
 
 defineProps<{
-  open: boolean
-  commands: CommandItem[]
-}>()
+  open: boolean;
+  commands: CommandItem[];
+}>();
 
 const emit = defineEmits<{
-  (e: 'select', command: CommandItem): void
-}>()
+  (e: "select", command: CommandItem): void;
+}>();
 </script>
 
 <template>

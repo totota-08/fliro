@@ -1,249 +1,310 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
-import { listenProjectChat, type ChatMessage } from '@/services/projectChat'
-import { listenProjectMembers, type ProjectMember } from '@/services/projectMembers'
-import { listenTimeline, type TimelinePost } from '@/services/timelineService'
-import { listenTasks, type TaskDoc } from '@/services/taskService'
-import { useAuthStore } from '@/store/auth'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
-import { collection, getDocs } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/firebase/config";
+import { listenProjectChat, type ChatMessage } from "@/services/projectChat";
+import {
+  listenProjectMembers,
+  type ProjectMember,
+} from "@/services/projectMembers";
+import { listenTimeline, type TimelinePost } from "@/services/timelineService";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
+import { useAuthStore } from "@/store/auth";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { getLogger } from "@logtape/logtape";
+import { collection, getDocs } from "firebase/firestore";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
-type NotificationType = 'mention' | 'deadline' | 'assignment'
+type NotificationType = "mention" | "deadline" | "assignment";
 
 type NotificationItem = {
-  id: string
-  title: string
-  body: string
-  type: NotificationType
-  createdAt: number
-  link?: { name: string; params?: Record<string, string> }
-}
+  id: string;
+  title: string;
+  body: string;
+  type: NotificationType;
+  createdAt: number;
+  link?: { name: string; params?: Record<string, string> };
+};
 
-const logger = getLogger('app.pages.projects.Notifications')
-const route = useRoute()
-const router = useRouter()
-const { user, profile } = useAuthStore()
+const logger = getLogger("app.pages.projects.Notifications");
+const route = useRoute();
+const router = useRouter();
+const { user, profile } = useAuthStore();
 
-const projectId = ref(String(route.params.projectId || ''))
-const projectList = ref<{ id: string; name: string }[]>([])
-const tasks = ref<TaskDoc[]>([])
-const timeline = ref<TimelinePost[]>([])
-const chatMessages = ref<ChatMessage[]>([])
-const members = ref<ProjectMember[]>([])
-const isSidebarOpen = ref(true)
-const permissionState = ref<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default')
+const projectId = ref(String(route.params.projectId || ""));
+const projectList = ref<{ id: string; name: string }[]>([]);
+const tasks = ref<TaskDoc[]>([]);
+const timeline = ref<TimelinePost[]>([]);
+const chatMessages = ref<ChatMessage[]>([]);
+const members = ref<ProjectMember[]>([]);
+const isSidebarOpen = ref(true);
+const permissionState = ref<NotificationPermission>(
+  typeof Notification !== "undefined" ? Notification.permission : "default",
+);
 
-let stopTasks: (() => void) | null = null
-let stopTimeline: (() => void) | null = null
-let stopChat: (() => void) | null = null
-let stopMembers: (() => void) | null = null
+let stopTasks: (() => void) | null = null;
+let stopTimeline: (() => void) | null = null;
+let stopChat: (() => void) | null = null;
+let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((project, index) => ({
     key: project.id,
     label: project.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: project.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+    to: {
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: project.id },
+    },
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
 const notifications = computed<NotificationItem[]>(() => {
-  const me = user.value?.uid
-  const displayName = profile.value?.nickname || profile.value?.fullName || ''
-  const list: NotificationItem[] = []
-  const now = Date.now()
-  const windowMs = 1000 * 60 * 60 * 48
+  const me = user.value?.uid;
+  const displayName = profile.value?.nickname || profile.value?.fullName || "";
+  const list: NotificationItem[] = [];
+  const now = Date.now();
+  const windowMs = 1000 * 60 * 60 * 48;
 
   // Deadline alerts
   tasks.value
     .filter((task) => task.dueDate?.seconds)
     .forEach((task) => {
-      const due = task.dueDate!.seconds * 1000
+      const due = task.dueDate!.seconds * 1000;
       if (due >= now && due - now <= windowMs) {
         list.push({
           id: `deadline-${task.id}`,
-          title: '締切が近いタスク',
+          title: "締切が近いタスク",
           body: `「${task.title}」の期限が近づいています`,
-          type: 'deadline',
+          type: "deadline",
           createdAt: due,
           link: { name: ROUTE_NAMES.myTasks },
-        })
+        });
       }
-    })
+    });
 
   // Assignment notifications
   tasks.value
     .filter((task) => me && task.assigneeId === me)
     .forEach((task) => {
-      const ts = (task.updatedAt && 'seconds' in task.updatedAt ? task.updatedAt.seconds * 1000 : now) ?? now
+      const ts =
+        (task.updatedAt && "seconds" in task.updatedAt
+          ? task.updatedAt.seconds * 1000
+          : now) ?? now;
       list.push({
         id: `assignment-${task.id}`,
-        title: 'タスクがアサインされました',
+        title: "タスクがアサインされました",
         body: `あなたに「${task.title}」が割り当てられました`,
-        type: 'assignment',
+        type: "assignment",
         createdAt: ts,
         link: { name: ROUTE_NAMES.myTasks },
-      })
-    })
+      });
+    });
 
   // Timeline mentions
   timeline.value.forEach((post) => {
-    const mentionTarget = displayName ? `@${displayName}` : ''
+    const mentionTarget = displayName ? `@${displayName}` : "";
     if (mentionTarget && post.body?.includes(mentionTarget)) {
-      const ts = post.createdAt && 'seconds' in post.createdAt ? post.createdAt.seconds * 1000 : now
+      const ts =
+        post.createdAt && "seconds" in post.createdAt
+          ? post.createdAt.seconds * 1000
+          : now;
       list.push({
         id: `timeline-${post.id}`,
-        title: 'タイムラインでのメンション',
+        title: "タイムラインでのメンション",
         body: post.body,
-        type: 'mention',
+        type: "mention",
         createdAt: ts,
-        link: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      })
+        link: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+      });
     }
-  })
+  });
 
   // Chat mentions
   chatMessages.value.forEach((msg) => {
-    const mentionIds = msg.mentions || []
-    const mentionTexts = [displayName].filter(Boolean).map((name) => `@${name}`)
+    const mentionIds = msg.mentions || [];
+    const mentionTexts = [displayName]
+      .filter(Boolean)
+      .map((name) => `@${name}`);
     const hasMention =
-      (me && mentionIds.includes(me)) || mentionTexts.some((text) => (msg.text || '').includes(text))
+      (me && mentionIds.includes(me)) ||
+      mentionTexts.some((text) => (msg.text || "").includes(text));
     if (hasMention) {
       list.push({
         id: `chat-${msg.id}`,
-        title: 'スレッドであなたがメンションされました',
-        body: msg.text || 'メッセージを確認してください',
-        type: 'mention',
+        title: "スレッドであなたがメンションされました",
+        body: msg.text || "メッセージを確認してください",
+        type: "mention",
         createdAt: msg.createdAt || now,
-        link: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      })
+        link: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+      });
     }
-  })
+  });
 
-  return list.sort((a, b) => b.createdAt - a.createdAt)
-})
+  return list.sort((a, b) => b.createdAt - a.createdAt);
+});
 
 const groupedNotifications = computed(() => {
-  const groups: Record<NotificationType, NotificationItem[]> = { mention: [], deadline: [], assignment: [] }
+  const groups: Record<NotificationType, NotificationItem[]> = {
+    mention: [],
+    deadline: [],
+    assignment: [],
+  };
   notifications.value.forEach((item) => {
-    groups[item.type].push(item)
-  })
-  return groups
-})
+    groups[item.type].push(item);
+  });
+  return groups;
+});
 
 function requestPushPermission() {
-  if (typeof Notification === 'undefined') return
+  if (typeof Notification === "undefined") return;
   Notification.requestPermission().then((permission) => {
-    permissionState.value = permission
-  })
+    permissionState.value = permission;
+  });
 }
 
 function openNotification(item: NotificationItem) {
-  if (!item.link) return
-  router.push(item.link)
+  if (!item.link) return;
+  router.push(item.link);
 }
 
 function resetWatchers() {
-  stopTasks?.()
-  stopTimeline?.()
-  stopChat?.()
-  stopMembers?.()
-  stopTasks = listenTasks(projectId.value, (list) => (tasks.value = list))
-  stopTimeline = listenTimeline(projectId.value, (list) => (timeline.value = list))
+  stopTasks?.();
+  stopTimeline?.();
+  stopChat?.();
+  stopMembers?.();
+  stopTasks = listenTasks(projectId.value, (list) => (tasks.value = list));
+  stopTimeline = listenTimeline(
+    projectId.value,
+    (list) => (timeline.value = list),
+  );
   stopChat = listenProjectChat(
     projectId.value,
     (messages) => (chatMessages.value = messages),
     (error) => logger.error`Failed to load chat: ${error}`,
-  )
-  stopMembers = listenProjectMembers(projectId.value, (list) => (members.value = list))
+  );
+  stopMembers = listenProjectMembers(
+    projectId.value,
+    (list) => (members.value = list),
+  );
 }
 
 async function loadProjectList() {
-  if (!user.value) return
-  const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
+  if (!user.value) return;
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
   projectList.value = snap.docs.map((docSnap) => ({
     id: docSnap.id,
-    name: (docSnap.data().projectName as string) || 'Project',
-  }))
+    name: (docSnap.data().projectName as string) || "Project",
+  }));
 }
 
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  loadProjectList()
-  resetWatchers()
-})
+  loadProjectList();
+  resetWatchers();
+});
 
 watch(
   () => route.params.projectId,
   (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    resetWatchers()
+    if (!newId) return;
+    projectId.value = String(newId);
+    resetWatchers();
   },
-)
+);
 
 onBeforeUnmount(() => {
-  stopTasks?.()
-  stopTimeline?.()
-  stopChat?.()
-  stopMembers?.()
-})
+  stopTasks?.();
+  stopTimeline?.();
+  stopChat?.();
+  stopMembers?.();
+});
 </script>
 
 <template>
-  <div :class="['notify-shell', { 'notify-shell--sidebar-collapsed': !isSidebarOpen }]">
+  <div
+    :class="[
+      'notify-shell',
+      { 'notify-shell--sidebar-collapsed': !isSidebarOpen },
+    ]"
+  >
     <DashboardSidebar
       :open="isSidebarOpen"
       :nav-items="navItems"
@@ -252,15 +313,34 @@ onBeforeUnmount(() => {
       brand-subtitle="通知センター"
       @close="closeSidebar"
     />
-    <div v-if="isSidebarOpen" class="notify-shell__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="notify-shell__overlay"
+      @click="closeSidebar"
+    />
 
     <main class="notify-shell__main">
       <header class="notify-shell__topbar">
         <div class="notify-shell__topbar-left">
-          <button type="button" class="notify-shell__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="notify-shell__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="notify-shell__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="notify-shell__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
@@ -270,7 +350,11 @@ onBeforeUnmount(() => {
         </div>
         <div class="notify-shell__actions">
           <AppButton variant="secondary" @click="requestPushPermission">
-            {{ permissionState === 'granted' ? 'ブラウザ通知: ON' : 'ブラウザ通知を有効化' }}
+            {{
+              permissionState === "granted"
+                ? "ブラウザ通知: ON"
+                : "ブラウザ通知を有効化"
+            }}
           </AppButton>
         </div>
       </header>
@@ -281,7 +365,9 @@ onBeforeUnmount(() => {
             <div>
               <p class="eyebrow">メンション/締切/アサイン</p>
               <h2>最近の通知</h2>
-              <p class="muted">スレッド、タイムライン、タスクからの重要なお知らせをまとめました。</p>
+              <p class="muted">
+                スレッド、タイムライン、タスクからの重要なお知らせをまとめました。
+              </p>
             </div>
           </header>
 
@@ -289,7 +375,9 @@ onBeforeUnmount(() => {
             <div class="notify-column">
               <h3>メンション</h3>
               <p class="muted">あなた宛てのメッセージ</p>
-              <div v-if="!groupedNotifications.mention.length" class="empty">メンションはありません。</div>
+              <div v-if="!groupedNotifications.mention.length" class="empty">
+                メンションはありません。
+              </div>
               <article
                 v-for="item in groupedNotifications.mention"
                 :key="item.id"
@@ -298,7 +386,9 @@ onBeforeUnmount(() => {
               >
                 <div class="notify-item__meta">
                   <span class="chip">mention</span>
-                  <span class="muted">{{ new Date(item.createdAt).toLocaleString() }}</span>
+                  <span class="muted">{{
+                    new Date(item.createdAt).toLocaleString()
+                  }}</span>
                 </div>
                 <p class="notify-item__title">{{ item.title }}</p>
                 <p class="notify-item__body">{{ item.body }}</p>
@@ -308,7 +398,9 @@ onBeforeUnmount(() => {
             <div class="notify-column">
               <h3>締切</h3>
               <p class="muted">期限が迫るタスク</p>
-              <div v-if="!groupedNotifications.deadline.length" class="empty">締切通知はありません。</div>
+              <div v-if="!groupedNotifications.deadline.length" class="empty">
+                締切通知はありません。
+              </div>
               <article
                 v-for="item in groupedNotifications.deadline"
                 :key="item.id"
@@ -317,7 +409,9 @@ onBeforeUnmount(() => {
               >
                 <div class="notify-item__meta">
                   <span class="chip chip--accent">deadline</span>
-                  <span class="muted">{{ new Date(item.createdAt).toLocaleString() }}</span>
+                  <span class="muted">{{
+                    new Date(item.createdAt).toLocaleString()
+                  }}</span>
                 </div>
                 <p class="notify-item__title">{{ item.title }}</p>
                 <p class="notify-item__body">{{ item.body }}</p>
@@ -327,7 +421,9 @@ onBeforeUnmount(() => {
             <div class="notify-column">
               <h3>アサイン</h3>
               <p class="muted">担当になったタスク</p>
-              <div v-if="!groupedNotifications.assignment.length" class="empty">アサイン通知はありません。</div>
+              <div v-if="!groupedNotifications.assignment.length" class="empty">
+                アサイン通知はありません。
+              </div>
               <article
                 v-for="item in groupedNotifications.assignment"
                 :key="item.id"
@@ -336,7 +432,9 @@ onBeforeUnmount(() => {
               >
                 <div class="notify-item__meta">
                   <span class="chip chip--soft">assignment</span>
-                  <span class="muted">{{ new Date(item.createdAt).toLocaleString() }}</span>
+                  <span class="muted">{{
+                    new Date(item.createdAt).toLocaleString()
+                  }}</span>
                 </div>
                 <p class="notify-item__title">{{ item.title }}</p>
                 <p class="notify-item__body">{{ item.body }}</p>
@@ -350,7 +448,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .notify-shell {
   display: flex;

@@ -1,310 +1,332 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import AuthBrand from '@/components/ui/AuthBrand.vue'
-import AuthFormField from '@/components/ui/AuthFormField.vue'
-import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
+import AppButton from "@/components/ui/AppButton.vue";
+import AuthBrand from "@/components/ui/AuthBrand.vue";
+import AuthFormField from "@/components/ui/AuthFormField.vue";
+import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
 import {
-    fetchProfile,
-    refreshCurrentUser,
-    registerCredentials,
-    resendVerificationEmail,
-} from '@/firebase/authService'
-import { auth } from '@/firebase/config'
+  fetchProfile,
+  refreshCurrentUser,
+  registerCredentials,
+  resendVerificationEmail,
+} from "@/firebase/authService";
+import { auth } from "@/firebase/config";
 import {
-    authenticateWithProvider,
-    completeProfileSetup,
-    updateAccountAvatar,
-} from '@/services/accountActions'
-import type { SocialProvider } from '@/types/auth'
-import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+  authenticateWithProvider,
+  completeProfileSetup,
+  updateAccountAvatar,
+} from "@/services/accountActions";
+import type { SocialProvider } from "@/types/auth";
+import { computed, onMounted, reactive, ref } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { getLogger } from '@logtape/logtape'
+import { getLogger } from "@logtape/logtape";
 
-const logger = getLogger('app.pages.auth.SignUp')
+const logger = getLogger("app.pages.auth.SignUp");
 
-const router = useRouter()
-const route = useRoute()
+const router = useRouter();
+const route = useRoute();
 
-type SignUpStep = 'credentials' | 'verify' | 'profile'
+type SignUpStep = "credentials" | "verify" | "profile";
 
-const currentStep = ref<SignUpStep>('credentials')
+const currentStep = ref<SignUpStep>("credentials");
 const credentialForm = reactive({
-  email: '',
-  password: '',
-})
+  email: "",
+  password: "",
+});
 const profileForm = reactive({
-  fullName: '',
-  nickname: '',
-  birthday: '',
-  jobRole: '',
-  jobTitle: '',
-})
+  fullName: "",
+  nickname: "",
+  birthday: "",
+  jobRole: "",
+  jobTitle: "",
+});
 
-const providerLoading = ref<SocialProvider | null>(null)
-const credentialLoading = ref(false)
-const profileLoading = ref(false)
-const resendLoading = ref(false)
-const verificationChecking = ref(false)
-const credentialError = ref('')
-const verificationMessage = ref('')
-const verificationError = ref('')
-const profileError = ref('')
-const credentialEmail = ref('')
+const providerLoading = ref<SocialProvider | null>(null);
+const credentialLoading = ref(false);
+const profileLoading = ref(false);
+const resendLoading = ref(false);
+const verificationChecking = ref(false);
+const credentialError = ref("");
+const verificationMessage = ref("");
+const verificationError = ref("");
+const profileError = ref("");
+const credentialEmail = ref("");
 
-const avatarFile = ref<File | null>(null)
-const avatarPreview = ref<string | null>(null)
+const avatarFile = ref<File | null>(null);
+const avatarPreview = ref<string | null>(null);
 
 onMounted(async () => {
-  const user = auth.currentUser
-  if (route.query.setup === 'false' && user) {
-    const profile = await fetchProfile(user.uid)
+  const user = auth.currentUser;
+  if (route.query.setup === "false" && user) {
+    const profile = await fetchProfile(user.uid);
     if (profile && !profile.setUp) {
-      currentStep.value = 'profile'
-      hydrateProfileFromUser()
+      currentStep.value = "profile";
+      hydrateProfileFromUser();
     }
   }
-})
+});
 
 const hydrateProfileFromUser = () => {
-  const user = auth.currentUser
-  if (!user) return
+  const user = auth.currentUser;
+  if (!user) return;
 
   if (!profileForm.fullName && user.displayName) {
-    profileForm.fullName = user.displayName
+    profileForm.fullName = user.displayName;
   }
 
   if (!profileForm.nickname && user.displayName) {
-    profileForm.nickname = user.displayName
+    profileForm.nickname = user.displayName;
   }
 
   if (!credentialEmail.value && user.email) {
-    credentialEmail.value = user.email
+    credentialEmail.value = user.email;
   }
-}
+};
 
 const providerOptions: { id: SocialProvider; label: string; icon: string }[] = [
-  { id: 'google', label: 'Googleで登録', icon: 'google' },
-  { id: 'github', label: 'GitHubで登録', icon: 'github' },
-]
+  { id: "google", label: "Googleで登録", icon: "google" },
+  { id: "github", label: "GitHubで登録", icon: "github" },
+];
 
 const jobOptions = [
-  { value: '', label: '職業を選択してください' },
-  { value: 'engineer', label: 'エンジニア' },
-  { value: 'designer', label: 'デザイナー' },
-  { value: 'product', label: 'プロダクトマネージャー' },
-  { value: 'marketing', label: 'マーケター' },
-  { value: 'sales', label: '営業' },
-  { value: 'cs', label: 'カスタマーサクセス' },
-  { value: 'other', label: 'その他' },
-]
+  { value: "", label: "職業を選択してください" },
+  { value: "engineer", label: "エンジニア" },
+  { value: "designer", label: "デザイナー" },
+  { value: "product", label: "プロダクトマネージャー" },
+  { value: "marketing", label: "マーケター" },
+  { value: "sales", label: "営業" },
+  { value: "cs", label: "カスタマーサクセス" },
+  { value: "other", label: "その他" },
+];
 
-const stepOrder: SignUpStep[] = ['credentials', 'verify', 'profile']
+const stepOrder: SignUpStep[] = ["credentials", "verify", "profile"];
 const stepLabels: Record<SignUpStep, string> = {
-  credentials: 'メールアドレス登録',
-  verify: 'メール認証',
-  profile: 'プロフィール設定',
-}
+  credentials: "メールアドレス登録",
+  verify: "メール認証",
+  profile: "プロフィール設定",
+};
 
 const credentialValid = computed(() => {
-  return credentialForm.email.includes('@') && credentialForm.password.length >= 6
-})
+  return (
+    credentialForm.email.includes("@") && credentialForm.password.length >= 6
+  );
+});
 
 const profileValid = computed(() => {
   return (
     profileForm.fullName.trim().length > 1 &&
     Boolean(profileForm.birthday) &&
     Boolean(profileForm.jobRole)
-  )
-})
+  );
+});
 
 const redirectPath = computed(() => {
-  return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage }
-})
+  return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage };
+});
 
 const currentStepIndex = computed(() => {
-  return Math.max(stepOrder.indexOf(currentStep.value), 0)
-})
+  return Math.max(stepOrder.indexOf(currentStep.value), 0);
+});
 
 const progressPercent = computed(() => {
-  return ((currentStepIndex.value + 1) / stepOrder.length) * 100
-})
+  return ((currentStepIndex.value + 1) / stepOrder.length) * 100;
+});
 
 const handleCredentialSubmit = async () => {
-  if (!credentialValid.value || credentialLoading.value) return
+  if (!credentialValid.value || credentialLoading.value) return;
 
-  credentialLoading.value = true
-  credentialError.value = ''
+  credentialLoading.value = true;
+  credentialError.value = "";
 
   try {
-    await registerCredentials({ ...credentialForm })
-    credentialEmail.value = credentialForm.email
-    verificationMessage.value = '認証メールを送信しました。受信ボックスをご確認ください。'
-    currentStep.value = 'verify'
+    await registerCredentials({ ...credentialForm });
+    credentialEmail.value = credentialForm.email;
+    verificationMessage.value =
+      "認証メールを送信しました。受信ボックスをご確認ください。";
+    currentStep.value = "verify";
   } catch (error) {
-    logger.error`Credential registration failed: ${error}`
-    credentialError.value = mapFirebaseError(error)
+    logger.error`Credential registration failed: ${error}`;
+    credentialError.value = mapFirebaseError(error);
   } finally {
-    credentialLoading.value = false
+    credentialLoading.value = false;
   }
-}
+};
 
 const handleProviderSelect = async (provider: SocialProvider) => {
-  if (providerLoading.value) return
+  if (providerLoading.value) return;
 
-  providerLoading.value = provider
-  credentialError.value = ''
-  verificationError.value = ''
-  profileError.value = ''
+  providerLoading.value = provider;
+  credentialError.value = "";
+  verificationError.value = "";
+  profileError.value = "";
 
   try {
-    await authenticateWithProvider(provider)
-    hydrateProfileFromUser()
-    currentStep.value = 'profile'
+    await authenticateWithProvider(provider);
+    hydrateProfileFromUser();
+    currentStep.value = "profile";
   } catch (error) {
-    logger.error`Provider auth failed: ${error}`
-    credentialError.value = mapFirebaseError(error)
+    logger.error`Provider auth failed: ${error}`;
+    credentialError.value = mapFirebaseError(error);
   } finally {
-    providerLoading.value = null
+    providerLoading.value = null;
   }
-}
+};
 
 const handleResend = async () => {
-  if (resendLoading.value) return
-  resendLoading.value = true
-  verificationMessage.value = ''
-  verificationError.value = ''
+  if (resendLoading.value) return;
+  resendLoading.value = true;
+  verificationMessage.value = "";
+  verificationError.value = "";
 
   try {
-    await resendVerificationEmail()
-    verificationMessage.value = '認証メールを再送しました。'
+    await resendVerificationEmail();
+    verificationMessage.value = "認証メールを再送しました。";
   } catch (error) {
-    logger.error`Resend verification failed: ${error}`
-    verificationError.value = '認証メールの再送に失敗しました。'
+    logger.error`Resend verification failed: ${error}`;
+    verificationError.value = "認証メールの再送に失敗しました。";
   } finally {
-    resendLoading.value = false
+    resendLoading.value = false;
   }
-}
+};
 
 const checkVerificationStatus = async () => {
-  if (verificationChecking.value) return
-  verificationChecking.value = true
-  verificationError.value = ''
+  if (verificationChecking.value) return;
+  verificationChecking.value = true;
+  verificationError.value = "";
 
   try {
-    const user = await refreshCurrentUser()
+    const user = await refreshCurrentUser();
     if (user?.emailVerified) {
-      currentStep.value = 'profile'
-      hydrateProfileFromUser()
-      return
+      currentStep.value = "profile";
+      hydrateProfileFromUser();
+      return;
     }
-    verificationError.value = 'まだメール認証が確認できません。確認後に再度お試しください。'
+    verificationError.value =
+      "まだメール認証が確認できません。確認後に再度お試しください。";
   } catch (error) {
-    logger.error`Verification check failed: ${error}`
-    verificationError.value = '認証状態を確認できませんでした。'
+    logger.error`Verification check failed: ${error}`;
+    verificationError.value = "認証状態を確認できませんでした。";
   } finally {
-    verificationChecking.value = false
+    verificationChecking.value = false;
   }
-}
+};
 
 const handleProfileSubmit = async () => {
-  if (!profileValid.value || profileLoading.value) return
+  if (!profileValid.value || profileLoading.value) return;
 
-  profileLoading.value = true
-  profileError.value = ''
+  profileLoading.value = true;
+  profileError.value = "";
 
   try {
-    const nickname = buildNickname(profileForm.fullName, profileForm.nickname)
+    const nickname = buildNickname(profileForm.fullName, profileForm.nickname);
     await completeProfileSetup({
       fullName: profileForm.fullName,
       nickname,
       birthday: profileForm.birthday,
       jobRole: profileForm.jobRole,
       jobTitle: profileForm.jobTitle,
-    })
+    });
 
     if (avatarFile.value) {
-      await updateAccountAvatar(avatarFile.value)
+      await updateAccountAvatar(avatarFile.value);
     }
 
-    await router.push(redirectPath.value)
+    await router.push(redirectPath.value);
   } catch (error) {
-    logger.error`Profile submission failed: ${error}`
-    profileError.value = 'プロフィールの保存に失敗しました。'
+    logger.error`Profile submission failed: ${error}`;
+    profileError.value = "プロフィールの保存に失敗しました。";
   } finally {
-    profileLoading.value = false
+    profileLoading.value = false;
   }
-}
+};
 
 const handleAvatarChange = (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0] ?? null
-  avatarFile.value = file
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  avatarFile.value = file;
 
   if (file) {
-    avatarPreview.value = URL.createObjectURL(file)
+    avatarPreview.value = URL.createObjectURL(file);
   } else {
-    avatarPreview.value = null
+    avatarPreview.value = null;
   }
-}
+};
 
 function buildNickname(fullName: string, nickname?: string) {
-  const trimmed = nickname?.trim()
+  const trimmed = nickname?.trim();
   if (trimmed) {
-    return trimmed
+    return trimmed;
   }
 
-  const tokens = fullName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
+  const tokens = fullName.trim().split(/\s+/).filter(Boolean);
 
   if (tokens.length >= 2) {
-    return `${extractInitial(tokens[0] ?? fullName)}${extractInitial(tokens[1] ?? tokens[0] ?? fullName)}`
+    return `${extractInitial(tokens[0] ?? fullName)}${extractInitial(tokens[1] ?? tokens[0] ?? fullName)}`;
   }
 
-  const initial = extractInitial(fullName)
-  return initial.padEnd(2, initial)
+  const initial = extractInitial(fullName);
+  return initial.padEnd(2, initial);
 }
 
 function extractInitial(value: string) {
-  const ascii = value.match(/[A-Za-z]/)
+  const ascii = value.match(/[A-Za-z]/);
   if (ascii) {
-    return ascii[0].toUpperCase()
+    return ascii[0].toUpperCase();
   }
-  return value.trim().charAt(0).toUpperCase() || 'U'
+  return value.trim().charAt(0).toUpperCase() || "U";
 }
 
 function mapFirebaseError(error: unknown) {
-  if (typeof error === 'object' && error && 'code' in error) {
-    const code = String((error as { code?: string }).code)
-    if (code === 'auth/email-already-in-use') return 'このメールアドレスは既に登録されています。'
-    if (code === 'auth/invalid-email') return 'メールアドレスの形式を確認してください。'
-    if (code === 'auth/weak-password') return 'パスワードは 6 文字以上で設定してください。'
+  if (typeof error === "object" && error && "code" in error) {
+    const code = String((error as { code?: string }).code);
+    if (code === "auth/email-already-in-use")
+      return "このメールアドレスは既に登録されています。";
+    if (code === "auth/invalid-email")
+      return "メールアドレスの形式を確認してください。";
+    if (code === "auth/weak-password")
+      return "パスワードは 6 文字以上で設定してください。";
   }
-  return 'リクエストを処理できませんでした。時間を置いて再度お試しください。'
+  return "リクエストを処理できませんでした。時間を置いて再度お試しください。";
 }
 </script>
 
 <template>
   <div class="signup-shell">
     <div class="signup-card">
-      <AuthBrand title="アカウント作成" description="ステップに沿ってアカウントを作成しましょう" />
+      <AuthBrand
+        title="アカウント作成"
+        description="ステップに沿ってアカウントを作成しましょう"
+      />
       <div class="signup-progress">
         <div class="signup-progress__labels">
-          <span>ステップ {{ currentStepIndex + 1 }} / {{ stepOrder.length }}</span>
+          <span
+            >ステップ {{ currentStepIndex + 1 }} / {{ stepOrder.length }}</span
+          >
           <span>{{ stepLabels[currentStep] }}</span>
         </div>
         <div class="signup-progress__bar">
-          <div class="signup-progress__value" :style="{ width: `${progressPercent}%` }" />
+          <div
+            class="signup-progress__value"
+            :style="{ width: `${progressPercent}%` }"
+          />
         </div>
       </div>
 
       <Transition name="slide-fade" mode="out-in">
         <section :key="currentStep">
-          <form v-if="currentStep === 'credentials'" class="signup-form" @submit.prevent="handleCredentialSubmit">
-            <AuthFormField v-model="credentialForm.email" label="メールアドレス" type="email" placeholder="you@example.com" required />
+          <form
+            v-if="currentStep === 'credentials'"
+            class="signup-form"
+            @submit.prevent="handleCredentialSubmit"
+          >
+            <AuthFormField
+              v-model="credentialForm.email"
+              label="メールアドレス"
+              type="email"
+              placeholder="you@example.com"
+              required
+            />
 
             <AuthFormField
               v-model="credentialForm.password"
@@ -315,7 +337,9 @@ function mapFirebaseError(error: unknown) {
               required
             />
 
-            <p v-if="credentialError" class="form-error">{{ credentialError }}</p>
+            <p v-if="credentialError" class="form-error">
+              {{ credentialError }}
+            </p>
 
             <AppButton
               type="submit"
@@ -344,8 +368,12 @@ function mapFirebaseError(error: unknown) {
               <strong>{{ credentialEmail }}</strong>
               宛に認証メールを送信しました。受信ボックスからリンクをクリックして認証を完了してください。
             </p>
-            <p v-if="verificationMessage" class="verify-step__message">{{ verificationMessage }}</p>
-            <p v-if="verificationError" class="form-error">{{ verificationError }}</p>
+            <p v-if="verificationMessage" class="verify-step__message">
+              {{ verificationMessage }}
+            </p>
+            <p v-if="verificationError" class="form-error">
+              {{ verificationError }}
+            </p>
             <div class="verify-step__actions">
               <AppButton
                 type="button"
@@ -368,8 +396,18 @@ function mapFirebaseError(error: unknown) {
             </div>
           </div>
 
-          <form v-else class="signup-form" @submit.prevent="handleProfileSubmit">
-            <AuthFormField v-model="profileForm.fullName" label="本名" type="text" placeholder="山田 太郎" required />
+          <form
+            v-else
+            class="signup-form"
+            @submit.prevent="handleProfileSubmit"
+          >
+            <AuthFormField
+              v-model="profileForm.fullName"
+              label="本名"
+              type="text"
+              placeholder="山田 太郎"
+              required
+            />
 
             <AuthFormField
               v-model="profileForm.nickname"
@@ -378,12 +416,21 @@ function mapFirebaseError(error: unknown) {
               placeholder="任意で入力"
             />
 
-            <AuthFormField v-model="profileForm.birthday" label="生年月日" type="date" required />
+            <AuthFormField
+              v-model="profileForm.birthday"
+              label="生年月日"
+              type="date"
+              required
+            />
 
             <div class="job-field">
               <label class="job-field__label" for="jobRole">職業</label>
               <select id="jobRole" v-model="profileForm.jobRole" required>
-                <option v-for="option in jobOptions" :key="option.value" :value="option.value">
+                <option
+                  v-for="option in jobOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
                   {{ option.label }}
                 </option>
               </select>
@@ -399,10 +446,16 @@ function mapFirebaseError(error: unknown) {
             <div class="avatar-field">
               <span>アイコン</span>
               <label class="avatar-field__upload">
-                <input type="file" accept="image/*" @change="handleAvatarChange" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  @change="handleAvatarChange"
+                />
                 画像を選択
               </label>
-              <p class="avatar-field__hint">アップロードは任意です。PNG / JPG / WEBP などに対応しています。</p>
+              <p class="avatar-field__hint">
+                アップロードは任意です。PNG / JPG / WEBP などに対応しています。
+              </p>
               <div v-if="avatarPreview" class="avatar-field__preview">
                 <img :src="avatarPreview" alt="アイコンのプレビュー" />
               </div>
@@ -436,7 +489,12 @@ function mapFirebaseError(error: unknown) {
 <style scoped>
 .signup-shell {
   min-height: calc(100vh - 4rem);
-  background: linear-gradient(135deg, rgba(184, 227, 233, 0.35), #fff, rgba(147, 177, 181, 0.35));
+  background: linear-gradient(
+    135deg,
+    rgba(184, 227, 233, 0.35),
+    #fff,
+    rgba(147, 177, 181, 0.35)
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -498,7 +556,7 @@ function mapFirebaseError(error: unknown) {
 }
 
 .divider::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 0;

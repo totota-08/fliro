@@ -1,68 +1,72 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import AuthFormField from '@/components/ui/AuthFormField.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { createProject } from '@/firebase/projectService'
-import { fetchScaleStats } from '@/services/statsService'
-import { useAuthStore } from '@/store/auth'
-import { getLogger } from '@logtape/logtape'
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import AppButton from "@/components/ui/AppButton.vue";
+import AuthFormField from "@/components/ui/AuthFormField.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { createProject } from "@/firebase/projectService";
+import { fetchScaleStats } from "@/services/statsService";
+import { useAuthStore } from "@/store/auth";
+import { getLogger } from "@logtape/logtape";
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
-const logger = getLogger('app.pages.projects.CreateProject')
+const logger = getLogger("app.pages.projects.CreateProject");
 
-const router = useRouter()
-const { user } = useAuthStore()
+const router = useRouter();
+const { user } = useAuthStore();
 
-const name = ref('')
-const description = ref('')
-const color = ref('#4f7c82')
+const name = ref("");
+const description = ref("");
+const color = ref("#4f7c82");
 // icon upload feature removed
-const isPublic = ref(false)
-const allowGuestView = ref(false)
-const startDate = ref<string | null>(null)
-const dueDate = ref<string | null>(null)
-const submitting = ref(false)
-const errorMsg = ref('')
+const isPublic = ref(false);
+const allowGuestView = ref(false);
+const startDate = ref<string | null>(null);
+const dueDate = ref<string | null>(null);
+const submitting = ref(false);
+const errorMsg = ref("");
 
-const homeColors = ['#4f7c82', '#0b2e33', '#93b1b5', '#b8e3e9']
+const homeColors = ["#4f7c82", "#0b2e33", "#93b1b5", "#b8e3e9"];
 
-type CreateStep = 'basic' | 'appearance' | 'settings'
-const stepOrder: CreateStep[] = ['basic', 'appearance', 'settings']
+type CreateStep = "basic" | "appearance" | "settings";
+const stepOrder: CreateStep[] = ["basic", "appearance", "settings"];
 const stepLabels: Record<CreateStep, string> = {
-  basic: '基本情報',
-  appearance: '見た目の設定',
-  settings: '詳細設定',
-}
+  basic: "基本情報",
+  appearance: "見た目の設定",
+  settings: "詳細設定",
+};
 
-const currentStep = ref<CreateStep>('basic')
-const currentStepIndex = computed(() => Math.max(stepOrder.indexOf(currentStep.value), 0))
-const progressPercent = computed(() => ((currentStepIndex.value + 1) / stepOrder.length) * 100)
-const basicValid = computed(() => name.value.trim().length > 0)
-const scaleStats = ref<{ users: number; projects: number } | null>(null)
+const currentStep = ref<CreateStep>("basic");
+const currentStepIndex = computed(() =>
+  Math.max(stepOrder.indexOf(currentStep.value), 0),
+);
+const progressPercent = computed(
+  () => ((currentStepIndex.value + 1) / stepOrder.length) * 100,
+);
+const basicValid = computed(() => name.value.trim().length > 0);
+const scaleStats = ref<{ users: number; projects: number } | null>(null);
 
 onMounted(async () => {
   try {
-    scaleStats.value = await fetchScaleStats()
+    scaleStats.value = await fetchScaleStats();
   } catch (error) {
-    logger.warn`Failed to fetch stats: ${error}`
+    logger.warn`Failed to fetch stats: ${error}`;
   }
-})
+});
 
 async function handleSubmit() {
   if (!user.value) {
-    errorMsg.value = 'ログインが必要です。'
-    return
+    errorMsg.value = "ログインが必要です。";
+    return;
   }
 
   if (!name.value.trim()) {
-    errorMsg.value = 'プロジェクト名は必須です。'
-    return
+    errorMsg.value = "プロジェクト名は必須です。";
+    return;
   }
 
-  submitting.value = true
-  errorMsg.value = ''
+  submitting.value = true;
+  errorMsg.value = "";
   try {
     const id = await createProject(
       {
@@ -75,28 +79,31 @@ async function handleSubmit() {
         allowGuestView: allowGuestView.value,
       },
       user.value.uid,
-    )
+    );
 
-    await router.push({ name: ROUTE_NAMES.projectDashboard, params: { projectId: id } })
+    await router.push({
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: id },
+    });
   } catch (e) {
-    logger.error`Failed to create project: ${e}`
-    errorMsg.value = 'プロジェクトの作成に失敗しました。再度お試しください。'
+    logger.error`Failed to create project: ${e}`;
+    errorMsg.value = "プロジェクトの作成に失敗しました。再度お試しください。";
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 
 function nextStep() {
-  const next = stepOrder[currentStepIndex.value + 1]
-  if (!next) return
-  if (currentStep.value === 'basic' && !basicValid.value) return
-  currentStep.value = next
+  const next = stepOrder[currentStepIndex.value + 1];
+  if (!next) return;
+  if (currentStep.value === "basic" && !basicValid.value) return;
+  currentStep.value = next;
 }
 
 function prevStep() {
-  const prev = stepOrder[currentStepIndex.value - 1]
-  if (!prev) return
-  currentStep.value = prev
+  const prev = stepOrder[currentStepIndex.value - 1];
+  if (!prev) return;
+  currentStep.value = prev;
 }
 
 // icon upload feature removed
@@ -136,13 +143,21 @@ function prevStep() {
         <span class="panel-pill">{{ Math.round(progressPercent) }}%</span>
       </header>
       <div class="panel-progress">
-        <div class="panel-progress__value" :style="{ width: `${progressPercent}%` }" />
+        <div
+          class="panel-progress__value"
+          :style="{ width: `${progressPercent}%` }"
+        />
       </div>
 
       <Transition name="slide-fade" mode="out-in">
         <div :key="currentStep" class="panel-body">
           <div v-if="currentStep === 'basic'" class="panel-section">
-            <AuthFormField v-model="name" label="プロジェクト名" placeholder="例）Webサイトリニューアル" required />
+            <AuthFormField
+              v-model="name"
+              label="プロジェクト名"
+              placeholder="例）Webサイトリニューアル"
+              required
+            />
 
             <label class="form-block">
               <span>プロジェクト説明</span>
@@ -158,7 +173,10 @@ function prevStep() {
           <div v-else-if="currentStep === 'appearance'" class="panel-section">
             <div class="form-block">
               <span>テーマカラー</span>
-              <p class="form-hint">{{ appName }} のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。</p>
+              <p class="form-hint">
+                {{ appName }}
+                のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。
+              </p>
               <div class="color-grid">
                 <button
                   v-for="c in homeColors"
@@ -171,7 +189,11 @@ function prevStep() {
                 />
                 <label class="color-picker">
                   <span>カスタム</span>
-                  <input v-model="color" type="color" aria-label="カスタムカラー" />
+                  <input
+                    v-model="color"
+                    type="color"
+                    aria-label="カスタムカラー"
+                  />
                 </label>
               </div>
             </div>
@@ -188,7 +210,9 @@ function prevStep() {
                   <input v-model="dueDate" type="date" />
                 </label>
               </div>
-              <p class="form-hint">終了期限はいつでも更新できます。未定の場合は空欄のままでも構いません。</p>
+              <p class="form-hint">
+                終了期限はいつでも更新できます。未定の場合は空欄のままでも構いません。
+              </p>
             </div>
           </div>
 
@@ -215,7 +239,9 @@ function prevStep() {
 
             <div class="invite-hint">
               <strong>参加リンクについて</strong>
-              <p>プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。</p>
+              <p>
+                プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。
+              </p>
             </div>
           </div>
         </div>
@@ -224,13 +250,19 @@ function prevStep() {
       <p v-if="errorMsg" class="panel-error">{{ errorMsg }}</p>
 
       <div class="panel-actions">
-        <AppButton variant="secondary" @click="prevStep" :disabled="currentStepIndex === 0">戻る</AppButton>
+        <AppButton
+          variant="secondary"
+          @click="prevStep"
+          :disabled="currentStepIndex === 0"
+          >戻る</AppButton
+        >
         <AppButton
           v-if="currentStepIndex < stepOrder.length - 1"
           variant="primary"
           :disabled="currentStep === 'basic' && !basicValid"
           @click="nextStep"
-        >次へ進む</AppButton>
+          >次へ進む</AppButton
+        >
         <AppButton
           v-else
           type="button"
@@ -238,7 +270,8 @@ function prevStep() {
           :loading="submitting"
           :disabled="submitting || !basicValid"
           @click="handleSubmit"
-        >プロジェクトを作成</AppButton>
+          >プロジェクトを作成</AppButton
+        >
       </div>
     </section>
   </div>
@@ -254,7 +287,11 @@ function prevStep() {
 
 .project-hero {
   padding: 4rem 3rem;
-  background: linear-gradient(180deg, rgba(11, 46, 51, 0.95), rgba(79, 124, 130, 0.9));
+  background: linear-gradient(
+    180deg,
+    rgba(11, 46, 51, 0.95),
+    rgba(79, 124, 130, 0.9)
+  );
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -418,7 +455,9 @@ function prevStep() {
   border-radius: 1rem;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 120ms ease, border 120ms ease;
+  transition:
+    transform 120ms ease,
+    border 120ms ease;
 }
 
 .color-swatch.is-active {
@@ -475,7 +514,9 @@ function prevStep() {
   border: 2px solid #edf2f3;
   border-radius: 1.25rem;
   padding: 1rem 1.25rem;
-  transition: border 150ms ease, background 150ms ease;
+  transition:
+    border 150ms ease,
+    background 150ms ease;
 }
 
 .toggle-card label {

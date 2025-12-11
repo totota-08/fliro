@@ -1,83 +1,91 @@
 <script setup lang="ts">
-import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
-import { appName } from '@/constants/appMeta'
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import SidebarUserProfile from "@/components/common/SidebarUserProfile.vue";
+import { appName } from "@/constants/appMeta";
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 
 type BaseNavItem = {
-  key: 'dashboard' | 'tasks' | 'team' | 'settings'
-  label: string
-  to?: string
-  icon: 'dashboard' | 'tasks' | 'team' | 'settings'
-  disabled?: boolean
-}
+  key: "dashboard" | "tasks" | "team" | "settings";
+  label: string;
+  to?: string;
+  icon: "dashboard" | "tasks" | "team" | "settings";
+  disabled?: boolean;
+};
 
-type NavItem = BaseNavItem & { active: boolean }
+type NavItem = BaseNavItem & { active: boolean };
 
 type ProjectItem = {
-  key: string
-  label: string
-  accent: 'primary' | 'secondary' | 'accent'
-}
+  key: string;
+  label: string;
+  accent: "primary" | "secondary" | "accent";
+};
 
 const props = defineProps<{
-  open: boolean
-}>()
+  open: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'close'): void
-}>()
+  (e: "close"): void;
+}>();
 
-const route = useRoute()
+const route = useRoute();
 
 const baseNavItems: BaseNavItem[] = [
-  { key: 'dashboard', label: 'ダッシュボード', to: '/demo/dashboard', icon: 'dashboard' },
-  { key: 'tasks', label: 'マイタスク', to: '/demo/tasks', icon: 'tasks' },
-  { key: 'team', label: 'チーム', to: '/demo/team', icon: 'team' },
-  { key: 'settings', label: '設定', icon: 'settings', disabled: true },
-]
+  {
+    key: "dashboard",
+    label: "ダッシュボード",
+    to: "/demo/dashboard",
+    icon: "dashboard",
+  },
+  { key: "tasks", label: "マイタスク", to: "/demo/tasks", icon: "tasks" },
+  { key: "team", label: "チーム", to: "/demo/team", icon: "team" },
+  { key: "settings", label: "設定", icon: "settings", disabled: true },
+];
 
 const currentSection = computed(() => {
-  if (typeof route.meta.section === 'string') {
-    return route.meta.section as BaseNavItem['key']
+  if (typeof route.meta.section === "string") {
+    return route.meta.section as BaseNavItem["key"];
   }
 
-  if (typeof route.name === 'string' && route.name.startsWith('demo.')) {
-    return route.name.split('.')[1] as BaseNavItem['key']
+  if (typeof route.name === "string" && route.name.startsWith("demo.")) {
+    return route.name.split(".")[1] as BaseNavItem["key"];
   }
 
-  if (typeof route.name === 'string' && route.name.startsWith('demo-')) {
-    return route.name.split('-')[1] as BaseNavItem['key']
+  if (typeof route.name === "string" && route.name.startsWith("demo-")) {
+    return route.name.split("-")[1] as BaseNavItem["key"];
   }
 
-  return undefined
-})
+  return undefined;
+});
 
 const navigationItems = computed<NavItem[]>(() =>
   baseNavItems.map((item) => {
-    const matchesPath = item.to ? route.path.startsWith(item.to) : false
+    const matchesPath = item.to ? route.path.startsWith(item.to) : false;
     return {
       ...item,
       active: currentSection.value === item.key || matchesPath,
-    }
+    };
   }),
-)
+);
 
 const projectItems: ProjectItem[] = [
-  { key: 'web', label: 'Webサイトリニューアル', accent: 'primary' },
-  { key: 'mobile', label: 'モバイルアプリ開発', accent: 'secondary' },
-  { key: 'marketing', label: 'マーケティングキャンペーン', accent: 'accent' },
-]
+  { key: "web", label: "Webサイトリニューアル", accent: "primary" },
+  { key: "mobile", label: "モバイルアプリ開発", accent: "secondary" },
+  { key: "marketing", label: "マーケティングキャンペーン", accent: "accent" },
+];
 
-const rootClasses = computed(() => ['sidebar', { 'is-hidden': !props.open, 'is-open': props.open }])
+const rootClasses = computed(() => [
+  "sidebar",
+  { "is-hidden": !props.open, "is-open": props.open },
+]);
 
-const handleClose = () => emit('close')
+const handleClose = () => emit("close");
 
 const handleNavigate = () => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    emit('close')
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    emit("close");
   }
-}
+};
 </script>
 
 <template>
@@ -105,7 +113,12 @@ const handleNavigate = () => {
             @click="handleNavigate"
           >
             <span class="sidebar__nav-icon" aria-hidden="true">
-              <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-if="item.icon === 'dashboard'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M4 12h16M12 4v16"
                   stroke-linecap="round"
@@ -113,7 +126,12 @@ const handleNavigate = () => {
                   stroke-width="1.8"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'tasks'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'tasks'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M5 6h14M5 12h14M5 18h8"
                   stroke-linecap="round"
@@ -121,7 +139,12 @@ const handleNavigate = () => {
                   stroke-width="1.8"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'team'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'team'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M7 17c0-2.21 1.79-4 4-4h2c2.21 0 4 1.79 4 4M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
                   stroke-linecap="round"
@@ -129,7 +152,12 @@ const handleNavigate = () => {
                   stroke-width="1.8"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'settings'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'settings'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
                   stroke-linecap="round"
@@ -179,7 +207,13 @@ const handleNavigate = () => {
     <div class="sidebar__projects">
       <div class="sidebar__projects-header">
         <p class="sidebar__section">プロジェクト</p>
-        <button type="button" class="sidebar__add" aria-label="プロジェクトを追加">+</button>
+        <button
+          type="button"
+          class="sidebar__add"
+          aria-label="プロジェクトを追加"
+        >
+          +
+        </button>
       </div>
       <ul>
         <li v-for="project in projectItems" :key="project.key">
