@@ -96,7 +96,11 @@ const pricingPlans = [
         <div class="landing__links">
           <a href="#features">機能</a>
           <a href="#pricing">料金</a>
-          <RouterLink class="landing__link" :to="{ name: ROUTE_NAMES.demoDashboard }">デモ</RouterLink>
+          <RouterLink
+            class="landing__link"
+            :to="{ name: ROUTE_NAMES.demoDashboard }"
+            >デモ</RouterLink
+          >
           <AppButton
             :to="{ name: ROUTE_NAMES.login }"
             variant="secondary"
@@ -119,14 +123,18 @@ const pricingPlans = [
           </p>
           <h1>チームのタスク管理とコミュニケーションを一つに</h1>
           <p>
-            {{ appName }}は、タスク管理とチャットを統合した新しいコラボレーションツールです。
+            {{
+              appName
+            }}は、タスク管理とチャットを統合した新しいコラボレーションツールです。
             シンプルで直感的なインターフェースで、チームの生産性を最大化します。
           </p>
           <div class="hero__actions">
             <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
               >無料で始める</AppButton
             >
-            <AppButton :to="{ name: ROUTE_NAMES.demoDashboard }" variant="outline"
+            <AppButton
+              :to="{ name: ROUTE_NAMES.demoDashboard }"
+              variant="outline"
               >デモを見る</AppButton
             >
           </div>
@@ -247,7 +255,7 @@ const pricingPlans = [
                 />
               </svg>
             </span>
-          <span class="landing__title">{{ appName }}</span>
+            <span class="landing__title">{{ appName }}</span>
           </div>
           <p>チームのタスク管理とコミュニケーションを一つに。</p>
         </div>
@@ -484,7 +492,9 @@ const pricingPlans = [
   border-radius: 1.5rem;
   padding: 1.75rem;
   background: #f8fcfd;
-  transition: box-shadow 150ms ease, transform 150ms ease;
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .feature-card:hover {

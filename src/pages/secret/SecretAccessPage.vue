@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { grantSecretAccess } from '@/services/secretAccess'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { grantSecretAccess } from "@/services/secretAccess";
 
-const router = useRouter()
-const command = ref('')
-const message = ref('')
+const router = useRouter();
+const command = ref("");
+const message = ref("");
 
 function handleSubmit() {
-  const value = command.value.trim().toLowerCase()
-  if (value === 'chat') {
-    grantSecretAccess('chat')
-    router.push({ name: ROUTE_NAMES.secretChat })
-    return
+  const value = command.value.trim().toLowerCase();
+  if (value === "chat") {
+    grantSecretAccess("chat");
+    router.push({ name: ROUTE_NAMES.secretChat });
+    return;
   }
-  message.value = 'Access denied'
+  message.value = "Access denied";
 }
 </script>
 
@@ -27,8 +27,9 @@ function handleSubmit() {
         <h1>Enter the secret key</h1>
       </header>
       <form class="command-form" @submit.prevent="handleSubmit">
-        <label>secret key
-          <input v-model="command" type="text"/>
+        <label
+          >secret key
+          <input v-model="command" type="text" />
         </label>
         <button type="submit">アクセス</button>
       </form>

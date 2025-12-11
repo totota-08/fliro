@@ -1,58 +1,58 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from "vue";
 
 type Milestone = {
-  label: string
-  date: Date
-  key: string
-}
+  label: string;
+  date: Date;
+  key: string;
+};
 
 const props = defineProps<{
-  projectName?: string
-  startDate?: Date | null
-  endDate?: Date | null
-  tasks?: { id: string; title: string; dueDate?: Date | null }[]
-}>()
+  projectName?: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  tasks?: { id: string; title: string; dueDate?: Date | null }[];
+}>();
 
-const start = computed(() => props.startDate || new Date())
+const start = computed(() => props.startDate || new Date());
 const end = computed(() => {
   const taskEnd = props.tasks?.reduce<Date | null>((max, task) => {
-    if (!task.dueDate) return max
-    if (!max || task.dueDate > max) return task.dueDate
-    return max
-  }, null)
-  return props.endDate || taskEnd || start.value
-})
+    if (!task.dueDate) return max;
+    if (!max || task.dueDate > max) return task.dueDate;
+    return max;
+  }, null);
+  return props.endDate || taskEnd || start.value;
+});
 
 const milestones = computed<Milestone[]>(() => {
   const list: Milestone[] = (props.tasks || [])
     .filter((task) => task.dueDate)
     .map((task) => ({
       key: task.id,
-      label: task.title || 'タスク',
+      label: task.title || "タスク",
       date: task.dueDate as Date,
-    }))
-  list.sort((a, b) => a.date.getTime() - b.date.getTime())
+    }));
+  list.sort((a, b) => a.date.getTime() - b.date.getTime());
   return [
-    { key: 'start', label: '開始', date: start.value },
+    { key: "start", label: "開始", date: start.value },
     ...list,
-    { key: 'end', label: 'ゴール', date: end.value },
-  ]
-})
+    { key: "end", label: "ゴール", date: end.value },
+  ];
+});
 
 const progress = computed(() => {
-  const now = Date.now()
-  const total = end.value.getTime() - start.value.getTime()
-  if (total <= 0) return 0
-  const elapsed = now - start.value.getTime()
-  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)))
-})
+  const now = Date.now();
+  const total = end.value.getTime() - start.value.getTime();
+  if (total <= 0) return 0;
+  const elapsed = now - start.value.getTime();
+  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+});
 
 function positionPercent(date: Date) {
-  const total = end.value.getTime() - start.value.getTime()
-  if (total <= 0) return 0
-  const diff = date.getTime() - start.value.getTime()
-  return Math.min(100, Math.max(0, (diff / total) * 100))
+  const total = end.value.getTime() - start.value.getTime();
+  if (total <= 0) return 0;
+  const diff = date.getTime() - start.value.getTime();
+  return Math.min(100, Math.max(0, (diff / total) * 100));
 }
 </script>
 

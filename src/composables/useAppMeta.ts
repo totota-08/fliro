@@ -1,5 +1,5 @@
-import { appName, appVersion } from '@/constants/appMeta'
+import { appName, appVersion } from "@/constants/appMeta";
 
 export function useAppMeta() {
-  return { appName, appVersion }
+  return { appName, appVersion };
 }

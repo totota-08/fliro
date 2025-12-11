@@ -61,7 +61,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run ESLint
-        run: npx eslint . --ext .vue,.js,.ts --max-warnings=0
+        run: npm run lint -- --max-warnings=0
 
   typecheck:
     name: Type Check (vue-tsc)

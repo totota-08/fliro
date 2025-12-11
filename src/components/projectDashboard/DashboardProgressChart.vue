@@ -1,14 +1,15 @@
 <script setup lang="ts">
 const props = defineProps<{
-  progress: number
-  totalTasks: number
-  doneTasks: number
-}>()
+  progress: number;
+  totalTasks: number;
+  doneTasks: number;
+}>();
 
-const RADIUS = 36
-const CIRC = 2 * Math.PI * RADIUS
+const RADIUS = 36;
+const CIRC = 2 * Math.PI * RADIUS;
 
-const dashOffset = () => CIRC * (1 - Math.min(Math.max(props.progress, 0), 100) / 100)
+const dashOffset = () =>
+  CIRC * (1 - Math.min(Math.max(props.progress, 0), 100) / 100);
 </script>
 
 <template>

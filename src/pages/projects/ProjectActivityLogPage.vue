@@ -1,201 +1,248 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
-import { listenProjectMembers, type ProjectMember } from '@/services/projectMembers'
-import { listenTasks, type TaskDoc } from '@/services/taskService'
-import { useAuthStore } from '@/store/auth'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { collection, getDocs } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/firebase/config";
+import {
+  listenProjectMembers,
+  type ProjectMember,
+} from "@/services/projectMembers";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
+import { useAuthStore } from "@/store/auth";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { collection, getDocs } from "firebase/firestore";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 
-type ActivityType = 'task' | 'member' | 'assignment'
+type ActivityType = "task" | "member" | "assignment";
 
 type ActivityEvent = {
-  id: string
-  title: string
-  description: string
-  type: ActivityType
-  createdAt: number
-}
+  id: string;
+  title: string;
+  description: string;
+  type: ActivityType;
+  createdAt: number;
+};
 
-const route = useRoute()
-const { user, profile } = useAuthStore()
+const route = useRoute();
+const { user, profile } = useAuthStore();
 
-const projectId = ref(String(route.params.projectId || ''))
-const projectList = ref<{ id: string; name: string }[]>([])
-const tasks = ref<TaskDoc[]>([])
-const members = ref<ProjectMember[]>([])
-const filterType = ref<ActivityType | 'all'>('all')
-const dateFrom = ref('')
-const dateTo = ref('')
-const isSidebarOpen = ref(true)
+const projectId = ref(String(route.params.projectId || ""));
+const projectList = ref<{ id: string; name: string }[]>([]);
+const tasks = ref<TaskDoc[]>([]);
+const members = ref<ProjectMember[]>([]);
+const filterType = ref<ActivityType | "all">("all");
+const dateFrom = ref("");
+const dateTo = ref("");
+const isSidebarOpen = ref(true);
 
-let stopTasks: (() => void) | null = null
-let stopMembers: (() => void) | null = null
+let stopTasks: (() => void) | null = null;
+let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'activity',
-      label: 'アクティビティ',
-      to: { name: ROUTE_NAMES.projectActivity, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "activity",
+        label: "アクティビティ",
+        to: {
+          name: ROUTE_NAMES.projectActivity,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((project, index) => ({
     key: project.id,
     label: project.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: project.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+    to: {
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: project.id },
+    },
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
 const activityEvents = computed<ActivityEvent[]>(() => {
-  const events: ActivityEvent[] = []
+  const events: ActivityEvent[] = [];
 
   tasks.value.forEach((task) => {
-    if (task.createdAt && 'seconds' in task.createdAt) {
+    if (task.createdAt && "seconds" in task.createdAt) {
       events.push({
         id: `task-created-${task.id}`,
-        title: 'タスク作成',
+        title: "タスク作成",
         description: `「${task.title}」が作成されました`,
-        type: 'task',
+        type: "task",
         createdAt: task.createdAt.seconds * 1000,
-      })
+      });
     }
-    if (task.updatedAt && 'seconds' in task.updatedAt && task.updatedAt.seconds !== task.createdAt?.seconds) {
+    if (
+      task.updatedAt &&
+      "seconds" in task.updatedAt &&
+      task.updatedAt.seconds !== task.createdAt?.seconds
+    ) {
       events.push({
         id: `task-updated-${task.id}`,
-        title: 'タスク更新',
+        title: "タスク更新",
         description: `「${task.title}」が更新されました`,
-        type: 'task',
+        type: "task",
         createdAt: task.updatedAt.seconds * 1000,
-      })
+      });
     }
     if (task.assigneeId) {
       events.push({
         id: `task-assigned-${task.id}`,
-        title: '担当アサイン',
-        description: `${task.assigneeName || '担当者未設定'} に「${task.title}」をアサイン`,
-        type: 'assignment',
-        createdAt: task.updatedAt?.seconds ? task.updatedAt.seconds * 1000 : Date.now(),
-      })
+        title: "担当アサイン",
+        description: `${task.assigneeName || "担当者未設定"} に「${task.title}」をアサイン`,
+        type: "assignment",
+        createdAt: task.updatedAt?.seconds
+          ? task.updatedAt.seconds * 1000
+          : Date.now(),
+      });
     }
-  })
+  });
 
   members.value.forEach((member) => {
-    const joined = (member as any).joinedAt
-    const joinedAt = joined?.seconds ? joined.seconds * 1000 : null
+    const joined = (member as any).joinedAt;
+    const joinedAt = joined?.seconds ? joined.seconds * 1000 : null;
     if (joinedAt) {
       events.push({
         id: `member-${member.userId}`,
-        title: 'メンバー参加',
+        title: "メンバー参加",
         description: `${member.displayName || member.userId} が参加しました`,
-        type: 'member',
+        type: "member",
         createdAt: joinedAt,
-      })
+      });
     }
-  })
+  });
 
-  return events.sort((a, b) => b.createdAt - a.createdAt)
-})
+  return events.sort((a, b) => b.createdAt - a.createdAt);
+});
 
 const filteredEvents = computed(() => {
-  const from = dateFrom.value ? new Date(dateFrom.value).getTime() : null
-  const to = dateTo.value ? new Date(dateTo.value).getTime() : null
+  const from = dateFrom.value ? new Date(dateFrom.value).getTime() : null;
+  const to = dateTo.value ? new Date(dateTo.value).getTime() : null;
   return activityEvents.value.filter((event) => {
-    if (filterType.value !== 'all' && event.type !== filterType.value) return false
-    if (from && event.createdAt < from) return false
-    if (to && event.createdAt > to + 24 * 60 * 60 * 1000) return false
-    return true
-  })
-})
+    if (filterType.value !== "all" && event.type !== filterType.value)
+      return false;
+    if (from && event.createdAt < from) return false;
+    if (to && event.createdAt > to + 24 * 60 * 60 * 1000) return false;
+    return true;
+  });
+});
 
 async function loadProjectList() {
-  if (!user.value) return
-  const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
+  if (!user.value) return;
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
   projectList.value = snap.docs.map((docSnap) => ({
     id: docSnap.id,
-    name: (docSnap.data().projectName as string) || 'Project',
-  }))
+    name: (docSnap.data().projectName as string) || "Project",
+  }));
 }
 
 function resetWatchers() {
-  stopTasks?.()
-  stopMembers?.()
-  stopTasks = listenTasks(projectId.value, (list) => (tasks.value = list))
-  stopMembers = listenProjectMembers(projectId.value, (list) => (members.value = list))
+  stopTasks?.();
+  stopMembers?.();
+  stopTasks = listenTasks(projectId.value, (list) => (tasks.value = list));
+  stopMembers = listenProjectMembers(
+    projectId.value,
+    (list) => (members.value = list),
+  );
 }
 
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  loadProjectList()
-  resetWatchers()
-})
+  loadProjectList();
+  resetWatchers();
+});
 
 watch(
   () => route.params.projectId,
   (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    resetWatchers()
+    if (!newId) return;
+    projectId.value = String(newId);
+    resetWatchers();
   },
-)
+);
 
 onBeforeUnmount(() => {
-  stopTasks?.()
-  stopMembers?.()
-})
+  stopTasks?.();
+  stopMembers?.();
+});
 </script>
 
 <template>
-  <div :class="['activity-shell', { 'activity-shell--sidebar-collapsed': !isSidebarOpen }]">
+  <div
+    :class="[
+      'activity-shell',
+      { 'activity-shell--sidebar-collapsed': !isSidebarOpen },
+    ]"
+  >
     <DashboardSidebar
       :open="isSidebarOpen"
       :nav-items="navItems"
@@ -204,19 +251,40 @@ onBeforeUnmount(() => {
       brand-subtitle="アクティビティ"
       @close="closeSidebar"
     />
-    <div v-if="isSidebarOpen" class="activity-shell__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="activity-shell__overlay"
+      @click="closeSidebar"
+    />
 
     <main class="activity-shell__main">
       <header class="activity-shell__topbar">
         <div class="activity-shell__topbar-left">
-          <button type="button" class="activity-shell__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="activity-shell__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="activity-shell__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="activity-shell__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
-            <p class="activity-shell__breadcrumb">プロジェクト &gt; アクティビティ</p>
+            <p class="activity-shell__breadcrumb">
+              プロジェクト &gt; アクティビティ
+            </p>
             <h1 class="activity-shell__heading">アクティビティログ</h1>
           </div>
         </div>
@@ -258,12 +326,22 @@ onBeforeUnmount(() => {
             <span class="badge">{{ filteredEvents.length }}件</span>
           </header>
 
-          <div v-if="!filteredEvents.length" class="empty">該当するイベントがありません。</div>
+          <div v-if="!filteredEvents.length" class="empty">
+            該当するイベントがありません。
+          </div>
           <ul v-else class="activity-items">
-            <li v-for="event in filteredEvents" :key="event.id" class="activity-item">
+            <li
+              v-for="event in filteredEvents"
+              :key="event.id"
+              class="activity-item"
+            >
               <div class="activity-item__meta">
-                <span class="chip" :class="`chip--${event.type}`">{{ event.type }}</span>
-                <span class="muted">{{ new Date(event.createdAt).toLocaleString() }}</span>
+                <span class="chip" :class="`chip--${event.type}`">{{
+                  event.type
+                }}</span>
+                <span class="muted">{{
+                  new Date(event.createdAt).toLocaleString()
+                }}</span>
               </div>
               <p class="activity-item__title">{{ event.title }}</p>
               <p class="activity-item__desc">{{ event.description }}</p>
@@ -276,7 +354,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .activity-shell {
   display: flex;
