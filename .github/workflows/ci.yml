@@ -1,0 +1,112 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  format:
+    name: Format (Prettier)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Check formatting
+        run: npx prettier --check .
+
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run ESLint
+        run: npx eslint . --ext .vue,.js,.ts --max-warnings=0
+
+  static-analysis:
+    name: Static Analysis (Type Check & Build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check and build
+        run: npm run build
+
+  security-scan:
+    name: Security Scan (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  tests:
+    name: Tests (Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build test image
+        run: |
+          docker build -t fliro-ci-test --build-arg NODE_VERSION=${{ env.NODE_VERSION }} -f - . <<'EOF'
+          ARG NODE_VERSION
+          FROM node:${NODE_VERSION}-bookworm
+
+          ENV CI=true
+          WORKDIR /workspace
+
+          RUN apt-get update \
+            && apt-get install -y --no-install-recommends openjdk-17-jre-headless git \
+            && rm -rf /var/lib/apt/lists/*
+
+          COPY package*.json ./
+          RUN npm ci
+
+          COPY . .
+          CMD ["npm","run","test:rules"]
+          EOF
+      - name: Run tests in Docker
+        run: docker run --rm fliro-ci-test
