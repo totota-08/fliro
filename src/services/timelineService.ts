@@ -1,4 +1,4 @@
-import { db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore'
 
 export type TimelinePost = {

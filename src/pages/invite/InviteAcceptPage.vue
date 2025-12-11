@@ -3,7 +3,8 @@ import AppButton from '@/components/ui/AppButton.vue'
 import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { loginWithEmail, registerCredentials } from '@/firebase/authService'
-import { auth, db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
+import { getCurrentUser } from '@/lib/getCurrentUser'
 import { redeemInvite } from '@/services/projectInvites'
 import { useAuthStore } from '@/store/auth'
 import { getLogger } from '@logtape/logtape'
@@ -98,7 +99,8 @@ onMounted(async () => {
 })
 
 async function ensureAuthenticatedUser() {
-  if (user.value) return user.value
+  const currentUser = user.value ?? (await getCurrentUser())
+  if (currentUser) return currentUser
 
   if (!emailInput.value.trim() || !passwordAuthInput.value.trim()) {
     throw new Error('メールアドレスとパスワードを入力してください。')
@@ -113,10 +115,11 @@ async function ensureAuthenticatedUser() {
     await loginWithEmail({ email: emailInput.value.trim(), password: passwordAuthInput.value.trim() })
   }
 
-  if (!auth.currentUser) {
+  const authed = await getCurrentUser()
+  if (!authed) {
     throw new Error('認証に失敗しました。')
   }
-  return auth.currentUser
+  return authed
 }
 
 async function handleJoin() {

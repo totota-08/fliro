@@ -1,4 +1,4 @@
-import { db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
 import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 
 export type TaskCategory = {

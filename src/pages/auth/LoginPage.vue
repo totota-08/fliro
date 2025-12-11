@@ -5,7 +5,7 @@ import AuthFormField from '@/components/ui/AuthFormField.vue'
 import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { fetchProfile } from '@/firebase/authService'
-import { auth } from '@/firebase/config'
+import { getCurrentUser } from '@/lib/getCurrentUser'
 import {
     authenticateWithEmail,
     authenticateWithProvider,
@@ -40,7 +40,7 @@ const providers: { id: SocialProvider; label: string; icon: string }[] = [
   { id: 'github', label: 'GitHub でログイン', icon: 'github' },
 ]
 const checksetUp = async () => {
-  const user = auth.currentUser
+  const user = await getCurrentUser()
   if (!user) return
 
   const profile = await fetchProfile(user.uid)

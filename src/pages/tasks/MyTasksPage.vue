@@ -2,7 +2,7 @@
 import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
 import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
 import { deleteTask, updateTask, type TaskDoc } from '@/services/taskService'
 import { useAuthStore } from '@/store/auth'
 import type { DashboardNavItem } from '@/types/projectDashboard'

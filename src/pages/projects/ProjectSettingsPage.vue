@@ -3,7 +3,7 @@ import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue
 import AppButton from '@/components/ui/AppButton.vue'
 import { appName } from '@/constants/appMeta'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
 import { deleteProject, fetchProject, updateProjectMetadata } from '@/firebase/projectService'
 import { updateProjectSettings } from '@/services/projectSettings'
 import { listenTasks, type TaskDoc } from '@/services/taskService'

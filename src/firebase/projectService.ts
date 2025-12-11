@@ -1,4 +1,4 @@
-import { db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
 import { addProjectMember } from '@/services/projectMembers'
 import type { CreateProjectPayload, ProjectDoc } from '@/types/project'
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore'

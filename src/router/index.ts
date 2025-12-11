@@ -12,6 +12,7 @@ import DemoMyTasksPage from '@/pages/demo/MyTasksPage.vue'
 import TeamPage from '@/pages/demo/TeamPage.vue'
 import NotFoundPage from '@/components/errorPage/404.vue'
 import { useAuthStore, waitForAuthReady } from '@/store/auth'
+import { getCurrentUser } from '@/lib/getCurrentUser'
 import { ROUTE_NAMES } from '@/constants/routes'
 import CreateProjectPage from '@/pages/projects/CreateProjectPage.vue'
 import InviteAcceptPage from '@/pages/invite/InviteAcceptPage.vue'
@@ -189,18 +190,32 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
+  const authRestricted = [String(ROUTE_NAMES.login), String(ROUTE_NAMES.signup)]
+  const needsAuthCheck = requiresAuth || (to.name && authRestricted.includes(String(to.name)))
+
+  if (!needsAuthCheck) {
+    return true
+  }
+
   await waitForAuthReady()
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated.value) {
+  let user = null
+  try {
+    user = await getCurrentUser()
+  } catch (error) {
+    console.error('Auth check failed', error)
+    return { name: ROUTE_NAMES.login }
+  }
+
+  if (requiresAuth && !user) {
     return {
       name: ROUTE_NAMES.login,
       query: { redirect: to.fullPath },
     }
   }
 
-  const authRestricted = [String(ROUTE_NAMES.login), String(ROUTE_NAMES.signup)]
-
-  if (to.name && authRestricted.includes(String(to.name)) && auth.isAuthenticated.value) {
+  if (to.name && authRestricted.includes(String(to.name)) && user) {
     const needsSetup = Boolean(auth.profile.value && auth.profile.value.setUp === false)
     const goingToSignup = String(to.name) === String(ROUTE_NAMES.signup)
     const explicitlySetupFlow = String(to.query.setup) === 'false'
@@ -211,6 +226,8 @@ router.beforeEach(async (to) => {
 
     return { name: ROUTE_NAMES.myPage }
   }
+
+  return true
 })
 
 export default router

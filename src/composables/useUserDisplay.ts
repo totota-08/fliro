@@ -1,4 +1,4 @@
-import { db } from '@/firebase/config'
+import { db } from '@/lib/firebase'
 import type { ProjectMember } from '@/services/projectMembers'
 import { getLogger } from '@logtape/logtape'
 import { doc, getDoc } from 'firebase/firestore'
