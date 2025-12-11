@@ -10,7 +10,8 @@ export type DashboardNavKey =
   | "activity"
   | "categories"
   | "timeline"
-  | "notifications";
+  | "notifications"
+  | "roles";
 
 export type DashboardNavItem = {
   key: DashboardNavKey;
