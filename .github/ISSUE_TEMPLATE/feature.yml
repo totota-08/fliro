@@ -1,0 +1,39 @@
+name: Feature request
+description: 新機能や改善の提案
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        改善したい内容を記入してください。
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: やりたいことの概要
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / background
+      description: 解決したい課題や背景
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: 解決策や要件、受け入れ条件
+      placeholder: 例) ユーザーは〇〇できる、エッジケース〇〇を考慮
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: スクリーンショット、参考URLなど
+    validations:
+      required: false

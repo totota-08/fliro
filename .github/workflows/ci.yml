@@ -8,6 +8,10 @@ on:
       - reopened
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -15,6 +19,16 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+
   format:
     name: Format (Prettier)
     runs-on: ubuntu-latest
@@ -49,8 +63,25 @@ jobs:
       - name: Run ESLint
         run: npx eslint . --ext .vue,.js,.ts --max-warnings=0
 
+  typecheck:
+    name: Type Check (vue-tsc)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run vue-tsc
+        run: npm run typecheck
+
   static-analysis:
-    name: Static Analysis (Type Check & Build)
+    name: Static Analysis (Build)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

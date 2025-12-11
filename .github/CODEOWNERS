@@ -1,0 +1,9 @@
+# Default owners
+* @hikitatomoya
+
+# CI / workflows
+.github/** @hikitatomoya
+
+# Frontend
+src/** @hikitatomoya
+public/** @hikitatomoya
