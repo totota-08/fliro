@@ -1,97 +1,100 @@
 <script setup lang="ts">
-import { appName } from '@/constants/appMeta'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { appName } from "@/constants/appMeta";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 
 interface ChatMessage {
-  author: string
-  time: string
-  message: string
-  type?: 'update'
-  highlight?: boolean
+  author: string;
+  time: string;
+  message: string;
+  type?: "update";
+  highlight?: boolean;
 }
 
-const onlineMembers = ref(8)
+const onlineMembers = ref(8);
 const baseMessages: ChatMessage[] = [
   {
-    author: '佐藤花子',
-    time: '10:30',
-    message: 'トップページのデザイン、レビューお願いします！',
+    author: "佐藤花子",
+    time: "10:30",
+    message: "トップページのデザイン、レビューお願いします！",
   },
   {
-    author: '田中太郎',
-    time: '10:36',
-    type: 'update',
-    message: '新しいタスクが作成されました：「デザイン修正対応」',
+    author: "田中太郎",
+    time: "10:36",
+    type: "update",
+    message: "新しいタスクが作成されました：「デザイン修正対応」",
   },
   {
-    author: '鈴木一郎',
-    time: '11:20',
-    message: 'データベース設計のレビュー会議、明日の14時でどうでしょうか？',
+    author: "鈴木一郎",
+    time: "11:20",
+    message: "データベース設計のレビュー会議、明日の14時でどうでしょうか？",
   },
   {
-    author: '高橋美咲',
-    time: '11:25',
-    message: '大丈夫です！参加します。',
+    author: "高橋美咲",
+    time: "11:25",
+    message: "大丈夫です！参加します。",
   },
-]
+];
 
 const demoQueue: ChatMessage[] = [
   {
     author: `${appName} Bot`,
-    time: '11:32',
-    type: 'update',
-    message: '進捗レポートが更新されました。',
+    time: "11:32",
+    type: "update",
+    message: "進捗レポートが更新されました。",
   },
   {
-    author: '大森健太',
-    time: '11:35',
-    message: 'ユーザーテストのフィードバック、まとめました！後ほど共有します。',
+    author: "大森健太",
+    time: "11:35",
+    message: "ユーザーテストのフィードバック、まとめました！後ほど共有します。",
   },
-]
+];
 
-const conversation = ref<ChatMessage[]>([...baseMessages])
-const typing = ref(false)
-let presenceTimer: number | undefined
-let demoTimer: number | undefined
-let queueIndex = 0
+const conversation = ref<ChatMessage[]>([...baseMessages]);
+const typing = ref(false);
+let presenceTimer: number | undefined;
+let demoTimer: number | undefined;
+let queueIndex = 0;
 
 onMounted(() => {
   presenceTimer = window.setInterval(() => {
-    onlineMembers.value = onlineMembers.value === 8 ? 9 : 8
-  }, 8000)
+    onlineMembers.value = onlineMembers.value === 8 ? 9 : 8;
+  }, 8000);
 
   demoTimer = window.setInterval(() => {
-    if (!demoQueue.length) return
-    const index = queueIndex % demoQueue.length
-    const next = demoQueue[index]
-    if (!next) return
-    queueIndex += 1
-    typing.value = true
+    if (!demoQueue.length) return;
+    const index = queueIndex % demoQueue.length;
+    const next = demoQueue[index];
+    if (!next) return;
+    queueIndex += 1;
+    typing.value = true;
     window.setTimeout(() => {
       const stamped: ChatMessage = {
         ...next,
         time: new Date().toTimeString().slice(0, 5),
         highlight: true,
-      }
-      const updated = [...conversation.value, stamped]
-      conversation.value = updated
-      typing.value = false
+      };
+      const updated = [...conversation.value, stamped];
+      conversation.value = updated;
+      typing.value = false;
       window.setTimeout(() => {
-        const followUp = [...conversation.value]
-        const targetIndex = updated.length - 1
+        const followUp = [...conversation.value];
+        const targetIndex = updated.length - 1;
         if (followUp[targetIndex]) {
-          followUp[targetIndex] = { ...followUp[targetIndex], highlight: false }
-          conversation.value = followUp
+          followUp[targetIndex] = {
+            ...followUp[targetIndex],
+            highlight: false,
+          };
+          conversation.value = followUp;
         }
-      }, 2500)
-    }, 1400)
-  }, 9500)
-})
+      }, 2500);
+    }, 1400);
+  }, 9500);
+});
 
 onBeforeUnmount(() => {
-  if (presenceTimer) window.clearInterval(presenceTimer)
-  if (demoTimer) window.clearInterval(demoTimer)
-})
+  if (presenceTimer) window.clearInterval(presenceTimer);
+  if (demoTimer) window.clearInterval(demoTimer);
+});
 </script>
 
 <template>
@@ -193,7 +196,10 @@ onBeforeUnmount(() => {
   background: rgba(184, 227, 233, 0.28);
   display: grid;
   gap: 0.4rem;
-  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .chat__messages--update {

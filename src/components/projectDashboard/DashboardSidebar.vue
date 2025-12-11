@@ -1,81 +1,107 @@
 <script setup lang="ts">
-import SidebarUserProfile from '@/components/common/SidebarUserProfile.vue'
-import { appName } from '@/constants/appMeta'
-import type { DashboardNavItem, DashboardProfileInfo, DashboardProjectItem } from '@/types/projectDashboard'
-import { computed } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import SidebarUserProfile from "@/components/common/SidebarUserProfile.vue";
+import { appName } from "@/constants/appMeta";
+import type {
+  DashboardNavItem,
+  DashboardProfileInfo,
+  DashboardProjectItem,
+} from "@/types/projectDashboard";
+import { computed } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 
-type NavItem = DashboardNavItem & { active: boolean }
+type NavItem = DashboardNavItem & { active: boolean };
 
 const props = withDefaults(
   defineProps<{
-    open: boolean
-    navItems?: DashboardNavItem[]
-    projects?: DashboardProjectItem[]
-    profile?: DashboardProfileInfo
-    brandSubtitle?: string
+    open: boolean;
+    navItems?: DashboardNavItem[];
+    projects?: DashboardProjectItem[];
+    profile?: DashboardProfileInfo;
+    brandSubtitle?: string;
   }>(),
   {
     navItems: () =>
       [
-        { key: 'dashboard', label: 'ダッシュボード', to: '/demo/dashboard', icon: 'dashboard' },
-        { key: 'tasks', label: 'マイタスク', to: '/demo/tasks', icon: 'tasks' },
-        { key: 'team', label: 'チーム', to: '/demo/team', icon: 'team' },
-        { key: 'members', label: 'メンバー', to: '/demo/team', icon: 'members' },
-        { key: 'settings', label: '設定', icon: 'settings', disabled: true },
+        {
+          key: "dashboard",
+          label: "ダッシュボード",
+          to: "/demo/dashboard",
+          icon: "dashboard",
+        },
+        { key: "tasks", label: "マイタスク", to: "/demo/tasks", icon: "tasks" },
+        { key: "team", label: "チーム", to: "/demo/team", icon: "team" },
+        {
+          key: "members",
+          label: "メンバー",
+          to: "/demo/team",
+          icon: "members",
+        },
+        { key: "settings", label: "設定", icon: "settings", disabled: true },
       ] satisfies DashboardNavItem[],
     projects: () =>
       [
-        { key: 'web', label: 'Webサイトリニューアル', accent: 'primary' },
-        { key: 'mobile', label: 'モバイルアプリ開発', accent: 'secondary' },
-        { key: 'marketing', label: 'マーケティングキャンペーン', accent: 'accent' },
+        { key: "web", label: "Webサイトリニューアル", accent: "primary" },
+        { key: "mobile", label: "モバイルアプリ開発", accent: "secondary" },
+        {
+          key: "marketing",
+          label: "マーケティングキャンペーン",
+          accent: "accent",
+        },
       ] satisfies DashboardProjectItem[],
-    profile: () => ({ name: '田中太郎', email: 'tanaka@example.com' } satisfies DashboardProfileInfo),
-    brandSubtitle: 'デモ体験',
+    profile: () =>
+      ({
+        name: "田中太郎",
+        email: "tanaka@example.com",
+      }) satisfies DashboardProfileInfo,
+    brandSubtitle: "デモ体験",
   },
-)
+);
 
 const emit = defineEmits<{
-  (e: 'close'): void
-}>()
+  (e: "close"): void;
+}>();
 
-const route = useRoute()
+const route = useRoute();
 
 const currentSection = computed(() => {
-  if (typeof route.meta.section === 'string') {
-    return route.meta.section as DashboardNavItem['key']
+  if (typeof route.meta.section === "string") {
+    return route.meta.section as DashboardNavItem["key"];
   }
 
-  if (typeof route.name === 'string' && route.name.startsWith('demo.')) {
-    return route.name.split('.')[1] as DashboardNavItem['key']
+  if (typeof route.name === "string" && route.name.startsWith("demo.")) {
+    return route.name.split(".")[1] as DashboardNavItem["key"];
   }
 
-  if (typeof route.name === 'string' && route.name.startsWith('demo-')) {
-    return route.name.split('-')[1] as DashboardNavItem['key']
+  if (typeof route.name === "string" && route.name.startsWith("demo-")) {
+    return route.name.split("-")[1] as DashboardNavItem["key"];
   }
 
-  return undefined
-})
+  return undefined;
+});
 
 const navigationItems = computed<NavItem[]>(() =>
   props.navItems.map((item) => {
-    const matchesPath = typeof item.to === 'string' ? route.path.startsWith(item.to) : false
+    const matchesPath =
+      typeof item.to === "string" ? route.path.startsWith(item.to) : false;
     return {
       ...item,
       active: currentSection.value === item.key || matchesPath,
-    }
+    };
   }),
-)
+);
 
-const rootClasses = computed(() => ['sidebar', { 'is-hidden': !props.open, 'is-open': props.open }])
+const rootClasses = computed(() => [
+  "sidebar",
+  { "is-hidden": !props.open, "is-open": props.open },
+]);
 
-const handleClose = () => emit('close')
+const handleClose = () => emit("close");
 
 const handleNavigate = () => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    emit('close')
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    emit("close");
   }
-}
+};
 </script>
 
 <template>
@@ -103,7 +129,12 @@ const handleNavigate = () => {
             @click="handleNavigate"
           >
             <span class="sidebar__nav-icon" aria-hidden="true">
-              <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-if="item.icon === 'dashboard'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M4 12h16M12 4v16"
                   stroke-linecap="round"
@@ -111,7 +142,12 @@ const handleNavigate = () => {
                   stroke-width="1.8"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'tasks'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'tasks'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M5 6h14M5 12h14M5 18h8"
                   stroke-linecap="round"
@@ -119,7 +155,12 @@ const handleNavigate = () => {
                   stroke-width="1.8"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'team'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'team'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M7 17c0-2.21 1.79-4 4-4h2c2.21 0 4 1.79 4 4M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
                   stroke-linecap="round"
@@ -127,7 +168,12 @@ const handleNavigate = () => {
                   stroke-width="1.8"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'members'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'members'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
                   stroke-linecap="round"
@@ -153,7 +199,12 @@ const handleNavigate = () => {
                   stroke-width="1.4"
                 />
               </svg>
-              <svg v-else-if="item.icon === 'settings' || item.icon === 'debug'" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg
+                v-else-if="item.icon === 'settings' || item.icon === 'debug'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
                 <path
                   d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
                   stroke-linecap="round"
@@ -203,7 +254,13 @@ const handleNavigate = () => {
     <div class="sidebar__projects">
       <div class="sidebar__projects-header">
         <p class="sidebar__section">プロジェクト</p>
-        <button type="button" class="sidebar__add" aria-label="プロジェクトを追加">+</button>
+        <button
+          type="button"
+          class="sidebar__add"
+          aria-label="プロジェクトを追加"
+        >
+          +
+        </button>
       </div>
       <ul>
         <li v-for="project in props.projects" :key="project.key">
@@ -213,7 +270,12 @@ const handleNavigate = () => {
             :to="project.to"
             @click="project.to ? handleNavigate() : undefined"
           >
-            <span class="dot" :class="project.accent ? `dot--${project.accent}` : 'dot--primary'" />
+            <span
+              class="dot"
+              :class="
+                project.accent ? `dot--${project.accent}` : 'dot--primary'
+              "
+            />
             {{ project.label }}
           </component>
         </li>

@@ -1,268 +1,323 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { buildPermissionsFromRoles } from '@/constants/roles'
-import { db } from '@/firebase/config'
-import { removeProjectMember, updateProjectMemberRole } from '@/services/projectMembers'
-import { useAuthStore } from '@/store/auth'
-import type { ProjectDoc } from '@/types/project'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
-import { collection, doc, getDocs, onSnapshot } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { buildPermissionsFromRoles } from "@/constants/roles";
+import { db } from "@/firebase/config";
+import {
+  removeProjectMember,
+  updateProjectMemberRole,
+} from "@/services/projectMembers";
+import { useAuthStore } from "@/store/auth";
+import type { ProjectDoc } from "@/types/project";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { getLogger } from "@logtape/logtape";
+import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 
-const logger = getLogger('app.pages.projects.ProjectMembers')
-type MemberRole = 'owner' | 'admin' | 'member' | 'viewer'
+const logger = getLogger("app.pages.projects.ProjectMembers");
+type MemberRole = "owner" | "admin" | "member" | "viewer";
 type MemberDisplay = {
-  id: string
-  userId: string
-  role: MemberRole
-  roles: string[]
-  displayName: string
-  email?: string
-  avatarUrl?: string
-  statusLabel: string
-  statusClass: 'online' | 'away' | 'offline'
-  lastAccessedAt?: { seconds: number; nanoseconds: number }
-  permissions: ReturnType<typeof buildPermissionsFromRoles>
-}
+  id: string;
+  userId: string;
+  role: MemberRole;
+  roles: string[];
+  displayName: string;
+  email?: string;
+  avatarUrl?: string;
+  statusLabel: string;
+  statusClass: "online" | "away" | "offline";
+  lastAccessedAt?: { seconds: number; nanoseconds: number };
+  permissions: ReturnType<typeof buildPermissionsFromRoles>;
+};
 
-const route = useRoute()
-const { user, profile } = useAuthStore()
-const projectId = ref(String(route.params.projectId || ''))
-const project = ref<ProjectDoc | null>(null)
-const projectList = ref<{ id: string; name: string }[]>([])
-const members = ref<MemberDisplay[]>([])
-const removingMemberId = ref('')
-const updatingRoleId = ref('')
-const isSidebarOpen = ref(true)
-const latestInviteLink = ref('')
-const inviteNotification = ref('')
-const memberActionError = ref('')
-const roleOptions: MemberRole[] = ['admin', 'member', 'viewer']
+const route = useRoute();
+const { user, profile } = useAuthStore();
+const projectId = ref(String(route.params.projectId || ""));
+const project = ref<ProjectDoc | null>(null);
+const projectList = ref<{ id: string; name: string }[]>([]);
+const members = ref<MemberDisplay[]>([]);
+const removingMemberId = ref("");
+const updatingRoleId = ref("");
+const isSidebarOpen = ref(true);
+const latestInviteLink = ref("");
+const inviteNotification = ref("");
+const memberActionError = ref("");
+const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
 
-let stopProject: (() => void) | null = null
-let stopMembers: (() => void) | null = null
+let stopProject: (() => void) | null = null;
+let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'timeline',
-      label: 'タイムライン',
-      to: { name: ROUTE_NAMES.projectTimeline, params: { projectId: projectId.value } },
-      icon: 'tasks',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "timeline",
+        label: "タイムライン",
+        to: {
+          name: ROUTE_NAMES.projectTimeline,
+          params: { projectId: projectId.value },
+        },
+        icon: "tasks",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
     key: entry.id,
     label: entry.name,
     to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
 const memberStats = computed(() => {
-  const total = members.value.length
-  const adminCount = members.value.filter((member) => member.role === 'owner' || member.role === 'admin').length
-  const online = members.value.filter((member) => member.statusClass === 'online').length
-  return { total, adminCount, online }
-})
+  const total = members.value.length;
+  const adminCount = members.value.filter(
+    (member) => member.role === "owner" || member.role === "admin",
+  ).length;
+  const online = members.value.filter(
+    (member) => member.statusClass === "online",
+  ).length;
+  return { total, adminCount, online };
+});
 
 const currentPermissions = computed(() => {
-  const currentId = user.value?.uid
-  if (!currentId) return buildPermissionsFromRoles([])
-  return members.value.find((member) => member.userId === currentId)?.permissions ?? buildPermissionsFromRoles([])
-})
+  const currentId = user.value?.uid;
+  if (!currentId) return buildPermissionsFromRoles([]);
+  return (
+    members.value.find((member) => member.userId === currentId)?.permissions ??
+    buildPermissionsFromRoles([])
+  );
+});
 const canManageMembers = computed(
-  () => currentPermissions.value.canEditRoles || currentPermissions.value.canInviteMembers || currentPermissions.value.canManageMembers,
-)
+  () =>
+    currentPermissions.value.canEditRoles ||
+    currentPermissions.value.canInviteMembers ||
+    currentPermissions.value.canManageMembers,
+);
 
 async function loadProjectList() {
-  if (!user.value) return
-  const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
+  if (!user.value) return;
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
   projectList.value = snap.docs.map((docSnap) => ({
     id: docSnap.id,
-    name: (docSnap.data().projectName as string) || 'Project',
-  }))
+    name: (docSnap.data().projectName as string) || "Project",
+  }));
 }
 
 function watchProject() {
-  stopProject = onSnapshot(doc(db, 'projects', projectId.value), (snapshot) => {
-    if (!snapshot.exists()) return
-    project.value = snapshot.data() as ProjectDoc
-  })
+  stopProject = onSnapshot(doc(db, "projects", projectId.value), (snapshot) => {
+    if (!snapshot.exists()) return;
+    project.value = snapshot.data() as ProjectDoc;
+  });
 
-  stopMembers = onSnapshot(collection(db, 'projects', projectId.value, 'members'), (snapshot) => {
-    const list = snapshot.docs.map((docSnap) => {
-      const data = docSnap.data() as any
-      const userId = data.userId || docSnap.id
-      const role: MemberRole = data.role || 'member'
-      const roles = (data.roles as string[] | undefined) ?? [role]
-      const permissions = data.permissions ?? buildPermissionsFromRoles(roles)
-      const statusLabel = getStatusLabel(data.lastAccessedAt)
-      return {
-        id: docSnap.id,
-        userId,
-        role,
-        roles,
-        displayName: data.nickname || data.fullName || `メンバー ${userId.slice(-4)}`,
-        email: data.email || null,
-        avatarUrl: data.avatarUrl || null,
-        statusLabel,
-        statusClass: getStatusClass(statusLabel),
-        lastAccessedAt: data.lastAccessedAt,
-        permissions,
-      } satisfies MemberDisplay
-    })
-    const rank: Record<MemberRole, number> = { owner: 0, admin: 1, member: 2, viewer: 3 }
-    members.value = list.sort((a, b) => rank[a.role] - rank[b.role])
-  })
+  stopMembers = onSnapshot(
+    collection(db, "projects", projectId.value, "members"),
+    (snapshot) => {
+      const list = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as any;
+        const userId = data.userId || docSnap.id;
+        const role: MemberRole = data.role || "member";
+        const roles = (data.roles as string[] | undefined) ?? [role];
+        const permissions =
+          data.permissions ?? buildPermissionsFromRoles(roles);
+        const statusLabel = getStatusLabel(data.lastAccessedAt);
+        return {
+          id: docSnap.id,
+          userId,
+          role,
+          roles,
+          displayName:
+            data.nickname || data.fullName || `メンバー ${userId.slice(-4)}`,
+          email: data.email || null,
+          avatarUrl: data.avatarUrl || null,
+          statusLabel,
+          statusClass: getStatusClass(statusLabel),
+          lastAccessedAt: data.lastAccessedAt,
+          permissions,
+        } satisfies MemberDisplay;
+      });
+      const rank: Record<MemberRole, number> = {
+        owner: 0,
+        admin: 1,
+        member: 2,
+        viewer: 3,
+      };
+      members.value = list.sort((a, b) => rank[a.role] - rank[b.role]);
+    },
+  );
 }
 
 function resetWatchers() {
-  stopProject?.()
-  stopMembers?.()
-  watchProject()
+  stopProject?.();
+  stopMembers?.();
+  watchProject();
 }
 
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 function scrollToInvite() {
-  const target = document.getElementById('member-invite')
-  target?.scrollIntoView({ behavior: 'smooth' })
+  const target = document.getElementById("member-invite");
+  target?.scrollIntoView({ behavior: "smooth" });
 }
 
 function handleLinkGenerated(link: string) {
-  latestInviteLink.value = link
-  inviteNotification.value = '共有リンクを作成しました。リンクをコピーしてメンバーに共有してください。'
+  latestInviteLink.value = link;
+  inviteNotification.value =
+    "共有リンクを作成しました。リンクをコピーしてメンバーに共有してください。";
 }
 
 async function handleRemoveMember(member: MemberDisplay) {
-  if (!canManageMembers.value) return
-  if (member.role === 'owner' || member.userId === user.value?.uid) return
-  if (!confirm(`「${member.displayName}」をプロジェクトから削除しますか？`)) return
-  removingMemberId.value = member.userId
+  if (!canManageMembers.value) return;
+  if (member.role === "owner" || member.userId === user.value?.uid) return;
+  if (!confirm(`「${member.displayName}」をプロジェクトから削除しますか？`))
+    return;
+  removingMemberId.value = member.userId;
   try {
-    await removeProjectMember(projectId.value, member.userId)
-    memberActionError.value = ''
+    await removeProjectMember(projectId.value, member.userId);
+    memberActionError.value = "";
   } catch (error) {
-    logger.error`Failed to remove member: ${error}`
-    memberActionError.value = 'メンバーの削除に失敗しました。'
+    logger.error`Failed to remove member: ${error}`;
+    memberActionError.value = "メンバーの削除に失敗しました。";
   } finally {
-    removingMemberId.value = ''
+    removingMemberId.value = "";
   }
 }
 
 async function handleChangeRole(member: MemberDisplay, nextRole: MemberRole) {
-  if (!canManageMembers.value) return
-  if (member.role === 'owner') return
+  if (!canManageMembers.value) return;
+  if (member.role === "owner") return;
   if (member.userId === user.value?.uid && nextRole !== member.role) {
-    if (!confirm('自分のロールを変更すると管理権限を失う可能性があります。続行しますか？')) {
-      return
+    if (
+      !confirm(
+        "自分のロールを変更すると管理権限を失う可能性があります。続行しますか？",
+      )
+    ) {
+      return;
     }
   }
-  updatingRoleId.value = member.userId
+  updatingRoleId.value = member.userId;
   try {
-    await updateProjectMemberRole(projectId.value, member.userId, nextRole)
-    memberActionError.value = ''
+    await updateProjectMemberRole(projectId.value, member.userId, nextRole);
+    memberActionError.value = "";
   } catch (error) {
-    logger.error`Failed to update role: ${error}`
-    memberActionError.value = 'ロールの更新に失敗しました。'
+    logger.error`Failed to update role: ${error}`;
+    memberActionError.value = "ロールの更新に失敗しました。";
   } finally {
-    updatingRoleId.value = ''
+    updatingRoleId.value = "";
   }
 }
 
 function onRoleChange(member: MemberDisplay, event: Event) {
-  const target = event.target as HTMLSelectElement
-  const value = (target?.value as MemberRole) || member.role
-  void handleChangeRole(member, value)
+  const target = event.target as HTMLSelectElement;
+  const value = (target?.value as MemberRole) || member.role;
+  void handleChangeRole(member, value);
 }
 
 function getStatusLabel(timestamp?: { seconds: number }) {
-  if (!timestamp?.seconds) return 'オフライン'
-  const diff = Date.now() - timestamp.seconds * 1000
-  if (diff < 1000 * 60 * 5) return 'オンライン'
-  if (diff < 1000 * 60 * 60) return '離席中'
-  return 'オフライン'
+  if (!timestamp?.seconds) return "オフライン";
+  const diff = Date.now() - timestamp.seconds * 1000;
+  if (diff < 1000 * 60 * 5) return "オンライン";
+  if (diff < 1000 * 60 * 60) return "離席中";
+  return "オフライン";
 }
 
-function getStatusClass(label: string): MemberDisplay['statusClass'] {
-  if (label === 'オンライン') return 'online'
-  if (label === '離席中') return 'away'
-  return 'offline'
+function getStatusClass(label: string): MemberDisplay["statusClass"] {
+  if (label === "オンライン") return "online";
+  if (label === "離席中") return "away";
+  return "offline";
 }
 
 function getInitials(name: string) {
-  if (!name) return '??'
-  const trimmed = name.trim()
-  return trimmed.length <= 2 ? trimmed : trimmed.slice(0, 2)
+  if (!name) return "??";
+  const trimmed = name.trim();
+  return trimmed.length <= 2 ? trimmed : trimmed.slice(0, 2);
 }
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  loadProjectList()
-  resetWatchers()
-})
+  loadProjectList();
+  resetWatchers();
+});
 
 watch(
   () => route.params.projectId,
   (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    resetWatchers()
+    if (!newId) return;
+    projectId.value = String(newId);
+    resetWatchers();
   },
-)
+);
 
 onBeforeUnmount(() => {
-  stopProject?.()
-  stopMembers?.()
-})
+  stopProject?.();
+  stopMembers?.();
+});
 </script>
 
 <template>
@@ -280,15 +335,30 @@ onBeforeUnmount(() => {
     <div class="demo__main">
       <header class="demo__topbar">
         <div class="demo__topbar-left">
-          <button type="button" class="demo__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="demo__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="demo__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="demo__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
             <p class="demo__breadcrumb">プロジェクト &gt; メンバー</p>
-            <h1 class="demo__heading">{{ project?.name || 'プロジェクト' }}</h1>
+            <h1 class="demo__heading">{{ project?.name || "プロジェクト" }}</h1>
           </div>
         </div>
       </header>
@@ -300,9 +370,18 @@ onBeforeUnmount(() => {
               <h2>チーム</h2>
               <p>メンバーの状態と権限をまとめて確認できます。</p>
             </div>
-            <button type="button" class="team-page__invite" @click="scrollToInvite">
+            <button
+              type="button"
+              class="team-page__invite"
+              @click="scrollToInvite"
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M12 5v14M5 12h14" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                <path
+                  d="M12 5v14M5 12h14"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
               メンバーを招待
             </button>
@@ -324,19 +403,27 @@ onBeforeUnmount(() => {
           </div>
 
           <ul class="team-member__list">
-            <li v-for="member in members" :key="member.userId" class="team-member">
+            <li
+              v-for="member in members"
+              :key="member.userId"
+              class="team-member"
+            >
               <div class="team-member__persona">
                 <div class="avatar" aria-hidden="true">
                   <span>{{ getInitials(member.displayName) }}</span>
                 </div>
                 <div>
                   <p class="team-member__name">{{ member.displayName }}</p>
-                  <p class="team-member__email">{{ member.email || 'メール未登録' }}</p>
+                  <p class="team-member__email">
+                    {{ member.email || "メール未登録" }}
+                  </p>
                 </div>
               </div>
 
               <div class="team-member__role">
-                <label class="sr-only" :for="`role-${member.userId}`">ロール</label>
+                <label class="sr-only" :for="`role-${member.userId}`"
+                  >ロール</label
+                >
                 <select
                   v-if="canManageMembers && member.role !== 'owner'"
                   :id="`role-${member.userId}`"
@@ -344,19 +431,31 @@ onBeforeUnmount(() => {
                   :disabled="updatingRoleId === member.userId"
                   @change="onRoleChange(member, $event)"
                 >
-                  <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+                  <option v-for="role in roleOptions" :key="role" :value="role">
+                    {{ role }}
+                  </option>
                 </select>
-                <span v-else class="badge" :class="`role-${member.role}`">{{ member.role }}</span>
+                <span v-else class="badge" :class="`role-${member.role}`">{{
+                  member.role
+                }}</span>
               </div>
 
               <div class="team-member__details">
-                <span class="status-indicator" :class="`status-${member.statusClass}`">{{ member.statusLabel }}</span>
+                <span
+                  class="status-indicator"
+                  :class="`status-${member.statusClass}`"
+                  >{{ member.statusLabel }}</span
+                >
                 <span class="badge badge--muted">role: {{ member.role }}</span>
               </div>
 
               <div class="team-member__actions">
                 <AppButton
-                  v-if="canManageMembers && member.role !== 'owner' && member.userId !== user?.uid"
+                  v-if="
+                    canManageMembers &&
+                    member.role !== 'owner' &&
+                    member.userId !== user?.uid
+                  "
                   variant="outline"
                   :loading="removingMemberId === member.userId"
                   @click="handleRemoveMember(member)"
@@ -364,28 +463,45 @@ onBeforeUnmount(() => {
                   削除
                 </AppButton>
                 <span v-else class="team-member__note">
-                  {{ member.role === 'owner' ? 'オーナー' : 'アクセス権限なし' }}
+                  {{
+                    member.role === "owner" ? "オーナー" : "アクセス権限なし"
+                  }}
                 </span>
               </div>
             </li>
-            <li v-if="!members.length" class="team-member team-member--empty">まだメンバーがいません。</li>
+            <li v-if="!members.length" class="team-member team-member--empty">
+              まだメンバーがいません。
+            </li>
           </ul>
-          <p v-if="memberActionError" class="team-member__error">{{ memberActionError }}</p>
+          <p v-if="memberActionError" class="team-member__error">
+            {{ memberActionError }}
+          </p>
         </section>
 
         <section id="member-invite" class="invite-panel">
           <header>
             <div>
               <h3>参加リンクを共有</h3>
-              <p>リンクをコピーして共有すると、メンバーはこのプロジェクトに参加できます。</p>
+              <p>
+                リンクをコピーして共有すると、メンバーはこのプロジェクトに参加できます。
+              </p>
             </div>
-            <p class="invite-panel__hint">必要に応じてパスワードを設定してください。</p>
+            <p class="invite-panel__hint">
+              必要に応じてパスワードを設定してください。
+            </p>
           </header>
 
-          <ProjectInviteForm :project-id="projectId" @generated="handleLinkGenerated" />
+          <ProjectInviteForm
+            :project-id="projectId"
+            @generated="handleLinkGenerated"
+          />
 
-          <p v-if="latestInviteLink" class="invite-panel__link">{{ latestInviteLink }}</p>
-          <p v-if="inviteNotification" class="invite-panel__message">{{ inviteNotification }}</p>
+          <p v-if="latestInviteLink" class="invite-panel__link">
+            {{ latestInviteLink }}
+          </p>
+          <p v-if="inviteNotification" class="invite-panel__message">
+            {{ inviteNotification }}
+          </p>
         </section>
       </div>
     </div>
@@ -393,7 +509,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .team-page {
   display: flex;

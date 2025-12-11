@@ -1,28 +1,28 @@
 <script setup lang="ts">
-import UserAvatar from '@/components/common/UserAvatar.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { useAuthStore } from '@/store/auth'
-import { computed } from 'vue'
+import UserAvatar from "@/components/common/UserAvatar.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { useAuthStore } from "@/store/auth";
+import { computed } from "vue";
 
 type ProfileInput = {
-  name?: string | null
-  email?: string | null
-  avatarUrl?: string | null
-  avatar?: string | null
-  nickname?: string | null
-  fullName?: string | null
-}
+  name?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+  avatar?: string | null;
+  nickname?: string | null;
+  fullName?: string | null;
+};
 
 const props = defineProps<{
-  profile?: ProfileInput | null
-}>()
+  profile?: ProfileInput | null;
+}>();
 
-const { profile: storeProfile, user } = useAuthStore()
+const { profile: storeProfile, user } = useAuthStore();
 
 const profileInfo = computed(() => {
-  const provided = props.profile
-  const store = storeProfile.value
+  const provided = props.profile;
+  const store = storeProfile.value;
 
   const name =
     provided?.name ||
@@ -30,19 +30,28 @@ const profileInfo = computed(() => {
     provided?.fullName ||
     store?.nickname ||
     store?.fullName ||
-    `${appName} User`
+    `${appName} User`;
 
-  const email = provided?.email || store?.email || ''
-  const avatarUrl = provided?.avatarUrl ?? provided?.avatar ?? store?.avatarUrl ?? user.value?.photoURL ?? null
+  const email = provided?.email || store?.email || "";
+  const avatarUrl =
+    provided?.avatarUrl ??
+    provided?.avatar ??
+    store?.avatarUrl ??
+    user.value?.photoURL ??
+    null;
 
-  return { name, email, avatarUrl }
-})
+  return { name, email, avatarUrl };
+});
 </script>
 
 <template>
   <router-link :to="{ name: ROUTE_NAMES.myPage }" class="user-profile">
     <div class="user-avatar-container">
-      <UserAvatar :src="profileInfo.avatarUrl" :name="profileInfo.name" :size="36" />
+      <UserAvatar
+        :src="profileInfo.avatarUrl"
+        :name="profileInfo.name"
+        :size="36"
+      />
     </div>
     <div class="user-info">
       <div class="user-name">{{ profileInfo.name }}</div>

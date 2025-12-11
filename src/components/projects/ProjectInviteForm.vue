@@ -1,62 +1,67 @@
 <script setup lang="ts">
-import { createProjectInvite } from '@/services/projectInvites'
-import { useAuthStore } from '@/store/auth'
-import { getLogger } from '@logtape/logtape'
-import { ref } from 'vue'
+import { createProjectInvite } from "@/services/projectInvites";
+import { useAuthStore } from "@/store/auth";
+import { getLogger } from "@logtape/logtape";
+import { ref } from "vue";
 
-const logger = getLogger('app.components.projects.ProjectInviteForm')
+const logger = getLogger("app.components.projects.ProjectInviteForm");
 
 const props = withDefaults(
   defineProps<{
-    projectId: string
-    label?: string
+    projectId: string;
+    label?: string;
   }>(),
   {
-    label: 'プロジェクト参加リンク',
+    label: "プロジェクト参加リンク",
   },
-)
+);
 
 const emit = defineEmits<{
-  (e: 'generated', link: string): void
-}>()
+  (e: "generated", link: string): void;
+}>();
 
-const { user } = useAuthStore()
-const enablePassword = ref(false)
-const password = ref('')
+const { user } = useAuthStore();
+const enablePassword = ref(false);
+const password = ref("");
 const expiryOptions = [
-  { label: '24時間', value: 24 },
-  { label: '7日間', value: 24 * 7 },
-  { label: '30日間', value: 24 * 30 },
-  { label: '期限なし', value: null },
-]
-const expiry = ref<number | null>(24 * 7)
-const maxUses = ref<string>('')
-const generating = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-const generatedLink = ref('')
+  { label: "24時間", value: 24 },
+  { label: "7日間", value: 24 * 7 },
+  { label: "30日間", value: 24 * 30 },
+  { label: "期限なし", value: null },
+];
+const expiry = ref<number | null>(24 * 7);
+const maxUses = ref<string>("");
+const generating = ref(false);
+const errorMessage = ref("");
+const successMessage = ref("");
+const generatedLink = ref("");
 
 async function handleGenerate() {
   if (!user.value) {
-    errorMessage.value = 'リンクを作成するにはログインが必要です。'
-    return
+    errorMessage.value = "リンクを作成するにはログインが必要です。";
+    return;
   }
   if (!props.projectId) {
-    errorMessage.value = 'プロジェクトIDが無効です。'
-    return
+    errorMessage.value = "プロジェクトIDが無効です。";
+    return;
   }
   if (enablePassword.value && password.value.trim().length < 4) {
-    errorMessage.value = 'パスワードは4文字以上で入力してください。'
-    return
+    errorMessage.value = "パスワードは4文字以上で入力してください。";
+    return;
   }
-  const maxUsesNumber = maxUses.value.trim() ? Number(maxUses.value.trim()) : null
-  if (maxUsesNumber !== null && (!Number.isFinite(maxUsesNumber) || maxUsesNumber < 1)) {
-    errorMessage.value = '利用回数は1以上の数値を入力してください。'
-    return
+  const maxUsesNumber = maxUses.value.trim()
+    ? Number(maxUses.value.trim())
+    : null;
+  if (
+    maxUsesNumber !== null &&
+    (!Number.isFinite(maxUsesNumber) || maxUsesNumber < 1)
+  ) {
+    errorMessage.value = "利用回数は1以上の数値を入力してください。";
+    return;
   }
-  generating.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  generating.value = true;
+  errorMessage.value = "";
+  successMessage.value = "";
   try {
     const token = await createProjectInvite({
       projectId: props.projectId,
@@ -64,59 +69,65 @@ async function handleGenerate() {
       password: enablePassword.value ? password.value.trim() : null,
       expiresInHours: expiry.value ?? null,
       maxUses: maxUsesNumber,
-    })
-    const link = typeof window !== 'undefined' ? `${window.location.origin}/invite/${token}` : token
-    generatedLink.value = link
-    successMessage.value = '共有リンクを作成しました。コピーしてメンバーに共有してください。'
-    emit('generated', link)
+    });
+    const link =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/invite/${token}`
+        : token;
+    generatedLink.value = link;
+    successMessage.value =
+      "共有リンクを作成しました。コピーしてメンバーに共有してください。";
+    emit("generated", link);
     if (!enablePassword.value) {
-      password.value = ''
+      password.value = "";
     }
   } catch (error) {
-    logger.error`Failed to generate invite link: ${error}`
-    errorMessage.value = 'リンクの生成に失敗しました。時間をおいてもう一度お試しください。'
+    logger.error`Failed to generate invite link: ${error}`;
+    errorMessage.value =
+      "リンクの生成に失敗しました。時間をおいてもう一度お試しください。";
   } finally {
-    generating.value = false
+    generating.value = false;
   }
 }
 
 async function copyLink() {
-  if (!generatedLink.value) return
+  if (!generatedLink.value) return;
   try {
-    if (typeof navigator === 'undefined' || !navigator.clipboard) {
-      throw new Error('Clipboard API unavailable')
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      throw new Error("Clipboard API unavailable");
     }
-    await navigator.clipboard.writeText(generatedLink.value)
-    successMessage.value = 'リンクをコピーしました。'
+    await navigator.clipboard.writeText(generatedLink.value);
+    successMessage.value = "リンクをコピーしました。";
   } catch (error) {
-    logger.warn`Failed to copy link: ${error}`
-    const fallbackSuccess = tryFallbackCopy(generatedLink.value)
+    logger.warn`Failed to copy link: ${error}`;
+    const fallbackSuccess = tryFallbackCopy(generatedLink.value);
     if (fallbackSuccess) {
-      successMessage.value = 'リンクをコピーしました。'
+      successMessage.value = "リンクをコピーしました。";
     } else {
-      errorMessage.value = 'コピーに失敗しました。リンクを手動で選択してください。'
+      errorMessage.value =
+        "コピーに失敗しました。リンクを手動で選択してください。";
     }
   }
 }
 
 function tryFallbackCopy(text: string) {
-  if (typeof document === 'undefined') return false
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.style.position = 'fixed'
-  textarea.style.left = '-9999px'
-  document.body.appendChild(textarea)
-  textarea.focus()
-  textarea.select()
-  let success = false
+  if (typeof document === "undefined") return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let success = false;
   try {
-    success = document.execCommand('copy')
+    success = document.execCommand("copy");
   } catch (error) {
-    success = false
+    success = false;
   } finally {
-    document.body.removeChild(textarea)
+    document.body.removeChild(textarea);
   }
-  return success
+  return success;
 }
 </script>
 
@@ -124,7 +135,9 @@ function tryFallbackCopy(text: string) {
   <div class="invite-card">
     <header>
       <h3>{{ props.label }}</h3>
-      <p>リンクを共有するとプロジェクトへ参加できます。必要に応じてパスワードを設定してください。</p>
+      <p>
+        リンクを共有するとプロジェクトへ参加できます。必要に応じてパスワードを設定してください。
+      </p>
     </header>
 
     <div class="invite-options">
@@ -142,7 +155,11 @@ function tryFallbackCopy(text: string) {
 
       <label class="small-label">有効期限</label>
       <select v-model="expiry">
-        <option v-for="opt in expiryOptions" :key="String(opt.value)" :value="opt.value">
+        <option
+          v-for="opt in expiryOptions"
+          :key="String(opt.value)"
+          :value="opt.value"
+        >
           {{ opt.label }}
         </option>
       </select>
@@ -153,7 +170,7 @@ function tryFallbackCopy(text: string) {
 
     <div class="invite-actions">
       <button type="button" :disabled="generating" @click="handleGenerate">
-        {{ generating ? '生成中...' : '参加リンクを生成' }}
+        {{ generating ? "生成中..." : "参加リンクを生成" }}
       </button>
     </div>
 
@@ -201,7 +218,7 @@ function tryFallbackCopy(text: string) {
 }
 
 .invite-options select,
-.invite-options input[type='number'] {
+.invite-options input[type="number"] {
   border: 2px solid #b8e3e9;
   border-radius: 0.9rem;
   padding: 0.6rem 0.9rem;
@@ -221,7 +238,7 @@ function tryFallbackCopy(text: string) {
   font-size: 0.9rem;
 }
 
-.invite-options input[type='password'] {
+.invite-options input[type="password"] {
   border: 2px solid #b8e3e9;
   border-radius: 0.9rem;
   padding: 0.75rem 1rem;

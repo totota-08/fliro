@@ -1,250 +1,279 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/firebase/config'
-import { deleteTask, updateTask, type TaskDoc } from '@/services/taskService'
-import { useAuthStore } from '@/store/auth'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
-import { collection, getDocs } from 'firebase/firestore'
-import { computed, onMounted, ref } from 'vue'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/firebase/config";
+import { deleteTask, updateTask, type TaskDoc } from "@/services/taskService";
+import { useAuthStore } from "@/store/auth";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { getLogger } from "@logtape/logtape";
+import { collection, getDocs } from "firebase/firestore";
+import { computed, onMounted, ref } from "vue";
 
-const logger = getLogger('app.pages.tasks.MyTasks')
+const logger = getLogger("app.pages.tasks.MyTasks");
 
-const { user, profile } = useAuthStore()
+const { user, profile } = useAuthStore();
 
-const isSidebarOpen = ref(true)
-const loading = ref(true)
-const errorMessage = ref('')
-const activeTab = ref<'active' | 'completed'>('active')
-const tasks = ref<TaskDoc[]>([])
-const projects = ref<{ id: string; name: string }[]>([])
+const isSidebarOpen = ref(true);
+const loading = ref(true);
+const errorMessage = ref("");
+const activeTab = ref<"active" | "completed">("active");
+const tasks = ref<TaskDoc[]>([]);
+const projects = ref<{ id: string; name: string }[]>([]);
 
 /**
  * Sidebar 用ナビゲーション
  */
 const navItems = computed<DashboardNavItem[]>(() => {
-  const firstProjectId = projects.value[0]?.id
+  const firstProjectId = projects.value[0]?.id;
   return [
     {
-      key: 'dashboard' as const,
-      label: 'ダッシュボード',
+      key: "dashboard" as const,
+      label: "ダッシュボード",
       to: firstProjectId
-        ? { name: ROUTE_NAMES.projectDashboard, params: { projectId: firstProjectId } }
+        ? {
+            name: ROUTE_NAMES.projectDashboard,
+            params: { projectId: firstProjectId },
+          }
         : undefined,
-      icon: 'dashboard',
+      icon: "dashboard",
       disabled: !firstProjectId,
     },
     {
-      key: 'tasks',
-      label: 'マイタスク',
+      key: "tasks",
+      label: "マイタスク",
       to: { name: ROUTE_NAMES.myTasks },
-      icon: 'tasks',
+      icon: "tasks",
     },
     {
-      key: 'team' as const,
-      label: 'チャット',
-      icon: 'team',
-      to: firstProjectId ? { name: ROUTE_NAMES.projectThreads, params: { projectId: firstProjectId } } : undefined,
+      key: "team" as const,
+      label: "チャット",
+      icon: "team",
+      to: firstProjectId
+        ? {
+            name: ROUTE_NAMES.projectThreads,
+            params: { projectId: firstProjectId },
+          }
+        : undefined,
       disabled: !firstProjectId,
-      tooltip: firstProjectId ? undefined : 'プロジェクトを選択してください',
+      tooltip: firstProjectId ? undefined : "プロジェクトを選択してください",
     },
     {
-      key: 'members',
-      label: 'メンバー',
-      icon: 'members',
-      to: firstProjectId ? { name: ROUTE_NAMES.projectMembers, params: { projectId: firstProjectId } } : undefined,
+      key: "members",
+      label: "メンバー",
+      icon: "members",
+      to: firstProjectId
+        ? {
+            name: ROUTE_NAMES.projectMembers,
+            params: { projectId: firstProjectId },
+          }
+        : undefined,
       disabled: !firstProjectId,
     },
     {
-      key: 'settings' as const,
-      label: '設定',
-      icon: 'settings',
-      to: firstProjectId ? { name: ROUTE_NAMES.projectSettings, params: { projectId: firstProjectId } } : undefined,
+      key: "settings" as const,
+      label: "設定",
+      icon: "settings",
+      to: firstProjectId
+        ? {
+            name: ROUTE_NAMES.projectSettings,
+            params: { projectId: firstProjectId },
+          }
+        : undefined,
       disabled: !firstProjectId,
     },
-  ] satisfies DashboardNavItem[]
-})
+  ] satisfies DashboardNavItem[];
+});
 
 const sidebarProjects = computed(() =>
   projects.value.map((project, index) => ({
     key: project.id,
     label: project.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: project.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as
-      | 'primary'
-      | 'secondary'
-      | 'accent'),
+    to: {
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: project.id },
+    },
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
 /**
  * Firestore からタスク読み込み
  */
 async function loadTasks() {
-  if (!user.value) return
-  loading.value = true
-  errorMessage.value = ''
+  if (!user.value) return;
+  loading.value = true;
+  errorMessage.value = "";
   try {
-    const projectEntries: { id: string; name: string }[] = []
-    const items: TaskDoc[] = []
+    const projectEntries: { id: string; name: string }[] = [];
+    const items: TaskDoc[] = [];
 
     const projectsSnap = await getDocs(
-      collection(db, 'userProjects', user.value.uid, 'projects'),
-    )
+      collection(db, "userProjects", user.value.uid, "projects"),
+    );
 
     for (const docSnap of projectsSnap.docs) {
-      const name = (docSnap.data().projectName as string) || 'プロジェクト'
-      const projectId = docSnap.id
-      projectEntries.push({ id: projectId, name })
+      const name = (docSnap.data().projectName as string) || "プロジェクト";
+      const projectId = docSnap.id;
+      projectEntries.push({ id: projectId, name });
 
-      const taskSnap = await getDocs(collection(db, 'projects', projectId, 'tasks'))
+      const taskSnap = await getDocs(
+        collection(db, "projects", projectId, "tasks"),
+      );
       taskSnap.forEach((taskDoc) => {
-        const data = taskDoc.data() as TaskDoc
-        items.push({ ...data, id: taskDoc.id, projectId })
-      })
+        const data = taskDoc.data() as TaskDoc;
+        items.push({ ...data, id: taskDoc.id, projectId });
+      });
     }
 
-    projects.value = projectEntries
-    tasks.value = items.filter((task) => task.assigneeId === user.value?.uid)
+    projects.value = projectEntries;
+    tasks.value = items.filter((task) => task.assigneeId === user.value?.uid);
   } catch (error) {
-    logger.error`Failed to load tasks: ${error}`
+    logger.error`Failed to load tasks: ${error}`;
     errorMessage.value =
-      'タスクを取得できませんでした。アクセス権限をご確認ください。'
+      "タスクを取得できませんでした。アクセス権限をご確認ください。";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 /**
  * UI 用の拡張型
  */
-type DisplayStatus = '完了' | '進行中' | 'レビュー待ち' | '未着手'
-type DisplayPriority = '高' | '中' | '低'
+type DisplayStatus = "完了" | "進行中" | "レビュー待ち" | "未着手";
+type DisplayPriority = "高" | "中" | "低";
 
 type DecoratedTask = TaskDoc & {
-  projectName: string
-  projectColor: string
-  dueMessage: string
-  dueClass: '' | 'due-over' | 'due-soon'
-  dueDateLabel: string
-  displayStatus: DisplayStatus
-  displayPriority: DisplayPriority
-}
+  projectName: string;
+  projectColor: string;
+  dueMessage: string;
+  dueClass: "" | "due-over" | "due-soon";
+  dueDateLabel: string;
+  displayStatus: DisplayStatus;
+  displayPriority: DisplayPriority;
+};
 
 /**
  * ステータス → バッジクラス
  */
 const getStatusBadgeClass = (status: DisplayStatus) => {
   switch (status) {
-    case '完了':
-      return 'badge status-done'
-    case '進行中':
-      return 'badge status-progress'
-    case 'レビュー待ち':
-      return 'badge status-review'
+    case "完了":
+      return "badge status-done";
+    case "進行中":
+      return "badge status-progress";
+    case "レビュー待ち":
+      return "badge status-review";
     default:
-      return 'badge status-todo'
+      return "badge status-todo";
   }
-}
+};
 
 /**
  * 優先度 → バッジクラス
  */
 const getPriorityBadgeClass = (priority: DisplayPriority) => {
   switch (priority) {
-    case '高':
-      return 'badge priority-high'
-    case '中':
-      return 'badge priority-medium'
+    case "高":
+      return "badge priority-high";
+    case "中":
+      return "badge priority-medium";
     default:
-      return 'badge priority-low'
+      return "badge priority-low";
   }
-}
+};
 
 /**
  * 期限までの日数計算（Date → 日数）
  */
 const getDaysDiff = (due: Date, base = new Date()) => {
-  const diffTime = due.getTime() - base.getTime()
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-}
+  const diffTime = due.getTime() - base.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
 /**
  * Firestore タスク → UI 用タスクに変換
  */
 function decorate(task: TaskDoc): DecoratedTask {
-  const projectIndex = projects.value.findIndex((entry) => entry.id === task.projectId)
-  const project = projects.value[projectIndex]
-  const projectName: string = project?.name ?? 'プロジェクト'
-  const projectColors = ['task-dot--primary', 'task-dot--secondary', 'task-dot--accent']
+  const projectIndex = projects.value.findIndex(
+    (entry) => entry.id === task.projectId,
+  );
+  const project = projects.value[projectIndex];
+  const projectName: string = project?.name ?? "プロジェクト";
+  const projectColors = [
+    "task-dot--primary",
+    "task-dot--secondary",
+    "task-dot--accent",
+  ];
   const projectColor: string =
     projectIndex >= 0
-      ? projectColors[projectIndex % projectColors.length] ?? 'task-dot--primary'
-      : 'task-dot--primary'
+      ? (projectColors[projectIndex % projectColors.length] ??
+        "task-dot--primary")
+      : "task-dot--primary";
 
-  const due =
-    (task as any).dueDate?.seconds
-      ? new Date((task as any).dueDate.seconds * 1000)
-      : null
+  const due = (task as any).dueDate?.seconds
+    ? new Date((task as any).dueDate.seconds * 1000)
+    : null;
 
-  let dueMessage = '期限未設定'
-  let dueClass: DecoratedTask['dueClass'] = ''
-  let dueDateLabel = '未設定'
+  let dueMessage = "期限未設定";
+  let dueClass: DecoratedTask["dueClass"] = "";
+  let dueDateLabel = "未設定";
 
   if (due) {
-    const diff = getDaysDiff(due)
-    dueDateLabel = due.toISOString().slice(0, 10)
+    const diff = getDaysDiff(due);
+    dueDateLabel = due.toISOString().slice(0, 10);
 
     if (diff < 0) {
-      dueMessage = `${Math.abs(diff)}日遅れ`
-      dueClass = 'due-over'
+      dueMessage = `${Math.abs(diff)}日遅れ`;
+      dueClass = "due-over";
     } else if (diff === 0) {
-      dueMessage = '今日が期限'
-      dueClass = 'due-soon'
+      dueMessage = "今日が期限";
+      dueClass = "due-soon";
     } else {
-      dueMessage = `あと${diff}日`
-      if (diff <= 3) dueClass = 'due-soon'
+      dueMessage = `あと${diff}日`;
+      if (diff <= 3) dueClass = "due-soon";
     }
   }
 
   // ステータス（英語）→ 表示用日本語
-  let displayStatus: DisplayStatus = '未着手'
+  let displayStatus: DisplayStatus = "未着手";
   switch ((task as any).status) {
-    case 'done':
-      displayStatus = '完了'
-      break
-    case 'in-progress':
-      displayStatus = '進行中'
-      break
-    case 'review':
-      displayStatus = 'レビュー待ち'
-      break
-    case 'todo':
+    case "done":
+      displayStatus = "完了";
+      break;
+    case "in-progress":
+      displayStatus = "進行中";
+      break;
+    case "review":
+      displayStatus = "レビュー待ち";
+      break;
+    case "todo":
     default:
-      displayStatus = '未着手'
-      break
+      displayStatus = "未着手";
+      break;
   }
 
   // 優先度（想定: 'high' | 'medium' | 'low'）→ 日本語
-  let displayPriority: DisplayPriority = '中'
+  let displayPriority: DisplayPriority = "中";
   switch ((task as any).priority) {
-    case 'high':
-      displayPriority = '高'
-      break
-    case 'low':
-      displayPriority = '低'
-      break
-    case 'medium':
+    case "high":
+      displayPriority = "高";
+      break;
+    case "low":
+      displayPriority = "低";
+      break;
+    case "medium":
     default:
-      displayPriority = '中'
-      break
+      displayPriority = "中";
+      break;
   }
 
   return {
@@ -256,59 +285,62 @@ function decorate(task: TaskDoc): DecoratedTask {
     dueDateLabel,
     displayStatus,
     displayPriority,
-  }
+  };
 }
 
-const decoratedTasks = computed(() => tasks.value.map(decorate))
+const decoratedTasks = computed(() => tasks.value.map(decorate));
 const activeTasks = computed(() =>
-  decoratedTasks.value.filter((task) => (task as any).status !== 'done'),
-)
+  decoratedTasks.value.filter((task) => (task as any).status !== "done"),
+);
 const completedTasks = computed(() =>
-  decoratedTasks.value.filter((task) => (task as any).status === 'done'),
-)
+  decoratedTasks.value.filter((task) => (task as any).status === "done"),
+);
 
 const stats = computed(() => ({
   total: decoratedTasks.value.length,
-  progress: decoratedTasks.value.filter((task) => (task as any).status === 'in-progress')
-    .length,
-  review: decoratedTasks.value.filter((task) => (task as any).status === 'review').length,
+  progress: decoratedTasks.value.filter(
+    (task) => (task as any).status === "in-progress",
+  ).length,
+  review: decoratedTasks.value.filter(
+    (task) => (task as any).status === "review",
+  ).length,
   done: completedTasks.value.length,
-}))
+}));
 
 /**
  * 完了トグル & 削除
  */
 async function toggleComplete(task: DecoratedTask) {
-  const next = (task as any).status === 'done' ? 'todo' : 'done'
-  await updateTask(task.projectId, task.id, { status: next } as any)
-  await loadTasks()
+  const next = (task as any).status === "done" ? "todo" : "done";
+  await updateTask(task.projectId, task.id, { status: next } as any);
+  await loadTasks();
 }
 
 async function removeTask(task: DecoratedTask) {
-  await deleteTask(task.projectId, task.id)
-  await loadTasks()
+  await deleteTask(task.projectId, task.id);
+  await loadTasks();
 }
 
 /**
  * サイドバー制御
  */
 const closeSidebar = () => {
-  isSidebarOpen.value = false
-}
+  isSidebarOpen.value = false;
+};
 
 const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-}
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
 
 /**
  * 初期ロード
  */
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  loadTasks()
-})
+  loadTasks();
+});
 </script>
 
 <template>
@@ -326,7 +358,11 @@ onMounted(() => {
     <div class="demo__main">
       <header class="demo__topbar">
         <div class="demo__topbar-left">
-          <button type="button" class="demo__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="demo__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
             <svg
               v-if="!isSidebarOpen"
@@ -337,7 +373,11 @@ onMounted(() => {
               stroke="currentColor"
               stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
             <svg
               v-else
@@ -348,7 +388,11 @@ onMounted(() => {
               stroke="currentColor"
               stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 6l12 12M18 6l-12 12"
+              />
             </svg>
           </button>
           <div>
@@ -398,7 +442,11 @@ onMounted(() => {
           </section>
 
           <section class="tasks-tabs">
-            <div class="tasks-tabs__list" role="tablist" aria-label="タスクの状態">
+            <div
+              class="tasks-tabs__list"
+              role="tablist"
+              aria-label="タスクの状態"
+            >
               <button
                 type="button"
                 class="tasks-tabs__trigger"
@@ -423,7 +471,9 @@ onMounted(() => {
 
             <div class="tasks-tabs__content" role="tabpanel">
               <!-- 状態メッセージ -->
-              <section v-if="loading" class="tasks-empty">読み込み中...</section>
+              <section v-if="loading" class="tasks-empty">
+                読み込み中...
+              </section>
               <section v-else-if="errorMessage" class="tasks-empty">
                 {{ errorMessage }}
               </section>
@@ -453,32 +503,45 @@ onMounted(() => {
                   >
                     <div class="task-card__headline">
                       <div class="task-card__project">
-                        <span :class="['task-dot', task.projectColor]" aria-hidden="true" />
+                        <span
+                          :class="['task-dot', task.projectColor]"
+                          aria-hidden="true"
+                        />
                         <span>{{ task.projectName }}</span>
                       </div>
                       <div class="task-card__badges">
                         <span :class="getStatusBadgeClass(task.displayStatus)">
                           {{ task.displayStatus }}
                         </span>
-                        <span :class="getPriorityBadgeClass(task.displayPriority)">
+                        <span
+                          :class="getPriorityBadgeClass(task.displayPriority)"
+                        >
                           {{ task.displayPriority }}
                         </span>
                       </div>
                     </div>
 
                     <h3>{{ task.title }}</h3>
-                    <p>{{ task.description || '説明なし' }}</p>
+                    <p>{{ task.description || "説明なし" }}</p>
 
                     <div class="task-card__meta">
                       <div class="task-card__meta-item">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                        >
                           <path
                             d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
                             stroke-width="1.6"
                             stroke-linecap="round"
                             stroke-linejoin="round"
                           />
-                          <path d="M7 10h10" stroke-width="1.6" stroke-linecap="round" />
+                          <path
+                            d="M7 10h10"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                          />
                           <path
                             d="M11 14h2"
                             stroke-width="1.6"
@@ -489,7 +552,11 @@ onMounted(() => {
                         <span>{{ task.dueDateLabel }}</span>
                       </div>
                       <div class="task-card__meta-item">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                        >
                           <path
                             d="M12 6v6l3.5 3.5"
                             stroke-width="1.7"
@@ -498,16 +565,18 @@ onMounted(() => {
                           />
                           <circle cx="12" cy="12" r="8" stroke-width="1.5" />
                         </svg>
-                        <span :class="task.dueClass">{{ task.dueMessage }}</span>
+                        <span :class="task.dueClass">{{
+                          task.dueMessage
+                        }}</span>
                       </div>
                     </div>
 
                     <div class="task-card__actions">
                       <button type="button" @click="toggleComplete(task)">
                         {{
-                          (task as any).status === 'done'
-                            ? '未完了に戻す'
-                            : '完了にする'
+                          (task as any).status === "done"
+                            ? "未完了に戻す"
+                            : "完了にする"
                         }}
                       </button>
                       <button
@@ -530,7 +599,10 @@ onMounted(() => {
                   >
                     <div class="task-card__headline">
                       <div class="task-card__project">
-                        <span :class="['task-dot', task.projectColor]" aria-hidden="true" />
+                        <span
+                          :class="['task-dot', task.projectColor]"
+                          aria-hidden="true"
+                        />
                         <span>{{ task.projectName }}</span>
                       </div>
                       <span :class="getStatusBadgeClass(task.displayStatus)">
@@ -538,22 +610,34 @@ onMounted(() => {
                       </span>
                     </div>
                     <h3>{{ task.title }}</h3>
-                    <p>{{ task.description || '説明なし' }}</p>
+                    <p>{{ task.description || "説明なし" }}</p>
                     <div class="task-card__meta">
                       <div class="task-card__meta-item">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                        >
                           <path
                             d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
                             stroke-width="1.6"
                             stroke-linecap="round"
                             stroke-linejoin="round"
                           />
-                          <path d="M7 10h10" stroke-width="1.6" stroke-linecap="round" />
+                          <path
+                            d="M7 10h10"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                          />
                         </svg>
                         <span>{{ task.dueDateLabel }}</span>
                       </div>
                       <div class="task-card__meta-item">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                        >
                           <path
                             d="M20 6 9 17l-5-5"
                             stroke-width="1.6"
@@ -589,7 +673,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .demo__content--condensed {
   padding: 2rem;
@@ -632,7 +716,10 @@ onMounted(() => {
   color: var(--primary-strong);
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .tasks-page__filter:hover {
@@ -709,7 +796,10 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .tasks-tabs__trigger.is-active {
@@ -732,7 +822,10 @@ onMounted(() => {
   background: rgba(245, 252, 255, 0.9);
   border: 1px solid rgba(11, 46, 51, 0.12);
   box-shadow: 0 10px 20px rgba(11, 46, 51, 0.12);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .task-card:hover {

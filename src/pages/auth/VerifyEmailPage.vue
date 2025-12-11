@@ -1,61 +1,63 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import AuthBrand from '@/components/ui/AuthBrand.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { verifyEmailWithCode } from '@/services/accountActions'
-import { getLogger } from '@logtape/logtape'
-import { onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import AppButton from "@/components/ui/AppButton.vue";
+import AuthBrand from "@/components/ui/AuthBrand.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { verifyEmailWithCode } from "@/services/accountActions";
+import { getLogger } from "@logtape/logtape";
+import { onMounted, ref } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
-const logger = getLogger('app.pages.auth.VerifyEmail')
+const logger = getLogger("app.pages.auth.VerifyEmail");
 
-const route = useRoute()
-const router = useRouter()
-const oobCode = ref<string | null>(null)
-const loading = ref(true)
-const success = ref(false)
-const errorMessage = ref('')
+const route = useRoute();
+const router = useRouter();
+const oobCode = ref<string | null>(null);
+const loading = ref(true);
+const success = ref(false);
+const errorMessage = ref("");
 
 onMounted(async () => {
-  const code = route.query.oobCode
-  const mode = route.query.mode
+  const code = route.query.oobCode;
+  const mode = route.query.mode;
 
-  if (mode === 'resetPassword') {
+  if (mode === "resetPassword") {
     router.replace({
       name: ROUTE_NAMES.passwordResetConfirm,
       query: route.query,
-    })
-    return
+    });
+    return;
   }
 
-  if (mode !== 'verifyEmail') {
-    errorMessage.value = 'メール認証用リンクではありません。'
-    loading.value = false
-    return
+  if (mode !== "verifyEmail") {
+    errorMessage.value = "メール認証用リンクではありません。";
+    loading.value = false;
+    return;
   }
 
-  if (typeof code !== 'string') {
-    errorMessage.value = '認証コードが無効です。再度メールのリンクからアクセスしてください。'
-    loading.value = false
-    return
+  if (typeof code !== "string") {
+    errorMessage.value =
+      "認証コードが無効です。再度メールのリンクからアクセスしてください。";
+    loading.value = false;
+    return;
   }
 
-  oobCode.value = code
+  oobCode.value = code;
 
   try {
-    await verifyEmailWithCode(code)
-    success.value = true
+    await verifyEmailWithCode(code);
+    success.value = true;
   } catch (error) {
-    logger.error`Email verification failed: ${error}`
-    errorMessage.value = '認証に失敗しました。リンクの有効期限が切れている可能性があります。'
+    logger.error`Email verification failed: ${error}`;
+    errorMessage.value =
+      "認証に失敗しました。リンクの有効期限が切れている可能性があります。";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-})
+});
 
 const goToContinue = () => {
-  window.close()
-}
+  window.close();
+};
 </script>
 
 <template>
@@ -63,14 +65,18 @@ const goToContinue = () => {
     <div class="action-card">
       <AuthBrand
         title="メール認証"
-        :description="success ? 'メールアドレスの認証が完了しました。' : 'メールアドレスを確認しています。'"
+        :description="
+          success
+            ? 'メールアドレスの認証が完了しました。'
+            : 'メールアドレスを確認しています。'
+        "
       />
 
       <div class="action-body">
         <p v-if="loading">メール認証を処理しています...</p>
         <template v-else>
           <p v-if="success">
-            プロフィールの登録を行なってください。<br>
+            プロフィールの登録を行なってください。<br />
             こちらの画面は閉じても問題ありません。
           </p>
           <p v-if="errorMessage" class="action-error">{{ errorMessage }}</p>
@@ -81,7 +87,9 @@ const goToContinue = () => {
         <AppButton v-if="success" variant="primary" @click="goToContinue">
           ウィンドウを閉じる
         </AppButton>
-        <RouterLink v-else :to="{ name: ROUTE_NAMES.home }">ヘルプを見る</RouterLink>
+        <RouterLink v-else :to="{ name: ROUTE_NAMES.home }"
+          >ヘルプを見る</RouterLink
+        >
       </div>
     </div>
   </div>
@@ -90,7 +98,12 @@ const goToContinue = () => {
 <style scoped>
 .action-shell {
   min-height: calc(100vh - 4rem);
-  background: linear-gradient(135deg, rgba(184, 227, 233, 0.35), #fff, rgba(147, 177, 181, 0.35));
+  background: linear-gradient(
+    135deg,
+    rgba(184, 227, 233, 0.35),
+    #fff,
+    rgba(147, 177, 181, 0.35)
+  );
   display: flex;
   align-items: center;
   justify-content: center;

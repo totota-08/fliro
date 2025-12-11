@@ -69,7 +69,11 @@
   background: transparent;
   color: var(--primary-strong);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .demo__menu-button:hover {
@@ -113,7 +117,11 @@
   cursor: pointer;
   font-weight: 600;
   color: var(--primary-strong);
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .demo__toolbar button:hover {

@@ -1,70 +1,88 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 export interface SummaryCard {
-  id: string
-  label: string
-  value: number | string
-  caption: string
-  tone?: 'neutral' | 'alert'
-  icon?: 'chart' | 'check' | 'activity' | 'alert'
+  id: string;
+  label: string;
+  value: number | string;
+  caption: string;
+  tone?: "neutral" | "alert";
+  icon?: "chart" | "check" | "activity" | "alert";
 }
 
 const props = withDefaults(
   defineProps<{
-    title?: string
-    description?: string
-    note?: string
-    cards?: SummaryCard[]
-    rotate?: boolean
-    showHeader?: boolean
+    title?: string;
+    description?: string;
+    note?: string;
+    cards?: SummaryCard[];
+    rotate?: boolean;
+    showHeader?: boolean;
   }>(),
   {
-    title: 'Webサイトリニューアル',
-    description: '今週の状況をひと目で確認できます。',
+    title: "Webサイトリニューアル",
+    description: "今週の状況をひと目で確認できます。",
     rotate: true,
     showHeader: true,
   },
-)
+);
 
 const defaultCards: SummaryCard[] = [
-  { id: 'progress', label: '進捗率', value: 68, caption: '計画タスクの達成率' },
-  { id: 'done', label: '完了', value: 24, caption: '完了済みタスク数' },
-  { id: 'active', label: '進行中', value: 8, caption: '現在進行中のタスク' },
-  { id: 'overdue', label: '期限切れ', value: 3, caption: '期限超過タスク', tone: 'alert' },
-]
-const defaultProgressValue = Number(defaultCards.find((card) => card.id === 'progress')?.value ?? 0)
+  { id: "progress", label: "進捗率", value: 68, caption: "計画タスクの達成率" },
+  { id: "done", label: "完了", value: 24, caption: "完了済みタスク数" },
+  { id: "active", label: "進行中", value: 8, caption: "現在進行中のタスク" },
+  {
+    id: "overdue",
+    label: "期限切れ",
+    value: 3,
+    caption: "期限超過タスク",
+    tone: "alert",
+  },
+];
+const defaultProgressValue = Number(
+  defaultCards.find((card) => card.id === "progress")?.value ?? 0,
+);
 
-const cardList = computed<SummaryCard[]>(() => (props.cards && props.cards.length ? props.cards : defaultCards))
-const isDemo = computed(() => !props.cards || props.cards.length === 0)
-const activeCardIndex = ref(0)
-const progressValue = ref<number>(Number(cardList.value.find((card) => card.id === 'progress')?.value ?? 0))
-let highlightTimer: number | undefined
-let progressTimer: number | undefined
-let progressDirection = 1
+const cardList = computed<SummaryCard[]>(() =>
+  props.cards && props.cards.length ? props.cards : defaultCards,
+);
+const isDemo = computed(() => !props.cards || props.cards.length === 0);
+const activeCardIndex = ref(0);
+const progressValue = ref<number>(
+  Number(cardList.value.find((card) => card.id === "progress")?.value ?? 0),
+);
+let highlightTimer: number | undefined;
+let progressTimer: number | undefined;
+let progressDirection = 1;
 
 onMounted(() => {
   if (props.rotate && isDemo.value) {
     highlightTimer = window.setInterval(() => {
-      activeCardIndex.value = (activeCardIndex.value + 1) % cardList.value.length
-    }, 3800)
+      activeCardIndex.value =
+        (activeCardIndex.value + 1) % cardList.value.length;
+    }, 3800);
 
     progressTimer = window.setInterval(() => {
-      progressValue.value += progressDirection
-      if (progressValue.value >= defaultProgressValue + 4 || progressValue.value <= defaultProgressValue - 4) {
-        progressDirection = -progressDirection
+      progressValue.value += progressDirection;
+      if (
+        progressValue.value >= defaultProgressValue + 4 ||
+        progressValue.value <= defaultProgressValue - 4
+      ) {
+        progressDirection = -progressDirection;
       }
-    }, 1200)
+    }, 1200);
   } else {
-    activeCardIndex.value = 0
-    progressValue.value = Number(cardList.value.find((card) => card.id === 'progress')?.value ?? 0)
+    activeCardIndex.value = 0;
+    progressValue.value = Number(
+      cardList.value.find((card) => card.id === "progress")?.value ?? 0,
+    );
   }
-})
+});
 
 onBeforeUnmount(() => {
-  if (highlightTimer) window.clearInterval(highlightTimer)
-  if (progressTimer) window.clearInterval(progressTimer)
-})
+  if (highlightTimer) window.clearInterval(highlightTimer);
+  if (progressTimer) window.clearInterval(progressTimer);
+});
 </script>
 
 <template>
@@ -84,24 +102,71 @@ onBeforeUnmount(() => {
         v-for="(card, index) in cardList"
         :key="card.id"
         class="summary-card"
-        :class="{ 'is-alert': card.tone === 'alert', 'is-active': index === activeCardIndex }"
+        :class="{
+          'is-alert': card.tone === 'alert',
+          'is-active': index === activeCardIndex,
+        }"
       >
         <div class="summary-card__content">
           <div class="summary-card__info">
             <div v-if="card.icon" class="summary-card__icon">
-              <svg v-if="card.icon === 'chart'" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                v-if="card.icon === 'chart'"
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <line x1="18" y1="20" x2="18" y2="10"></line>
                 <line x1="12" y1="20" x2="12" y2="4"></line>
                 <line x1="6" y1="20" x2="6" y2="14"></line>
               </svg>
-              <svg v-else-if="card.icon === 'check'" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                v-else-if="card.icon === 'check'"
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
               </svg>
-              <svg v-else-if="card.icon === 'activity'" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                v-else-if="card.icon === 'activity'"
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
               </svg>
-              <svg v-else-if="card.icon === 'alert'" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                v-else-if="card.icon === 'alert'"
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -124,7 +189,9 @@ onBeforeUnmount(() => {
             <div v-if="card.id === 'progress'" class="summary-card__bar">
               <div
                 class="summary-card__bar-fill"
-                :style="{ width: `${card.id === 'progress' ? (isDemo ? progressValue : parseFloat(String(card.value)) || 0) : 0}%` }"
+                :style="{
+                  width: `${card.id === 'progress' ? (isDemo ? progressValue : parseFloat(String(card.value)) || 0) : 0}%`,
+                }"
               />
             </div>
           </div>
@@ -188,7 +255,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+  transition:
+    transform 240ms ease,
+    box-shadow 240ms ease,
+    border-color 240ms ease;
 }
 
 .summary-card__content {

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-type NotificationType = 'info' | 'warning' | 'critical'
+type NotificationType = "info" | "warning" | "critical";
 
 defineProps<{
-  notifications: { id: string; type: NotificationType; message: string }[]
-}>()
+  notifications: { id: string; type: NotificationType; message: string }[];
+}>();
 
 const typeLabel: Record<NotificationType, string> = {
-  info: 'お知らせ',
-  warning: '警告',
-  critical: '重要',
-}
+  info: "お知らせ",
+  warning: "警告",
+  critical: "重要",
+};
 </script>
 
 <template>

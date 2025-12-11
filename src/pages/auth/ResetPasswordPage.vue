@@ -1,53 +1,70 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import AuthBrand from '@/components/ui/AuthBrand.vue'
-import AuthFormField from '@/components/ui/AuthFormField.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { requestPasswordReset } from '@/services/accountActions'
-import { getLogger } from '@logtape/logtape'
-import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import AppButton from "@/components/ui/AppButton.vue";
+import AuthBrand from "@/components/ui/AuthBrand.vue";
+import AuthFormField from "@/components/ui/AuthFormField.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { requestPasswordReset } from "@/services/accountActions";
+import { getLogger } from "@logtape/logtape";
+import { computed, ref } from "vue";
+import { RouterLink } from "vue-router";
 
-const logger = getLogger('app.pages.auth.ResetPassword')
+const logger = getLogger("app.pages.auth.ResetPassword");
 
-const email = ref('')
-const loading = ref(false)
-const successMessage = ref('')
-const errorMessage = ref('')
+const email = ref("");
+const loading = ref(false);
+const successMessage = ref("");
+const errorMessage = ref("");
 
-const isValid = computed(() => email.value.includes('@'))
+const isValid = computed(() => email.value.includes("@"));
 
 const handleSubmit = async () => {
-  if (!isValid.value || loading.value) return
+  if (!isValid.value || loading.value) return;
 
-  loading.value = true
-  errorMessage.value = ''
-  successMessage.value = ''
+  loading.value = true;
+  errorMessage.value = "";
+  successMessage.value = "";
 
   try {
-    await requestPasswordReset(email.value)
-    successMessage.value = 'パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。'
+    await requestPasswordReset(email.value);
+    successMessage.value =
+      "パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。";
   } catch (error) {
-    logger.error`Password reset request failed: ${error}`
-    errorMessage.value = 'メールを送信できませんでした。時間を置いて再度お試しください。'
+    logger.error`Password reset request failed: ${error}`;
+    errorMessage.value =
+      "メールを送信できませんでした。時間を置いて再度お試しください。";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <template>
   <div class="reset-shell">
     <div class="reset-card">
-      <AuthBrand title="パスワード再設定" description="登録済みのメールアドレスを入力してください。" />
+      <AuthBrand
+        title="パスワード再設定"
+        description="登録済みのメールアドレスを入力してください。"
+      />
 
       <form class="reset-form" @submit.prevent="handleSubmit">
-        <AuthFormField v-model="email" label="メールアドレス" type="email" placeholder="you@example.com" required />
+        <AuthFormField
+          v-model="email"
+          label="メールアドレス"
+          type="email"
+          placeholder="you@example.com"
+          required
+        />
 
         <p v-if="successMessage" class="reset-success">{{ successMessage }}</p>
         <p v-if="errorMessage" class="reset-error">{{ errorMessage }}</p>
 
-        <AppButton type="submit" variant="primary" block :disabled="!isValid || loading" :loading="loading">
+        <AppButton
+          type="submit"
+          variant="primary"
+          block
+          :disabled="!isValid || loading"
+          :loading="loading"
+        >
           再設定メールを送信
         </AppButton>
       </form>
@@ -63,7 +80,12 @@ const handleSubmit = async () => {
 <style scoped>
 .reset-shell {
   min-height: calc(100vh - 4rem);
-  background: linear-gradient(135deg, rgba(184, 227, 233, 0.35), #fff, rgba(147, 177, 181, 0.35));
+  background: linear-gradient(
+    135deg,
+    rgba(184, 227, 233, 0.35),
+    #fff,
+    rgba(147, 177, 181, 0.35)
+  );
   display: flex;
   align-items: center;
   justify-content: center;

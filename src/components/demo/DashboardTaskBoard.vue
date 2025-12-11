@@ -1,132 +1,139 @@
 <script setup lang="ts">
-import { appName } from '@/constants/appMeta'
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { appName } from "@/constants/appMeta";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 
 interface TaskItem {
-  title: string
-  description: string
-  status: '未着手' | '進行中' | 'レビュー' | '完了'
-  priority: '高' | '中' | '低'
-  due: string
-  assignee: string
-  comments: number
+  title: string;
+  description: string;
+  status: "未着手" | "進行中" | "レビュー" | "完了";
+  priority: "高" | "中" | "低";
+  due: string;
+  assignee: string;
+  comments: number;
 }
 
-const columns: { key: string; title: string; badge?: string; tasks: TaskItem[] }[] = [
+const columns: {
+  key: string;
+  title: string;
+  badge?: string;
+  tasks: TaskItem[];
+}[] = [
   {
-    key: 'todo',
-    title: '未着手',
+    key: "todo",
+    title: "未着手",
     tasks: [
       {
-        title: 'データベース設計レビュー',
-        description: '認証まわりのテーブル設計を確認',
-        status: '未着手',
-        priority: '中',
-        due: '2025-11-12',
-        assignee: '鈴木一郎',
+        title: "データベース設計レビュー",
+        description: "認証まわりのテーブル設計を確認",
+        status: "未着手",
+        priority: "中",
+        due: "2025-11-12",
+        assignee: "鈴木一郎",
         comments: 3,
       },
       {
-        title: 'APIドキュメント作成',
-        description: '社内共有用のエンドポイント一覧',
-        status: '未着手',
-        priority: '低',
-        due: '2025-11-15',
-        assignee: '高橋美咲',
+        title: "APIドキュメント作成",
+        description: "社内共有用のエンドポイント一覧",
+        status: "未着手",
+        priority: "低",
+        due: "2025-11-15",
+        assignee: "高橋美咲",
         comments: 6,
       },
     ],
   },
   {
-    key: 'progress',
-    title: '進行中',
-    badge: '2',
+    key: "progress",
+    title: "進行中",
+    badge: "2",
     tasks: [
       {
-        title: 'トップページのデザイン作成',
-        description: 'コンポーネントガイドラインに合わせる',
-        status: '進行中',
-        priority: '高',
-        due: '2025-11-10',
-        assignee: '田中太郎',
+        title: "トップページのデザイン作成",
+        description: "コンポーネントガイドラインに合わせる",
+        status: "進行中",
+        priority: "高",
+        due: "2025-11-10",
+        assignee: "田中太郎",
         comments: 5,
       },
       {
-        title: 'ユーザー認証機能の実装',
-        description: 'Firebase Auth + ロール権限',
-        status: '進行中',
-        priority: '高',
-        due: '2025-11-08',
-        assignee: '佐藤花子',
+        title: "ユーザー認証機能の実装",
+        description: "Firebase Auth + ロール権限",
+        status: "進行中",
+        priority: "高",
+        due: "2025-11-08",
+        assignee: "佐藤花子",
         comments: 12,
       },
     ],
   },
   {
-    key: 'review',
-    title: 'レビュー',
-    badge: '3',
+    key: "review",
+    title: "レビュー",
+    badge: "3",
     tasks: [
       {
-        title: 'コンテンツ校正',
-        description: 'ブログ用コピーを最終チェック',
-        status: 'レビュー',
-        priority: '中',
-        due: '2025-11-09',
-        assignee: '山本大輔',
+        title: "コンテンツ校正",
+        description: "ブログ用コピーを最終チェック",
+        status: "レビュー",
+        priority: "中",
+        due: "2025-11-09",
+        assignee: "山本大輔",
         comments: 4,
       },
     ],
   },
   {
-    key: 'done',
-    title: '完了',
-    badge: '0',
+    key: "done",
+    title: "完了",
+    badge: "0",
     tasks: [],
   },
-]
+];
 
-const activeTask = ref<TaskItem | null>(null)
-const focusTrail = ref<number[]>([])
-const autoHighlightTimer = ref<number>()
+const activeTask = ref<TaskItem | null>(null);
+const focusTrail = ref<number[]>([]);
+const autoHighlightTimer = ref<number>();
 
-const flattenedTasks = computed(() => columns.flatMap((column) => column.tasks))
+const flattenedTasks = computed(() =>
+  columns.flatMap((column) => column.tasks),
+);
 
 function openTask(task: TaskItem) {
-  activeTask.value = task
-  stopAutoHighlight()
+  activeTask.value = task;
+  stopAutoHighlight();
 }
 
 function closeTask() {
-  activeTask.value = null
+  activeTask.value = null;
 }
 
 function stopAutoHighlight() {
   if (autoHighlightTimer.value) {
-    window.clearInterval(autoHighlightTimer.value)
-    autoHighlightTimer.value = undefined
+    window.clearInterval(autoHighlightTimer.value);
+    autoHighlightTimer.value = undefined;
   }
-  focusTrail.value = []
+  focusTrail.value = [];
 }
 
 onMounted(() => {
-  let cursor = 0
+  let cursor = 0;
   autoHighlightTimer.value = window.setInterval(() => {
-    const list = flattenedTasks.value
-    if (!list.length) return
-    const index = cursor % list.length
-    const nextTask = list[index]
+    const list = flattenedTasks.value;
+    if (!list.length) return;
+    const index = cursor % list.length;
+    const nextTask = list[index];
     if (nextTask) {
-      activeTask.value = nextTask
-      focusTrail.value = [index]
-      cursor += 1
+      activeTask.value = nextTask;
+      focusTrail.value = [index];
+      cursor += 1;
     }
-  }, 7000)
-})
+  }, 7000);
+});
 
 onBeforeUnmount(() => {
-  stopAutoHighlight()
-})
+  stopAutoHighlight();
+});
 </script>
 
 <template>
@@ -154,7 +161,9 @@ onBeforeUnmount(() => {
             class="task-card"
             :class="{
               'is-selected': activeTask?.title === task.title,
-              'is-highlight': focusTrail[0] !== undefined && flattenedTasks[focusTrail[0]]?.title === task.title,
+              'is-highlight':
+                focusTrail[0] !== undefined &&
+                flattenedTasks[focusTrail[0]]?.title === task.title,
             }"
             role="button"
             tabindex="0"
@@ -163,7 +172,9 @@ onBeforeUnmount(() => {
           >
             <div class="task-card__head">
               <h4>{{ task.title }}</h4>
-              <span class="priority" :class="`priority--${task.priority}`">{{ task.priority }}</span>
+              <span class="priority" :class="`priority--${task.priority}`">{{
+                task.priority
+              }}</span>
             </div>
             <p class="task-card__description">{{ task.description }}</p>
             <dl class="task-card__meta">
@@ -186,10 +197,20 @@ onBeforeUnmount(() => {
     </div>
 
     <transition name="task-detail">
-      <div v-if="activeTask" class="task-detail" role="dialog" aria-modal="true">
+      <div
+        v-if="activeTask"
+        class="task-detail"
+        role="dialog"
+        aria-modal="true"
+      >
         <div class="task-detail__header">
           <h3>{{ activeTask.title }}</h3>
-          <button type="button" class="task-detail__close" @click="closeTask" aria-label="閉じる">
+          <button
+            type="button"
+            class="task-detail__close"
+            @click="closeTask"
+            aria-label="閉じる"
+          >
             ×
           </button>
         </div>
@@ -216,7 +237,10 @@ onBeforeUnmount(() => {
             <dd>{{ activeTask.comments }}</dd>
           </div>
         </dl>
-        <p class="task-detail__hint">※ このデモではカードをクリックすると詳細が開きます。実際の {{ appName }} ではさらにサブタスクやコメントを閲覧できます。</p>
+        <p class="task-detail__hint">
+          ※ このデモではカードをクリックすると詳細が開きます。実際の
+          {{ appName }} ではさらにサブタスクやコメントを閲覧できます。
+        </p>
       </div>
     </transition>
   </section>
@@ -229,7 +253,6 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
   overflow-x: hidden;
 }
-
 
 .board__header {
   display: flex;
@@ -253,7 +276,9 @@ onBeforeUnmount(() => {
   color: var(--surface-elevated);
   cursor: pointer;
   box-shadow: 0 12px 20px rgba(79, 124, 130, 0.25);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .board__new:hover {
@@ -281,7 +306,6 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   min-width: 0;
 }
-
 
 .board-column__header {
   display: flex;
@@ -329,11 +353,13 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.75rem;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
   width: 100%;
   box-sizing: border-box;
 }
-
 
 .task-card__head {
   display: flex;
