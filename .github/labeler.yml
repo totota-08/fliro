@@ -1,0 +1,19 @@
+frontend:
+  - "src/**"
+  - "public/**"
+
+tests:
+  - "tests/**"
+
+docs:
+  - "README.md"
+  - "docs/**"
+  - "hoge.md"
+
+ci:
+  - ".github/**"
+
+config:
+  - "firebase.json"
+  - "firestore.rules"
+  - "vite.config.ts"
