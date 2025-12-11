@@ -17,7 +17,7 @@
     "@logtape/logtape": "^1.2.2",
     "axios": "^1.13.2",
     "firebase": "^12.5.0",
-    "vue": "^3.5.22",
+    "vue": "^3.5.25",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
