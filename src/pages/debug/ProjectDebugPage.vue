@@ -1,71 +1,77 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import AppButton from '@/components/ui/AppButton.vue'
-import { fetchProject } from '@/firebase/projectService'
-import { ROUTE_NAMES } from '@/constants/routes'
-import ProjectInviteForm from '@/components/projects/ProjectInviteForm.vue'
-import { useNotificationCenter } from '@/composables/useNotificationCenter'
+import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
+import AppButton from "@/components/ui/AppButton.vue";
+import { fetchProject } from "@/firebase/projectService";
+import { ROUTE_NAMES } from "@/constants/routes";
+import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
+import { useNotificationCenter } from "@/composables/useNotificationCenter";
 
-const route = useRoute()
-const projectId = String(route.params.projectId || '')
+const route = useRoute();
+const projectId = String(route.params.projectId || "");
 
-const loading = ref(true)
-const errorMsg = ref('')
-const project = ref<any | null>(null)
-const latestLink = ref('')
-const inviteNotice = ref('')
-const notificationMessage = ref('')
-const notificationType = ref<'info' | 'warning' | 'critical'>('info')
-const { sendNotification } = useNotificationCenter()
+const loading = ref(true);
+const errorMsg = ref("");
+const project = ref<any | null>(null);
+const latestLink = ref("");
+const inviteNotice = ref("");
+const notificationMessage = ref("");
+const notificationType = ref<"info" | "warning" | "critical">("info");
+const { sendNotification } = useNotificationCenter();
 
 onMounted(async () => {
   try {
-    project.value = await fetchProject(projectId)
+    project.value = await fetchProject(projectId);
     if (!project.value) {
-      errorMsg.value = 'プロジェクトが見つかりません。'
+      errorMsg.value = "プロジェクトが見つかりません。";
     }
   } catch (e) {
-    console.error(e)
-    errorMsg.value = 'プロジェクトの取得に失敗しました。'
+    console.error(e);
+    errorMsg.value = "プロジェクトの取得に失敗しました。";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-})
+});
 
-const projectTitle = computed(() => project.value?.name ?? 'プロジェクト')
+const projectTitle = computed(() => project.value?.name ?? "プロジェクト");
 function formatDate(value: any) {
-  if (!value) return '-'
+  if (!value) return "-";
   if (value.seconds) {
-    return new Date(value.seconds * 1000).toLocaleDateString()
+    return new Date(value.seconds * 1000).toLocaleDateString();
   }
   try {
-    return new Date(value).toLocaleDateString()
+    return new Date(value).toLocaleDateString();
   } catch (error) {
-    return '-'
+    return "-";
   }
 }
 
 const infoRows = computed(() => {
-  if (!project.value) return []
+  if (!project.value) return [];
   return [
-    { label: 'ステータス', value: project.value.status },
-    { label: '公開設定', value: project.value.settings?.isPublic ? '公開' : '非公開' },
-    { label: 'ゲスト閲覧', value: project.value.settings?.allowGuestView ? '有効' : '無効' },
-    { label: '開始日', value: formatDate(project.value.startDate) },
-    { label: '期限', value: formatDate(project.value.dueDate) },
-  ]
-})
+    { label: "ステータス", value: project.value.status },
+    {
+      label: "公開設定",
+      value: project.value.settings?.isPublic ? "公開" : "非公開",
+    },
+    {
+      label: "ゲスト閲覧",
+      value: project.value.settings?.allowGuestView ? "有効" : "無効",
+    },
+    { label: "開始日", value: formatDate(project.value.startDate) },
+    { label: "期限", value: formatDate(project.value.dueDate) },
+  ];
+});
 
 function handleLinkGenerated(link: string) {
-  latestLink.value = link
-  inviteNotice.value = 'リンクをコピーしてメンバーと共有してください。'
+  latestLink.value = link;
+  inviteNotice.value = "リンクをコピーしてメンバーと共有してください。";
 }
 
 function sendDebugNotification() {
-  if (!notificationMessage.value.trim()) return
-  sendNotification(notificationType.value, notificationMessage.value.trim())
-  notificationMessage.value = ''
+  if (!notificationMessage.value.trim()) return;
+  sendNotification(notificationType.value, notificationMessage.value.trim());
+  notificationMessage.value = "";
 }
 </script>
 
@@ -84,8 +90,12 @@ function sendDebugNotification() {
         </div>
       </dl>
       <div class="debug-actions">
-        <AppButton :to="{ name: ROUTE_NAMES.projectCreate }" variant="primary">新しいプロジェクト</AppButton>
-        <AppButton :to="{ name: ROUTE_NAMES.myPage }" variant="secondary">マイページへ</AppButton>
+        <AppButton :to="{ name: ROUTE_NAMES.projectCreate }" variant="primary"
+          >新しいプロジェクト</AppButton
+        >
+        <AppButton :to="{ name: ROUTE_NAMES.myPage }" variant="secondary"
+          >マイページへ</AppButton
+        >
       </div>
     </section>
 
@@ -94,7 +104,10 @@ function sendDebugNotification() {
 
     <section v-else class="debug-panel">
       <h2>メンバー招待</h2>
-      <ProjectInviteForm :project-id="projectId" @generated="handleLinkGenerated" />
+      <ProjectInviteForm
+        :project-id="projectId"
+        @generated="handleLinkGenerated"
+      />
       <p v-if="latestLink" class="info">{{ latestLink }}</p>
       <p v-if="inviteNotice" class="info">{{ inviteNotice }}</p>
     </section>
@@ -107,7 +120,11 @@ function sendDebugNotification() {
           <option value="warning">警告</option>
           <option value="critical">重要</option>
         </select>
-        <input v-model="notificationMessage" type="text" placeholder="通知メッセージを入力" />
+        <input
+          v-model="notificationMessage"
+          type="text"
+          placeholder="通知メッセージを入力"
+        />
         <button type="button" @click="sendDebugNotification">送信</button>
       </div>
     </section>
@@ -223,5 +240,8 @@ pre {
   cursor: pointer;
 }
 
-.error { color: #d64545; font-weight: 600; }
+.error {
+  color: #d64545;
+  font-weight: 600;
+}
 </style>

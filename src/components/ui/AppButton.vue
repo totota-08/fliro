@@ -1,31 +1,31 @@
 <script setup lang="ts">
-import { computed, useAttrs } from 'vue'
-import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { computed, useAttrs } from "vue";
+import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'outline'
-    loading?: boolean
-    to?: RouteLocationRaw
-    type?: 'button' | 'submit' | 'reset'
-    block?: boolean
+    variant?: "primary" | "secondary" | "outline";
+    loading?: boolean;
+    to?: RouteLocationRaw;
+    type?: "button" | "submit" | "reset";
+    block?: boolean;
   }>(),
   {
-    variant: 'primary',
+    variant: "primary",
     loading: false,
-    type: 'button',
+    type: "button",
     block: false,
   },
-)
+);
 
-const attrs = useAttrs()
+const attrs = useAttrs();
 
-const isLink = computed(() => Boolean(props.to))
+const isLink = computed(() => Boolean(props.to));
 const classes = computed(() => [
-  'app-button',
+  "app-button",
   `app-button--${props.variant}`,
-  { 'is-loading': props.loading, 'is-block': props.block },
-])
+  { "is-loading": props.loading, "is-block": props.block },
+]);
 </script>
 
 <template>
@@ -54,7 +54,10 @@ const classes = computed(() => [
   font-size: 1rem;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
   text-decoration: none;
 }
 

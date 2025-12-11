@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { appName } from '@/constants/appMeta'
+import { appName } from "@/constants/appMeta";
 
 defineProps<{
-  loading: boolean
-}>()
+  loading: boolean;
+}>();
 </script>
 
 <template>
@@ -48,7 +48,7 @@ defineProps<{
 }
 
 .loading-text {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 600;
   color: #0f172a;
   font-size: 1.25rem;

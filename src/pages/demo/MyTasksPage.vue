@@ -1,141 +1,141 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import DashboardSidebar from '@/components/demo/DashboardSidebar.vue'
+import { computed, onMounted, ref } from "vue";
+import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
 
 type Task = {
-  id: number
-  title: string
-  project: string
-  projectColor: string
-  status: '完了' | '進行中' | 'レビュー待ち' | '未着手'
-  priority: '高' | '中' | '低'
-  dueDate: string
-  description: string
-}
+  id: number;
+  title: string;
+  project: string;
+  projectColor: string;
+  status: "完了" | "進行中" | "レビュー待ち" | "未着手";
+  priority: "高" | "中" | "低";
+  dueDate: string;
+  description: string;
+};
 
-const isSidebarOpen = ref(true)
-const activeTab = ref<'active' | 'completed'>('active')
+const isSidebarOpen = ref(true);
+const activeTab = ref<"active" | "completed">("active");
 
 const myTasks = ref<Task[]>([
   {
     id: 1,
-    title: 'ホームページのデザイン作成',
-    project: 'Webサイトリニューアル',
-    projectColor: 'task-dot--primary',
-    status: '進行中',
-    priority: '高',
-    dueDate: '2025-01-15',
-    description: '新しいホームページのモックアップを作成する',
+    title: "ホームページのデザイン作成",
+    project: "Webサイトリニューアル",
+    projectColor: "task-dot--primary",
+    status: "進行中",
+    priority: "高",
+    dueDate: "2025-01-15",
+    description: "新しいホームページのモックアップを作成する",
   },
   {
     id: 2,
-    title: 'API仕様書のレビュー',
-    project: 'モバイルアプリ開発',
-    projectColor: 'task-dot--secondary',
-    status: 'レビュー待ち',
-    priority: '中',
-    dueDate: '2025-01-12',
-    description: 'バックエンドチームが作成したAPI仕様書を確認',
+    title: "API仕様書のレビュー",
+    project: "モバイルアプリ開発",
+    projectColor: "task-dot--secondary",
+    status: "レビュー待ち",
+    priority: "中",
+    dueDate: "2025-01-12",
+    description: "バックエンドチームが作成したAPI仕様書を確認",
   },
   {
     id: 3,
-    title: 'ユーザーテストの実施',
-    project: 'Webサイトリニューアル',
-    projectColor: 'task-dot--primary',
-    status: '未着手',
-    priority: '中',
-    dueDate: '2025-01-20',
-    description: '5名のユーザーに対してプロトタイプのテストを実施',
+    title: "ユーザーテストの実施",
+    project: "Webサイトリニューアル",
+    projectColor: "task-dot--primary",
+    status: "未着手",
+    priority: "中",
+    dueDate: "2025-01-20",
+    description: "5名のユーザーに対してプロトタイプのテストを実施",
   },
   {
     id: 4,
-    title: 'SNS投稿コンテンツ作成',
-    project: 'マーケティングキャンペーン',
-    projectColor: 'task-dot--accent',
-    status: '進行中',
-    priority: '高',
-    dueDate: '2025-01-10',
-    description: '来週のキャンペーン用のSNS投稿を3件作成',
+    title: "SNS投稿コンテンツ作成",
+    project: "マーケティングキャンペーン",
+    projectColor: "task-dot--accent",
+    status: "進行中",
+    priority: "高",
+    dueDate: "2025-01-10",
+    description: "来週のキャンペーン用のSNS投稿を3件作成",
   },
   {
     id: 5,
-    title: 'データベース設計',
-    project: 'モバイルアプリ開発',
-    projectColor: 'task-dot--secondary',
-    status: '完了',
-    priority: '高',
-    dueDate: '2025-01-08',
-    description: 'ユーザー情報とタスク管理のためのDB設計',
+    title: "データベース設計",
+    project: "モバイルアプリ開発",
+    projectColor: "task-dot--secondary",
+    status: "完了",
+    priority: "高",
+    dueDate: "2025-01-08",
+    description: "ユーザー情報とタスク管理のためのDB設計",
   },
-])
+]);
 
 const closeSidebar = () => {
-  isSidebarOpen.value = false
-}
+  isSidebarOpen.value = false;
+};
 
 const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-}
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-})
+});
 
-const getStatusBadgeClass = (status: Task['status']) => {
+const getStatusBadgeClass = (status: Task["status"]) => {
   switch (status) {
-    case '完了':
-      return 'badge status-done'
-    case '進行中':
-      return 'badge status-progress'
-    case 'レビュー待ち':
-      return 'badge status-review'
+    case "完了":
+      return "badge status-done";
+    case "進行中":
+      return "badge status-progress";
+    case "レビュー待ち":
+      return "badge status-review";
     default:
-      return 'badge status-todo'
+      return "badge status-todo";
   }
-}
+};
 
-const getPriorityBadgeClass = (priority: Task['priority']) => {
+const getPriorityBadgeClass = (priority: Task["priority"]) => {
   switch (priority) {
-    case '高':
-      return 'badge priority-high'
-    case '中':
-      return 'badge priority-medium'
+    case "高":
+      return "badge priority-high";
+    case "中":
+      return "badge priority-medium";
     default:
-      return 'badge priority-low'
+      return "badge priority-low";
   }
-}
+};
 
 const getDaysUntilDue = (dueDate: string) => {
-  const today = new Date()
-  const due = new Date(dueDate)
-  const diffTime = due.getTime() - today.getTime()
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-}
+  const today = new Date();
+  const due = new Date(dueDate);
+  const diffTime = due.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
 type DecoratedTask = Task & {
-  daysUntil: number
-  dueMessage: string
-  dueClass: '' | 'due-over' | 'due-soon'
-}
+  daysUntil: number;
+  dueMessage: string;
+  dueClass: "" | "due-over" | "due-soon";
+};
 
 const decorateTask = (task: Task): DecoratedTask => {
-  const daysUntil = getDaysUntilDue(task.dueDate)
-  let dueMessage = ''
-  let dueClass: DecoratedTask['dueClass'] = ''
+  const daysUntil = getDaysUntilDue(task.dueDate);
+  let dueMessage = "";
+  let dueClass: DecoratedTask["dueClass"] = "";
 
   if (daysUntil < 0) {
-    dueMessage = `${Math.abs(daysUntil)}日遅れ`
-    dueClass = 'due-over'
+    dueMessage = `${Math.abs(daysUntil)}日遅れ`;
+    dueClass = "due-over";
   } else if (daysUntil === 0) {
-    dueMessage = '今日が期限'
-    dueClass = 'due-soon'
+    dueMessage = "今日が期限";
+    dueClass = "due-soon";
   } else if (daysUntil <= 3) {
-    dueMessage = `あと${daysUntil}日`
-    dueClass = 'due-soon'
+    dueMessage = `あと${daysUntil}日`;
+    dueClass = "due-soon";
   } else {
-    dueMessage = `あと${daysUntil}日`
+    dueMessage = `あと${daysUntil}日`;
   }
 
   return {
@@ -143,19 +143,23 @@ const decorateTask = (task: Task): DecoratedTask => {
     daysUntil,
     dueMessage,
     dueClass,
-  }
-}
+  };
+};
 
-const decoratedTasks = computed(() => myTasks.value.map(decorateTask))
-const activeTasks = computed(() => decoratedTasks.value.filter((task) => task.status !== '完了'))
-const completedTasks = computed(() => decoratedTasks.value.filter((task) => task.status === '完了'))
+const decoratedTasks = computed(() => myTasks.value.map(decorateTask));
+const activeTasks = computed(() =>
+  decoratedTasks.value.filter((task) => task.status !== "完了"),
+);
+const completedTasks = computed(() =>
+  decoratedTasks.value.filter((task) => task.status === "完了"),
+);
 
 const stats = computed(() => ({
   total: myTasks.value.length,
-  progress: myTasks.value.filter((task) => task.status === '進行中').length,
-  review: myTasks.value.filter((task) => task.status === 'レビュー待ち').length,
+  progress: myTasks.value.filter((task) => task.status === "進行中").length,
+  review: myTasks.value.filter((task) => task.status === "レビュー待ち").length,
   done: completedTasks.value.length,
-}))
+}));
 </script>
 
 <template>
@@ -166,7 +170,11 @@ const stats = computed(() => ({
     <div class="demo__main">
       <header class="demo__topbar">
         <div class="demo__topbar-left">
-          <button type="button" class="demo__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="demo__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
             <svg
               v-if="!isSidebarOpen"
@@ -177,7 +185,11 @@ const stats = computed(() => ({
               stroke="currentColor"
               stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
             <svg
               v-else
@@ -188,7 +200,11 @@ const stats = computed(() => ({
               stroke="currentColor"
               stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6l-12 12" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 6l12 12M18 6l-12 12"
+              />
             </svg>
           </button>
           <div>
@@ -242,7 +258,11 @@ const stats = computed(() => ({
           </section>
 
           <section class="tasks-tabs">
-            <div class="tasks-tabs__list" role="tablist" aria-label="タスクの状態">
+            <div
+              class="tasks-tabs__list"
+              role="tablist"
+              aria-label="タスクの状態"
+            >
               <button
                 type="button"
                 class="tasks-tabs__trigger"
@@ -267,15 +287,27 @@ const stats = computed(() => ({
 
             <div class="tasks-tabs__content" role="tabpanel">
               <template v-if="activeTab === 'active'">
-                <article v-for="task in activeTasks" :key="task.id" class="task-card" :class="{ 'is-overdue': task.daysUntil < 0 }">
+                <article
+                  v-for="task in activeTasks"
+                  :key="task.id"
+                  class="task-card"
+                  :class="{ 'is-overdue': task.daysUntil < 0 }"
+                >
                   <div class="task-card__headline">
                     <div class="task-card__project">
-                      <span :class="['task-dot', task.projectColor]" aria-hidden="true" />
+                      <span
+                        :class="['task-dot', task.projectColor]"
+                        aria-hidden="true"
+                      />
                       <span>{{ task.project }}</span>
                     </div>
                     <div class="task-card__badges">
-                      <span :class="getStatusBadgeClass(task.status)">{{ task.status }}</span>
-                      <span :class="getPriorityBadgeClass(task.priority)">{{ task.priority }}</span>
+                      <span :class="getStatusBadgeClass(task.status)">{{
+                        task.status
+                      }}</span>
+                      <span :class="getPriorityBadgeClass(task.priority)">{{
+                        task.priority
+                      }}</span>
                     </div>
                   </div>
 
@@ -284,20 +316,37 @@ const stats = computed(() => ({
 
                   <div class="task-card__meta">
                     <div class="task-card__meta-item">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <path
                           d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
                           stroke-width="1.6"
                           stroke-linecap="round"
                           stroke-linejoin="round"
                         />
-                        <path d="M7 10h10" stroke-width="1.6" stroke-linecap="round" />
-                        <path d="M11 14h2" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                        <path
+                          d="M7 10h10"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                        <path
+                          d="M11 14h2"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
                       </svg>
                       <span>{{ task.dueDate }}</span>
                     </div>
                     <div class="task-card__meta-item">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <path
                           d="M12 6v6l3.5 3.5"
                           stroke-width="1.7"
@@ -313,31 +362,52 @@ const stats = computed(() => ({
               </template>
 
               <template v-else>
-                <article v-for="task in completedTasks" :key="task.id" class="task-card is-completed">
+                <article
+                  v-for="task in completedTasks"
+                  :key="task.id"
+                  class="task-card is-completed"
+                >
                   <div class="task-card__headline">
                     <div class="task-card__project">
-                      <span :class="['task-dot', task.projectColor]" aria-hidden="true" />
+                      <span
+                        :class="['task-dot', task.projectColor]"
+                        aria-hidden="true"
+                      />
                       <span>{{ task.project }}</span>
                     </div>
-                    <span :class="getStatusBadgeClass(task.status)">{{ task.status }}</span>
+                    <span :class="getStatusBadgeClass(task.status)">{{
+                      task.status
+                    }}</span>
                   </div>
                   <h3>{{ task.title }}</h3>
                   <p>{{ task.description }}</p>
                   <div class="task-card__meta">
                     <div class="task-card__meta-item">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <path
                           d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
                           stroke-width="1.6"
                           stroke-linecap="round"
                           stroke-linejoin="round"
                         />
-                        <path d="M7 10h10" stroke-width="1.6" stroke-linecap="round" />
+                        <path
+                          d="M7 10h10"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
                       </svg>
                       <span>{{ task.dueDate }}</span>
                     </div>
                     <div class="task-card__meta-item">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <path
                           d="M20 6 9 17l-5-5"
                           stroke-width="1.6"
@@ -359,7 +429,7 @@ const stats = computed(() => ({
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .demo__content--condensed {
   padding: 2rem;
@@ -402,7 +472,10 @@ const stats = computed(() => ({
   color: var(--primary-strong);
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .tasks-page__filter:hover {
@@ -479,7 +552,10 @@ const stats = computed(() => ({
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .tasks-tabs__trigger.is-active {
@@ -501,7 +577,10 @@ const stats = computed(() => ({
   background: rgba(245, 252, 255, 0.95);
   border: 1px solid rgba(11, 46, 51, 0.12);
   box-shadow: 0 20px 34px rgba(11, 46, 51, 0.14);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .task-card:hover {
