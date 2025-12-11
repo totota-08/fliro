@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.ts --fix",
     "format": "prettier --write .",
-    "test:rules": "firebase emulators:exec --project test-project --only firestore \"node --test tests/firestore.invite.test.mjs\""
+    "typecheck": "vue-tsc --noEmit",
+    "test:rules": "firebase emulators:exec --project test-project --only firestore \"node --test tests/firestore.invite.test.mjs\"",
+    "prepare": "husky"
   },
   "dependencies": {
     "@logtape/logtape": "^1.2.2",
@@ -24,8 +26,19 @@
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
     "firebase-tools": "^13.31.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
     "typescript": "~5.9.3",
     "vite": "^7.1.7",
     "vue-tsc": "^3.1.0"
+  },
+  "lint-staged": {
+    "*.{js,ts,vue,css,scss,json,md}": [
+      "prettier --write"
+    ],
+    "*.{js,ts,vue}": [
+      "eslint --fix --ext .js,.ts,.vue"
+    ]
   }
 }

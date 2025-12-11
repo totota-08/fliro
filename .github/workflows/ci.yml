@@ -78,7 +78,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run vue-tsc
-        run: npx vue-tsc --noEmit
+        run: npm run typecheck
 
   static-analysis:
     name: Static Analysis (Build)
