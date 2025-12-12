@@ -23,11 +23,15 @@ googleProvider.setCustomParameters({ prompt: "select_account" });
 const githubProvider = new GithubAuthProvider();
 githubProvider.setCustomParameters({ allow_signup: "true" });
 
-if (import.meta.env.DEV) {
-  // connectAuthEmulator(auth, 'http://localhost:9099')
-  // connectFirestoreEmulator(db, 'localhost', 8080)
-  // connectDatabaseEmulator(database, 'localhost', 9000)
-  // connectStorageEmulator(storage, 'localhost', 9199)
+const useEmulators =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+
+if (useEmulators) {
+  connectAuthEmulator(auth, "http://localhost:9099");
+  connectFirestoreEmulator(db, "localhost", 8080);
+  connectDatabaseEmulator(database, "localhost", 9000);
+  connectStorageEmulator(storage, "localhost", 9199);
 }
 
 export { app, auth, database, db, githubProvider, googleProvider, storage };
