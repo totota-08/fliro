@@ -1,19 +1,29 @@
 frontend:
-  - "src/**"
-  - "public/**"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/**"
+          - "public/**"
 
 tests:
-  - "tests/**"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
 
 docs:
-  - "README.md"
-  - "docs/**"
-  - "hoge.md"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "README.md"
+          - "docs/**"
+          - "hoge.md"
 
 ci:
-  - ".github/**"
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
 
 config:
-  - "firebase.json"
-  - "firestore.rules"
-  - "vite.config.ts"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "firebase.json"
+          - "firestore.rules"
+          - "vite.config.ts"
