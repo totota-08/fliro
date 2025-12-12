@@ -1,96 +1,112 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/lib/firebase'
-import { useAuthStore } from '@/store/auth'
-import { getLogger } from '@logtape/logtape'
-import { collection, getDocs, query } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import AppButton from "@/components/ui/AppButton.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/lib/firebase";
+import { useAuthStore } from "@/store/auth";
+import { getLogger } from "@logtape/logtape";
+import { collection, getDocs, query } from "firebase/firestore";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
-const logger = getLogger('app.pages.account.MyPage')
+const logger = getLogger("app.pages.account.MyPage");
 
 interface TaskDoc {
-  title: string
-  status: string
-  dueDate?: { seconds: number }
-  projectId: string
-  projectName: string
+  title: string;
+  status: string;
+  dueDate?: { seconds: number };
+  projectId: string;
+  projectName: string;
 }
 
-const { user, profile } = useAuthStore()
-const loading = ref(true)
-const taskList = ref<TaskDoc[]>([])
-const projectCount = ref(0)
-const projects = ref<{ id: string; name: string; role?: string }[]>([])
-const keyBuffer = ref('')
-const SECRET = appName.toLowerCase()
-const router = useRouter()
+const { user, profile } = useAuthStore();
+const loading = ref(true);
+const taskList = ref<TaskDoc[]>([]);
+const projectCount = ref(0);
+const projects = ref<{ id: string; name: string; role?: string }[]>([]);
+const keyBuffer = ref("");
+const SECRET = appName.toLowerCase();
+const router = useRouter();
 
 async function fetchTasks() {
-  if (!user.value) return
-  loading.value = true
+  if (!user.value) return;
+  loading.value = true;
   try {
-    const items: TaskDoc[] = []
-    const projectItems: { id: string; name: string; role?: string }[] = []
-    const projectsSnap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
-    projectCount.value = projectsSnap.size
+    const items: TaskDoc[] = [];
+    const projectItems: { id: string; name: string; role?: string }[] = [];
+    const projectsSnap = await getDocs(
+      collection(db, "userProjects", user.value.uid, "projects"),
+    );
+    projectCount.value = projectsSnap.size;
     for (const docSnap of projectsSnap.docs) {
-      const projectId = docSnap.id
-      const projectName = (docSnap.data().projectName as string) || 'プロジェクト'
-      projectItems.push({ id: projectId, name: projectName, role: docSnap.data().role as string })
-      const tasksSnap = await getDocs(query(collection(db, 'projects', projectId, 'tasks')))
+      const projectId = docSnap.id;
+      const projectName =
+        (docSnap.data().projectName as string) || "プロジェクト";
+      projectItems.push({
+        id: projectId,
+        name: projectName,
+        role: docSnap.data().role as string,
+      });
+      const tasksSnap = await getDocs(
+        query(collection(db, "projects", projectId, "tasks")),
+      );
       tasksSnap.forEach((task) => {
-        const data = task.data() as any
+        const data = task.data() as any;
         items.push({
-          title: data.title ?? 'タスク',
-          status: data.status ?? 'todo',
+          title: data.title ?? "タスク",
+          status: data.status ?? "todo",
           dueDate: data.dueDate,
           projectId,
           projectName,
-        })
-      })
+        });
+      });
     }
-    taskList.value = items
-    projects.value = projectItems
+    taskList.value = items;
+    projects.value = projectItems;
   } catch (error) {
-    logger.error`Failed to load tasks: ${error}`
+    logger.error`Failed to load tasks: ${error}`;
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 const upcomingTasks = computed(() => {
-  const now = Date.now()
-  const weekAhead = now + 7 * 24 * 60 * 60 * 1000
+  const now = Date.now();
+  const weekAhead = now + 7 * 24 * 60 * 60 * 1000;
   return taskList.value
     .filter((task) => task.dueDate?.seconds)
     .filter((task) => {
-      const due = task.dueDate!.seconds * 1000
-      return due >= now && due <= weekAhead
+      const due = task.dueDate!.seconds * 1000;
+      return due >= now && due <= weekAhead;
     })
-    .sort((a, b) => a.dueDate!.seconds - b.dueDate!.seconds)
-})
+    .sort((a, b) => a.dueDate!.seconds - b.dueDate!.seconds);
+});
 
-const totalTasks = computed(() => taskList.value.length)
-const completedThisWeek = computed(() => taskList.value.filter((task) => task.status === 'done' || task.status === 'completed').length)
+const totalTasks = computed(() => taskList.value.length);
+const completedThisWeek = computed(
+  () =>
+    taskList.value.filter(
+      (task) => task.status === "done" || task.status === "completed",
+    ).length,
+);
 
 function handleKeydown(event: KeyboardEvent) {
-  keyBuffer.value = (keyBuffer.value + event.key.toLowerCase()).slice(-SECRET.length)
+  keyBuffer.value = (keyBuffer.value + event.key.toLowerCase()).slice(
+    -SECRET.length,
+  );
   if (keyBuffer.value === SECRET) {
-    router.push({ name: ROUTE_NAMES.secretAccess })
+    router.push({ name: ROUTE_NAMES.secretAccess });
   }
 }
 
 onMounted(async () => {
-  await fetchTasks()
-  window.addEventListener('keydown', handleKeydown)
-})
+  await fetchTasks();
+  window.addEventListener("keydown", handleKeydown);
+});
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleKeydown)
-})
+  window.removeEventListener("keydown", handleKeydown);
+});
 </script>
 
 <template>
@@ -98,11 +114,17 @@ onBeforeUnmount(() => {
     <section class="profile-card">
       <div>
         <p class="eyebrow">My Page</p>
-        <h1>{{ profile?.nickname || profile?.fullName || `${appName} ユーザー` }}</h1>
+        <h1>
+          {{ profile?.nickname || profile?.fullName || `${appName} ユーザー` }}
+        </h1>
         <p>{{ profile?.email }}</p>
         <div class="profile-actions">
-          <AppButton :to="{ name: ROUTE_NAMES.authDebug }" variant="outline">アカウント設定</AppButton>
-          <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">新しいプロジェクト</AppButton>
+          <AppButton :to="{ name: ROUTE_NAMES.authDebug }" variant="outline"
+            >アカウント設定</AppButton
+          >
+          <AppButton :to="{ name: ROUTE_NAMES.projectCreate }"
+            >新しいプロジェクト</AppButton
+          >
         </div>
       </div>
       <dl>
@@ -128,14 +150,22 @@ onBeforeUnmount(() => {
           <p>クリックしてプロジェクトのデバッグ画面にアクセスできます。</p>
         </div>
       </header>
-      <div v-if="!projects.length" class="empty">まだプロジェクトに参加していません。</div>
+      <div v-if="!projects.length" class="empty">
+        まだプロジェクトに参加していません。
+      </div>
       <ul v-else class="project-list">
         <li v-for="project in projects" :key="project.id">
           <div>
             <p class="project-name">{{ project.name }}</p>
-            <p class="project-role">ロール: {{ project.role || 'member' }}</p>
+            <p class="project-role">ロール: {{ project.role || "member" }}</p>
           </div>
-          <AppButton variant="outline" :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId: project.id } }">
+          <AppButton
+            variant="outline"
+            :to="{
+              name: ROUTE_NAMES.projectDashboard,
+              params: { projectId: project.id },
+            }"
+          >
             開く
           </AppButton>
         </li>
@@ -154,10 +184,17 @@ onBeforeUnmount(() => {
         まだタスクがありません。新しいプロジェクトでタスクを追加してみましょう。
       </div>
       <div v-else class="task-grid">
-        <article v-for="task in upcomingTasks" :key="task.title + task.projectId" class="task-card">
+        <article
+          v-for="task in upcomingTasks"
+          :key="task.title + task.projectId"
+          class="task-card"
+        >
           <p class="task-title">{{ task.title }}</p>
           <p class="task-project">{{ task.projectName }}</p>
-          <p class="task-due" v-if="task.dueDate">期限: {{ new Date(task.dueDate.seconds * 1000).toLocaleDateString() }}</p>
+          <p class="task-due" v-if="task.dueDate">
+            期限:
+            {{ new Date(task.dueDate.seconds * 1000).toLocaleDateString() }}
+          </p>
           <p class="task-due" v-else>期限: 未設定</p>
         </article>
       </div>

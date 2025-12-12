@@ -1,48 +1,49 @@
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationRaw } from "vue-router";
 
 export type DashboardNavKey =
-  | 'dashboard'
-  | 'tasks'
-  | 'team'
-  | 'members'
-  | 'settings'
-  | 'debug'
-  | 'activity'
-  | 'categories'
-  | 'timeline'
-  | 'notifications'
+  | "dashboard"
+  | "tasks"
+  | "team"
+  | "members"
+  | "settings"
+  | "debug"
+  | "activity"
+  | "categories"
+  | "timeline"
+  | "notifications"
+  | "roles";
 
 export type DashboardNavItem = {
-  key: DashboardNavKey
-  label: string
-  to?: RouteLocationRaw
-  icon: DashboardNavKey
-  disabled?: boolean
-  tooltip?: string
-}
+  key: DashboardNavKey;
+  label: string;
+  to?: RouteLocationRaw;
+  icon: DashboardNavKey;
+  disabled?: boolean;
+  tooltip?: string;
+};
 
-import type { ReactionSummary } from '@/services/projectChat'
+import type { ReactionSummary } from "@/services/projectChat";
 
 export interface PreviewChatMessage {
-  id: string
-  author: string
-  time: string
-  message: string
-  reactions?: ReactionSummary[]
-  senderId?: string
-  linkedTaskId?: string | null
-  isTask?: boolean
+  id: string;
+  author: string;
+  time: string;
+  message: string;
+  reactions?: ReactionSummary[];
+  senderId?: string;
+  linkedTaskId?: string | null;
+  isTask?: boolean;
 }
 
 export type DashboardProjectItem = {
-  key: string
-  label: string
-  accent?: 'primary' | 'secondary' | 'accent'
-  to?: RouteLocationRaw
-}
+  key: string;
+  label: string;
+  accent?: "primary" | "secondary" | "accent";
+  to?: RouteLocationRaw;
+};
 
 export type DashboardProfileInfo = {
-  name: string
-  email: string
-  avatar?: string
-}
+  name: string;
+  email: string;
+  avatar?: string;
+};

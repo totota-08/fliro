@@ -6,4 +6,4 @@ export {
   githubProvider,
   googleProvider,
   storage,
-} from '@/lib/firebase'
+} from "@/lib/firebase";

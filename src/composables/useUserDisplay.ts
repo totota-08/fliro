@@ -1,48 +1,49 @@
-import { db } from '@/lib/firebase'
-import type { ProjectMember } from '@/services/projectMembers'
-import { getLogger } from '@logtape/logtape'
-import { doc, getDoc } from 'firebase/firestore'
-import type { Ref } from 'vue'
+import { db } from "@/lib/firebase";
+import type { ProjectMember } from "@/services/projectMembers";
+import { getLogger } from "@logtape/logtape";
+import { doc, getDoc } from "firebase/firestore";
+import type { Ref } from "vue";
 
-const logger = getLogger('app.composables.useUserDisplay')
+const logger = getLogger("app.composables.useUserDisplay");
 
-const nameCache = new Map<string, string>()
-const fetching = new Set<string>()
+const nameCache = new Map<string, string>();
+const fetching = new Set<string>();
 
 async function fetchProfileName(userId: string) {
-  if (!userId || fetching.has(userId) || nameCache.has(userId)) return
-  fetching.add(userId)
+  if (!userId || fetching.has(userId) || nameCache.has(userId)) return;
+  fetching.add(userId);
   try {
-    const snap = await getDoc(doc(db, 'profiles', userId))
+    const snap = await getDoc(doc(db, "profiles", userId));
     if (snap.exists()) {
-      const data = snap.data() as any
-      const name = data?.nickname || data?.fullName || data?.displayName
+      const data = snap.data() as any;
+      const name = data?.nickname || data?.fullName || data?.displayName;
       if (name) {
-        nameCache.set(userId, name)
+        nameCache.set(userId, name);
       }
     }
   } catch (error) {
-    logger.warn`Failed to fetch profile for ${userId}: ${error}`
+    logger.warn`Failed to fetch profile for ${userId}: ${error}`;
   } finally {
-    fetching.delete(userId)
+    fetching.delete(userId);
   }
 }
 
 export function useUserDisplay(members?: Ref<ProjectMember[]>) {
   function getDisplayName(userId?: string | null) {
-    if (!userId) return ''
-    if (nameCache.has(userId)) return nameCache.get(userId) || ''
+    if (!userId) return "";
+    if (nameCache.has(userId)) return nameCache.get(userId) || "";
 
-    const member = members?.value?.find((m) => m.userId === userId)
-    const memberName = member?.nickname || member?.fullName || member?.displayName
+    const member = members?.value?.find((m) => m.userId === userId);
+    const memberName =
+      member?.nickname || member?.fullName || member?.displayName;
     if (memberName) {
-      nameCache.set(userId, memberName)
-      return memberName
+      nameCache.set(userId, memberName);
+      return memberName;
     }
 
-    fetchProfileName(userId)
-    return ''
+    fetchProfileName(userId);
+    return "";
   }
 
-  return { getDisplayName }
+  return { getDisplayName };
 }

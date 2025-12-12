@@ -1,70 +1,74 @@
 <script setup lang="ts">
-import UserAvatar from '@/components/common/UserAvatar.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { removeAccount, updateAccountAvatar } from '@/services/accountActions'
-import { signOutUser, useAuthStore } from '@/store/auth'
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import UserAvatar from "@/components/common/UserAvatar.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { removeAccount, updateAccountAvatar } from "@/services/accountActions";
+import { signOutUser, useAuthStore } from "@/store/auth";
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 
-const router = useRouter()
-const { user, profile } = useAuthStore()
+const router = useRouter();
+const { user, profile } = useAuthStore();
 
-const maskedPassword = '********'
-const profileJson = computed(() => JSON.stringify(profile.value ?? {}, null, 2))
-const avatarUrl = computed(() => profile.value?.avatarUrl || user.value?.photoURL || '')
+const maskedPassword = "********";
+const profileJson = computed(() =>
+  JSON.stringify(profile.value ?? {}, null, 2),
+);
+const avatarUrl = computed(
+  () => profile.value?.avatarUrl || user.value?.photoURL || "",
+);
 
-
-const avatarUploading = ref(false)
-const avatarMessage = ref('')
-const deleteLoading = ref(false)
-const deleteError = ref('')
+const avatarUploading = ref(false);
+const avatarMessage = ref("");
+const deleteLoading = ref(false);
+const deleteError = ref("");
 
 const handleAvatarChange = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  avatarMessage.value = ''
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  avatarMessage.value = "";
 
   if (!file) {
-    return
+    return;
   }
 
-  avatarUploading.value = true
+  avatarUploading.value = true;
   try {
-    await updateAccountAvatar(file)
-    avatarMessage.value = 'アイコンを更新しました。'
+    await updateAccountAvatar(file);
+    avatarMessage.value = "アイコンを更新しました。";
   } catch (error) {
-    console.error(error)
-    avatarMessage.value = `アイコンのアップロードに失敗しました。${error}`
+    console.error(error);
+    avatarMessage.value = `アイコンのアップロードに失敗しました。${error}`;
   } finally {
-    avatarUploading.value = false
-    input.value = ''
+    avatarUploading.value = false;
+    input.value = "";
   }
-}
+};
 
 const handleDeleteAccount = async () => {
-  if (deleteLoading.value) return
+  if (deleteLoading.value) return;
 
-  const confirmed = window.confirm('本当にアカウントを削除しますか？この操作は取り消せません。')
-  if (!confirmed) return
+  const confirmed = window.confirm(
+    "本当にアカウントを削除しますか？この操作は取り消せません。",
+  );
+  if (!confirmed) return;
 
-  deleteError.value = ''
-  deleteLoading.value = true
+  deleteError.value = "";
+  deleteLoading.value = true;
   try {
-    await removeAccount()
-    await router.push({ name: ROUTE_NAMES.login })
+    await removeAccount();
+    await router.push({ name: ROUTE_NAMES.login });
   } catch (error) {
-    console.error(error)
-    deleteError.value =
-      `アカウントを削除できませんでした。再ログイン後に再度お試しください。${error}`
+    console.error(error);
+    deleteError.value = `アカウントを削除できませんでした。再ログイン後に再度お試しください。${error}`;
   } finally {
-    deleteLoading.value = false
+    deleteLoading.value = false;
   }
-}
+};
 
 const handleSignOut = async () => {
-  await signOutUser()
-  await router.push({ name: ROUTE_NAMES.login })
-}
+  await signOutUser();
+  await router.push({ name: ROUTE_NAMES.login });
+};
 </script>
 
 <template>
@@ -74,12 +78,24 @@ const handleSignOut = async () => {
     </header>
 
     <section class="avatar-panel">
-      <UserAvatar :src="avatarUrl" :name="profile?.nickname || profile?.fullName" :size="96" />
+      <UserAvatar
+        :src="avatarUrl"
+        :name="profile?.nickname || profile?.fullName"
+        :size="96"
+      />
       <div class="avatar-panel__content">
-        <p>画像ファイル（PNG / JPG / WEBP など）を選択してアイコンを変更できます。</p>
+        <p>
+          画像ファイル（PNG / JPG / WEBP
+          など）を選択してアイコンを変更できます。
+        </p>
         <label class="upload-button">
-          <input type="file" accept="image/*" @change="handleAvatarChange" :disabled="avatarUploading" />
-          {{ avatarUploading ? 'アップロード中...' : 'アイコンをアップロード' }}
+          <input
+            type="file"
+            accept="image/*"
+            @change="handleAvatarChange"
+            :disabled="avatarUploading"
+          />
+          {{ avatarUploading ? "アップロード中..." : "アイコンをアップロード" }}
         </label>
         <p v-if="avatarMessage" class="avatar-message">{{ avatarMessage }}</p>
       </div>
@@ -90,16 +106,16 @@ const handleSignOut = async () => {
         <h2>Firebase User</h2>
         <dl>
           <dt>UID</dt>
-          <dd>{{ user?.uid ?? '取得中...' }}</dd>
+          <dd>{{ user?.uid ?? "取得中..." }}</dd>
 
           <dt>メールアドレス</dt>
-          <dd>{{ user?.email ?? '未設定' }}</dd>
+          <dd>{{ user?.email ?? "未設定" }}</dd>
 
           <dt>パスワード</dt>
-          <dd>{{ user ? maskedPassword : '未ログイン' }}</dd>
+          <dd>{{ user ? maskedPassword : "未ログイン" }}</dd>
 
           <dt>写真 URL</dt>
-          <dd>{{ user?.photoURL ?? '未設定' }}</dd>
+          <dd>{{ user?.photoURL ?? "未設定" }}</dd>
         </dl>
       </article>
 
@@ -107,16 +123,16 @@ const handleSignOut = async () => {
         <h2>プロフィール</h2>
         <dl>
           <dt>本名</dt>
-          <dd>{{ profile?.fullName ?? '未登録' }}</dd>
+          <dd>{{ profile?.fullName ?? "未登録" }}</dd>
 
           <dt>ニックネーム</dt>
-          <dd>{{ profile?.nickname ?? '未登録' }}</dd>
+          <dd>{{ profile?.nickname ?? "未登録" }}</dd>
 
           <dt>生年月日</dt>
-          <dd>{{ profile?.birthday ?? '未登録' }}</dd>
+          <dd>{{ profile?.birthday ?? "未登録" }}</dd>
 
           <dt>アイコン URL</dt>
-          <dd>{{ profile?.avatarUrl || '未登録' }}</dd>
+          <dd>{{ profile?.avatarUrl || "未登録" }}</dd>
         </dl>
       </article>
     </div>
@@ -150,7 +166,7 @@ const handleSignOut = async () => {
         :disabled="deleteLoading"
         @click="handleDeleteAccount"
       >
-        {{ deleteLoading ? 'アカウント削除中...' : 'アカウントを削除' }}
+        {{ deleteLoading ? "アカウント削除中..." : "アカウントを削除" }}
       </button>
     </div>
 
@@ -184,8 +200,6 @@ const handleSignOut = async () => {
 .avatar-panel__content {
   flex: 1;
 }
-
-
 
 .upload-button {
   display: inline-flex;

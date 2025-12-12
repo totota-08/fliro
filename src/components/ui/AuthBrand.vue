@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { appName } from '@/constants/appMeta'
+import { appName } from "@/constants/appMeta";
 
 const props = withDefaults(
   defineProps<{
@@ -10,7 +10,7 @@ const props = withDefaults(
   {
     brandName: appName,
     description: "",
-  }
+  },
 );
 </script>
 

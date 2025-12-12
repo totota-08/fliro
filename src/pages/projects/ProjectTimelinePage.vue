@@ -1,199 +1,260 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import AppButton from '@/components/ui/AppButton.vue'
-import { appName } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/lib/firebase'
-import { listenProjectMembers, type ProjectMember } from '@/services/projectMembers'
-import { addTimelinePost, listenTimeline, type TimelinePost } from '@/services/timelineService'
-import { listenTasks, type TaskDoc } from '@/services/taskService'
-import { useAuthStore } from '@/store/auth'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { collection, getDocs } from 'firebase/firestore'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/lib/firebase";
+import {
+  listenProjectMembers,
+  type ProjectMember,
+} from "@/services/projectMembers";
+import {
+  addTimelinePost,
+  listenTimeline,
+  type TimelinePost,
+} from "@/services/timelineService";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
+import { useAuthStore } from "@/store/auth";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { getLogger } from "@logtape/logtape";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import { collection, getDocs } from "firebase/firestore";
 
-const logger = getLogger('app.pages.projects.Timeline')
-const route = useRoute()
-const { user, profile } = useAuthStore()
+const logger = getLogger("app.pages.projects.Timeline");
+const route = useRoute();
+const { user, profile } = useAuthStore();
 
-const projectId = ref(String(route.params.projectId || ''))
-const projectList = ref<{ id: string; name: string }[]>([])
-const timelinePosts = ref<TimelinePost[]>([])
-const tasks = ref<TaskDoc[]>([])
-const members = ref<ProjectMember[]>([])
-const newPost = ref('')
-const posting = ref(false)
-const isSidebarOpen = ref(true)
+const projectId = ref(String(route.params.projectId || ""));
+const projectList = ref<{ id: string; name: string }[]>([]);
+const timelinePosts = ref<TimelinePost[]>([]);
+const tasks = ref<TaskDoc[]>([]);
+const members = ref<ProjectMember[]>([]);
+const newPost = ref("");
+const posting = ref(false);
+const isSidebarOpen = ref(true);
 
-let stopTimeline: (() => void) | null = null
-let stopTasks: (() => void) | null = null
-let stopMembers: (() => void) | null = null
+let stopTimeline: (() => void) | null = null;
+let stopTasks: (() => void) | null = null;
+let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'timeline',
-      label: 'タイムライン',
-      to: { name: ROUTE_NAMES.projectTimeline, params: { projectId: projectId.value } },
-      icon: 'tasks',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "timeline",
+        label: "タイムライン",
+        to: {
+          name: ROUTE_NAMES.projectTimeline,
+          params: { projectId: projectId.value },
+        },
+        icon: "tasks",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
-const currentMember = computed(() => members.value.find((entry) => entry.userId === user.value?.uid))
-const canPost = computed(() => (currentMember.value?.role || 'viewer') !== 'viewer')
+const currentMember = computed(() =>
+  members.value.find((entry) => entry.userId === user.value?.uid),
+);
+const canPost = computed(
+  () => (currentMember.value?.role || "viewer") !== "viewer",
+);
 const sidebarProjects = computed(() =>
   projectList.value.map((project, index) => ({
     key: project.id,
     label: project.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: project.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+    to: {
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: project.id },
+    },
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const deadlineBotPosts = computed<TimelinePost[]>(() => {
-  const now = Date.now()
-  const windowMs = 1000 * 60 * 60 * 48
+  const now = Date.now();
+  const windowMs = 1000 * 60 * 60 * 48;
   return tasks.value
     .filter((task) => task.dueDate?.seconds)
     .filter((task) => {
-      const due = task.dueDate!.seconds * 1000
-      return due >= now && due - now <= windowMs
+      const due = task.dueDate!.seconds * 1000;
+      return due >= now && due - now <= windowMs;
     })
     .map((task) => {
-      const assigneeName = getMemberName(task.assigneeId) || task.assigneeName || '担当者'
-      const dueDate = new Date(task.dueDate!.seconds * 1000).toLocaleString()
+      const assigneeName =
+        getMemberName(task.assigneeId) || task.assigneeName || "担当者";
+      const dueDate = new Date(task.dueDate!.seconds * 1000).toLocaleString();
       return {
         id: `bot-${task.id}`,
-        authorId: 'deadline-bot',
-        authorName: 'Deadline Bot',
+        authorId: "deadline-bot",
+        authorName: "Deadline Bot",
         body: `@${assigneeName} タスク「${task.title}」の期限が近づいています（${dueDate}）`,
         taskId: task.id,
         dueDate,
         isBot: true,
-        createdAt: { seconds: Math.floor(task.dueDate!.seconds), nanoseconds: 0 },
-      }
-    })
-})
+        createdAt: {
+          seconds: Math.floor(task.dueDate!.seconds),
+          nanoseconds: 0,
+        },
+      };
+    });
+});
 
 const combinedFeed = computed(() => {
-  const all = [...timelinePosts.value, ...deadlineBotPosts.value]
-  return all.sort((a, b) => getCreatedAtMillis(b) - getCreatedAtMillis(a))
-})
+  const all = [...timelinePosts.value, ...deadlineBotPosts.value];
+  return all.sort((a, b) => getCreatedAtMillis(b) - getCreatedAtMillis(a));
+});
 
 function getCreatedAtMillis(post: TimelinePost) {
-  if (post.createdAt && 'seconds' in post.createdAt) {
-    return post.createdAt.seconds * 1000 + (post.createdAt.nanoseconds || 0) / 1_000_000
+  if (post.createdAt && "seconds" in post.createdAt) {
+    return (
+      post.createdAt.seconds * 1000 +
+      (post.createdAt.nanoseconds || 0) / 1_000_000
+    );
   }
-  return Date.now()
+  return Date.now();
 }
 
 function getMemberName(userId?: string | null) {
-  if (!userId) return ''
-  return members.value.find((member) => member.userId === userId)?.displayName || ''
+  if (!userId) return "";
+  return (
+    members.value.find((member) => member.userId === userId)?.displayName || ""
+  );
 }
 
 async function submitPost() {
-  if (!projectId.value || !newPost.value.trim() || !user.value) return
-  posting.value = true
+  if (!projectId.value || !newPost.value.trim() || !user.value) return;
+  posting.value = true;
   try {
     await addTimelinePost(projectId.value, {
       authorId: user.value.uid,
-      authorName: profile.value?.nickname || profile.value?.fullName || 'メンバー',
+      authorName:
+        profile.value?.nickname || profile.value?.fullName || "メンバー",
       body: newPost.value.trim(),
-    })
-    newPost.value = ''
+    });
+    newPost.value = "";
   } catch (error) {
-    logger.error`Failed to submit timeline post: ${error}`
+    logger.error`Failed to submit timeline post: ${error}`;
   } finally {
-    posting.value = false
+    posting.value = false;
   }
 }
 
 function resetWatchers() {
-  stopTimeline?.()
-  stopTasks?.()
-  stopMembers?.()
-  stopTimeline = listenTimeline(projectId.value, (items) => (timelinePosts.value = items))
-  stopTasks = listenTasks(projectId.value, (list) => (tasks.value = list))
-  stopMembers = listenProjectMembers(projectId.value, (list) => (members.value = list))
+  stopTimeline?.();
+  stopTasks?.();
+  stopMembers?.();
+  stopTimeline = listenTimeline(
+    projectId.value,
+    (items) => (timelinePosts.value = items),
+  );
+  stopTasks = listenTasks(projectId.value, (list) => (tasks.value = list));
+  stopMembers = listenProjectMembers(
+    projectId.value,
+    (list) => (members.value = list),
+  );
 }
 
 async function loadProjectList() {
-  if (!user.value) return
-  const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
+  if (!user.value) return;
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
   projectList.value = snap.docs.map((docSnap) => ({
     id: docSnap.id,
-    name: (docSnap.data().projectName as string) || 'Project',
-  }))
+    name: (docSnap.data().projectName as string) || "Project",
+  }));
 }
 
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  loadProjectList()
-  resetWatchers()
-})
+  loadProjectList();
+  resetWatchers();
+});
 
 watch(
   () => route.params.projectId,
   (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    resetWatchers()
+    if (!newId) return;
+    projectId.value = String(newId);
+    resetWatchers();
   },
-)
+);
 
 onBeforeUnmount(() => {
-  stopTimeline?.()
-  stopTasks?.()
-  stopMembers?.()
-})
+  stopTimeline?.();
+  stopTasks?.();
+  stopMembers?.();
+});
 </script>
 
 <template>
-  <div :class="['timeline-shell', { 'timeline-shell--sidebar-collapsed': !isSidebarOpen }]">
+  <div
+    :class="[
+      'timeline-shell',
+      { 'timeline-shell--sidebar-collapsed': !isSidebarOpen },
+    ]"
+  >
     <DashboardSidebar
       :open="isSidebarOpen"
       :nav-items="navItems"
@@ -202,19 +263,40 @@ onBeforeUnmount(() => {
       brand-subtitle="プロジェクト"
       @close="closeSidebar"
     />
-    <div v-if="isSidebarOpen" class="timeline-shell__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="timeline-shell__overlay"
+      @click="closeSidebar"
+    />
 
     <main class="timeline-shell__main">
       <header class="timeline-shell__topbar">
         <div class="timeline-shell__topbar-left">
-          <button type="button" class="timeline-shell__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="timeline-shell__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="timeline-shell__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="timeline-shell__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
-            <p class="timeline-shell__breadcrumb">プロジェクト &gt; タイムライン</p>
+            <p class="timeline-shell__breadcrumb">
+              プロジェクト &gt; タイムライン
+            </p>
             <h1 class="timeline-shell__heading">タイムライン</h1>
           </div>
         </div>
@@ -225,41 +307,67 @@ onBeforeUnmount(() => {
           <div>
             <p class="eyebrow">フィード投稿</p>
             <h2>チームの進捗を共有</h2>
-            <p class="muted">締切前のボット投稿とメンバー投稿をまとめて表示します。</p>
+            <p class="muted">
+              締切前のボット投稿とメンバー投稿をまとめて表示します。
+            </p>
           </div>
           <textarea
             v-model="newPost"
             class="timeline-compose__input"
             rows="3"
-            :placeholder="canPost ? '今日の進捗や共有事項を投稿' : '閲覧のみ可能です'"
+            :placeholder="
+              canPost ? '今日の進捗や共有事項を投稿' : '閲覧のみ可能です'
+            "
             :disabled="!canPost"
           />
           <div class="timeline-compose__actions">
-            <span v-if="!canPost" class="muted">閲覧権限のみのため投稿できません</span>
-            <AppButton variant="primary" :disabled="!newPost.trim() || !canPost" :loading="posting" @click="submitPost">
+            <span v-if="!canPost" class="muted"
+              >閲覧権限のみのため投稿できません</span
+            >
+            <AppButton
+              variant="primary"
+              :disabled="!newPost.trim() || !canPost"
+              :loading="posting"
+              @click="submitPost"
+            >
               投稿する
             </AppButton>
           </div>
         </section>
 
         <section class="timeline-feed">
-          <article v-for="post in combinedFeed" :key="post.id" :class="['timeline-item', { 'timeline-item--bot': post.isBot }]">
+          <article
+            v-for="post in combinedFeed"
+            :key="post.id"
+            :class="['timeline-item', { 'timeline-item--bot': post.isBot }]"
+          >
             <header class="timeline-item__header">
-              <div class="timeline-item__avatar" :data-bot="post.isBot ? 'bot' : ''">
-                <span>{{ post.isBot ? '🤖' : (post.authorName || '??').slice(0, 2) }}</span>
+              <div
+                class="timeline-item__avatar"
+                :data-bot="post.isBot ? 'bot' : ''"
+              >
+                <span>{{
+                  post.isBot ? "🤖" : (post.authorName || "??").slice(0, 2)
+                }}</span>
               </div>
               <div>
                 <p class="timeline-item__author">{{ post.authorName }}</p>
-                <p class="timeline-item__meta">{{ new Date(getCreatedAtMillis(post)).toLocaleString() }}</p>
+                <p class="timeline-item__meta">
+                  {{ new Date(getCreatedAtMillis(post)).toLocaleString() }}
+                </p>
               </div>
             </header>
             <p class="timeline-item__body">{{ post.body }}</p>
             <div class="timeline-item__tags">
               <span v-if="post.isBot" class="chip">Deadline Bot</span>
-              <span v-if="post.dueDate" class="chip chip--soft">期限: {{ post.dueDate }}</span>
+              <span v-if="post.dueDate" class="chip chip--soft"
+                >期限: {{ post.dueDate }}</span
+              >
             </div>
           </article>
-          <p v-if="!combinedFeed.length" class="muted">まだ投稿がありません。</p>
+          <p v-if="!combinedFeed.length" class="muted">
+            まだ投稿がありません。
+          </p>
         </section>
       </div>
     </main>
@@ -267,7 +375,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .timeline-shell {
   display: flex;
@@ -419,7 +527,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.timeline-item__avatar[data-bot='bot'] {
+.timeline-item__avatar[data-bot="bot"] {
   background: rgba(52, 168, 83, 0.18);
 }
 

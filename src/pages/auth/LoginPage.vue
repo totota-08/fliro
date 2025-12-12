@@ -1,104 +1,110 @@
 <script setup lang="ts">
-import AppButton from '@/components/ui/AppButton.vue'
-import AuthBrand from '@/components/ui/AuthBrand.vue'
-import AuthFormField from '@/components/ui/AuthFormField.vue'
-import AuthProviderButtons from '@/components/ui/AuthProviderButtons.vue'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { fetchProfile } from '@/firebase/authService'
-import { getCurrentUser } from '@/lib/getCurrentUser'
+import AppButton from "@/components/ui/AppButton.vue";
+import AuthBrand from "@/components/ui/AuthBrand.vue";
+import AuthFormField from "@/components/ui/AuthFormField.vue";
+import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { fetchProfile } from "@/firebase/authService";
+import { getCurrentUser } from "@/lib/getCurrentUser";
 import {
-    authenticateWithEmail,
-    authenticateWithProvider,
-} from '@/services/accountActions'
-import type { SocialProvider } from '@/types/auth'
-import { computed, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+  authenticateWithEmail,
+  authenticateWithProvider,
+} from "@/services/accountActions";
+import type { SocialProvider } from "@/types/auth";
+import { computed, reactive, ref } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { getLogger } from '@logtape/logtape'
+import { getLogger } from "@logtape/logtape";
 
-const logger = getLogger('app.pages.auth.Login')
+const logger = getLogger("app.pages.auth.Login");
 
-const router = useRouter()
-const route = useRoute()
+const router = useRouter();
+const route = useRoute();
 
 const form = reactive({
-  email: '',
-  password: '',
-})
+  email: "",
+  password: "",
+});
 
-const rememberMe = ref(false)
-const loading = ref(false)
-const providerLoading = ref<SocialProvider | null>(null)
-const errorMessage = ref('')
+const rememberMe = ref(false);
+const loading = ref(false);
+const providerLoading = ref<SocialProvider | null>(null);
+const errorMessage = ref("");
 
 const redirectTarget = computed(() => {
-  return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage }
-})
+  return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage };
+});
 
 const providers: { id: SocialProvider; label: string; icon: string }[] = [
-  { id: 'google', label: 'Google でログイン', icon: 'google' },
-  { id: 'github', label: 'GitHub でログイン', icon: 'github' },
-]
+  { id: "google", label: "Google でログイン", icon: "google" },
+  { id: "github", label: "GitHub でログイン", icon: "github" },
+];
 const checksetUp = async () => {
-  const user = await getCurrentUser()
-  if (!user) return
+  const user = await getCurrentUser();
+  if (!user) return;
 
-  const profile = await fetchProfile(user.uid)
+  const profile = await fetchProfile(user.uid);
   if (profile && profile.setUp === false) {
-    await router.push({ name: ROUTE_NAMES.signup, query: { setup: 'false' } })
-    return
+    await router.push({ name: ROUTE_NAMES.signup, query: { setup: "false" } });
+    return;
   }
-  await router.push(redirectTarget.value)
-}
+  await router.push(redirectTarget.value);
+};
 const handleSubmit = async () => {
-  if (loading.value) return
+  if (loading.value) return;
 
-  loading.value = true
-  errorMessage.value = ''
+  loading.value = true;
+  errorMessage.value = "";
 
   try {
-    await authenticateWithEmail({ ...form })
-    await checksetUp()
+    await authenticateWithEmail({ ...form });
+    await checksetUp();
   } catch (error) {
-    logger.error`Login failed: ${error}`
-    errorMessage.value = mapFirebaseError(error)
+    logger.error`Login failed: ${error}`;
+    errorMessage.value = mapFirebaseError(error);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const handleProvider = async (provider: SocialProvider) => {
-  if (providerLoading.value) return
+  if (providerLoading.value) return;
 
-  providerLoading.value = provider
-  errorMessage.value = ''
+  providerLoading.value = provider;
+  errorMessage.value = "";
 
   try {
-    await authenticateWithProvider(provider)
-    await checksetUp()
+    await authenticateWithProvider(provider);
+    await checksetUp();
   } catch (error) {
-    logger.error`Provider login failed: ${error}`
-    errorMessage.value = mapFirebaseError(error)
+    logger.error`Provider login failed: ${error}`;
+    errorMessage.value = mapFirebaseError(error);
   } finally {
-    providerLoading.value = null
+    providerLoading.value = null;
   }
-}
+};
 
 function mapFirebaseError(error: unknown) {
-  if (typeof error === 'object' && error && 'code' in error) {
-    const code = String((error as { code?: string }).code)
-    if (code === 'auth/invalid-credential') return 'メールアドレスまたはパスワードが正しくありません。'
-    if (code === 'auth/user-disabled') return 'このアカウントは無効化されています。'
-    if (code === 'auth/too-many-requests') return '試行回数が多すぎます。しばらく待ってから再度お試しください。'
+  if (typeof error === "object" && error && "code" in error) {
+    const code = String((error as { code?: string }).code);
+    if (code === "auth/invalid-credential")
+      return "メールアドレスまたはパスワードが正しくありません。";
+    if (code === "auth/user-disabled")
+      return "このアカウントは無効化されています。";
+    if (code === "auth/too-many-requests")
+      return "試行回数が多すぎます。しばらく待ってから再度お試しください。";
   }
-  return 'ログインできませんでした。時間を置いて再度お試しください。'
+  return "ログインできませんでした。時間を置いて再度お試しください。";
 }
 </script>
 
 <template>
   <div class="login-hero">
     <div class="login-card">
-      <AuthBrand title="ログイン" description="アカウントにログインしてください" />
+      <AuthBrand
+        title="ログイン"
+        description="アカウントにログインしてください"
+      />
 
       <form class="login-form" @submit.prevent="handleSubmit">
         <AuthFormField
@@ -230,7 +236,7 @@ function mapFirebaseError(error: unknown) {
 }
 
 .divider::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 0;
@@ -288,11 +294,11 @@ function mapFirebaseError(error: unknown) {
   background-repeat: no-repeat;
 }
 
-.social-icon[data-icon='google'] {
+.social-icon[data-icon="google"] {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="%234285F4" d="M19.6 10.227c0-.709-.064-1.39-.182-2.045H10v3.868h5.382a4.6 4.6 0 01-1.996 3.018v2.51h3.232c1.891-1.742 2.982-4.305 2.982-7.35z"/><path fill="%2334A853" d="M10 20c2.7 0 4.964-.895 6.618-2.423l-3.232-2.509c-.895.6-2.04.955-3.386.955-2.605 0-4.81-1.76-5.595-4.123H1.064v2.59A9.996 9.996 0 0010 20z"/><path fill="%23FBBC05" d="M4.405 11.9c-.2-.6-.314-1.24-.314-1.9 0-.66.114-1.3.314-1.9V5.51H1.064A9.996 9.996 0 000 10c0 1.614.386 3.14 1.064 4.49l3.34-2.59z"/><path fill="%23EA4335" d="M10 3.977c1.468 0 2.786.505 3.823 1.496l2.868-2.868C14.959.99 12.695 0 10 0 6.09 0 2.71 2.24 1.064 5.51l3.34 2.59C5.19 5.736 7.395 3.977 10 3.977z"/></svg>');
 }
 
-.social-icon[data-icon='github'] {
+.social-icon[data-icon="github"] {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="%230B2E33" viewBox="0 0 24 24"><path d="M12 0a12 12 0 00-3.79 23.4c.6.11.82-.26.82-.58v-2.02c-3.34.73-4.05-1.61-4.05-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.21.09 1.84 1.25 1.84 1.25 1.07 1.84 2.8 1.31 3.48 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.51.12-3.14 0 0 1.01-.32 3.3 1.23a11.37 11.37 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.63.24 2.84.12 3.14.77.84 1.24 1.91 1.24 3.22 0 4.63-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.23v3.31c0 .32.22.69.82.58A12 12 0 0012 0z" /></svg>');
 }
 

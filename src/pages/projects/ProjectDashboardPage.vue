@@ -1,335 +1,411 @@
 <script setup lang="ts">
-import DashboardSidebar from '@/components/projectDashboard/DashboardSidebar.vue'
-import DashboardSummaryCards, { type SummaryCard } from '@/components/projectDashboard/DashboardSummaryCards.vue'
-import NotificationBar from '@/components/projectDashboard/NotificationBar.vue'
-import { useNotificationCenter } from '@/composables/useNotificationCenter'
-import { useUserDisplay } from '@/composables/useUserDisplay'
-import { appName, appVersion } from '@/constants/appMeta'
-import { ROUTE_NAMES } from '@/constants/routes'
-import { db } from '@/lib/firebase'
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import DashboardSummaryCards, {
+  type SummaryCard,
+} from "@/components/projectDashboard/DashboardSummaryCards.vue";
+import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
+import { useNotificationCenter } from "@/composables/useNotificationCenter";
+import { useUserDisplay } from "@/composables/useUserDisplay";
+import { appName, appVersion } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/lib/firebase";
 import {
-    // addMessageReaction,
-    // deleteProjectMessage,
-    listenProjectChat,
-    // sendProjectMessage,
-    // updateProjectMessage,
-    type ChatMessage,
-} from '@/services/projectChat'
-import type { ProjectMember } from '@/services/projectMembers'
+  // addMessageReaction,
+  // deleteProjectMessage,
+  listenProjectChat,
+  // sendProjectMessage,
+  // updateProjectMessage,
+  type ChatMessage,
+} from "@/services/projectChat";
+import type { ProjectMember } from "@/services/projectMembers";
 import {
-    createTask,
-    deleteTask,
-    listenTasks,
-    updateTask,
-    type TaskDoc,
-    type TaskStatus,
-} from '@/services/taskService'
-import { listenTaskCategories, type TaskCategory } from '@/services/taskCategoryService'
-import { useAuthStore } from '@/store/auth'
-import type { ProjectDoc } from '@/types/project'
-import type { DashboardNavItem } from '@/types/projectDashboard'
-import { getLogger } from '@logtape/logtape'
-import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore'
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+  createTask,
+  deleteTask,
+  listenTasks,
+  updateTask,
+  type TaskDoc,
+  type TaskStatus,
+} from "@/services/taskService";
+import {
+  listenTaskCategories,
+  type TaskCategory,
+} from "@/services/taskCategoryService";
+import { useAuthStore } from "@/store/auth";
+import type { ProjectDoc } from "@/types/project";
+import type { DashboardNavItem } from "@/types/projectDashboard";
+import { getLogger } from "@logtape/logtape";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
+import { useRoute } from "vue-router";
 
-const logger = getLogger('app.pages.projects.ProjectDashboard')
+const logger = getLogger("app.pages.projects.ProjectDashboard");
 
-const route = useRoute()
-const { user, profile } = useAuthStore()
-const projectId = ref(String(route.params.projectId || ''))
+const route = useRoute();
+const { user, profile } = useAuthStore();
+const projectId = ref(String(route.params.projectId || ""));
 
 type MemberEntry = ProjectMember & {
-  id: string
-  name: string
-  lastAccessedAt?: { seconds: number; nanoseconds: number }
-}
+  id: string;
+  name: string;
+  lastAccessedAt?: { seconds: number; nanoseconds: number };
+};
 
 type DashboardNotification = {
-  id: string
-  message: string
-  dismissible: boolean
-}
+  id: string;
+  message: string;
+  dismissible: boolean;
+};
 
-const project = ref<ProjectDoc | null>(null)
-const projectList = ref<{ id: string; name: string }[]>([])
-const members = ref<MemberEntry[]>([])
-const { getDisplayName } = useUserDisplay(members)
-const tasks = ref<TaskDoc[]>([])
-const categories = ref<TaskCategory[]>([])
-const { notifications: notificationsBar } = useNotificationCenter()
-const taskView = ref<'all' | 'mine'>('all')
-const selectedTask = ref<TaskDoc | null>(null)
-const editor = reactive({ description: '', dueDate: '', assigneeId: '', status: 'todo' as TaskStatus, progress: 0 })
-const chatMessages = ref<ChatMessage[]>([])
-const chatLoading = ref(true)
-const notifications = ref<DashboardNotification[]>([])
-const dismissedNotificationIds = ref<Set<string>>(new Set())
-const filters = reactive({ search: '', status: 'all', assignee: 'all', due: 'all', category: 'all' })
-const showMyTasksOnly = ref(false)
-const isSidebarOpen = ref(true)
-const isTaskModalOpen = ref(false)
+const project = ref<ProjectDoc | null>(null);
+const projectList = ref<{ id: string; name: string }[]>([]);
+const members = ref<MemberEntry[]>([]);
+const { getDisplayName } = useUserDisplay(members);
+const tasks = ref<TaskDoc[]>([]);
+const categories = ref<TaskCategory[]>([]);
+const { notifications: notificationsBar } = useNotificationCenter();
+const taskView = ref<"all" | "mine">("all");
+const selectedTask = ref<TaskDoc | null>(null);
+const editor = reactive({
+  description: "",
+  dueDate: "",
+  assigneeId: "",
+  status: "todo" as TaskStatus,
+  progress: 0,
+});
+const chatMessages = ref<ChatMessage[]>([]);
+const chatLoading = ref(true);
+const notifications = ref<DashboardNotification[]>([]);
+const dismissedNotificationIds = ref<Set<string>>(new Set());
+const filters = reactive({
+  search: "",
+  status: "all",
+  assignee: "all",
+  due: "all",
+  category: "all",
+});
+const showMyTasksOnly = ref(false);
+const isSidebarOpen = ref(true);
+const isTaskModalOpen = ref(false);
 // const secondaryTab = ref<'chat' | 'members'>('chat')
-const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const
-
-
+const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
 
 const taskForm = reactive({
-  title: '',
-  description: '',
-  dueDate: '',
-  assigneeId: '',
-  categoryId: '',
+  title: "",
+  description: "",
+  dueDate: "",
+  assigneeId: "",
+  categoryId: "",
   progress: 0,
   addToThread: false,
-})
-const threadNameDraft = ref('')
-const isThreadFormOpen = ref(false)
-const threadCreationLoading = ref(false)
+});
+const threadNameDraft = ref("");
+const isThreadFormOpen = ref(false);
+const threadCreationLoading = ref(false);
 
-let stopTasks: (() => void) | null = null
-let stopProject: (() => void) | null = null
-let stopMembers: (() => void) | null = null
-let stopChat: (() => void) | null = null
-let stopCategories: (() => void) | null = null
+let stopTasks: (() => void) | null = null;
+let stopProject: (() => void) | null = null;
+let stopMembers: (() => void) | null = null;
+let stopChat: (() => void) | null = null;
+let stopCategories: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(() =>
-  [
-    {
-      key: 'dashboard',
-      label: 'ダッシュボード',
-      to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projectId.value } },
-      icon: 'dashboard',
-    },
-    { key: 'tasks', label: 'マイタスク', to: { name: ROUTE_NAMES.myTasks }, icon: 'tasks' },
-    {
-      key: 'team',
-      label: 'スレッド',
-      to: { name: ROUTE_NAMES.projectThreads, params: { projectId: projectId.value } },
-      icon: 'team',
-    },
-    {
-      key: 'members',
-      label: 'メンバー',
-      to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projectId.value } },
-      icon: 'members',
-    },
-    {
-      key: 'settings',
-      label: '設定',
-      to: { name: ROUTE_NAMES.projectSettings, params: { projectId: projectId.value } },
-      icon: 'settings',
-    },
-    {
-      key: 'debug',
-      label: 'デバッグ',
-      to: { name: ROUTE_NAMES.projectDebug, params: { projectId: projectId.value } },
-      icon: 'debug',
-    },
-  ] satisfies DashboardNavItem[],
-)
+const navItems = computed<DashboardNavItem[]>(
+  () =>
+    [
+      {
+        key: "dashboard",
+        label: "ダッシュボード",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+        icon: "dashboard",
+      },
+      {
+        key: "tasks",
+        label: "マイタスク",
+        to: { name: ROUTE_NAMES.myTasks },
+        icon: "tasks",
+      },
+      {
+        key: "team",
+        label: "スレッド",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+        icon: "team",
+      },
+      {
+        key: "timeline",
+        label: "タイムライン",
+        to: {
+          name: ROUTE_NAMES.projectTimeline,
+          params: { projectId: projectId.value },
+        },
+        icon: "tasks",
+      },
+      {
+        key: "members",
+        label: "メンバー",
+        to: {
+          name: ROUTE_NAMES.projectMembers,
+          params: { projectId: projectId.value },
+        },
+        icon: "members",
+      },
+      {
+        key: "settings",
+        label: "設定",
+        to: {
+          name: ROUTE_NAMES.projectSettings,
+          params: { projectId: projectId.value },
+        },
+        icon: "settings",
+      },
+      {
+        key: "debug",
+        label: "デバッグ",
+        to: {
+          name: ROUTE_NAMES.projectDebug,
+          params: { projectId: projectId.value },
+        },
+        icon: "debug",
+      },
+    ] satisfies DashboardNavItem[],
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
     key: entry.id,
     label: entry.name,
     to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: (['primary', 'secondary', 'accent'][index % 3] as 'primary' | 'secondary' | 'accent'),
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
-)
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || '',
-}))
+  email: profile.value?.email || "",
+}));
 
 const filteredTasks = computed(() => {
-  let list = [...tasks.value]
+  let list = [...tasks.value];
   if (filters.search.trim()) {
-    const keyword = filters.search.trim().toLowerCase()
-    list = list.filter((task) => task.title.toLowerCase().includes(keyword))
+    const keyword = filters.search.trim().toLowerCase();
+    list = list.filter((task) => task.title.toLowerCase().includes(keyword));
   }
-  if (filters.status !== 'all') {
-    list = list.filter((task) => task.status === filters.status)
+  if (filters.status !== "all") {
+    list = list.filter((task) => task.status === filters.status);
   }
-  if (filters.assignee !== 'all') {
-    list = list.filter((task) => (task.assigneeId || '') === filters.assignee)
+  if (filters.assignee !== "all") {
+    list = list.filter((task) => (task.assigneeId || "") === filters.assignee);
   }
-  if (filters.due !== 'all') {
-    const now = new Date()
+  if (filters.due !== "all") {
+    const now = new Date();
     list = list.filter((task) => {
-      if (!task.dueDate?.seconds) return false
-      const due = new Date(task.dueDate.seconds * 1000)
-      if (filters.due === 'today') return due.toDateString() === now.toDateString()
-      if (filters.due === 'week') return due.getTime() - now.getTime() <= 7 * 24 * 60 * 60 * 1000 && due >= now
-      if (filters.due === 'overdue') return due < now
-      return true
-    })
+      if (!task.dueDate?.seconds) return false;
+      const due = new Date(task.dueDate.seconds * 1000);
+      if (filters.due === "today")
+        return due.toDateString() === now.toDateString();
+      if (filters.due === "week")
+        return (
+          due.getTime() - now.getTime() <= 7 * 24 * 60 * 60 * 1000 && due >= now
+        );
+      if (filters.due === "overdue") return due < now;
+      return true;
+    });
   }
-  if (filters.category !== 'all') {
-    list = list.filter((task) => (task.categoryId || 'none') === filters.category)
+  if (filters.category !== "all") {
+    list = list.filter(
+      (task) => (task.categoryId || "none") === filters.category,
+    );
   }
   if (showMyTasksOnly.value && user.value) {
-    list = list.filter((task) => task.assigneeId === user.value?.uid)
+    list = list.filter((task) => task.assigneeId === user.value?.uid);
   }
-if (taskView.value === 'mine' && user.value) {
-  list = list.filter((task) => task.assigneeId === user.value?.uid)
-}
-return list
-})
+  if (taskView.value === "mine" && user.value) {
+    list = list.filter((task) => task.assigneeId === user.value?.uid);
+  }
+  return list;
+});
 
 const summaryCards = computed<SummaryCard[]>(() => {
-  const total = tasks.value.length
-  const done = tasks.value.filter((task) => task.status === 'done').length
-  
-  const inProgress = tasks.value.filter((task) => task.status === 'in-progress').length
-  const overdue = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now()).length
-  
+  const total = tasks.value.length;
+  const done = tasks.value.filter((task) => task.status === "done").length;
+
+  const inProgress = tasks.value.filter(
+    (task) => task.status === "in-progress",
+  ).length;
+  const overdue = tasks.value.filter(
+    (task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now(),
+  ).length;
+
   return [
-    { 
-      id: 'done', 
-      label: '完了タスク', 
-      value: String(done), 
+    {
+      id: "done",
+      label: "完了タスク",
+      value: String(done),
       caption: `全${total}件中${done}件が完了`,
-      icon: 'check'
+      icon: "check",
     },
-    { 
-      id: 'active', 
-      label: '進行中', 
-      value: String(inProgress), 
-      caption: '現在作業中のタスク数',
-      icon: 'activity'
+    {
+      id: "active",
+      label: "進行中",
+      value: String(inProgress),
+      caption: "現在作業中のタスク数",
+      icon: "activity",
     },
-    { 
-      id: 'overdue', 
-      label: '期限切れ', 
-      value: String(overdue), 
-      caption: '期限を超過したタスク', 
-      tone: overdue > 0 ? 'alert' : 'neutral',
-      icon: 'alert'
+    {
+      id: "overdue",
+      label: "期限切れ",
+      value: String(overdue),
+      caption: "期限を超過したタスク",
+      tone: overdue > 0 ? "alert" : "neutral",
+      icon: "alert",
     },
-  ]
-})
+  ];
+});
 
-
-const gaugeRadius = 80
-const gaugeCircumference = Math.PI * gaugeRadius
+const gaugeRadius = 80;
+const gaugeCircumference = Math.PI * gaugeRadius;
 
 const overallProgress = computed(() => {
-  const total = tasks.value.length
-  if (!total) return 0
+  const total = tasks.value.length;
+  if (!total) return 0;
   const totalProgress = tasks.value.reduce((sum, task) => {
-    return sum + (task.progress ?? (task.status === 'done' ? 100 : 0))
-  }, 0)
-  return Math.round(totalProgress / total)
-})
+    return sum + (task.progress ?? (task.status === "done" ? 100 : 0));
+  }, 0);
+  return Math.round(totalProgress / total);
+});
 
 watch(selectedTask, (task) => {
   if (task) {
-    threadNameDraft.value = task.threadName || task.title || ''
+    threadNameDraft.value = task.threadName || task.title || "";
   } else {
-    threadNameDraft.value = ''
+    threadNameDraft.value = "";
   }
-  isThreadFormOpen.value = false
-  threadCreationLoading.value = false
-})
+  isThreadFormOpen.value = false;
+  threadCreationLoading.value = false;
+});
 
 const statusCounts = computed(() => {
   const counts: Record<TaskStatus, number> = {
     todo: 0,
-    'in-progress': 0,
+    "in-progress": 0,
     review: 0,
     done: 0,
-  }
+  };
   tasks.value.forEach((task) => {
-    counts[task.status] = (counts[task.status] || 0) + 1
-  })
-  return counts
-})
+    counts[task.status] = (counts[task.status] || 0) + 1;
+  });
+  return counts;
+});
 
 const maxStatusCount = computed(() => {
-  const values = Object.values(statusCounts.value)
-  return Math.max(1, ...values)
-})
+  const values = Object.values(statusCounts.value);
+  return Math.max(1, ...values);
+});
 
 const healthScore = computed(() => {
-  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length
-  const now = Date.now()
-  const soonThreshold = 3 * 24 * 60 * 60 * 1000
+  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
+  const now = Date.now();
+  const soonThreshold = 3 * 24 * 60 * 60 * 1000;
   const dueSoon = tasks.value.filter(
-    (task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 - now <= soonThreshold && task.dueDate.seconds * 1000 > now,
-  ).length
-  const progressPenalty = Math.max(0, 70 - overallProgress.value) * 0.4
-  let score = 100
-  score -= overdue * 12
-  score -= dueSoon * 5
-  score -= progressPenalty
-  return Math.max(0, Math.min(100, Math.round(score)))
-})
+    (task) =>
+      task.dueDate?.seconds &&
+      task.dueDate.seconds * 1000 - now <= soonThreshold &&
+      task.dueDate.seconds * 1000 > now,
+  ).length;
+  const progressPenalty = Math.max(0, 70 - overallProgress.value) * 0.4;
+  let score = 100;
+  score -= overdue * 12;
+  score -= dueSoon * 5;
+  score -= progressPenalty;
+  return Math.max(0, Math.min(100, Math.round(score)));
+});
 
 const healthColor = computed(() => {
-  if (healthScore.value >= 80) return '#16a34a'
-  if (healthScore.value >= 60) return '#f59e0b'
-  if (healthScore.value >= 40) return '#f97316'
-  return '#ef4444'
-})
+  if (healthScore.value >= 80) return "#16a34a";
+  if (healthScore.value >= 60) return "#f59e0b";
+  if (healthScore.value >= 40) return "#f97316";
+  return "#ef4444";
+});
 
-const gaugeDashoffset = computed(() => gaugeCircumference * (1 - healthScore.value / 100))
-const healthNeedleRotation = computed(() => -90 + (healthScore.value / 100) * 180)
+const gaugeDashoffset = computed(
+  () => gaugeCircumference * (1 - healthScore.value / 100),
+);
+const healthNeedleRotation = computed(
+  () => -90 + (healthScore.value / 100) * 180,
+);
 
 const gaugeSegments = [
-  { id: 'danger', color: '#ef4444', size: 40 },
-  { id: 'warn', color: '#f97316', size: 20 },
-  { id: 'caution', color: '#f59e0b', size: 20 },
-  { id: 'good', color: '#16a34a', size: 20 },
-]
+  { id: "danger", color: "#ef4444", size: 40 },
+  { id: "warn", color: "#f97316", size: 20 },
+  { id: "caution", color: "#f59e0b", size: 20 },
+  { id: "good", color: "#16a34a", size: 20 },
+];
 
 const gaugeSegmentStyles = computed(() => {
-  let offset = 0
+  let offset = 0;
   return gaugeSegments.map((segment) => {
-    const len = gaugeCircumference * (segment.size / 100)
+    const len = gaugeCircumference * (segment.size / 100);
     const style = {
       stroke: segment.color,
       strokeDasharray: `${len} ${gaugeCircumference - len}`,
       strokeDashoffset: `${-offset}`,
-    }
-    offset += len
-    return style
-  })
-})
-
+    };
+    offset += len;
+    return style;
+  });
+});
 
 function formatDueDate(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return '未設定'
-  return new Date(task.dueDate.seconds * 1000).toLocaleDateString()
+  if (!task.dueDate?.seconds) return "未設定";
+  return new Date(task.dueDate.seconds * 1000).toLocaleDateString();
 }
 
 function isTaskOverdue(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return false
-  const due = task.dueDate.seconds * 1000
-  return due < Date.now() && task.status !== 'done'
+  if (!task.dueDate?.seconds) return false;
+  const due = task.dueDate.seconds * 1000;
+  return due < Date.now() && task.status !== "done";
 }
 
 function taskStatusLabel(status: TaskStatus) {
-  if (status === 'in-progress') return '進行中'
-  if (status === 'review') return 'レビュー'
-  if (status === 'done') return '完了'
-  return '未着手'
+  if (status === "in-progress") return "進行中";
+  if (status === "review") return "レビュー";
+  if (status === "done") return "完了";
+  return "未着手";
 }
 
 function taskStatusClass(task: TaskDoc) {
-  const base = `task-row__status--${task.status}`
-  return [base, { 'is-overdue': isTaskOverdue(task) }]
+  const base = `task-row__status--${task.status}`;
+  return [base, { "is-overdue": isTaskOverdue(task) }];
 }
 
 function normalizeProgress(value: number | null | undefined) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 0
-  const clamped = Math.min(100, Math.max(0, value))
-  return Math.round(clamped / 25) * 25
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+  const clamped = Math.min(100, Math.max(0, value));
+  return Math.round(clamped / 25) * 25;
 }
 
 function taskProgress(task: TaskDoc) {
-  return normalizeProgress(task.progress ?? (task.status === 'done' ? 100 : 0))
+  return normalizeProgress(task.progress ?? (task.status === "done" ? 100 : 0));
 }
 
 // const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
@@ -356,210 +432,247 @@ function taskProgress(task: TaskDoc) {
 //   })),
 // )
 
+watch(
+  () => editor.progress,
+  (newVal) => {
+    if (newVal > 0 && newVal < 100 && editor.status === "todo") {
+      editor.status = "in-progress";
+    }
+    if (newVal === 100 && editor.status !== "done") {
+      editor.status = "done";
+    }
+    if (newVal < 100 && editor.status === "done") {
+      editor.status = "in-progress";
+    }
+  },
+);
 
-watch(() => editor.progress, (newVal) => {
-  if (newVal > 0 && newVal < 100 && editor.status === 'todo') {
-    editor.status = 'in-progress'
-  }
-  if (newVal === 100 && editor.status !== 'done') {
-    editor.status = 'done'
-  }
-  if (newVal < 100 && editor.status === 'done') {
-    editor.status = 'in-progress'
-  }
-})
-
-watch(() => editor.status, (newVal) => {
-  if (newVal === 'done') {
-    editor.progress = 100
-  }
-  if (newVal === 'todo' && editor.progress > 0) {
-    editor.progress = 0
-  }
-})
+watch(
+  () => editor.status,
+  (newVal) => {
+    if (newVal === "done") {
+      editor.progress = 100;
+    }
+    if (newVal === "todo" && editor.progress > 0) {
+      editor.progress = 0;
+    }
+  },
+);
 
 function evaluateNotifications() {
-  const now = Date.now()
-  const oneDay = 24 * 60 * 60 * 1000
-  const userAssignments = tasks.value.filter((task) => task.assigneeId === user.value?.uid)
-  const dueSoon = tasks.value.filter((task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 - now <= oneDay && task.dueDate.seconds * 1000 > now)
-  const overdueCount = tasks.value.filter((task) => isTaskOverdue(task)).length
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  const userAssignments = tasks.value.filter(
+    (task) => task.assigneeId === user.value?.uid,
+  );
+  const dueSoon = tasks.value.filter(
+    (task) =>
+      task.dueDate?.seconds &&
+      task.dueDate.seconds * 1000 - now <= oneDay &&
+      task.dueDate.seconds * 1000 > now,
+  );
+  const overdueCount = tasks.value.filter((task) => isTaskOverdue(task)).length;
 
-  const alerts: DashboardNotification[] = []
-  if (userAssignments.length && !dismissedNotificationIds.value.has('assigned')) {
-    alerts.push({ id: 'assigned', message: `あなたに割り当てられたタスクが ${userAssignments.length} 件あります`, dismissible: true })
+  const alerts: DashboardNotification[] = [];
+  if (
+    userAssignments.length &&
+    !dismissedNotificationIds.value.has("assigned")
+  ) {
+    alerts.push({
+      id: "assigned",
+      message: `あなたに割り当てられたタスクが ${userAssignments.length} 件あります`,
+      dismissible: true,
+    });
   }
-  if (dueSoon.length && !dismissedNotificationIds.value.has('due-soon')) {
-    alerts.push({ id: 'due-soon', message: `期限が迫っているタスク: ${dueSoon.length} 件`, dismissible: true })
+  if (dueSoon.length && !dismissedNotificationIds.value.has("due-soon")) {
+    alerts.push({
+      id: "due-soon",
+      message: `期限が迫っているタスク: ${dueSoon.length} 件`,
+      dismissible: true,
+    });
   }
   if (overdueCount) {
-    alerts.push({ id: 'overdue', message: `期限切れのタスクが ${overdueCount} 件あります`, dismissible: false })
+    alerts.push({
+      id: "overdue",
+      message: `期限切れのタスクが ${overdueCount} 件あります`,
+      dismissible: false,
+    });
   }
-  notifications.value = alerts
+  notifications.value = alerts;
 }
 
 function dismissNotification(id: string) {
-  const note = notifications.value.find((entry) => entry.id === id)
-  if (!note || !note.dismissible) return
-  const next = new Set(dismissedNotificationIds.value)
-  next.add(id)
-  dismissedNotificationIds.value = next
-  notifications.value = notifications.value.filter((entry) => entry.id !== id)
+  const note = notifications.value.find((entry) => entry.id === id);
+  if (!note || !note.dismissible) return;
+  const next = new Set(dismissedNotificationIds.value);
+  next.add(id);
+  dismissedNotificationIds.value = next;
+  notifications.value = notifications.value.filter((entry) => entry.id !== id);
 }
 
 function resetFilters() {
-  filters.search = ''
-  filters.status = 'all'
-  filters.assignee = 'all'
-  filters.due = 'all'
-  filters.category = 'all'
+  filters.search = "";
+  filters.status = "all";
+  filters.assignee = "all";
+  filters.due = "all";
+  filters.category = "all";
 }
 
 watch(
   taskView,
   (mode) => {
-    showMyTasksOnly.value = mode === 'mine'
+    showMyTasksOnly.value = mode === "mine";
   },
   { immediate: true },
-)
+);
 
 watch(showMyTasksOnly, (flag) => {
-  taskView.value = flag ? 'mine' : 'all'
-})
-
-
+  taskView.value = flag ? "mine" : "all";
+});
 
 async function loadProjectList() {
-  if (!user.value) return
-  const snap = await getDocs(collection(db, 'userProjects', user.value.uid, 'projects'))
-  projectList.value = snap.docs.map((docSnap) => ({ id: docSnap.id, name: (docSnap.data().projectName as string) || 'Project' }))
+  if (!user.value) return;
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
+  projectList.value = snap.docs.map((docSnap) => ({
+    id: docSnap.id,
+    name: (docSnap.data().projectName as string) || "Project",
+  }));
 }
 
 function watchProject() {
-  stopProject = onSnapshot(doc(db, 'projects', projectId.value), (snapshot) => {
-    if (!snapshot.exists()) return
-    project.value = snapshot.data() as ProjectDoc
-  })
-  stopMembers = onSnapshot(collection(db, 'projects', projectId.value, 'members'), async (snapshot) => {
-    const promises = snapshot.docs.map(async (docSnap) => {
-      const data = docSnap.data() as any
-      const memberId = data.userId || docSnap.id
-      let name = data.nickname || data.fullName
+  stopProject = onSnapshot(doc(db, "projects", projectId.value), (snapshot) => {
+    if (!snapshot.exists()) return;
+    project.value = snapshot.data() as ProjectDoc;
+  });
+  stopMembers = onSnapshot(
+    collection(db, "projects", projectId.value, "members"),
+    async (snapshot) => {
+      const promises = snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data() as any;
+        const memberId = data.userId || docSnap.id;
+        let name = data.nickname || data.fullName;
 
-      if (!name) {
-        try {
-          const profileSnap = await getDoc(doc(db, 'profiles', memberId))
-          if (profileSnap.exists()) {
-            const profile = profileSnap.data()
-            name = profile.nickname || profile.fullName
+        if (!name) {
+          try {
+            const profileSnap = await getDoc(doc(db, "profiles", memberId));
+            if (profileSnap.exists()) {
+              const profile = profileSnap.data();
+              name = profile.nickname || profile.fullName;
+            }
+          } catch (e) {
+            logger.error`Failed to fetch profile for ${memberId}: ${e}`;
           }
-        } catch (e) {
-          logger.error`Failed to fetch profile for ${memberId}: ${e}`
         }
-      }
 
-      return {
-        id: memberId,
-        name: name || docSnap.id,
-        userId: memberId,
-        role: (data.role as ProjectMember['role']) || 'member',
-        projectRole: (data.projectRole as ProjectMember['projectRole']) || 'member',
-        nickname: data.nickname,
-        fullName: data.fullName,
-        displayName: data.nickname || data.fullName || name || docSnap.id,
-        email: data.email,
-        lastAccessedAt: data.lastAccessedAt,
-      }
-    })
+        return {
+          id: memberId,
+          name: name || docSnap.id,
+          userId: memberId,
+          role: (data.role as ProjectMember["role"]) || "member",
+          projectRole:
+            (data.projectRole as ProjectMember["projectRole"]) || "member",
+          nickname: data.nickname,
+          fullName: data.fullName,
+          displayName: data.nickname || data.fullName || name || docSnap.id,
+          email: data.email,
+          lastAccessedAt: data.lastAccessedAt,
+        };
+      });
 
-    members.value = await Promise.all(promises)
-  })
+      members.value = await Promise.all(promises);
+    },
+  );
 }
 
 function watchTasks() {
   stopTasks = listenTasks(projectId.value, (list) => {
-    tasks.value = list
-    evaluateNotifications()
-  })
+    tasks.value = list;
+    evaluateNotifications();
+  });
 }
 
 function watchCategories() {
   stopCategories = listenTaskCategories(projectId.value, (list) => {
-    categories.value = list
-  })
+    categories.value = list;
+  });
 }
 
 function watchChat() {
-  chatLoading.value = true
+  chatLoading.value = true;
   stopChat = listenProjectChat(
     projectId.value,
     (messages) => {
-      chatMessages.value = messages
-      chatLoading.value = false
+      chatMessages.value = messages;
+      chatLoading.value = false;
     },
     (error) => {
-      logger.error`Failed to load chat: ${error}`
-      chatLoading.value = false
+      logger.error`Failed to load chat: ${error}`;
+      chatLoading.value = false;
     },
-  )
+  );
 }
 
 function resetWatchers() {
-  stopTasks?.()
-  stopProject?.()
-  stopMembers?.()
-  stopChat?.()
-  stopCategories?.()
-  watchProject()
-  watchTasks()
-  watchCategories()
-  watchChat()
+  stopTasks?.();
+  stopProject?.();
+  stopMembers?.();
+  stopChat?.();
+  stopCategories?.();
+  watchProject();
+  watchTasks();
+  watchCategories();
+  watchChat();
 }
 
 function resetTaskForm() {
-  taskForm.title = ''
-  taskForm.description = ''
-  taskForm.dueDate = ''
-  taskForm.assigneeId = ''
-  taskForm.categoryId = ''
-  taskForm.progress = 0
-  taskForm.addToThread = false
+  taskForm.title = "";
+  taskForm.description = "";
+  taskForm.dueDate = "";
+  taskForm.assigneeId = "";
+  taskForm.categoryId = "";
+  taskForm.progress = 0;
+  taskForm.addToThread = false;
 }
 
 function openTaskModal() {
-  resetTaskForm()
-  isTaskModalOpen.value = true
+  resetTaskForm();
+  isTaskModalOpen.value = true;
 }
 
 function closeTaskModal() {
-  isTaskModalOpen.value = false
+  isTaskModalOpen.value = false;
 }
 
 function getMemberNameById(id?: string | null) {
-  if (!id) return ''
-  const member = members.value.find((entry) => entry.id === id)
-  return member?.name || getDisplayName(id) || ''
+  if (!id) return "";
+  const member = members.value.find((entry) => entry.id === id);
+  return member?.name || getDisplayName(id) || "";
 }
 
 function displayAssignee(task: TaskDoc) {
-  if (task.assigneeName) return task.assigneeName
-  const memberName = getMemberNameById(task.assigneeId || '')
-  return memberName || task.assigneeId || '未割当'
+  if (task.assigneeName) return task.assigneeName;
+  const memberName = getMemberNameById(task.assigneeId || "");
+  return memberName || task.assigneeId || "未割当";
 }
 
 function getCategoryName(categoryId?: string | null) {
-  if (!categoryId) return '未分類'
-  return categories.value.find((category) => category.id === categoryId)?.name || '未分類'
+  if (!categoryId) return "未分類";
+  return (
+    categories.value.find((category) => category.id === categoryId)?.name ||
+    "未分類"
+  );
 }
 
 async function submitTaskForm() {
-  if (!user.value || !taskForm.title.trim()) return
-  const assigneeId = taskForm.assigneeId || null
-  const normalizedProgress = normalizeProgress(taskForm.progress)
-  
-  let initialStatus: TaskStatus = 'todo'
-  if (normalizedProgress === 100) initialStatus = 'done'
-  else if (normalizedProgress > 0) initialStatus = 'in-progress'
+  if (!user.value || !taskForm.title.trim()) return;
+  const assigneeId = taskForm.assigneeId || null;
+  const normalizedProgress = normalizeProgress(taskForm.progress);
+
+  let initialStatus: TaskStatus = "todo";
+  if (normalizedProgress === 100) initialStatus = "done";
+  else if (normalizedProgress > 0) initialStatus = "in-progress";
 
   await createTask(
     projectId.value,
@@ -576,28 +689,34 @@ async function submitTaskForm() {
       threadName: taskForm.addToThread ? taskForm.title.trim() : null,
     },
     user.value.uid,
-  )
-  closeTaskModal()
+  );
+  closeTaskModal();
 }
 
 function openEditor(task: TaskDoc) {
-  selectedTask.value = task
-  editor.description = task.description || ''
-  editor.dueDate = task.dueDate?.seconds ? new Date(task.dueDate.seconds * 1000).toISOString().slice(0, 10) : ''
-  editor.assigneeId = task.assigneeId || ''
-  editor.status = task.status
-  editor.progress = normalizeProgress(task.progress ?? (task.status === 'done' ? 100 : 0))
+  selectedTask.value = task;
+  editor.description = task.description || "";
+  editor.dueDate = task.dueDate?.seconds
+    ? new Date(task.dueDate.seconds * 1000).toISOString().slice(0, 10)
+    : "";
+  editor.assigneeId = task.assigneeId || "";
+  editor.status = task.status;
+  editor.progress = normalizeProgress(
+    task.progress ?? (task.status === "done" ? 100 : 0),
+  );
 }
 
 function selectTaskById(taskId: string) {
-  const match = tasks.value.find((task) => task.id === taskId)
-  if (match) openEditor(match)
+  const match = tasks.value.find((task) => task.id === taskId);
+  if (match) openEditor(match);
 }
 
 async function saveTask() {
-  if (!selectedTask.value) return
-  const assigneeName = editor.assigneeId ? getMemberNameById(editor.assigneeId) : null
-  const normalizedProgress = normalizeProgress(editor.progress)
+  if (!selectedTask.value) return;
+  const assigneeName = editor.assigneeId
+    ? getMemberNameById(editor.assigneeId)
+    : null;
+  const normalizedProgress = normalizeProgress(editor.progress);
   await updateTask(projectId.value, selectedTask.value.id, {
     description: editor.description,
     status: editor.status,
@@ -605,35 +724,43 @@ async function saveTask() {
     assigneeId: editor.assigneeId || null,
     assigneeName,
     progress: normalizedProgress,
-  })
-  selectedTask.value = null
+  });
+  selectedTask.value = null;
 }
 
 async function removeTask(taskId: string) {
-  await deleteTask(projectId.value, taskId)
+  await deleteTask(projectId.value, taskId);
 }
 
 function startTaskThreadForm() {
-  if (!selectedTask.value) return
-  threadNameDraft.value = selectedTask.value.threadName || selectedTask.value.title || ''
-  isThreadFormOpen.value = true
+  if (!selectedTask.value) return;
+  threadNameDraft.value =
+    selectedTask.value.threadName || selectedTask.value.title || "";
+  isThreadFormOpen.value = true;
 }
 
 function cancelTaskThreadForm() {
-  isThreadFormOpen.value = false
+  isThreadFormOpen.value = false;
 }
 
 async function createThreadForSelectedTask() {
-  if (!selectedTask.value) return
-  const name = threadNameDraft.value.trim()
-  if (!name) return
-  threadCreationLoading.value = true
+  if (!selectedTask.value) return;
+  const name = threadNameDraft.value.trim();
+  if (!name) return;
+  threadCreationLoading.value = true;
   try {
-    await updateTask(projectId.value, selectedTask.value.id, { hasThread: true, threadName: name })
-    selectedTask.value = { ...selectedTask.value, hasThread: true, threadName: name }
-    isThreadFormOpen.value = false
+    await updateTask(projectId.value, selectedTask.value.id, {
+      hasThread: true,
+      threadName: name,
+    });
+    selectedTask.value = {
+      ...selectedTask.value,
+      hasThread: true,
+      threadName: name,
+    };
+    isThreadFormOpen.value = false;
   } finally {
-    threadCreationLoading.value = false
+    threadCreationLoading.value = false;
   }
 }
 
@@ -705,40 +832,38 @@ async function createThreadForSelectedTask() {
 //   return trimmed.slice(0, 2).toUpperCase()
 // }
 
-
-
 function closeSidebar() {
-  isSidebarOpen.value = false
+  isSidebarOpen.value = false;
 }
 
 function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
+  isSidebarOpen.value = !isSidebarOpen.value;
 }
 
 onMounted(() => {
-  if (window.matchMedia('(max-width: 1200px)').matches) {
-    isSidebarOpen.value = false
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    isSidebarOpen.value = false;
   }
-  loadProjectList()
-  resetWatchers()
-})
+  loadProjectList();
+  resetWatchers();
+});
 
 watch(
   () => route.params.projectId,
   (newId) => {
-    if (!newId) return
-    projectId.value = String(newId)
-    resetWatchers()
+    if (!newId) return;
+    projectId.value = String(newId);
+    resetWatchers();
   },
-)
+);
 
 onBeforeUnmount(() => {
-  stopTasks?.()
-  stopProject?.()
-  stopMembers?.()
-  stopChat?.()
-  stopCategories?.()
-})
+  stopTasks?.();
+  stopProject?.();
+  stopMembers?.();
+  stopChat?.();
+  stopCategories?.();
+});
 </script>
 
 <template>
@@ -756,15 +881,30 @@ onBeforeUnmount(() => {
     <div class="demo__main">
       <header class="demo__topbar">
         <div class="demo__topbar-left">
-          <button type="button" class="demo__menu-button" @click="toggleSidebar">
+          <button
+            type="button"
+            class="demo__menu-button"
+            @click="toggleSidebar"
+          >
             <span class="sr-only">サイドバーを切り替え</span>
-            <svg aria-hidden="true" class="demo__menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              aria-hidden="true"
+              class="demo__menu-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
           <div>
             <p class="demo__breadcrumb">{{ appName }} &gt; ダッシュボード</p>
-            <h1 class="demo__heading">{{ project?.name || 'プロジェクト' }}</h1>
+            <h1 class="demo__heading">{{ project?.name || "プロジェクト" }}</h1>
           </div>
         </div>
         <div class="demo__toolbar">
@@ -774,7 +914,11 @@ onBeforeUnmount(() => {
 
       <div class="demo__content">
         <section v-if="notifications.length" class="dashboard__alerts">
-          <div v-for="note in notifications" :key="note.id" class="dashboard__alert">
+          <div
+            v-for="note in notifications"
+            :key="note.id"
+            class="dashboard__alert"
+          >
             <p>⚡ {{ note.message }}</p>
             <button
               v-if="note.dismissible"
@@ -798,7 +942,10 @@ onBeforeUnmount(() => {
             <span class="chart-card__metric">{{ overallProgress }}%</span>
             <div class="progress-chart">
               <div class="progress-chart__track">
-                <div class="progress-chart__fill" :style="{ width: `${overallProgress}%` }" />
+                <div
+                  class="progress-chart__fill"
+                  :style="{ width: `${overallProgress}%` }"
+                />
               </div>
               <div class="progress-chart__labels">
                 <span>0%</span>
@@ -822,19 +969,23 @@ onBeforeUnmount(() => {
                 <div class="status-bars__track">
                   <div
                     class="status-bars__fill status-bars__fill--todo"
-                    :style="{ width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%` }"
+                    :style="{
+                      width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%`,
+                    }"
                   />
                 </div>
               </li>
               <li class="status-bars__row">
                 <div class="status-bars__label">
                   <span>進行中</span>
-                  <strong>{{ statusCounts['in-progress'] }}</strong>
+                  <strong>{{ statusCounts["in-progress"] }}</strong>
                 </div>
                 <div class="status-bars__track">
                   <div
                     class="status-bars__fill status-bars__fill--progress"
-                    :style="{ width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%` }"
+                    :style="{
+                      width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%`,
+                    }"
                   />
                 </div>
               </li>
@@ -846,7 +997,9 @@ onBeforeUnmount(() => {
                 <div class="status-bars__track">
                   <div
                     class="status-bars__fill status-bars__fill--review"
-                    :style="{ width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%` }"
+                    :style="{
+                      width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%`,
+                    }"
                   />
                 </div>
               </li>
@@ -858,7 +1011,9 @@ onBeforeUnmount(() => {
                 <div class="status-bars__track">
                   <div
                     class="status-bars__fill status-bars__fill--done"
-                    :style="{ width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%` }"
+                    :style="{
+                      width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%`,
+                    }"
                   />
                 </div>
               </li>
@@ -871,10 +1026,15 @@ onBeforeUnmount(() => {
               <h3>ヘルススコア</h3>
               <span class="chart-card__meta">期限・進捗から算出</span>
             </header>
-            <span class="chart-card__metric chart-card__metric--health">{{ healthScore }}%</span>
+            <span class="chart-card__metric chart-card__metric--health"
+              >{{ healthScore }}%</span
+            >
             <div class="gauge-chart">
               <svg viewBox="0 0 200 120">
-                <path class="gauge-chart__base" d="M20 120 A80 80 0 0 1 180 120" />
+                <path
+                  class="gauge-chart__base"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                />
                 <path
                   v-for="(segment, index) in gaugeSegments"
                   :key="segment.id"
@@ -885,30 +1045,51 @@ onBeforeUnmount(() => {
                 <path
                   class="gauge-chart__value-path"
                   d="M20 120 A80 80 0 0 1 180 120"
-                  :style="{ strokeDasharray: `${gaugeCircumference}`, strokeDashoffset: `${gaugeDashoffset}`, stroke: healthColor }"
+                  :style="{
+                    strokeDasharray: `${gaugeCircumference}`,
+                    strokeDashoffset: `${gaugeDashoffset}`,
+                    stroke: healthColor,
+                  }"
                 />
                 <polygon
                   class="gauge-chart__needle"
                   points="100,28 96,120 104,120"
                   :transform="`rotate(${healthNeedleRotation} 100 120)`"
                 />
-                <circle class="gauge-chart__needle-hub" cx="100" cy="120" r="6" />
+                <circle
+                  class="gauge-chart__needle-hub"
+                  cx="100"
+                  cy="120"
+                  r="6"
+                />
               </svg>
               <div class="gauge-chart__legend">
                 <span class="gauge-chart__legend-item">
-                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--danger" aria-hidden="true"></span>
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--danger"
+                    aria-hidden="true"
+                  ></span>
                   危険
                 </span>
                 <span class="gauge-chart__legend-item">
-                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--warn" aria-hidden="true"></span>
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--warn"
+                    aria-hidden="true"
+                  ></span>
                   要対応
                 </span>
                 <span class="gauge-chart__legend-item">
-                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--caution" aria-hidden="true"></span>
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--caution"
+                    aria-hidden="true"
+                  ></span>
                   注意
                 </span>
                 <span class="gauge-chart__legend-item">
-                  <span class="gauge-chart__legend-dot gauge-chart__legend-dot--good" aria-hidden="true"></span>
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--good"
+                    aria-hidden="true"
+                  ></span>
                   良好
                 </span>
               </div>
@@ -927,28 +1108,41 @@ onBeforeUnmount(() => {
         <section class="dashboard-hero">
           <div>
             <p class="eyebrow">概要</p>
-            <h2>{{ project?.name || 'プロジェクト' }}</h2>
-            <p class="muted">{{ project?.description || 'このプロジェクトの概要がここに表示されます。' }}</p>
+            <h2>{{ project?.name || "プロジェクト" }}</h2>
+            <p class="muted">
+              {{
+                project?.description ||
+                "このプロジェクトの概要がここに表示されます。"
+              }}
+            </p>
             <div class="hero-tags">
               <span class="chip">タスク {{ tasks.length }}</span>
               <span class="chip">メンバー {{ members.length }}</span>
             </div>
           </div>
           <div class="hero-actions">
-            <button type="button" class="hero-btn" @click="openTaskModal">＋ タスクを追加</button>
+            <button type="button" class="hero-btn" @click="openTaskModal">
+              ＋ タスクを追加
+            </button>
             <button
               type="button"
               class="hero-btn hero-btn--ghost"
-              @click="$router.push({ name: ROUTE_NAMES.projectSettings, params: { projectId } })"
+              @click="
+                $router.push({
+                  name: ROUTE_NAMES.projectSettings,
+                  params: { projectId },
+                })
+              "
             >
               設定を開く
             </button>
           </div>
         </section>
 
-
         <div class="top-actions">
-          <button type="button" class="top-actions__new" @click="openTaskModal">＋ 新規タスク</button>
+          <button type="button" class="top-actions__new" @click="openTaskModal">
+            ＋ 新規タスク
+          </button>
         </div>
         <div class="demo__grid">
           <section class="demo__primary">
@@ -967,7 +1161,13 @@ onBeforeUnmount(() => {
                   </select>
                   <select v-model="filters.assignee" class="task-filter-select">
                     <option value="all">担当者</option>
-                    <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+                    <option
+                      v-for="member in members"
+                      :key="member.id"
+                      :value="member.id"
+                    >
+                      {{ member.name }}
+                    </option>
                   </select>
                   <select v-model="filters.due" class="task-filter-select">
                     <option value="all">期限</option>
@@ -978,13 +1178,38 @@ onBeforeUnmount(() => {
                   <select v-model="filters.category" class="task-filter-select">
                     <option value="all">カテゴリ</option>
                     <option value="none">未分類</option>
-                    <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                    <option
+                      v-for="category in categories"
+                      :key="category.id"
+                      :value="category.id"
+                    >
+                      {{ category.name }}
+                    </option>
                   </select>
-                  <button type="button" class="filter-reset-btn" @click="resetFilters" title="フィルターをリセット">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                  <button
+                    type="button"
+                    class="filter-reset-btn"
+                    @click="resetFilters"
+                    title="フィルターをリセット"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+                      ></path>
                       <path d="M21 3v5h-5"></path>
-                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                      <path
+                        d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+                      ></path>
                       <path d="M3 21v-5h5"></path>
                     </svg>
                   </button>
@@ -1000,18 +1225,33 @@ onBeforeUnmount(() => {
                 >
                   <div class="task-row__content">
                     <p class="task-row__title">{{ task.title }}</p>
-                    <span class="task-row__category">{{ getCategoryName(task.categoryId) }}</span>
-                    <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
-                    <span class="task-row__status" :class="taskStatusClass(task)">
+                    <span class="task-row__category">{{
+                      getCategoryName(task.categoryId)
+                    }}</span>
+                    <span class="task-row__assignee">{{
+                      displayAssignee(task)
+                    }}</span>
+                    <span
+                      class="task-row__status"
+                      :class="taskStatusClass(task)"
+                    >
                       {{ taskStatusLabel(task.status) }}
                     </span>
                     <div class="task-row__progress">
                       <div class="task-row__progress-bar">
-                        <div class="task-row__progress-fill" :style="{ width: `${taskProgress(task)}%` }" />
+                        <div
+                          class="task-row__progress-fill"
+                          :style="{ width: `${taskProgress(task)}%` }"
+                        />
                       </div>
-                      <span class="task-row__progress-value">{{ taskProgress(task) }}%</span>
+                      <span class="task-row__progress-value"
+                        >{{ taskProgress(task) }}%</span
+                      >
                     </div>
-                    <span class="task-row__due" :class="{ 'task-row__due--overdue': isTaskOverdue(task) }">
+                    <span
+                      class="task-row__due"
+                      :class="{ 'task-row__due--overdue': isTaskOverdue(task) }"
+                    >
                       {{ formatDueDate(task) }}
                     </span>
                   </div>
@@ -1115,11 +1355,20 @@ onBeforeUnmount(() => {
         <form class="task-modal__form" @submit.prevent="submitTaskForm">
           <label>
             タイトル
-            <input v-model="taskForm.title" type="text" placeholder="例）デザインレビュー" required />
+            <input
+              v-model="taskForm.title"
+              type="text"
+              placeholder="例）デザインレビュー"
+              required
+            />
           </label>
           <label>
             説明
-            <textarea v-model="taskForm.description" rows="3" placeholder="タスクの詳細を入力"></textarea>
+            <textarea
+              v-model="taskForm.description"
+              rows="3"
+              placeholder="タスクの詳細を入力"
+            ></textarea>
           </label>
           <label>
             期限
@@ -1129,14 +1378,24 @@ onBeforeUnmount(() => {
             カテゴリ
             <select v-model="taskForm.categoryId">
               <option value="">カテゴリなし</option>
-              <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
             </select>
           </label>
           <label>
             担当者
             <select v-model="taskForm.assigneeId">
               <option value="">未割当</option>
-              <option v-for="member in members" :key="member.id" :value="member.id">
+              <option
+                v-for="member in members"
+                :key="member.id"
+                :value="member.id"
+              >
                 {{ member.name }}
               </option>
             </select>
@@ -1151,7 +1410,10 @@ onBeforeUnmount(() => {
                 v-for="option in PROGRESS_OPTIONS"
                 :key="`modal-progress-${option}`"
                 type="button"
-                :class="['progress-pill', { 'is-active': taskForm.progress === option }]"
+                :class="[
+                  'progress-pill',
+                  { 'is-active': taskForm.progress === option },
+                ]"
                 @click="taskForm.progress = option"
               >
                 {{ option }}%
@@ -1170,7 +1432,9 @@ onBeforeUnmount(() => {
             </label>
           </section>
           <footer>
-            <button type="button" class="ghost" @click="closeTaskModal">キャンセル</button>
+            <button type="button" class="ghost" @click="closeTaskModal">
+              キャンセル
+            </button>
             <button type="submit">作成</button>
           </footer>
         </form>
@@ -1200,64 +1464,98 @@ onBeforeUnmount(() => {
             <p class="label">担当者</p>
             <select v-model="editor.assigneeId">
               <option value="">未割当</option>
-              <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
+              <option
+                v-for="member in members"
+                :key="member.id"
+                :value="member.id"
+              >
+                {{ member.name }}
+              </option>
             </select>
           </section>
-        <section class="task-drawer__section">
-          <p class="label">ステータス</p>
-          <select v-model="editor.status">
-            <option value="todo">未着手</option>
-            <option value="in-progress">進行中</option>
-            <option value="review">レビュー</option>
-            <option value="done">完了</option>
-          </select>
-        </section>
-        <section class="task-drawer__section">
-          <div class="task-modal__range-header">
-            <p class="label">進捗率</p>
-            <span class="hint">{{ editor.progress }}%</span>
-          </div>
-          <div class="progress-picker">
-            <button
-              v-for="option in PROGRESS_OPTIONS"
-              :key="`drawer-progress-${option}`"
-              type="button"
-              :class="['progress-pill', { 'is-active': editor.progress === option }]"
-              @click="editor.progress = option"
-            >
-              {{ option }}%
-            </button>
-          </div>
-        </section>
-        <section class="task-drawer__section thread-section">
-          <p class="label">スレッド</p>
-          <div v-if="selectedTask.hasThread" class="thread-status created">
-            <p>このタスクにはスレッドがあります。</p>
-            <p class="thread-name">{{ selectedTask.threadName || selectedTask.title }}</p>
-          </div>
-          <div v-else>
-            <div v-if="isThreadFormOpen" class="thread-form">
-              <input v-model="threadNameDraft" type="text" placeholder="スレッド名" />
-              <div class="thread-actions">
-                <button type="button" class="ghost" @click="cancelTaskThreadForm">キャンセル</button>
-                <button
-                  type="button"
-                  :disabled="!threadNameDraft.trim() || threadCreationLoading"
-                  @click="createThreadForSelectedTask"
-                >
-                  作成
-                </button>
-              </div>
+          <section class="task-drawer__section">
+            <p class="label">ステータス</p>
+            <select v-model="editor.status">
+              <option value="todo">未着手</option>
+              <option value="in-progress">進行中</option>
+              <option value="review">レビュー</option>
+              <option value="done">完了</option>
+            </select>
+          </section>
+          <section class="task-drawer__section">
+            <div class="task-modal__range-header">
+              <p class="label">進捗率</p>
+              <span class="hint">{{ editor.progress }}%</span>
             </div>
-            <button v-else type="button" class="thread-create-btn" @click="startTaskThreadForm">
-              スレッドを作成
-            </button>
-          </div>
-        </section>
+            <div class="progress-picker">
+              <button
+                v-for="option in PROGRESS_OPTIONS"
+                :key="`drawer-progress-${option}`"
+                type="button"
+                :class="[
+                  'progress-pill',
+                  { 'is-active': editor.progress === option },
+                ]"
+                @click="editor.progress = option"
+              >
+                {{ option }}%
+              </button>
+            </div>
+          </section>
+          <section class="task-drawer__section thread-section">
+            <p class="label">スレッド</p>
+            <div v-if="selectedTask.hasThread" class="thread-status created">
+              <p>このタスクにはスレッドがあります。</p>
+              <p class="thread-name">
+                {{ selectedTask.threadName || selectedTask.title }}
+              </p>
+            </div>
+            <div v-else>
+              <div v-if="isThreadFormOpen" class="thread-form">
+                <input
+                  v-model="threadNameDraft"
+                  type="text"
+                  placeholder="スレッド名"
+                />
+                <div class="thread-actions">
+                  <button
+                    type="button"
+                    class="ghost"
+                    @click="cancelTaskThreadForm"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="!threadNameDraft.trim() || threadCreationLoading"
+                    @click="createThreadForSelectedTask"
+                  >
+                    作成
+                  </button>
+                </div>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="thread-create-btn"
+                @click="startTaskThreadForm"
+              >
+                スレッドを作成
+              </button>
+            </div>
+          </section>
           <footer class="task-drawer__footer">
-            <button type="button" class="ghost" @click="selectedTask = null">閉じる</button>
+            <button type="button" class="ghost" @click="selectedTask = null">
+              閉じる
+            </button>
             <button type="button" @click="saveTask">保存</button>
-            <button type="button" class="danger" @click="selectedTask && removeTask(selectedTask.id)">削除</button>
+            <button
+              type="button"
+              class="danger"
+              @click="selectedTask && removeTask(selectedTask.id)"
+            >
+              削除
+            </button>
           </footer>
         </aside>
       </div>
@@ -1266,7 +1564,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import '@/pages/demo/styles/demo-shell.css';
+@import "@/pages/demo/styles/demo-shell.css";
 
 .demo__version {
   padding: 0.35rem 0.65rem;
@@ -1370,7 +1668,9 @@ onBeforeUnmount(() => {
   font-weight: 600;
   box-shadow: 0 10px 20px rgba(11, 46, 51, 0.2);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .top-actions__new:hover {
@@ -1645,7 +1945,9 @@ onBeforeUnmount(() => {
   padding: 0.25rem 0.35rem;
   line-height: 1;
   border-radius: 0.5rem;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .dashboard__alert-close:hover {
@@ -1917,7 +2219,9 @@ onBeforeUnmount(() => {
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .task-row:hover {
@@ -1937,19 +2241,19 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
     gap: 0.5rem;
   }
-  
+
   .task-row__title {
     font-size: 1.1rem;
   }
-  
+
   .task-row__status {
     justify-content: flex-start;
   }
-  
+
   .task-row__progress {
     margin-top: 0.25rem;
   }
-  
+
   .task-row__due {
     text-align: left;
     font-size: 0.85rem;
@@ -2241,7 +2545,10 @@ onBeforeUnmount(() => {
   background: transparent;
   cursor: pointer;
   font-size: 0.8rem;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .progress-pill.is-active {
@@ -2317,7 +2624,9 @@ onBeforeUnmount(() => {
   gap: 1rem;
   padding: 1.5rem;
   transform: translateX(0);
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
 }
 
 .task-drawer__header {

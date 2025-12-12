@@ -1,173 +1,185 @@
 <script setup lang="ts">
-import { appName } from '@/constants/appMeta'
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { appName } from "@/constants/appMeta";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 
 export interface DemoTaskItem {
-  id?: string
-  title: string
-  description: string
-  status: '未着手' | '進行中' | 'レビュー' | '完了'
-  priority: '高' | '中' | '低'
-  due: string
-  assignee: string
-  comments?: number
+  id?: string;
+  title: string;
+  description: string;
+  status: "未着手" | "進行中" | "レビュー" | "完了";
+  priority: "高" | "中" | "低";
+  due: string;
+  assignee: string;
+  comments?: number;
 }
 
 export interface BoardColumn {
-  key: string
-  title: string
-  badge?: string
-  tasks: DemoTaskItem[]
+  key: string;
+  title: string;
+  badge?: string;
+  tasks: DemoTaskItem[];
 }
 
 const props = defineProps<{
-  columns?: BoardColumn[]
-  selectedTaskId?: string | null
-  interactive?: boolean
-}>()
+  columns?: BoardColumn[];
+  selectedTaskId?: string | null;
+  interactive?: boolean;
+}>();
 
-const emit = defineEmits<{ (e: 'create'): void; (e: 'select', taskId: string): void; (e: 'change-status', payload: { taskId: string; status: string }): void }>()
+const emit = defineEmits<{
+  (e: "create"): void;
+  (e: "select", taskId: string): void;
+  (e: "change-status", payload: { taskId: string; status: string }): void;
+}>();
 
 const fallbackColumns: BoardColumn[] = [
   {
-    key: 'todo',
-    title: '未着手',
+    key: "todo",
+    title: "未着手",
     tasks: [
       {
-        title: 'データベース設計レビュー',
-        description: '認証まわりのテーブル設計を確認',
-        status: '未着手',
-        priority: '中',
-        due: '2025-11-12',
-        assignee: '鈴木一郎',
+        title: "データベース設計レビュー",
+        description: "認証まわりのテーブル設計を確認",
+        status: "未着手",
+        priority: "中",
+        due: "2025-11-12",
+        assignee: "鈴木一郎",
         comments: 3,
       },
       {
-        title: 'APIドキュメント作成',
-        description: '社内共有用のエンドポイント一覧',
-        status: '未着手',
-        priority: '低',
-        due: '2025-11-15',
-        assignee: '高橋美咲',
+        title: "APIドキュメント作成",
+        description: "社内共有用のエンドポイント一覧",
+        status: "未着手",
+        priority: "低",
+        due: "2025-11-15",
+        assignee: "高橋美咲",
         comments: 6,
       },
     ],
   },
   {
-    key: 'progress',
-    title: '進行中',
-    badge: '2',
+    key: "progress",
+    title: "進行中",
+    badge: "2",
     tasks: [
       {
-        title: 'トップページのデザイン作成',
-        description: 'コンポーネントガイドラインに合わせる',
-        status: '進行中',
-        priority: '高',
-        due: '2025-11-10',
-        assignee: '田中太郎',
+        title: "トップページのデザイン作成",
+        description: "コンポーネントガイドラインに合わせる",
+        status: "進行中",
+        priority: "高",
+        due: "2025-11-10",
+        assignee: "田中太郎",
         comments: 5,
       },
       {
-        title: 'ユーザー認証機能の実装',
-        description: 'Firebase Auth + ロール権限',
-        status: '進行中',
-        priority: '高',
-        due: '2025-11-08',
-        assignee: '佐藤花子',
+        title: "ユーザー認証機能の実装",
+        description: "Firebase Auth + ロール権限",
+        status: "進行中",
+        priority: "高",
+        due: "2025-11-08",
+        assignee: "佐藤花子",
         comments: 12,
       },
     ],
   },
   {
-    key: 'review',
-    title: 'レビュー',
-    badge: '3',
+    key: "review",
+    title: "レビュー",
+    badge: "3",
     tasks: [
       {
-        title: 'コンテンツ校正',
-        description: 'ブログ用コピーを最終チェック',
-        status: 'レビュー',
-        priority: '中',
-        due: '2025-11-09',
-        assignee: '山本大輔',
+        title: "コンテンツ校正",
+        description: "ブログ用コピーを最終チェック",
+        status: "レビュー",
+        priority: "中",
+        due: "2025-11-09",
+        assignee: "山本大輔",
         comments: 4,
       },
     ],
   },
   {
-    key: 'done',
-    title: '完了',
-    badge: '0',
+    key: "done",
+    title: "完了",
+    badge: "0",
     tasks: [],
   },
-]
+];
 
-const columns = computed(() => (props.columns && props.columns.length ? props.columns : fallbackColumns))
-const isDemo = computed(() => !props.columns || !props.columns.length)
-const isInteractive = computed(() => !isDemo.value && props.interactive !== false)
-const activeTask = ref<DemoTaskItem | null>(null)
-const focusTrail = ref<number[]>([])
-const autoHighlightTimer = ref<number>()
-const draggingTask = ref<DemoTaskItem | null>(null)
+const columns = computed(() =>
+  props.columns && props.columns.length ? props.columns : fallbackColumns,
+);
+const isDemo = computed(() => !props.columns || !props.columns.length);
+const isInteractive = computed(
+  () => !isDemo.value && props.interactive !== false,
+);
+const activeTask = ref<DemoTaskItem | null>(null);
+const focusTrail = ref<number[]>([]);
+const autoHighlightTimer = ref<number>();
+const draggingTask = ref<DemoTaskItem | null>(null);
 
-const flattenedTasks = computed(() => columns.value.flatMap((column) => column.tasks))
+const flattenedTasks = computed(() =>
+  columns.value.flatMap((column) => column.tasks),
+);
 
 function openTask(task: DemoTaskItem) {
   if (isInteractive.value) {
-    if (task.id) emit('select', task.id)
-    return
+    if (task.id) emit("select", task.id);
+    return;
   }
-  activeTask.value = task
-  stopAutoHighlight()
+  activeTask.value = task;
+  stopAutoHighlight();
 }
 
 function closeTask() {
-  activeTask.value = null
+  activeTask.value = null;
 }
 
 function stopAutoHighlight() {
   if (autoHighlightTimer.value) {
-    window.clearInterval(autoHighlightTimer.value)
-    autoHighlightTimer.value = undefined
+    window.clearInterval(autoHighlightTimer.value);
+    autoHighlightTimer.value = undefined;
   }
-  focusTrail.value = []
+  focusTrail.value = [];
 }
 
 function handleDrop(columnKey: string) {
-  if (!draggingTask.value || !isInteractive.value) return
+  if (!draggingTask.value || !isInteractive.value) return;
   if (draggingTask.value.id) {
-    emit('change-status', { taskId: draggingTask.value.id, status: columnKey })
+    emit("change-status", { taskId: draggingTask.value.id, status: columnKey });
   }
-  draggingTask.value = null
+  draggingTask.value = null;
 }
 
 onMounted(() => {
   if (isDemo.value) {
-    let cursor = 0
+    let cursor = 0;
     autoHighlightTimer.value = window.setInterval(() => {
-      const list = flattenedTasks.value
-      if (!list.length) return
-      const index = cursor % list.length
-      const nextTask = list[index]
+      const list = flattenedTasks.value;
+      if (!list.length) return;
+      const index = cursor % list.length;
+      const nextTask = list[index];
       if (nextTask) {
-        activeTask.value = nextTask
-        focusTrail.value = [index]
-        cursor += 1
+        activeTask.value = nextTask;
+        focusTrail.value = [index];
+        cursor += 1;
       }
-    }, 7000)
+    }, 7000);
   }
-})
+});
 
 onBeforeUnmount(() => {
-  stopAutoHighlight()
-})
+  stopAutoHighlight();
+});
 </script>
 
 <template>
   <section class="board">
     <div class="board__header">
       <h2>タスク管理</h2>
-      <button type="button" class="board__new" @click="emit('create')">＋ 新規タスク</button>
+      <button type="button" class="board__new" @click="emit('create')">
+        ＋ 新規タスク
+      </button>
     </div>
 
     <div class="board__columns">
@@ -181,14 +193,21 @@ onBeforeUnmount(() => {
           完了したタスクはまだありません。
         </p>
 
-        <div v-else class="board-column__tasks" @dragover.prevent @drop.prevent="handleDrop(column.key)">
+        <div
+          v-else
+          class="board-column__tasks"
+          @dragover.prevent
+          @drop.prevent="handleDrop(column.key)"
+        >
           <article
             v-for="task in column.tasks"
             :key="task.id || task.title"
             class="task-card"
             :class="{
               'is-selected': activeTask?.title === task.title,
-              'is-highlight': focusTrail[0] !== undefined && flattenedTasks[focusTrail[0]]?.title === task.title,
+              'is-highlight':
+                focusTrail[0] !== undefined &&
+                flattenedTasks[focusTrail[0]]?.title === task.title,
             }"
             role="button"
             tabindex="0"
@@ -199,7 +218,9 @@ onBeforeUnmount(() => {
           >
             <div class="task-card__head">
               <h4>{{ task.title }}</h4>
-              <span class="priority" :class="`priority--${task.priority}`">{{ task.priority }}</span>
+              <span class="priority" :class="`priority--${task.priority}`">{{
+                task.priority
+              }}</span>
             </div>
             <p class="task-card__description">{{ task.description }}</p>
             <dl class="task-card__meta">
@@ -222,10 +243,20 @@ onBeforeUnmount(() => {
     </div>
 
     <transition name="task-detail">
-      <div v-if="activeTask && isDemo" class="task-detail" role="dialog" aria-modal="true">
+      <div
+        v-if="activeTask && isDemo"
+        class="task-detail"
+        role="dialog"
+        aria-modal="true"
+      >
         <div class="task-detail__header">
           <h3>{{ activeTask.title }}</h3>
-          <button type="button" class="task-detail__close" @click="closeTask" aria-label="閉じる">
+          <button
+            type="button"
+            class="task-detail__close"
+            @click="closeTask"
+            aria-label="閉じる"
+          >
             ×
           </button>
         </div>
@@ -252,7 +283,10 @@ onBeforeUnmount(() => {
             <dd>{{ activeTask.comments }}</dd>
           </div>
         </dl>
-        <p class="task-detail__hint">※ このデモではカードをクリックすると詳細が開きます。実際の {{ appName }} ではさらにサブタスクやコメントを閲覧できます。</p>
+        <p class="task-detail__hint">
+          ※ このデモではカードをクリックすると詳細が開きます。実際の
+          {{ appName }} ではさらにサブタスクやコメントを閲覧できます。
+        </p>
       </div>
     </transition>
   </section>
@@ -287,7 +321,9 @@ onBeforeUnmount(() => {
   color: var(--surface-elevated);
   cursor: pointer;
   box-shadow: 0 12px 20px rgba(79, 124, 130, 0.25);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .board__new:hover {
@@ -360,7 +396,10 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.75rem;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
 }
 
 .task-card__head {
