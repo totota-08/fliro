@@ -24,7 +24,8 @@ import {
   githubProvider,
   googleProvider,
   storage,
-} from "@/firebase/config";
+} from "@/lib/firebase";
+import { getCurrentUser } from "@/lib/getCurrentUser";
 import type {
   CredentialSignUpPayload,
   LoginPayload,
@@ -49,15 +50,12 @@ export async function registerCredentials(payload: CredentialSignUpPayload) {
 }
 
 export async function resendVerificationEmail() {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error("ユーザーが認証されていません。");
-  }
+  const user = await requireCurrentUser();
   await sendEmailVerification(user);
 }
 
 export async function refreshCurrentUser() {
-  const user = auth.currentUser;
+  const user = await getCurrentUser();
   if (!user) {
     return null;
   }
@@ -82,11 +80,7 @@ export async function confirmPasswordResetWithCode(
 }
 
 export async function saveProfileDetails(payload: ProfileSetupPayload) {
-  const user = auth.currentUser;
-
-  if (!user) {
-    throw new Error("ユーザーが認証されていません。");
-  }
+  const user = await requireCurrentUser();
 
   const displayName = payload.nickname?.trim() || payload.fullName;
   await updateProfile(user, { displayName });
@@ -127,11 +121,7 @@ export async function fetchProfile(uid: string) {
 }
 
 export async function uploadAvatar(file: File) {
-  const user = auth.currentUser;
-
-  if (!user) {
-    throw new Error("ユーザーが認証されていません。");
-  }
+  const user = await requireCurrentUser();
 
   const fileRef = storageRef(storage, `avatars/${user.uid}/${Date.now()}`);
   await uploadBytes(fileRef, file, { contentType: file.type });
@@ -142,11 +132,7 @@ export async function uploadAvatar(file: File) {
 }
 
 export async function deleteCurrentAccount() {
-  const user = auth.currentUser;
-
-  if (!user) {
-    throw new Error("ユーザーが認証されていません。");
-  }
+  const user = await requireCurrentUser();
 
   await deleteDoc(doc(db, "profiles", user.uid));
   await deleteUser(user);
@@ -186,4 +172,14 @@ async function persistProfile(
 
   await setDoc(ref, profile, { merge: true });
   return profile;
+}
+
+async function requireCurrentUser() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error("ユーザーが認証されていません。");
+  }
+
+  return user;
 }

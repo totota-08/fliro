@@ -2,7 +2,7 @@
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/firebase/config";
+import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs, query } from "firebase/firestore";

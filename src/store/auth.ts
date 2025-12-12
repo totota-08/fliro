@@ -1,5 +1,5 @@
 import { fetchProfile } from "@/firebase/authService";
-import { auth } from "@/firebase/config";
+import { auth } from "@/lib/firebase";
 import type { UserProfile } from "@/types/auth";
 import type { User } from "firebase/auth";
 import { signOut as firebaseSignOut, onAuthStateChanged } from "firebase/auth";
@@ -61,6 +61,10 @@ export async function initAuthListener() {
 }
 
 export function waitForAuthReady() {
+  if (!initPromise) {
+    void initAuthListener();
+  }
+
   if (authReady.value) {
     return Promise.resolve();
   }

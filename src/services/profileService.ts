@@ -1,5 +1,5 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { db } from "@/lib/firebase";
 import type { UserProfile } from "@/types/auth";
 
 async function queryProfileByField(

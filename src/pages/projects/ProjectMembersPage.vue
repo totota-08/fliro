@@ -5,7 +5,7 @@ import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildPermissionsFromRoles } from "@/constants/roles";
-import { db } from "@/firebase/config";
+import { db } from "@/lib/firebase";
 import {
   removeProjectMember,
   updateProjectMemberRole,

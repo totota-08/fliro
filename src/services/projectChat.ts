@@ -1,4 +1,4 @@
-import { database, db } from "@/firebase/config";
+import { database, db } from "@/lib/firebase";
 import { getLogger } from "@logtape/logtape";
 import {
   ref as dbRef,

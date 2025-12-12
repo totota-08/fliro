@@ -8,7 +8,7 @@ import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/firebase/config";
+import { db } from "@/lib/firebase";
 import {
   // addMessageReaction,
   // deleteProjectMessage,

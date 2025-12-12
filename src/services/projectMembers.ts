@@ -1,4 +1,4 @@
-import { database, db } from "@/firebase/config";
+import { database, db } from "@/lib/firebase";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ref, remove, set } from "firebase/database";
 import {

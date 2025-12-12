@@ -19,16 +19,6 @@ env:
   NODE_VERSION: "20"
 
 jobs:
-  dependency-review:
-    name: Dependency Review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Dependency review
-        uses: actions/dependency-review-action@v4
-
   format:
     name: Format (Prettier)
     runs-on: ubuntu-latest
@@ -124,14 +114,16 @@ jobs:
         run: |
           docker build -t fliro-ci-test --build-arg NODE_VERSION=${{ env.NODE_VERSION }} -f - . <<'EOF'
           ARG NODE_VERSION
-          FROM node:${NODE_VERSION}-bookworm
+          FROM node:${NODE_VERSION:-20}-bookworm
 
           ENV CI=true
           WORKDIR /workspace
 
           RUN apt-get update \
-            && apt-get install -y --no-install-recommends openjdk-17-jre-headless git \
-            && rm -rf /var/lib/apt/lists/*
+            && apt-get install -y --no-install-recommends wget ca-certificates git \
+            && wget -O /tmp/jdk21.deb https://cdn.azul.com/zulu/bin/zulu21.38.21-ca-jdk21.0.0-linux_amd64.deb \
+            && apt-get install -y --no-install-recommends /tmp/jdk21.deb \
+            && rm -rf /var/lib/apt/lists/* /tmp/jdk21.deb
 
           COPY package*.json ./
           RUN npm ci

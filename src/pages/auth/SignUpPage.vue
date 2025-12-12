@@ -4,13 +4,14 @@ import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
 import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { useAuth } from "@/composables/useAuth";
 import {
   fetchProfile,
   refreshCurrentUser,
   registerCredentials,
   resendVerificationEmail,
 } from "@/firebase/authService";
-import { auth } from "@/firebase/config";
+import { getCurrentUser } from "@/lib/getCurrentUser";
 import {
   authenticateWithProvider,
   completeProfileSetup,
@@ -26,6 +27,7 @@ const logger = getLogger("app.pages.auth.SignUp");
 
 const router = useRouter();
 const route = useRoute();
+const { user } = useAuth();
 
 type SignUpStep = "credentials" | "verify" | "profile";
 
@@ -57,30 +59,29 @@ const avatarFile = ref<File | null>(null);
 const avatarPreview = ref<string | null>(null);
 
 onMounted(async () => {
-  const user = auth.currentUser;
-  if (route.query.setup === "false" && user) {
-    const profile = await fetchProfile(user.uid);
+  const currentUser = user.value ?? (await getCurrentUser());
+  if (route.query.setup === "false" && currentUser) {
+    const profile = await fetchProfile(currentUser.uid);
     if (profile && !profile.setUp) {
       currentStep.value = "profile";
-      hydrateProfileFromUser();
+      hydrateProfileFromUser(currentUser);
     }
   }
 });
 
-const hydrateProfileFromUser = () => {
-  const user = auth.currentUser;
-  if (!user) return;
+const hydrateProfileFromUser = (current = user.value) => {
+  if (!current) return;
 
-  if (!profileForm.fullName && user.displayName) {
-    profileForm.fullName = user.displayName;
+  if (!profileForm.fullName && current.displayName) {
+    profileForm.fullName = current.displayName;
   }
 
-  if (!profileForm.nickname && user.displayName) {
-    profileForm.nickname = user.displayName;
+  if (!profileForm.nickname && current.displayName) {
+    profileForm.nickname = current.displayName;
   }
 
-  if (!credentialEmail.value && user.email) {
-    credentialEmail.value = user.email;
+  if (!credentialEmail.value && current.email) {
+    credentialEmail.value = current.email;
   }
 };
 
@@ -163,7 +164,8 @@ const handleProviderSelect = async (provider: SocialProvider) => {
 
   try {
     await authenticateWithProvider(provider);
-    hydrateProfileFromUser();
+    const currentUser = user.value ?? (await getCurrentUser());
+    hydrateProfileFromUser(currentUser);
     currentStep.value = "profile";
   } catch (error) {
     logger.error`Provider auth failed: ${error}`;
@@ -199,7 +201,7 @@ const checkVerificationStatus = async () => {
     const user = await refreshCurrentUser();
     if (user?.emailVerified) {
       currentStep.value = "profile";
-      hydrateProfileFromUser();
+      hydrateProfileFromUser(user);
       return;
     }
     verificationError.value =

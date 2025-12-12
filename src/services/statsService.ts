@@ -1,5 +1,5 @@
 import { collection, getCountFromServer } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { db } from "@/lib/firebase";
 
 export async function fetchScaleStats() {
   const [userSnap, projectSnap] = await Promise.all([

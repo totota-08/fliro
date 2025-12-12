@@ -7,6 +7,7 @@ import "./assets/style.css";
 import router from "./router";
 
 import { initLogger } from "@/utils/logger";
+import "@/lib/firebase";
 
 import { getLogger } from "@logtape/logtape";
 

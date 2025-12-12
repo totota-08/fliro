@@ -5,7 +5,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { db } from "@/lib/firebase";
 import { addProjectMember } from "@/services/projectMembers";
 
 interface CreateInviteOptions {

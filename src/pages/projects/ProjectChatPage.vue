@@ -6,7 +6,7 @@ import { useSlashCommands } from "@/composables/useSlashCommands";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { database, db } from "@/firebase/config";
+import { database, db } from "@/lib/firebase";
 import { fetchProject } from "@/firebase/projectService";
 import {
   addMessageReaction,
