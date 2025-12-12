@@ -24,8 +24,7 @@ const githubProvider = new GithubAuthProvider();
 githubProvider.setCustomParameters({ allow_signup: "true" });
 
 const useEmulators =
-  import.meta.env.DEV &&
-  import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+  import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
 
 if (useEmulators) {
   connectAuthEmulator(auth, "http://localhost:9099");
