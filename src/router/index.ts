@@ -205,8 +205,7 @@ router.beforeEach(async (to) => {
     String(ROUTE_NAMES.signup),
   ];
   const needsAuthCheck =
-    requiresAuth ||
-    (to.name && authRestricted.includes(String(to.name)));
+    requiresAuth || (to.name && authRestricted.includes(String(to.name)));
 
   if (!needsAuthCheck) {
     return true;
@@ -229,11 +228,7 @@ router.beforeEach(async (to) => {
     };
   }
 
-  if (
-    to.name &&
-    authRestricted.includes(String(to.name)) &&
-    user
-  ) {
+  if (to.name && authRestricted.includes(String(to.name)) && user) {
     const needsSetup = Boolean(
       auth.profile.value && auth.profile.value.setUp === false,
     );
