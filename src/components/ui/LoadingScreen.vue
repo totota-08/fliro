@@ -1,9 +1,59 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
 
-defineProps<{
+import { onMounted, onUnmounted, ref, watch } from "vue";
+
+const props = defineProps<{
   loading: boolean;
 }>();
+
+const messages = [
+  "ちょっと待っててね…",
+  "今日もいい感じに進んでるよ！",
+  "コーヒー飲んでる間に準備するね☕️",
+  "猫の手も借りたい…かも？🐾",
+  "データをふわっと並べ替え中…",
+];
+
+const currentMessage = ref(messages[0]);
+let timer: ReturnType<typeof setInterval> | null = null;
+
+const pickMessage = () => {
+  const candidates = messages.filter((m) => m !== currentMessage.value);
+  const next = candidates[Math.floor(Math.random() * candidates.length)] ?? messages[0];
+  currentMessage.value = next;
+};
+
+const startCycle = () => {
+  if (timer) return;
+  pickMessage();
+  timer = setInterval(pickMessage, 2200);
+};
+
+const stopCycle = () => {
+  if (!timer) return;
+  clearInterval(timer);
+  timer = null;
+};
+
+onMounted(() => {
+  if (props.loading) startCycle();
+});
+
+watch(
+  () => props.loading,
+  (val) => {
+    if (val) {
+      startCycle();
+    } else {
+      stopCycle();
+    }
+  },
+);
+
+onUnmounted(() => {
+  stopCycle();
+});
 </script>
 
 <template>
@@ -12,6 +62,7 @@ defineProps<{
       <div class="loading-content">
         <div class="spinner"></div>
         <p class="loading-text">{{ appName }}</p>
+        <p class="loading-message">{{ currentMessage }}</p>
       </div>
     </div>
   </transition>
@@ -53,6 +104,16 @@ defineProps<{
   color: #0f172a;
   font-size: 1.25rem;
   letter-spacing: -0.025em;
+}
+
+.loading-message {
+  margin: 0;
+  font-weight: 700;
+  color: #4f7c82;
+  background: rgba(147, 177, 181, 0.12);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 @keyframes spin {
