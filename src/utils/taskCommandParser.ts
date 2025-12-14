@@ -24,7 +24,6 @@ export function parseTaskCommand(
   let dueDate: Date | null = null;
   let assigneeId: string | null = null;
   let assigneeName: string | null = null;
-  let categoryName: string | null = null;
 
   // Extract due:YYYY-MM-DD
   const dueMatch = title.match(/\bdue:(\d{4}-\d{2}-\d{2})\b/);
@@ -63,20 +62,13 @@ export function parseTaskCommand(
   // Extract #Category
   const catMatch = title.match(/#(\S+)/);
   if (catMatch && catMatch[1]) {
-    categoryName = catMatch[1]; // We store name, matching logic is simpler to do here if we had category list,
-    // but per requirement we just pass null/ignore if logic complex or let caller handle.
-    // Prompt says: "if categories exist, match by name; otherwise store category as null (do not fail)."
-    // Since we don't have categories passed in, we will treat as just stripping tag for now or null.
+    // We strip the tag but ignore the value for v1
     title = title.replace(catMatch[0], "").trim();
   }
 
   if (!title) {
     return { isValid: false, error: "Title is required" };
   }
-
-  // categoryName is currently unused in payload as strict ID is needed or name field in payload
-  // but keeping variable for future use if payload supports threadName/categoryName
-  void categoryName;
 
   return {
     isValid: true,

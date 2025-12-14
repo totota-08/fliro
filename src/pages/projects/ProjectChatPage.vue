@@ -242,7 +242,7 @@ async function handleSend() {
         const dateText = result.payload.dueDate
           ? ` (期限: ${result.payload.dueDate.toLocaleDateString()})`
           : "";
-        const successText = `✅ Task created: 「${result.payload.title}」${assigneeText}${dateText}`;
+        const successText = `✅ Task created: 「${result.payload.title}」${assigneeText}${dateText} (ID: ${taskId})`;
 
         await sendProjectMessage(
           projectId.value,
