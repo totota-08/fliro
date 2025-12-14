@@ -4,6 +4,7 @@ import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
+import TaskDiscussionTab from "@/components/taskDrawer/TaskDiscussionTab.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
@@ -19,6 +20,10 @@ import {
 } from "@/services/projectChat";
 import type { ProjectMember } from "@/services/projectMembers";
 import {
+  listenTaskCategories,
+  type TaskCategory,
+} from "@/services/taskCategoryService";
+import {
   createTask,
   deleteTask,
   listenTasks,
@@ -26,10 +31,6 @@ import {
   type TaskDoc,
   type TaskStatus,
 } from "@/services/taskService";
-import {
-  listenTaskCategories,
-  type TaskCategory,
-} from "@/services/taskCategoryService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import type { DashboardNavItem } from "@/types/projectDashboard";
@@ -56,7 +57,6 @@ const logger = getLogger("app.pages.projects.ProjectDashboard");
 const route = useRoute();
 const { user, profile } = useAuthStore();
 const projectId = ref(String(route.params.projectId || ""));
-
 type MemberEntry = ProjectMember & {
   id: string;
   name: string;
@@ -78,6 +78,7 @@ const categories = ref<TaskCategory[]>([]);
 const { notifications: notificationsBar } = useNotificationCenter();
 const taskView = ref<"all" | "mine">("all");
 const selectedTask = ref<TaskDoc | null>(null);
+const activeDrawerTab = ref<"overview" | "discussion" | "activity">("overview");
 const editor = reactive({
   description: "",
   dueDate: "",
@@ -109,11 +110,7 @@ const taskForm = reactive({
   assigneeId: "",
   categoryId: "",
   progress: 0,
-  addToThread: false,
 });
-const threadNameDraft = ref("");
-const isThreadFormOpen = ref(false);
-const threadCreationLoading = ref(false);
 
 let stopTasks: (() => void) | null = null;
 let stopProject: (() => void) | null = null;
@@ -296,12 +293,8 @@ const overallProgress = computed(() => {
 
 watch(selectedTask, (task) => {
   if (task) {
-    threadNameDraft.value = task.threadName || task.title || "";
-  } else {
-    threadNameDraft.value = "";
+    activeDrawerTab.value = "overview";
   }
-  isThreadFormOpen.value = false;
-  threadCreationLoading.value = false;
 });
 
 const statusCounts = computed(() => {
@@ -633,7 +626,6 @@ function resetTaskForm() {
   taskForm.assigneeId = "";
   taskForm.categoryId = "";
   taskForm.progress = 0;
-  taskForm.addToThread = false;
 }
 
 function openTaskModal() {
@@ -685,8 +677,6 @@ async function submitTaskForm() {
       assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
       progress: normalizedProgress,
       status: initialStatus,
-      hasThread: taskForm.addToThread,
-      threadName: taskForm.addToThread ? taskForm.title.trim() : null,
     },
     user.value.uid,
   );
@@ -730,38 +720,6 @@ async function saveTask() {
 
 async function removeTask(taskId: string) {
   await deleteTask(projectId.value, taskId);
-}
-
-function startTaskThreadForm() {
-  if (!selectedTask.value) return;
-  threadNameDraft.value =
-    selectedTask.value.threadName || selectedTask.value.title || "";
-  isThreadFormOpen.value = true;
-}
-
-function cancelTaskThreadForm() {
-  isThreadFormOpen.value = false;
-}
-
-async function createThreadForSelectedTask() {
-  if (!selectedTask.value) return;
-  const name = threadNameDraft.value.trim();
-  if (!name) return;
-  threadCreationLoading.value = true;
-  try {
-    await updateTask(projectId.value, selectedTask.value.id, {
-      hasThread: true,
-      threadName: name,
-    });
-    selectedTask.value = {
-      ...selectedTask.value,
-      hasThread: true,
-      threadName: name,
-    };
-    isThreadFormOpen.value = false;
-  } finally {
-    threadCreationLoading.value = false;
-  }
 }
 
 // async function sendChatMessage(text: string) {
@@ -1420,17 +1378,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </section>
-          <section class="task-modal__thread-toggle">
-            <label class="thread-toggle">
-              <input v-model="taskForm.addToThread" type="checkbox" />
-              <div>
-                <p class="thread-toggle__title">チャットスレッドを作成</p>
-                <p class="thread-toggle__description">
-                  チェックするとこのタスク専用のチャットチャネルを作成します
-                </p>
-              </div>
-            </label>
-          </section>
+
           <footer>
             <button type="button" class="ghost" @click="closeTaskModal">
               キャンセル
@@ -1450,113 +1398,130 @@ onBeforeUnmount(() => {
               <p class="task-drawer__eyebrow">タスク詳細</p>
               <h3>{{ selectedTask.title }}</h3>
             </div>
-            <button type="button" @click="selectedTask = null">×</button>
-          </header>
-          <section class="task-drawer__section">
-            <p class="label">説明</p>
-            <textarea v-model="editor.description" rows="4"></textarea>
-          </section>
-          <section class="task-drawer__section">
-            <p class="label">期限</p>
-            <input v-model="editor.dueDate" type="date" />
-          </section>
-          <section class="task-drawer__section">
-            <p class="label">担当者</p>
-            <select v-model="editor.assigneeId">
-              <option value="">未割当</option>
-              <option
-                v-for="member in members"
-                :key="member.id"
-                :value="member.id"
-              >
-                {{ member.name }}
-              </option>
-            </select>
-          </section>
-          <section class="task-drawer__section">
-            <p class="label">ステータス</p>
-            <select v-model="editor.status">
-              <option value="todo">未着手</option>
-              <option value="in-progress">進行中</option>
-              <option value="review">レビュー</option>
-              <option value="done">完了</option>
-            </select>
-          </section>
-          <section class="task-drawer__section">
-            <div class="task-modal__range-header">
-              <p class="label">進捗率</p>
-              <span class="hint">{{ editor.progress }}%</span>
-            </div>
-            <div class="progress-picker">
-              <button
-                v-for="option in PROGRESS_OPTIONS"
-                :key="`drawer-progress-${option}`"
-                type="button"
-                :class="[
-                  'progress-pill',
-                  { 'is-active': editor.progress === option },
-                ]"
-                @click="editor.progress = option"
-              >
-                {{ option }}%
-              </button>
-            </div>
-          </section>
-          <section class="task-drawer__section thread-section">
-            <p class="label">スレッド</p>
-            <div v-if="selectedTask.hasThread" class="thread-status created">
-              <p>このタスクにはスレッドがあります。</p>
-              <p class="thread-name">
-                {{ selectedTask.threadName || selectedTask.title }}
-              </p>
-            </div>
-            <div v-else>
-              <div v-if="isThreadFormOpen" class="thread-form">
-                <input
-                  v-model="threadNameDraft"
-                  type="text"
-                  placeholder="スレッド名"
-                />
-                <div class="thread-actions">
-                  <button
-                    type="button"
-                    class="ghost"
-                    @click="cancelTaskThreadForm"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="button"
-                    :disabled="!threadNameDraft.trim() || threadCreationLoading"
-                    @click="createThreadForSelectedTask"
-                  >
-                    作成
-                  </button>
-                </div>
-              </div>
-              <button
-                v-else
-                type="button"
-                class="thread-create-btn"
-                @click="startTaskThreadForm"
-              >
-                スレッドを作成
-              </button>
-            </div>
-          </section>
-          <footer class="task-drawer__footer">
-            <button type="button" class="ghost" @click="selectedTask = null">
-              閉じる
-            </button>
-            <button type="button" @click="saveTask">保存</button>
             <button
               type="button"
-              class="danger"
-              @click="selectedTask && removeTask(selectedTask.id)"
+              class="drawer-close"
+              @click="selectedTask = null"
             >
-              削除
+              ×
             </button>
-          </footer>
+          </header>
+
+          <nav class="drawer-tabs">
+            <button
+              type="button"
+              :class="[
+                'drawer-tab',
+                { active: activeDrawerTab === 'overview' },
+              ]"
+              @click="activeDrawerTab = 'overview'"
+            >
+              概要
+            </button>
+            <button
+              type="button"
+              :class="[
+                'drawer-tab',
+                { active: activeDrawerTab === 'discussion' },
+              ]"
+              @click="activeDrawerTab = 'discussion'"
+            >
+              議論
+            </button>
+            <button
+              type="button"
+              :class="[
+                'drawer-tab',
+                { active: activeDrawerTab === 'activity' },
+              ]"
+              @click="activeDrawerTab = 'activity'"
+            >
+              履歴
+            </button>
+          </nav>
+
+          <div v-show="activeDrawerTab === 'overview'" class="drawer-content">
+            <section class="task-drawer__section">
+              <p class="label">説明</p>
+              <textarea v-model="editor.description" rows="4"></textarea>
+            </section>
+            <section class="task-drawer__section">
+              <p class="label">期限</p>
+              <input v-model="editor.dueDate" type="date" />
+            </section>
+            <section class="task-drawer__section">
+              <p class="label">担当者</p>
+              <select v-model="editor.assigneeId">
+                <option value="">未割当</option>
+                <option
+                  v-for="member in members"
+                  :key="member.id"
+                  :value="member.id"
+                >
+                  {{ member.name }}
+                </option>
+              </select>
+            </section>
+            <section class="task-drawer__section">
+              <p class="label">ステータス</p>
+              <select v-model="editor.status">
+                <option value="todo">未着手</option>
+                <option value="in-progress">進行中</option>
+                <option value="review">レビュー</option>
+                <option value="done">完了</option>
+              </select>
+            </section>
+            <section class="task-drawer__section">
+              <div class="task-modal__range-header">
+                <p class="label">進捗率</p>
+                <span class="hint">{{ editor.progress }}%</span>
+              </div>
+              <div class="progress-picker">
+                <button
+                  v-for="option in PROGRESS_OPTIONS"
+                  :key="`drawer-progress-${option}`"
+                  type="button"
+                  :class="[
+                    'progress-pill',
+                    { 'is-active': editor.progress === option },
+                  ]"
+                  @click="editor.progress = option"
+                >
+                  {{ option }}%
+                </button>
+              </div>
+            </section>
+
+            <footer class="task-drawer__footer">
+              <button type="button" class="ghost" @click="selectedTask = null">
+                閉じる
+              </button>
+              <button type="button" @click="saveTask">保存</button>
+              <button
+                type="button"
+                class="danger"
+                @click="selectedTask && removeTask(selectedTask.id)"
+              >
+                削除
+              </button>
+            </footer>
+          </div>
+
+          <div
+            v-if="activeDrawerTab === 'discussion'"
+            class="drawer-content no-padding"
+          >
+            <TaskDiscussionTab
+              :project-id="projectId"
+              :task-id="selectedTask.id"
+            />
+          </div>
+
+          <div v-if="activeDrawerTab === 'activity'" class="drawer-content">
+            <div class="empty-placeholder">
+              履歴は準備中です（ステータス変更ログなど）
+            </div>
+          </div>
         </aside>
       </div>
     </transition>
@@ -2743,5 +2708,85 @@ onBeforeUnmount(() => {
 
 .task-drawer__footer .danger {
   background: #d64545;
+}
+
+/* Task Drawer Tabs */
+.drawer-tabs {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(11, 46, 51, 0.12); /* --line */
+  margin-bottom: 16px;
+}
+
+.drawer-tab {
+  border: 1px solid rgba(11, 46, 51, 0.12);
+  background: rgba(11, 46, 51, 0.04);
+  color: #0b2e33; /* --brand */
+  font-weight: 900;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+}
+
+.drawer-tab.active {
+  background: #0b2e33; /* --brand */
+  color: #fff;
+  border-color: #0b2e33;
+}
+
+.drawer-tab:hover:not(.active) {
+  background: rgba(11, 46, 51, 0.08);
+}
+
+.drawer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.drawer-content.no-padding {
+  padding: 0;
+  gap: 0;
+}
+
+.drawer-close {
+  border: 1px solid rgba(11, 46, 51, 0.12);
+  background: #fff;
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-weight: 900;
+  color: #0b2e33;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+
+.empty-placeholder {
+  padding: 20px;
+  border: 1px dashed rgba(11, 46, 51, 0.2);
+  border-radius: 16px;
+  background: rgba(11, 46, 51, 0.03);
+  color: #64748b;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* Enhancements for Task List */
+.task-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.task-row:hover {
+  background: rgba(184, 227, 233, 0.18);
+  border-color: rgba(11, 46, 51, 0.18);
 }
 </style>
