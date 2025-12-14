@@ -120,10 +120,8 @@ jobs:
           WORKDIR /workspace
 
           RUN apt-get update \
-            && apt-get install -y --no-install-recommends wget ca-certificates git \
-            && wget -O /tmp/jdk21.deb https://cdn.azul.com/zulu/bin/zulu21.38.21-ca-jdk21.0.0-linux_amd64.deb \
-            && apt-get install -y --no-install-recommends /tmp/jdk21.deb \
-            && rm -rf /var/lib/apt/lists/* /tmp/jdk21.deb
+            && apt-get install -y --no-install-recommends wget ca-certificates git openjdk-17-jdk-headless \
+            && rm -rf /var/lib/apt/lists/*
 
           COPY package*.json ./
           RUN npm ci
