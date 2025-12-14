@@ -9,8 +9,16 @@ import {
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectDatabaseEmulator, getDatabase } from "firebase/database";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+if (typeof window !== "undefined" && import.meta.env.VITE_APP_CHECK_KEY) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(import.meta.env.VITE_APP_CHECK_KEY),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 const auth = getAuth(app);
 const db = getFirestore(app);
