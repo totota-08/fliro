@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -13,11 +14,9 @@ import {
   listenProjectMembers,
   type ProjectMember,
 } from "@/services/projectMembers";
-import { createTask } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import type { DashboardNavItem } from "@/types/projectDashboard";
-import { parseTaskCommand } from "@/utils/taskCommandParser";
 import { getLogger } from "@logtape/logtape";
 import {
   addDoc,
@@ -72,22 +71,18 @@ const activeChannelId = ref("general");
 
 // Command Autocomplete
 const showCommandSuggestions = ref(false);
-const availableCommands = [
-  {
-    label: "/task",
-    description: "タスクを作成します",
-    example: "/task 新機能のテスト due:2025-01-01 @User",
-  },
-  {
-    label: "/news",
-    description: "最新のテックニュースを取得します",
-    example: "/news",
-  },
-];
+const availableCommands = computed(() =>
+  commands.map((c) => ({
+    label: c.name,
+    description: c.description,
+    example: c.example,
+  })),
+);
+
 const filteredCommands = computed(() => {
   if (!input.value.startsWith("/")) return [];
   const query = input.value.toLowerCase();
-  return availableCommands.filter((cmd) => cmd.label.startsWith(query));
+  return availableCommands.value.filter((cmd) => cmd.label.startsWith(query));
 });
 
 watch(input, (val) => {
@@ -260,120 +255,37 @@ function watchCustomChannels() {
 }
 
 // Actions
+// Actions
 async function handleSend() {
   const text = input.value.trim();
   if (!text || !user.value) return;
 
-  // Check for /task command
-  if (text.startsWith("/task ")) {
-    const result = parseTaskCommand(text, projectMembers.value);
+  // Check for commands
+  if (text.startsWith("/")) {
+    const result = await executeCommand(text, {
+      projectId: projectId.value,
+      userId: user.value.uid,
+      activeChannelId: activeChannelId.value,
+      members: projectMembers.value,
+    });
 
-    if (result.isValid && result.payload) {
-      try {
-        const taskId = await createTask(
-          projectId.value,
-          result.payload,
-          user.value.uid,
-        );
-
-        // Send success bot message
-        const assigneeText = result.payload.assigneeName
-          ? ` (担当: ${result.payload.assigneeName})`
-          : "";
-        const dateText = result.payload.dueDate
-          ? ` (期限: ${result.payload.dueDate.toLocaleDateString()})`
-          : "";
-        const successText = `✅ Task created: 「${result.payload.title}」${assigneeText}${dateText} (ID: ${taskId})`;
-
+    if (result.handled) {
+      if (result.result) {
+        // Send bot message based on command result
         await sendProjectMessage(
           projectId.value,
           "system",
           "Fliro Bot",
-          successText,
+          result.result.message || "Command executed",
           activeChannelId.value,
           undefined,
-          { isBot: true, linkedTaskId: taskId },
-        );
-      } catch (e) {
-        logger.error`Failed to create task from command: ${e}`;
-        await sendProjectMessage(
-          projectId.value,
-          "system",
-          "Fliro Bot",
-          "⚠️ Task creation failed. Please try again.",
-          activeChannelId.value,
-          undefined,
-          { isBot: true },
+          { isBot: true, linkedTaskId: result.result.linkedTaskId },
         );
       }
-    } else {
-      // Send error bot message
-      await sendProjectMessage(
-        projectId.value,
-        "system",
-        "Fliro Bot",
-        `⚠️ ${result.error || "Invalid command"}`,
-        activeChannelId.value,
-        undefined,
-        { isBot: true },
-      );
+      input.value = "";
+      scrollToBottom();
+      return;
     }
-    input.value = ""; // Clear input but DO NOT send user message
-    scrollToBottom();
-    return;
-  }
-
-  // Check for /news command
-  if (text.startsWith("/news")) {
-    try {
-      // 1. Fetch top stories IDs
-      const topRes = await fetch(
-        "https://hacker-news.firebaseio.com/v0/topstories.json",
-      );
-      const topIds = await topRes.json();
-      const targetIds = topIds.slice(0, 3); // Get top 3
-
-      // 2. Fetch details for each
-      const promises = targetIds.map((id: number) =>
-        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(
-          (r) => r.json(),
-        ),
-      );
-      const stories = await Promise.all(promises);
-
-      // 3. Format message
-      let newsText = "📰 **Latest Tech News**\n";
-      stories.forEach((story: any) => {
-        if (story && story.title) {
-          newsText += `• [${story.title}](${story.url || `https://news.ycombinator.com/item?id=${story.id}`})\n`;
-        }
-      });
-
-      // 4. Send bot message
-      await sendProjectMessage(
-        projectId.value,
-        "system",
-        "Fliro Bot",
-        newsText,
-        activeChannelId.value,
-        undefined,
-        { isBot: true },
-      );
-    } catch (e) {
-      logger.error`Failed to fetch news: ${e}`;
-      await sendProjectMessage(
-        projectId.value,
-        "system",
-        "Fliro Bot",
-        "⚠️ Failed to fetch news.",
-        activeChannelId.value,
-        undefined,
-        { isBot: true },
-      );
-    }
-    input.value = "";
-    scrollToBottom();
-    return;
   }
 
   try {
