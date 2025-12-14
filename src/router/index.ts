@@ -29,6 +29,7 @@ import ProjectActivityLogPage from "@/pages/projects/ProjectActivityLogPage.vue"
 import ProjectNotificationsPage from "@/pages/projects/ProjectNotificationsPage.vue";
 import ProjectRolesPage from "@/pages/projects/ProjectRolesPage.vue";
 import MyTasksPage from "@/pages/tasks/MyTasksPage.vue";
+import TaskDetailView from "@/pages/TaskDetailView.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -145,6 +146,12 @@ export const router = createRouter({
       path: "/tasks",
       name: ROUTE_NAMES.myTasks,
       component: MyTasksPage,
+      meta: { requiresAuth: true, section: "tasks" },
+    },
+    {
+      path: "/tasks/:taskId",
+      name: "taskDetail",
+      component: TaskDetailView,
       meta: { requiresAuth: true, section: "tasks" },
     },
     {
