@@ -69,6 +69,32 @@ const projectMembers = ref<ProjectMember[]>([]);
 const customChannels = ref<ChatChannel[]>([]);
 const chatContainer = ref<HTMLElement | null>(null);
 const activeChannelId = ref("general");
+
+// Command Autocomplete
+const showCommandSuggestions = ref(false);
+const availableCommands = [
+  { label: "/task", description: "タスクを作成します" },
+];
+const filteredCommands = computed(() => {
+  if (!input.value.startsWith("/")) return [];
+  const query = input.value.toLowerCase();
+  return availableCommands.filter((cmd) => cmd.label.startsWith(query));
+});
+
+watch(input, (val) => {
+  if (val.startsWith("/") && !val.includes(" ")) {
+    showCommandSuggestions.value = true;
+  } else {
+    showCommandSuggestions.value = false;
+  }
+});
+
+function selectCommand(cmd: string) {
+  input.value = `${cmd} `;
+  showCommandSuggestions.value = false;
+  const inputEl = document.querySelector(".composer-input") as HTMLInputElement;
+  inputEl?.focus();
+}
 // UI state
 const customThreadFormOpen = ref(false);
 const customThreadForm = ref({ name: "", description: "" });
@@ -522,6 +548,20 @@ watch(channels, (list) => {
           </div>
 
           <div class="composer">
+            <div
+              v-if="showCommandSuggestions && filteredCommands.length > 0"
+              class="suggestions-list"
+            >
+              <button
+                v-for="cmd in filteredCommands"
+                :key="cmd.label"
+                class="suggestion-item"
+                @click="selectCommand(cmd.label)"
+              >
+                <span class="cmd-label">{{ cmd.label }}</span>
+                <span class="cmd-desc">{{ cmd.description }}</span>
+              </button>
+            </div>
             <input
               v-model="input"
               @keydown.enter="handleSend"
@@ -824,6 +864,7 @@ watch(channels, (list) => {
   display: flex;
   gap: 12px;
   background: #fff;
+  position: relative;
 }
 
 .composer-input {
@@ -866,5 +907,50 @@ watch(channels, (list) => {
   .threads-panel {
     display: none; /* Hide threads list on mobile for simplicity in this MVP */
   }
+}
+
+.suggestions-list {
+  position: absolute;
+  bottom: 100%;
+  left: 20px;
+  max-width: 400px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  z-index: 10;
+  margin-bottom: 8px;
+}
+
+.suggestion-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background: #f8fafc;
+}
+
+.cmd-label {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.cmd-desc {
+  font-size: 12px;
+  color: #64748b;
 }
 </style>
