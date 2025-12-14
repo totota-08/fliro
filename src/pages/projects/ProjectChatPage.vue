@@ -73,7 +73,16 @@ const activeChannelId = ref("general");
 // Command Autocomplete
 const showCommandSuggestions = ref(false);
 const availableCommands = [
-  { label: "/task", description: "タスクを作成します" },
+  {
+    label: "/task",
+    description: "タスクを作成します",
+    example: "/task 新機能のテスト due:2025-01-01 @User",
+  },
+  {
+    label: "/news",
+    description: "最新のテックニュースを取得します",
+    example: "/news",
+  },
 ];
 const filteredCommands = computed(() => {
   if (!input.value.startsWith("/")) return [];
@@ -90,7 +99,13 @@ watch(input, (val) => {
 });
 
 function selectCommand(cmd: string) {
-  input.value = `${cmd} `;
+  if (cmd === "/news") {
+    // /news command doesn't need arguments usually, so maybe just set it?
+    // User might validly just hit enter.
+    input.value = `${cmd}`;
+  } else {
+    input.value = `${cmd} `;
+  }
   showCommandSuggestions.value = false;
   const inputEl = document.querySelector(".composer-input") as HTMLInputElement;
   inputEl?.focus();
@@ -308,6 +323,59 @@ async function handleSend() {
     return;
   }
 
+  // Check for /news command
+  if (text.startsWith("/news")) {
+    try {
+      // 1. Fetch top stories IDs
+      const topRes = await fetch(
+        "https://hacker-news.firebaseio.com/v0/topstories.json",
+      );
+      const topIds = await topRes.json();
+      const targetIds = topIds.slice(0, 3); // Get top 3
+
+      // 2. Fetch details for each
+      const promises = targetIds.map((id: number) =>
+        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(
+          (r) => r.json(),
+        ),
+      );
+      const stories = await Promise.all(promises);
+
+      // 3. Format message
+      let newsText = "📰 **Latest Tech News**\n";
+      stories.forEach((story: any) => {
+        if (story && story.title) {
+          newsText += `• [${story.title}](${story.url || `https://news.ycombinator.com/item?id=${story.id}`})\n`;
+        }
+      });
+
+      // 4. Send bot message
+      await sendProjectMessage(
+        projectId.value,
+        "system",
+        "Fliro Bot",
+        newsText,
+        activeChannelId.value,
+        undefined,
+        { isBot: true },
+      );
+    } catch (e) {
+      logger.error`Failed to fetch news: ${e}`;
+      await sendProjectMessage(
+        projectId.value,
+        "system",
+        "Fliro Bot",
+        "⚠️ Failed to fetch news.",
+        activeChannelId.value,
+        undefined,
+        { isBot: true },
+      );
+    }
+    input.value = "";
+    scrollToBottom();
+    return;
+  }
+
   try {
     await sendProjectMessage(
       projectId.value,
@@ -389,6 +457,26 @@ function formatTime(createdAt: ChatMessage["createdAt"]) {
     return "";
   }
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatMessage(text: string) {
+  if (!text) return "";
+  // 1. Escape HTML
+  let formatted = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // 2. Parse Markdown Links [Text](URL)
+  formatted = formatted.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#0ea5e9;text-decoration:underline;">$1</a>',
+  );
+
+  // 3. New lines to <br>
+  formatted = formatted.replace(/\n/g, "<br>");
+
+  return formatted;
 }
 
 // Lifecycle
@@ -535,7 +623,7 @@ watch(channels, (list) => {
                   <span class="sender">{{ msg.senderName }}</span>
                   <span class="time">{{ formatTime(msg.createdAt) }}</span>
                 </div>
-                <div class="msg-text">{{ msg.text }}</div>
+                <div class="msg-text" v-html="formatMessage(msg.text)"></div>
                 <button
                   v-if="msg.linkedTaskId"
                   class="open-task-btn"
@@ -558,8 +646,13 @@ watch(channels, (list) => {
                 class="suggestion-item"
                 @click="selectCommand(cmd.label)"
               >
-                <span class="cmd-label">{{ cmd.label }}</span>
-                <span class="cmd-desc">{{ cmd.description }}</span>
+                <div class="cmd-row">
+                  <span class="cmd-label">{{ cmd.label }}</span>
+                  <span class="cmd-desc">{{ cmd.description }}</span>
+                </div>
+                <div v-if="cmd.example" class="cmd-example">
+                  例: {{ cmd.example }}
+                </div>
               </button>
             </div>
             <input
@@ -943,6 +1036,12 @@ watch(channels, (list) => {
   background: #f8fafc;
 }
 
+.cmd-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .cmd-label {
   font-weight: 700;
   font-size: 14px;
@@ -952,5 +1051,11 @@ watch(channels, (list) => {
 .cmd-desc {
   font-size: 12px;
   color: #64748b;
+}
+
+.cmd-example {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
 }
 </style>
