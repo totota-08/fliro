@@ -305,9 +305,8 @@ async function handleSend() {
 
 function openTask(taskId: string) {
   router.push({
-    name: ROUTE_NAMES.projectDashboard,
-    params: { projectId: projectId.value },
-    query: { taskId },
+    name: ROUTE_NAMES.projectTaskDetail,
+    params: { projectId: projectId.value, taskId },
   });
 }
 
