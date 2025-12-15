@@ -11,6 +11,11 @@ export interface ChatCommand {
   name: string; // e.g. "/task"
   description: string;
   example: string;
+  suggestions?: Array<{
+    name: string;
+    description: string;
+    example?: string;
+  }>;
   match: (text: string) => boolean;
   execute: (
     text: string,

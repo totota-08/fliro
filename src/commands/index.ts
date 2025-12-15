@@ -1,8 +1,13 @@
+import { fliloBotCommand } from "./fliloBotCommand";
 import { newsCommand } from "./newsCommand";
 import { taskCommand } from "./taskCommand";
 import type { ChatCommand, CommandContext } from "./types";
 
-export const commands: ChatCommand[] = [taskCommand, newsCommand];
+export const commands: ChatCommand[] = [
+  fliloBotCommand,
+  taskCommand,
+  newsCommand,
+];
 
 export async function executeCommand(
   text: string,

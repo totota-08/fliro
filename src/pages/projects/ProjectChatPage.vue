@@ -72,11 +72,21 @@ const activeChannelId = ref("general");
 // Command Autocomplete
 const showCommandSuggestions = ref(false);
 const availableCommands = computed(() =>
-  commands.map((c) => ({
-    label: c.name,
-    description: c.description,
-    example: c.example,
-  })),
+  commands.flatMap((c) =>
+    c.suggestions?.length
+      ? c.suggestions.map((s) => ({
+          label: s.name,
+          description: s.description,
+          example: s.example ?? c.example,
+        }))
+      : [
+          {
+            label: c.name,
+            description: c.description,
+            example: c.example,
+          },
+        ],
+  ),
 );
 
 const filteredCommands = computed(() => {
@@ -918,6 +928,7 @@ watch(channels, (list) => {
   bottom: 100%;
   left: 20px;
   max-width: 400px;
+  max-height: 300px;
   background: #fff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -925,6 +936,7 @@ watch(channels, (list) => {
   overflow: hidden;
   z-index: 10;
   margin-bottom: 8px;
+  overflow-y: auto;
 }
 
 .suggestion-item {
