@@ -141,3 +141,31 @@ export async function deleteTask(projectId: string, taskId: string) {
     throw error;
   }
 }
+
+export function listenTask(
+  projectId: string,
+  taskId: string,
+  callback: (task: TaskDoc | null) => void,
+) {
+  logger.debug`Starting to listen for task ${taskId} in project ${projectId}`;
+  const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+  return onSnapshot(
+    taskRef,
+    (docSnap) => {
+      logger.debug`Received update for task ${taskId}`;
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        callback({
+          id: docSnap.id,
+          projectId,
+          ...(data as Omit<TaskDoc, "id" | "projectId">),
+        });
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      logger.error`Failed to listen for task ${taskId}: ${error}`;
+    },
+  );
+}

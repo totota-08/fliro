@@ -1,34 +1,34 @@
-import { createRouter, createWebHistory } from "vue-router";
+import NotFoundPage from "@/components/errorPage/404.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+import { getCurrentUser } from "@/lib/getCurrentUser";
 import HomePage from "@/pages/HomePage.vue";
-import SignUpPage from "@/pages/auth/SignUpPage.vue";
+import MyPage from "@/pages/account/MyPage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
-import ResetPasswordPage from "@/pages/auth/ResetPasswordPage.vue";
 import ResetPasswordConfirmPage from "@/pages/auth/ResetPasswordConfirmPage.vue";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage.vue";
+import SignUpPage from "@/pages/auth/SignUpPage.vue";
 import VerifyEmailPage from "@/pages/auth/VerifyEmailPage.vue";
 import AuthDebugPage from "@/pages/debug/AuthDebugPage.vue";
 import ProjectDebugPage from "@/pages/debug/ProjectDebugPage.vue";
 import DashboardDemoPage from "@/pages/demo/DashboardDemoPage.vue";
 import DemoMyTasksPage from "@/pages/demo/MyTasksPage.vue";
 import TeamPage from "@/pages/demo/TeamPage.vue";
-import NotFoundPage from "@/components/errorPage/404.vue";
-import { useAuthStore, waitForAuthReady } from "@/store/auth";
-import { getCurrentUser } from "@/lib/getCurrentUser";
-import { ROUTE_NAMES } from "@/constants/routes";
-import CreateProjectPage from "@/pages/projects/CreateProjectPage.vue";
 import InviteAcceptPage from "@/pages/invite/InviteAcceptPage.vue";
-import MyPage from "@/pages/account/MyPage.vue";
-import SecretChatPage from "@/pages/secret/SecretChatPage.vue";
-import SecretAccessPage from "@/pages/secret/SecretAccessPage.vue";
-import ProjectDashboardPage from "@/pages/projects/ProjectDashboardPage.vue";
-import ProjectChatPage from "@/pages/projects/ProjectChatPage.vue";
-import ProjectMembersPage from "@/pages/projects/ProjectMembersPage.vue";
-import ProjectCategoriesPage from "@/pages/projects/ProjectCategoriesPage.vue";
-import ProjectTimelinePage from "@/pages/projects/ProjectTimelinePage.vue";
-import ProjectSettingsPage from "@/pages/projects/ProjectSettingsPage.vue";
+import CreateProjectPage from "@/pages/projects/CreateProjectPage.vue";
 import ProjectActivityLogPage from "@/pages/projects/ProjectActivityLogPage.vue";
+import ProjectCategoriesPage from "@/pages/projects/ProjectCategoriesPage.vue";
+import ProjectChatPage from "@/pages/projects/ProjectChatPage.vue";
+import ProjectDashboardPage from "@/pages/projects/ProjectDashboardPage.vue";
+import ProjectMembersPage from "@/pages/projects/ProjectMembersPage.vue";
 import ProjectNotificationsPage from "@/pages/projects/ProjectNotificationsPage.vue";
 import ProjectRolesPage from "@/pages/projects/ProjectRolesPage.vue";
+import ProjectSettingsPage from "@/pages/projects/ProjectSettingsPage.vue";
+import ProjectTimelinePage from "@/pages/projects/ProjectTimelinePage.vue";
+import SecretAccessPage from "@/pages/secret/SecretAccessPage.vue";
+import SecretChatPage from "@/pages/secret/SecretChatPage.vue";
 import MyTasksPage from "@/pages/tasks/MyTasksPage.vue";
+import { useAuthStore, waitForAuthReady } from "@/store/auth";
+import { createRouter, createWebHistory } from "vue-router";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -140,6 +140,12 @@ export const router = createRouter({
       name: ROUTE_NAMES.projectNotifications,
       component: ProjectNotificationsPage,
       meta: { requiresAuth: true, section: "notifications" },
+    },
+    {
+      path: "/projects/:projectId/tasks/:taskId",
+      name: ROUTE_NAMES.projectTaskDetail,
+      component: () => import("@/pages/projects/ProjectTaskDetailPage.vue"),
+      meta: { requiresAuth: true, section: "tasks" },
     },
     {
       path: "/tasks",
