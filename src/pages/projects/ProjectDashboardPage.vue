@@ -47,11 +47,12 @@ import {
   ref,
   watch,
 } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectDashboard");
 
 const route = useRoute();
+const router = useRouter();
 const { user, profile } = useAuthStore();
 const projectId = ref(String(route.params.projectId || ""));
 type MemberEntry = ProjectMember & {
@@ -585,13 +586,9 @@ function resetTaskForm() {
   taskForm.progress = 0;
 }
 
-function openTaskModal() {
-  resetTaskForm();
-  isTaskModalOpen.value = true;
-}
-
 function closeTaskModal() {
   isTaskModalOpen.value = false;
+  resetTaskForm();
 }
 
 function getMemberNameById(id?: string | null) {
@@ -643,6 +640,14 @@ async function submitTaskForm() {
 function selectTaskById(taskId: string) {
   const match = tasks.value.find((task) => task.id === taskId);
   if (match) selectedTask.value = match;
+}
+
+function navigateToTaskDetail(taskId: string) {
+  if (!projectId.value) return;
+  router.push({
+    name: ROUTE_NAMES.projectTaskDetail,
+    params: { projectId: projectId.value, taskId },
+  });
 }
 
 // async function sendChatMessage(text: string) {
