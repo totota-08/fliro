@@ -264,6 +264,36 @@ function watchCustomChannels() {
   });
 }
 
+function stopWatchers() {
+  unsubscribeChat?.();
+  unsubscribeMembers?.();
+  unsubscribeCustomChannels?.();
+  unsubscribeChat = null;
+  unsubscribeMembers = null;
+  unsubscribeCustomChannels = null;
+}
+
+async function refreshProjectContext() {
+  stopWatchers();
+  messages.value = [];
+  projectMembers.value = [];
+  customChannels.value = [];
+  project.value = null;
+
+  if (!projectId.value) return;
+
+  try {
+    project.value = await fetchProject(projectId.value);
+  } catch (error) {
+    logger.error`Failed to load project: ${error}`;
+    return;
+  }
+
+  watchChat();
+  watchMembers();
+  watchCustomChannels();
+}
+
 // Actions
 // Actions
 async function handleSend() {
@@ -401,20 +431,24 @@ function formatMessage(text: string) {
 }
 
 // Lifecycle
-onMounted(async () => {
+onMounted(() => {
   if (projectId.value) {
-    const p = await fetchProject(projectId.value);
-    project.value = p;
-    watchChat();
-    watchMembers();
-    watchCustomChannels();
+    void refreshProjectContext();
   }
 });
 
+watch(
+  () => route.params.projectId,
+  (newId) => {
+    const nextId = newId ? String(newId) : "";
+    if (nextId === projectId.value) return;
+    projectId.value = nextId;
+    void refreshProjectContext();
+  },
+);
+
 onBeforeUnmount(() => {
-  unsubscribeChat?.();
-  unsubscribeMembers?.();
-  unsubscribeCustomChannels?.();
+  stopWatchers();
 });
 
 watch(activeChannelId, () => {
