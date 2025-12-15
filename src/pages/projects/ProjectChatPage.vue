@@ -928,6 +928,7 @@ watch(channels, (list) => {
   bottom: 100%;
   left: 20px;
   max-width: 400px;
+  max-height: 300px;
   background: #fff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -935,6 +936,7 @@ watch(channels, (list) => {
   overflow: hidden;
   z-index: 10;
   margin-bottom: 8px;
+  overflow-y: auto;
 }
 
 .suggestion-item {
