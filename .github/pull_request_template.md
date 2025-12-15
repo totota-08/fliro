@@ -1,26 +1,23 @@
-## Summary
+### 目的
+（例：プロジェクト作成時に未ログイン状態でクラッシュする不具合を修正）
 
--
+### 変更点（UI変更なし）
+- （例：auth未確定時のnull参照を防ぐガードを追加）
+- （例：Firestore取得失敗時の例外経路を安全化）
 
-## Changes
+### 再現手順
+1.
+2.
+3.
 
--
+### 修正内容
+- 原因：
+- 対応：
 
-## Testing
+### 検証
+- コマンド: npm run typecheck / npm run lint / npm run dev
+- 手動: （画面操作）
 
-- [ ] `npm run lint`
-- [ ] `npm run typecheck` (or `npx vue-tsc --noEmit`)
-- [ ] `npm run build`
-- [ ] `npm run test:rules`
-- [ ] Other:
-
-## Screenshots
-
-- [ ] Added/updated
-
-## Checklist
-
-- [ ] Linked task ID (e.g., T1–T13/T9b)
-- [ ] Docs updated (if needed)
-- [ ] No console logs or unused code
-- [ ] Self-review completed
+### 影響範囲 / リスク
+- （例：プロジェクト作成周りのみ）
+- （例：既存UI変更なし）
