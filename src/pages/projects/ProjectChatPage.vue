@@ -52,7 +52,7 @@ type ChatChannel = {
 
 const defaultChannel: ChatChannel = {
   id: "general",
-  name: "general",
+  name: "全体",
   description: "全メンバーと共有するチャネル",
   type: "general",
 };
@@ -132,7 +132,7 @@ const navItems = computed<DashboardNavItem[]>(() => [
   },
   {
     key: "team",
-    label: "プロジェクト会話",
+    label: "チャット",
     to: {
       name: ROUTE_NAMES.projectThreads,
       params: { projectId: projectId.value },
@@ -190,7 +190,7 @@ const sidebarProjects = computed(() =>
 );
 
 const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || "User",
+  name: profile.value?.nickname || profile.value?.fullName || "ユーザー",
   email: profile.value?.email || "",
 }));
 
@@ -276,7 +276,7 @@ async function handleSend() {
           projectId.value,
           "system",
           "Fliro Bot",
-          result.result.message || "Command executed",
+          result.result.message || "コマンドを実行しました",
           activeChannelId.value,
           undefined,
           { isBot: true, linkedTaskId: result.result.linkedTaskId },
@@ -292,7 +292,7 @@ async function handleSend() {
     await sendProjectMessage(
       projectId.value,
       user.value.uid,
-      profile.value?.nickname || profile.value?.fullName || "User",
+      profile.value?.nickname || profile.value?.fullName || "ユーザー",
       text,
       activeChannelId.value, // Explicitly set channelId
     );
@@ -433,7 +433,7 @@ watch(channels, (list) => {
       <header class="top-bar">
         <div class="bar-left">
           <!-- Placeholder for sidebar toggle if needed -->
-          <h2 class="page-title">{{ project?.name || "Project" }}</h2>
+          <h2 class="page-title">{{ project?.name || "プロジェクト" }}</h2>
         </div>
       </header>
 
@@ -447,7 +447,7 @@ watch(channels, (list) => {
               :class="{ active: activeChannelId === 'general' }"
               @click="selectChannel('general')"
             >
-              # general
+              # {{ defaultChannel.name }}
             </button>
           </div>
 
@@ -524,7 +524,7 @@ watch(channels, (list) => {
               <UserAvatar
                 v-if="!msg.isBot"
                 :url="null"
-                :name="msg.senderName || 'U'"
+                :name="msg.senderName || 'ゲスト'"
                 class="avatar"
               />
               <div v-else class="bot-avatar">🤖</div>
@@ -540,7 +540,7 @@ watch(channels, (list) => {
                   class="open-task-btn"
                   @click="openTask(msg.linkedTaskId)"
                 >
-                  Open Task
+                  タスクを開く
                 </button>
               </div>
             </div>

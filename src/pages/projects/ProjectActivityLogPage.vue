@@ -59,7 +59,7 @@ const navItems = computed<DashboardNavItem[]>(
       },
       {
         key: "team",
-        label: "スレッド",
+        label: "チャット",
         to: {
           name: ROUTE_NAMES.projectThreads,
           params: { projectId: projectId.value },

@@ -30,7 +30,7 @@ export const taskCommand: ChatCommand = {
       const dateText = result.payload.dueDate
         ? ` (期限: ${result.payload.dueDate.toLocaleDateString()})`
         : "";
-      const successText = `✅ Task created: 「${result.payload.title}」${assigneeText}${dateText} (ID: ${taskId})`;
+      const successText = `Task created: 「${result.payload.title}」${assigneeText}${dateText} (ID: ${taskId})`;
 
       return {
         success: true,

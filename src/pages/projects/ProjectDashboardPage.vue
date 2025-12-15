@@ -4,7 +4,6 @@ import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
-import TaskDiscussionTab from "@/components/taskDrawer/TaskDiscussionTab.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
@@ -25,9 +24,7 @@ import {
 } from "@/services/taskCategoryService";
 import {
   createTask,
-  deleteTask,
   listenTasks,
-  updateTask,
   type TaskDoc,
   type TaskStatus,
 } from "@/services/taskService";
@@ -78,14 +75,6 @@ const categories = ref<TaskCategory[]>([]);
 const { notifications: notificationsBar } = useNotificationCenter();
 const taskView = ref<"all" | "mine">("all");
 const selectedTask = ref<TaskDoc | null>(null);
-const activeDrawerTab = ref<"overview" | "discussion" | "activity">("overview");
-const editor = reactive({
-  description: "",
-  dueDate: "",
-  assigneeId: "",
-  status: "todo" as TaskStatus,
-  progress: 0,
-});
 const chatMessages = ref<ChatMessage[]>([]);
 const chatLoading = ref(true);
 const notifications = ref<DashboardNotification[]>([]);
@@ -100,7 +89,8 @@ const filters = reactive({
 const showMyTasksOnly = ref(false);
 const isSidebarOpen = ref(true);
 const isTaskModalOpen = ref(false);
-// const secondaryTab = ref<'chat' | 'members'>('chat')
+const isDescriptionExpanded = ref(false);
+
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
 
 const taskForm = reactive({
@@ -138,7 +128,7 @@ const navItems = computed<DashboardNavItem[]>(
       },
       {
         key: "team",
-        label: "スレッド",
+        label: "チャット",
         to: {
           name: ROUTE_NAMES.projectThreads,
           params: { projectId: projectId.value },
@@ -291,12 +281,6 @@ const overallProgress = computed(() => {
   return Math.round(totalProgress / total);
 });
 
-watch(selectedTask, (task) => {
-  if (task) {
-    activeDrawerTab.value = "overview";
-  }
-});
-
 const statusCounts = computed(() => {
   const counts: Record<TaskStatus, number> = {
     todo: 0,
@@ -424,33 +408,6 @@ function taskProgress(task: TaskDoc) {
 //     statusClass: memberStatusClass(member),
 //   })),
 // )
-
-watch(
-  () => editor.progress,
-  (newVal) => {
-    if (newVal > 0 && newVal < 100 && editor.status === "todo") {
-      editor.status = "in-progress";
-    }
-    if (newVal === 100 && editor.status !== "done") {
-      editor.status = "done";
-    }
-    if (newVal < 100 && editor.status === "done") {
-      editor.status = "in-progress";
-    }
-  },
-);
-
-watch(
-  () => editor.status,
-  (newVal) => {
-    if (newVal === "done") {
-      editor.progress = 100;
-    }
-    if (newVal === "todo" && editor.progress > 0) {
-      editor.progress = 0;
-    }
-  },
-);
 
 function evaluateNotifications() {
   const now = Date.now();
@@ -683,43 +640,9 @@ async function submitTaskForm() {
   closeTaskModal();
 }
 
-function openEditor(task: TaskDoc) {
-  selectedTask.value = task;
-  editor.description = task.description || "";
-  editor.dueDate = task.dueDate?.seconds
-    ? new Date(task.dueDate.seconds * 1000).toISOString().slice(0, 10)
-    : "";
-  editor.assigneeId = task.assigneeId || "";
-  editor.status = task.status;
-  editor.progress = normalizeProgress(
-    task.progress ?? (task.status === "done" ? 100 : 0),
-  );
-}
-
 function selectTaskById(taskId: string) {
   const match = tasks.value.find((task) => task.id === taskId);
-  if (match) openEditor(match);
-}
-
-async function saveTask() {
-  if (!selectedTask.value) return;
-  const assigneeName = editor.assigneeId
-    ? getMemberNameById(editor.assigneeId)
-    : null;
-  const normalizedProgress = normalizeProgress(editor.progress);
-  await updateTask(projectId.value, selectedTask.value.id, {
-    description: editor.description,
-    status: editor.status,
-    dueDate: editor.dueDate ? new Date(editor.dueDate) : null,
-    assigneeId: editor.assigneeId || null,
-    assigneeName,
-    progress: normalizedProgress,
-  });
-  selectedTask.value = null;
-}
-
-async function removeTask(taskId: string) {
-  await deleteTask(projectId.value, taskId);
+  if (match) selectedTask.value = match;
 }
 
 // async function sendChatMessage(text: string) {
@@ -792,6 +715,16 @@ async function removeTask(taskId: string) {
 
 function closeSidebar() {
   isSidebarOpen.value = false;
+}
+
+function formatStatus(status: TaskStatus) {
+  const map: Record<TaskStatus, string> = {
+    todo: "未着手",
+    "in-progress": "進行中",
+    review: "レビュー",
+    done: "完了",
+  };
+  return map[status] || status;
 }
 
 function toggleSidebar() {
@@ -890,6 +823,36 @@ onBeforeUnmount(() => {
           </div>
         </section>
         <NotificationBar :notifications="notificationsBar" />
+        <section class="dashboard-hero">
+          <div>
+            <p class="eyebrow">概要</p>
+            <h2>{{ project?.name || "プロジェクト" }}</h2>
+            <p class="muted">
+              {{
+                project?.description ||
+                "このプロジェクトの概要がここに表示されます。"
+              }}
+            </p>
+            <div class="hero-tags">
+              <span class="chip">タスク {{ tasks.length }}</span>
+              <span class="chip">メンバー {{ members.length }}</span>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <button
+              type="button"
+              class="hero-btn hero-btn--ghost"
+              @click="
+                $router.push({
+                  name: ROUTE_NAMES.projectSettings,
+                  params: { projectId },
+                })
+              "
+            >
+              設定を開く
+            </button>
+          </div>
+        </section>
         <section class="dashboard__charts">
           <div class="chart-card chart-card--donut">
             <header class="chart-card__header">
@@ -1062,46 +1025,6 @@ onBeforeUnmount(() => {
           :rotate="false"
           :show-header="false"
         />
-
-        <section class="dashboard-hero">
-          <div>
-            <p class="eyebrow">概要</p>
-            <h2>{{ project?.name || "プロジェクト" }}</h2>
-            <p class="muted">
-              {{
-                project?.description ||
-                "このプロジェクトの概要がここに表示されます。"
-              }}
-            </p>
-            <div class="hero-tags">
-              <span class="chip">タスク {{ tasks.length }}</span>
-              <span class="chip">メンバー {{ members.length }}</span>
-            </div>
-          </div>
-          <div class="hero-actions">
-            <button type="button" class="hero-btn" @click="openTaskModal">
-              ＋ タスクを追加
-            </button>
-            <button
-              type="button"
-              class="hero-btn hero-btn--ghost"
-              @click="
-                $router.push({
-                  name: ROUTE_NAMES.projectSettings,
-                  params: { projectId },
-                })
-              "
-            >
-              設定を開く
-            </button>
-          </div>
-        </section>
-
-        <div class="top-actions">
-          <button type="button" class="top-actions__new" @click="openTaskModal">
-            ＋ 新規タスク
-          </button>
-        </div>
         <div class="demo__grid">
           <section class="demo__primary">
             <div class="task-list">
@@ -1180,6 +1103,7 @@ onBeforeUnmount(() => {
                   class="task-row"
                   :class="{ 'is-overdue': isTaskOverdue(task) }"
                   @click="selectTaskById(task.id)"
+                  @dblclick="navigateToTaskDetail(task.id)"
                 >
                   <div class="task-row__content">
                     <p class="task-row__title">{{ task.title }}</p>
@@ -1395,8 +1319,22 @@ onBeforeUnmount(() => {
         <aside class="task-drawer__panel">
           <header class="task-drawer__header">
             <div>
-              <p class="task-drawer__eyebrow">タスク詳細</p>
-              <h3>{{ selectedTask.title }}</h3>
+              <p class="task-drawer__eyebrow">タスク概要</p>
+              <h3>
+                <router-link
+                  :to="{
+                    name: ROUTE_NAMES.projectTaskDetail,
+                    params: { projectId: projectId, taskId: selectedTask.id },
+                    query: { from: 'dashboard' },
+                  }"
+                  class="task-drawer__title-link"
+                >
+                  {{ selectedTask.title }} ↗
+                </router-link>
+              </h3>
+              <p class="task-drawer__helper">
+                詳細は別ページで確認・議論できます
+              </p>
             </div>
             <button
               type="button"
@@ -1407,121 +1345,73 @@ onBeforeUnmount(() => {
             </button>
           </header>
 
-          <nav class="drawer-tabs">
-            <button
-              type="button"
-              :class="[
-                'drawer-tab',
-                { active: activeDrawerTab === 'overview' },
-              ]"
-              @click="activeDrawerTab = 'overview'"
-            >
-              概要
-            </button>
-            <button
-              type="button"
-              :class="[
-                'drawer-tab',
-                { active: activeDrawerTab === 'discussion' },
-              ]"
-              @click="activeDrawerTab = 'discussion'"
-            >
-              議論
-            </button>
-            <button
-              type="button"
-              :class="[
-                'drawer-tab',
-                { active: activeDrawerTab === 'activity' },
-              ]"
-              @click="activeDrawerTab = 'activity'"
-            >
-              履歴
-            </button>
-          </nav>
-
-          <div v-show="activeDrawerTab === 'overview'" class="drawer-content">
-            <section class="task-drawer__section">
-              <p class="label">説明</p>
-              <textarea v-model="editor.description" rows="4"></textarea>
-            </section>
-            <section class="task-drawer__section">
-              <p class="label">期限</p>
-              <input v-model="editor.dueDate" type="date" />
-            </section>
-            <section class="task-drawer__section">
-              <p class="label">担当者</p>
-              <select v-model="editor.assigneeId">
-                <option value="">未割当</option>
-                <option
-                  v-for="member in members"
-                  :key="member.id"
-                  :value="member.id"
-                >
-                  {{ member.name }}
-                </option>
-              </select>
-            </section>
+          <div class="drawer-content">
             <section class="task-drawer__section">
               <p class="label">ステータス</p>
-              <select v-model="editor.status">
-                <option value="todo">未着手</option>
-                <option value="in-progress">進行中</option>
-                <option value="review">レビュー</option>
-                <option value="done">完了</option>
-              </select>
-            </section>
-            <section class="task-drawer__section">
-              <div class="task-modal__range-header">
-                <p class="label">進捗率</p>
-                <span class="hint">{{ editor.progress }}%</span>
-              </div>
-              <div class="progress-picker">
-                <button
-                  v-for="option in PROGRESS_OPTIONS"
-                  :key="`drawer-progress-${option}`"
-                  type="button"
-                  :class="[
-                    'progress-pill',
-                    { 'is-active': editor.progress === option },
-                  ]"
-                  @click="editor.progress = option"
+              <div class="readonly-value">
+                <span :class="['status-badge', selectedTask.status]">
+                  {{ formatStatus(selectedTask.status) }}
+                </span>
+                <span class="muted" style="margin-left: 8px"
+                  >{{ selectedTask.progress }}%</span
                 >
-                  {{ option }}%
-                </button>
               </div>
             </section>
 
-            <footer class="task-drawer__footer">
-              <button type="button" class="ghost" @click="selectedTask = null">
-                閉じる
-              </button>
-              <button type="button" @click="saveTask">保存</button>
-              <button
-                type="button"
-                class="danger"
-                @click="selectedTask && removeTask(selectedTask.id)"
+            <section class="task-drawer__section">
+              <p class="label">担当者</p>
+              <div class="readonly-value">
+                {{ selectedTask.assigneeName || "未割当" }}
+              </div>
+            </section>
+
+            <section class="task-drawer__section">
+              <p class="label">期限</p>
+              <div class="readonly-value">
+                {{
+                  selectedTask.dueDate
+                    ? new Date(
+                        selectedTask.dueDate.seconds * 1000,
+                      ).toLocaleDateString()
+                    : "未設定"
+                }}
+              </div>
+            </section>
+
+            <section class="task-drawer__section">
+              <p class="label">説明</p>
+              <div
+                class="description-preview"
+                :class="{ 'is-expanded': isDescriptionExpanded }"
               >
-                削除
+                {{ selectedTask.description || "説明はありません" }}
+              </div>
+              <button
+                v-if="
+                  (selectedTask.description || '').split('\n').length > 5 ||
+                  (selectedTask.description || '').length > 200
+                "
+                type="button"
+                class="description-toggle"
+                @click="isDescriptionExpanded = !isDescriptionExpanded"
+              >
+                {{ isDescriptionExpanded ? "閉じる" : "もっと見る" }}
               </button>
-            </footer>
+            </section>
           </div>
 
-          <div
-            v-if="activeDrawerTab === 'discussion'"
-            class="drawer-content no-padding"
-          >
-            <TaskDiscussionTab
-              :project-id="projectId"
-              :task-id="selectedTask.id"
-            />
-          </div>
-
-          <div v-if="activeDrawerTab === 'activity'" class="drawer-content">
-            <div class="empty-placeholder">
-              履歴は準備中です（ステータス変更ログなど）
-            </div>
-          </div>
+          <footer class="task-drawer__sticky-footer">
+            <router-link
+              :to="{
+                name: ROUTE_NAMES.projectTaskDetail,
+                params: { projectId: projectId, taskId: selectedTask.id },
+                query: { from: 'dashboard' },
+              }"
+              class="cta-button"
+            >
+              詳細ページを開く →
+            </router-link>
+          </footer>
         </aside>
       </div>
     </transition>
@@ -2788,5 +2678,105 @@ onBeforeUnmount(() => {
 .task-row:hover {
   background: rgba(184, 227, 233, 0.18);
   border-color: rgba(11, 46, 51, 0.18);
+}
+.task-row:hover {
+  background: rgba(184, 227, 233, 0.18);
+  border-color: rgba(11, 46, 51, 0.18);
+}
+
+.task-drawer__title-link {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.task-drawer__title-link:hover {
+  color: #0d9488; /* teal-600 */
+  text-decoration: underline;
+}
+
+.task-drawer__helper {
+  font-size: 11px;
+  color: #64748b;
+  margin: 4px 0 0 0;
+}
+
+.task-drawer__panel {
+  background: #f5fcff !important; /* Existing hero color */
+  border-left: 1px solid rgba(11, 46, 51, 0.08);
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+}
+
+.readonly-value {
+  padding: 8px 0;
+  color: #334155;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.description-preview {
+  white-space: pre-wrap;
+  color: #475569; /* slate-600 */
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: 100px; /* Collapsed height */
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(11, 46, 51, 0.08);
+  transition: max-height 0.3s ease;
+}
+
+.description-preview.is-expanded {
+  max-height: 500px; /* Expanded state */
+  overflow-y: auto;
+}
+
+.description-toggle {
+  background: none;
+  border: none;
+  color: #0d9488;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 4px;
+  font-weight: 600;
+}
+.description-toggle:hover {
+  text-decoration: underline;
+}
+
+.task-drawer__sticky-footer {
+  margin-top: auto;
+  padding: 16px 24px;
+  background: rgba(245, 252, 255, 0.95); /* Matches panel bg */
+  border-top: 1px solid rgba(11, 46, 51, 0.08);
+  display: flex;
+  justify-content: center;
+  position: sticky;
+  bottom: 0;
+}
+
+.cta-button {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 16px;
+  border: 1px solid #0d9488;
+  border-radius: 8px;
+  color: #0d9488;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 14px;
+  background: white;
+  transition: all 0.2s;
+}
+
+.cta-button:hover {
+  background: #f0fdfa; /* teal-50 */
 }
 </style>

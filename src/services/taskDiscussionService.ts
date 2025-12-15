@@ -67,13 +67,11 @@ export async function sendTaskDiscussionMessage(
     senderName: string;
   },
 ) {
-  let text = payload.text;
+  const text = payload.text;
   let type: "normal" | "decision" = "normal";
 
   if (text.startsWith("/decide ")) {
     type = "decision";
-    // Remove '/decide ' prefix and add '✅ '
-    text = "✅ " + text.slice(8);
   }
 
   await addDoc(

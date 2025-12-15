@@ -9,10 +9,12 @@ import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs } from "firebase/firestore";
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.tasks.MyTasks");
 
 const { user, profile } = useAuthStore();
+const router = useRouter();
 
 const isSidebarOpen = ref(true);
 const loading = ref(true);
@@ -307,6 +309,13 @@ const stats = computed(() => ({
   done: completedTasks.value.length,
 }));
 
+function goToTask(task: DecoratedTask) {
+  router.push({
+    name: ROUTE_NAMES.projectTaskDetail,
+    params: { projectId: task.projectId, taskId: task.id },
+  });
+}
+
 /**
  * 完了トグル & 削除
  */
@@ -496,10 +505,15 @@ onMounted(() => {
                   <article
                     v-for="task in activeTasks"
                     :key="task.id"
-                    class="task-card"
+                    class="task-card is-clickable"
                     :class="{
                       'is-overdue': task.dueClass === 'due-over',
                     }"
+                    role="button"
+                    tabindex="0"
+                    @click="goToTask(task)"
+                    @keydown.enter.prevent="goToTask(task)"
+                    @keydown.space.prevent="goToTask(task)"
                   >
                     <div class="task-card__headline">
                       <div class="task-card__project">
@@ -572,7 +586,7 @@ onMounted(() => {
                     </div>
 
                     <div class="task-card__actions">
-                      <button type="button" @click="toggleComplete(task)">
+                      <button type="button" @click.stop="toggleComplete(task)">
                         {{
                           (task as any).status === "done"
                             ? "未完了に戻す"
@@ -582,7 +596,7 @@ onMounted(() => {
                       <button
                         type="button"
                         class="is-danger"
-                        @click="removeTask(task)"
+                        @click.stop="removeTask(task)"
                       >
                         削除
                       </button>
@@ -595,7 +609,12 @@ onMounted(() => {
                   <article
                     v-for="task in completedTasks"
                     :key="task.id"
-                    class="task-card is-completed"
+                    class="task-card is-completed is-clickable"
+                    role="button"
+                    tabindex="0"
+                    @click="goToTask(task)"
+                    @keydown.enter.prevent="goToTask(task)"
+                    @keydown.space.prevent="goToTask(task)"
                   >
                     <div class="task-card__headline">
                       <div class="task-card__project">
@@ -650,13 +669,13 @@ onMounted(() => {
                     </div>
 
                     <div class="task-card__actions">
-                      <button type="button" @click="toggleComplete(task)">
+                      <button type="button" @click.stop="toggleComplete(task)">
                         未完了に戻す
                       </button>
                       <button
                         type="button"
                         class="is-danger"
-                        @click="removeTask(task)"
+                        @click.stop="removeTask(task)"
                       >
                         削除
                       </button>
@@ -826,6 +845,10 @@ onMounted(() => {
     transform 0.15s ease,
     box-shadow 0.15s ease,
     border-color 0.15s ease;
+}
+
+.task-card.is-clickable {
+  cursor: pointer;
 }
 
 .task-card:hover {
