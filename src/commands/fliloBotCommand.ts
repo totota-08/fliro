@@ -2,144 +2,184 @@ import type { ChatCommand, CommandContext } from "./types";
 
 type Resolver = (text: string) => string | null;
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const randomPick = (options: string[]): string =>
   options.length > 0
     ? (options[Math.floor(Math.random() * options.length)] ?? options[0] ?? "")
     : "";
 
-const responseMap: Array<{
-  match: (text: string) => boolean;
+type BotCommandEntry = {
+  name: string;
+  description: string;
+  example?: string;
   resolve: Resolver;
-}> = [
+  match: (normalized: string) => boolean;
+};
+
+const botCommands: BotCommandEntry[] = [
   {
-    match: (text) => text.trim() === "/explain",
+    name: "/explain",
+    description: "今やっていることを一行で言語化",
     resolve: () =>
       randomPick([
         "これは“あとで困らないために今つらい作業”です。",
         "面倒ですが、必要な工程です。",
       ]),
+    match: (text) => text === "/explain",
   },
   {
-    match: (text) => text.trim() === "/why",
+    name: "/why",
+    description: "タスクの存在理由を雑に説明",
     resolve: () =>
       randomPick([
         "過去のあなたが未来のあなたを助けようとしました。",
         "消すより残す方が安全だったからです。",
       ]),
+    match: (text) => text === "/why",
   },
   {
-    match: (text) => text.trim() === "/simple",
+    name: "/simple",
+    description: "複雑化チェック",
     resolve: () =>
       randomPick([
         "その複雑さは、価値と釣り合っていますか。",
         "一度、削れないか考えてもいいかもしれません。",
       ]),
+    match: (text) => text === "/simple",
   },
   {
-    match: (text) => text.trim() === "/python",
+    name: "/python",
+    description: "思想リマインド",
     resolve: () =>
       randomPick(["Readability counts.", "賢さより、分かりやすさです。"]),
+    match: (text) => text === "/python",
   },
   {
-    match: (text) => text.trim() === "/todo?",
+    name: "/todo?",
+    description: "次にやることを示す",
     resolve: () =>
       randomPick([
         "一番期限が近くて、まだ始まっていないものです。",
         "今はこれ以上増やさなくて大丈夫です。",
       ]),
+    match: (text) => text === "/todo?",
   },
   {
-    match: (text) => text.trim() === "/status",
+    name: "/status",
+    description: "今のプロジェクト状態を一言",
     resolve: () =>
       randomPick([
         "進んでいます。速度は普通です。",
         "止まっているように見えて、理解は進んでいます。",
       ]),
+    match: (text) => text === "/status",
   },
   {
-    match: (text) => text.trim() === "/done",
+    name: "/done",
+    description: "完了時の静かな肯定",
     resolve: () => randomPick(["完了です。", "一区切りつきました。"]),
+    match: (text) => text === "/done",
   },
   {
-    match: (text) => text.trim() === "/tired",
+    name: "/tired",
+    description: "疲労時のケア",
     resolve: () =>
       randomPick([
         "今日はここまででも進捗です。",
         "8割で止める判断もあります。",
       ]),
+    match: (text) => text === "/tired",
   },
   {
-    match: (text) => text.trim() === "/panic",
+    name: "/panic",
+    description: "焦りの鎮静",
     resolve: () =>
       randomPick(["まだ取り返しはつきます。", "git pushは、まだです。"]),
+    match: (text) => text === "/panic",
   },
   {
-    match: (text) => text.trim() === "/coffee",
+    name: "/coffee",
+    description: "休憩提案",
     resolve: () =>
       randomPick([
         "一度席を立っても、タスクは逃げません。☕️",
         "戻ってきたら続きを考えましょう。",
       ]),
+    match: (text) => text === "/coffee",
   },
   {
-    match: (text) => text.trim() === "/blame",
+    name: "/blame",
+    description: "責任転嫁の冗談",
     resolve: () =>
       randomPick([
         "これは仕様ということで。",
         "誰かが悪いわけではなさそうです。",
       ]),
+    match: (text) => text === "/blame",
   },
   {
-    match: (text) => text.trim().startsWith("/hero"),
+    name: "/hero",
+    description: "MVP表彰",
+    example: "/hero @tanaka",
     resolve: (text) => {
-      const mention = text.trim().slice(5).trim() || "誰か";
+      const mention = text.replace("/hero", "").trim() || "誰か";
       return randomPick([
         `${mention} は静かに問題を一つ消しました。`,
         "目立たない仕事でした。",
       ]);
     },
+    match: (text) => text.startsWith("/hero"),
   },
   {
-    match: (text) => text.trim() === "/silence",
+    name: "/silence",
+    description: "沈黙時の一言",
     resolve: () =>
       randomPick(["沈黙も、作業の一部です。", "今は入力中かもしれません。"]),
+    match: (text) => text === "/silence",
   },
   {
-    match: (text) => text.trim() === "/task",
-    resolve: () => null,
-  },
-  {
-    match: (text) => text.trim() === "/task later",
+    name: "/task later",
+    description: "先送りの記録",
     resolve: () =>
       randomPick([
         "“あとで”という箱に入りました。",
         "忘れないための先送りです。",
       ]),
+    match: (text) => text === "/task later",
   },
   {
-    match: (text) => text.trim() === "/explain task",
+    name: "/explain task",
+    description: "タスク要約",
     resolve: () =>
       randomPick([
         "やることは明確です。量は多めです。",
         "分解すると楽になります。",
       ]),
+    match: (text) => text === "/explain task",
   },
   {
-    match: (text) => text.trim() === "/bot",
+    name: "/bot",
+    description: "Bot自己紹介",
     resolve: () =>
       randomPick(["私は進捗を評価しません。", "考えを整理する係です。"]),
+    match: (text) => text === "/bot",
   },
   {
-    match: (text) => text.trim() === "/rules",
+    name: "/rules",
+    description: "Flilo思想の再確認",
     resolve: () => randomPick(["少なく、分かりやすく。", "迷ったら削ります。"]),
+    match: (text) => text === "/rules",
   },
   {
-    match: (text) => text.trim() === "/refactor",
+    name: "/refactor",
+    description: "改修衝動の抑制",
     resolve: () =>
       randomPick([
         "動いているなら、今日は触らなくていいです。",
         "必要になったら直しましょう。",
       ]),
+    match: (text) => text === "/refactor",
   },
 ];
 
@@ -147,10 +187,18 @@ export const fliloBotCommand: ChatCommand = {
   name: "Flilo Bot",
   description: "Flilo Bot のユーモラスコマンド",
   example: "/explain",
-  match: (text: string) =>
-    responseMap.some((entry) => entry.match(text.toLowerCase())),
+  suggestions: botCommands.map((entry) => ({
+    name: entry.name,
+    description: entry.description,
+    example: entry.example ?? entry.name,
+  })),
+  match: (text: string) => {
+    const normalized = text.trim().toLowerCase();
+    return botCommands.some((entry) => entry.match(normalized));
+  },
   execute: async (text: string, _context: CommandContext) => {
-    const entry = responseMap.find((item) => item.match(text.toLowerCase()));
+    const normalized = text.trim().toLowerCase();
+    const entry = botCommands.find((item) => item.match(normalized));
     if (!entry) {
       return { success: false, message: "" };
     }
@@ -158,6 +206,7 @@ export const fliloBotCommand: ChatCommand = {
     if (!message) {
       return { success: false, message: "" };
     }
+    await delay(1000);
     return { success: true, message };
   },
 };

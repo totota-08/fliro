@@ -72,11 +72,21 @@ const activeChannelId = ref("general");
 // Command Autocomplete
 const showCommandSuggestions = ref(false);
 const availableCommands = computed(() =>
-  commands.map((c) => ({
-    label: c.name,
-    description: c.description,
-    example: c.example,
-  })),
+  commands.flatMap((c) =>
+    c.suggestions?.length
+      ? c.suggestions.map((s) => ({
+          label: s.name,
+          description: s.description,
+          example: s.example ?? c.example,
+        }))
+      : [
+          {
+            label: c.name,
+            description: c.description,
+            example: c.example,
+          },
+        ],
+  ),
 );
 
 const filteredCommands = computed(() => {
