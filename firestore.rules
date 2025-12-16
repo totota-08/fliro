@@ -120,6 +120,19 @@ service cloud.firestore {
                     || resource.parent().parent().data.settings.isPublic == true;
       }
 
+      match /events/{eventId} {
+        allow create: if isProjectMember(projectId)
+                      && request.resource.data.v is int
+                      && request.resource.data.type is string
+                      && request.resource.data.origin in ['ui', 'command', 'bot', 'system']
+                      && (request.resource.data.actorId == null || request.resource.data.actorId is string)
+                      && request.resource.data.actorName is string
+                      && request.resource.data.payload is map
+                      && request.resource.data.createdAt is timestamp;
+        allow read: if isProjectMember(projectId)
+                    || resource.parent().parent().data.settings.isPublic == true;
+      }
+
       match /tasks/{taskId} {
         allow create: if isProjectMember(projectId)
                       && request.resource.data.title is string
@@ -130,6 +143,17 @@ service cloud.firestore {
         allow read: if isProjectMember(projectId)
                     || resource.parent().parent().data.settings.isPublic == true;
         allow update, delete: if isProjectMember(projectId);
+
+        match /messages/{messageId} {
+          allow read: if isProjectMember(projectId)
+                      || resource.parent().parent().parent().data.settings.isPublic == true;
+          allow create: if isProjectMember(projectId)
+                        && request.resource.data.text is string
+                        && request.resource.data.senderId == request.auth.uid
+                        && request.resource.data.senderName is string
+                        && request.resource.data.createdAt is timestamp
+                        && request.resource.data.type in ['normal', 'decision'];
+        }
       }
 
       match /threads/{threadId} {

@@ -5,12 +5,17 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+import {
+  addProjectEvent,
+  type ProjectEventOrigin,
+} from "@/services/projectActivityLogService";
 
 const logger = getLogger("app.services.task");
 
@@ -81,8 +86,16 @@ export async function createTask(
   projectId: string,
   payload: CreateTaskPayload,
   userId: string,
+  options?: {
+    origin?: ProjectEventOrigin;
+    actorName?: string;
+    actorId?: string | null;
+  },
 ) {
   logger.info`Creating task in project ${projectId}: ${payload.title}`;
+  const origin = options?.origin ?? "ui";
+  const actorId = options?.actorId ?? userId;
+  const actorName = options?.actorName ?? userId ?? "Unknown";
   try {
     const hasThread = payload.hasThread ?? false;
     const providedThreadName = (payload.threadName || "").trim();
@@ -106,6 +119,27 @@ export async function createTask(
       },
     );
     logger.info`Task created successfully. ID: ${docRef.id}`;
+    try {
+      await addProjectEvent(projectId, {
+        type: "task.created",
+        origin,
+        actorId,
+        actorName,
+        payload: {
+          taskId: docRef.id,
+          taskTitle: payload.title,
+          assigneeId: payload.assigneeId ?? null,
+          assigneeName: payload.assigneeName ?? null,
+          dueDate: payload.dueDate ?? null,
+          status: payload.status ?? "todo",
+          categoryId: payload.categoryId ?? null,
+          categoryName: payload.categoryName ?? null,
+          progress: payload.progress ?? 0,
+        },
+      });
+    } catch (eventError) {
+      logger.error`Failed to add task.created event: ${eventError}`;
+    }
     return docRef.id;
   } catch (error) {
     logger.error`Failed to create task: ${error}`;
@@ -117,25 +151,234 @@ export async function updateTask(
   projectId: string,
   taskId: string,
   updates: Partial<CreateTaskPayload>,
+  context?: {
+    userId?: string | null;
+    actorName?: string;
+    origin?: ProjectEventOrigin;
+  },
 ) {
   logger.debug`Updating task ${taskId} in project ${projectId}`;
+  const origin = context?.origin ?? "ui";
+  const actorId = context?.userId ?? null;
+  const actorName = context?.actorName ?? context?.userId ?? "Unknown";
+  const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+
+  let before: TaskDoc | null = null;
   try {
-    await updateDoc(doc(db, "projects", projectId, "tasks", taskId), {
+    const snap = await getDoc(taskRef);
+    if (snap.exists()) {
+      before = {
+        id: snap.id,
+        projectId,
+        ...(snap.data() as Omit<TaskDoc, "id" | "projectId">),
+      };
+    }
+  } catch (error) {
+    logger.error`Failed to fetch task before update ${taskId}: ${error}`;
+  }
+
+  try {
+    await updateDoc(taskRef, {
       ...updates,
       updatedAt: serverTimestamp(),
     });
     logger.debug`Task ${taskId} updated successfully`;
+
+    if (!before) {
+      if (Object.keys(updates).length === 0) return;
+      try {
+        await addProjectEvent(projectId, {
+          type: "task.updated",
+          origin,
+          actorId,
+          actorName,
+          payload: {
+            taskId: taskId,
+            taskTitle: updates.title,
+            changes: Object.entries(updates).map(([field, value]) => ({
+              field,
+              from: null,
+              to: value,
+            })),
+          },
+        });
+      } catch (eventError) {
+        logger.error`Failed to add task.updated event (no before data): ${eventError}`;
+      }
+      return;
+    }
+
+    const after: TaskDoc = {
+      ...before,
+      ...updates,
+    };
+
+    const eventsQueue: Array<{
+      type: TaskEventType;
+      payload: Record<string, any>;
+    }> = [];
+
+    if (updates.status && updates.status !== before.status) {
+      eventsQueue.push({
+        type: "task.status_changed",
+        payload: {
+          taskId,
+          taskTitle: after.title,
+          fromStatus: before.status,
+          toStatus: updates.status,
+        },
+      });
+    }
+
+    if (
+      typeof updates.progress === "number" &&
+      !Number.isNaN(updates.progress) &&
+      (before.progress ?? 0) !== updates.progress
+    ) {
+      eventsQueue.push({
+        type: "task.progress_changed",
+        payload: {
+          taskId,
+          taskTitle: after.title,
+          fromProgress: before.progress ?? 0,
+          toProgress: updates.progress,
+        },
+      });
+    }
+
+    const assigneeChanged =
+      Object.prototype.hasOwnProperty.call(updates, "assigneeId") ||
+      Object.prototype.hasOwnProperty.call(updates, "assigneeName");
+    if (
+      assigneeChanged &&
+      (before.assigneeId !== after.assigneeId ||
+        before.assigneeName !== after.assigneeName)
+    ) {
+      eventsQueue.push({
+        type: "task.assigned",
+        payload: {
+          taskId,
+          taskTitle: after.title,
+          fromAssigneeId: before.assigneeId ?? null,
+          fromAssigneeName: before.assigneeName ?? null,
+          toAssigneeId: after.assigneeId ?? null,
+          toAssigneeName: after.assigneeName ?? null,
+        },
+      });
+    }
+
+    const dueChanged = Object.prototype.hasOwnProperty.call(updates, "dueDate");
+    if (dueChanged) {
+      const fromDue =
+        before.dueDate && "seconds" in before.dueDate
+          ? before.dueDate
+          : (before.dueDate ?? null);
+      const toDue = updates.dueDate ?? after.dueDate ?? null;
+      if (JSON.stringify(fromDue) !== JSON.stringify(toDue)) {
+        eventsQueue.push({
+          type: "task.due_changed",
+          payload: {
+            taskId,
+            taskTitle: after.title,
+            fromDueDate: fromDue,
+            toDueDate: toDue,
+          },
+        });
+      }
+    }
+
+    const remainingChanges: Array<{ field: string; from: any; to: any }> = [];
+    const tracked = [
+      "status",
+      "progress",
+      "assigneeId",
+      "assigneeName",
+      "dueDate",
+    ];
+    Object.entries(updates).forEach(([field, value]) => {
+      if (tracked.includes(field)) return;
+      const previous = (before as any)[field];
+      if (JSON.stringify(previous) !== JSON.stringify(value)) {
+        remainingChanges.push({ field, from: previous ?? null, to: value });
+      }
+    });
+
+    if (remainingChanges.length) {
+      eventsQueue.push({
+        type: "task.updated",
+        payload: {
+          taskId,
+          taskTitle: after.title,
+          changes: remainingChanges,
+        },
+      });
+    }
+
+    for (const entry of eventsQueue) {
+      try {
+        await addProjectEvent(projectId, {
+          type: entry.type,
+          origin,
+          actorId,
+          actorName,
+          payload: entry.payload,
+        });
+      } catch (eventError) {
+        logger.error`Failed to add task update event ${entry.type}: ${eventError}`;
+      }
+    }
   } catch (error) {
     logger.error`Failed to update task ${taskId}: ${error}`;
     throw error;
   }
 }
 
-export async function deleteTask(projectId: string, taskId: string) {
+type TaskEventType =
+  | "task.status_changed"
+  | "task.progress_changed"
+  | "task.assigned"
+  | "task.due_changed"
+  | "task.updated";
+
+export async function deleteTask(
+  projectId: string,
+  taskId: string,
+  context?: {
+    userId?: string | null;
+    actorName?: string;
+    origin?: ProjectEventOrigin;
+  },
+) {
   logger.info`Deleting task ${taskId} in project ${projectId}`;
+  const origin = context?.origin ?? "ui";
+  const actorId = context?.userId ?? null;
+  const actorName = context?.actorName ?? context?.userId ?? "Unknown";
+  let title: string | undefined;
+  try {
+    const snap = await getDoc(doc(db, "projects", projectId, "tasks", taskId));
+    if (snap.exists()) {
+      title = (snap.data() as any).title as string;
+    }
+  } catch (error) {
+    logger.error`Failed to fetch task before delete ${taskId}: ${error}`;
+  }
   try {
     await deleteDoc(doc(db, "projects", projectId, "tasks", taskId));
     logger.info`Task ${taskId} deleted successfully`;
+    try {
+      await addProjectEvent(projectId, {
+        type: "task.deleted",
+        origin,
+        actorId,
+        actorName,
+        payload: {
+          taskId,
+          taskTitle: title ?? "",
+        },
+      });
+    } catch (eventError) {
+      logger.error`Failed to add task.deleted event: ${eventError}`;
+    }
   } catch (error) {
     logger.error`Failed to delete task ${taskId}: ${error}`;
     throw error;

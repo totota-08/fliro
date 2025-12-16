@@ -80,7 +80,7 @@ const navItems = computed<DashboardNavItem[]>(
       },
       {
         key: "timeline",
-        label: "タイムライン",
+        label: "ログ",
         to: {
           name: ROUTE_NAMES.projectTimeline,
           params: { projectId: projectId.value },
@@ -237,7 +237,11 @@ async function handleRemoveMember(member: MemberDisplay) {
     return;
   removingMemberId.value = member.userId;
   try {
-    await removeProjectMember(projectId.value, member.userId);
+    await removeProjectMember(projectId.value, member.userId, {
+      id: user.value?.uid ?? null,
+      name: profile.value?.nickname || profile.value?.fullName || "",
+      origin: "ui",
+    });
     memberActionError.value = "";
   } catch (error) {
     logger.error`Failed to remove member: ${error}`;

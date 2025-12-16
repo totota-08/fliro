@@ -1,7 +1,10 @@
 import { db } from "@/lib/firebase";
+import { addProjectEvent } from "@/services/projectActivityLogService";
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -69,9 +72,11 @@ export async function sendTaskDiscussionMessage(
 ) {
   const text = payload.text;
   let type: "normal" | "decision" = "normal";
+  let normalizedDecision: string | null = null;
 
   if (text.startsWith("/decide ")) {
     type = "decision";
+    normalizedDecision = `✅ ${text.replace("/decide", "").trim()}`;
   }
 
   await addDoc(
@@ -86,4 +91,33 @@ export async function sendTaskDiscussionMessage(
       type,
     },
   );
+
+  if (type === "decision") {
+    try {
+      let taskTitle: string | undefined;
+      try {
+        const snap = await getDoc(
+          doc(db, "projects", projectId, "tasks", taskId),
+        );
+        if (snap.exists()) {
+          taskTitle = (snap.data() as any).title as string;
+        }
+      } catch {
+        // best-effort
+      }
+      await addProjectEvent(projectId, {
+        type: "decision.made",
+        origin: "command",
+        actorId: payload.senderId,
+        actorName: payload.senderName,
+        payload: {
+          taskId,
+          taskTitle: taskTitle ?? "",
+          text: normalizedDecision ?? text,
+        },
+      });
+    } catch {
+      // ログはベストエフォート
+    }
+  }
 }

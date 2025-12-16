@@ -138,7 +138,7 @@ const navItems = computed<DashboardNavItem[]>(
       },
       {
         key: "timeline",
-        label: "タイムライン",
+        label: "ログ",
         to: {
           name: ROUTE_NAMES.projectTimeline,
           params: { projectId: projectId.value },
@@ -633,6 +633,12 @@ async function submitTaskForm() {
       status: initialStatus,
     },
     user.value.uid,
+    {
+      origin: "ui",
+      actorId: user.value.uid,
+      actorName:
+        profile.value?.nickname || profile.value?.fullName || user.value.uid,
+    },
   );
   closeTaskModal();
 }
