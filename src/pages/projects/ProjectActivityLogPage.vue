@@ -7,7 +7,6 @@ import {
   type ProjectEventCursor,
 } from "@/services/projectActivityLogService";
 import type { ProjectEvent, ProjectEventCategory } from "@/types/projectEvent";
-import { useAuthStore } from "@/store/auth";
 import {
   categorizeProjectEvent,
   getEventTemplate,
@@ -65,8 +64,6 @@ const iconMap: Record<string, IconDef> = {
 };
 
 const route = useRoute();
-const { user } = useAuthStore();
-
 const projectId = ref(String(route.params.projectId || ""));
 const filterType = ref<ProjectEventCategory | "all">("all");
 const loading = ref(true);

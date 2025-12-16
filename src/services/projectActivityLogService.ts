@@ -1,10 +1,5 @@
 import { db } from "@/lib/firebase";
-import type {
-  ProjectEvent,
-  ProjectEventInput,
-  ProjectEventOrigin,
-  ProjectEventType,
-} from "@/types/projectEvent";
+import type { ProjectEvent, ProjectEventInput } from "@/types/projectEvent";
 import {
   addDoc,
   collection,
@@ -62,9 +57,11 @@ export function listenProjectEvents(
         ...data,
       } as ProjectEvent;
     });
-    options?.onCursor?.(
-      snapshot.docs.length ? snapshot.docs[snapshot.docs.length - 1] : null,
-    );
+    const cursor =
+      snapshot.docs.length && snapshot.docs[snapshot.docs.length - 1]
+        ? snapshot.docs[snapshot.docs.length - 1]
+        : null;
+    options?.onCursor?.(cursor);
     callback(list);
   });
 }
@@ -97,7 +94,9 @@ export async function fetchProjectEventsPage(
   });
 
   const nextCursor =
-    snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+    snapshot.docs.length > 0 && snapshot.docs[snapshot.docs.length - 1]
+      ? snapshot.docs[snapshot.docs.length - 1]
+      : null;
 
   return { events, nextCursor };
 }

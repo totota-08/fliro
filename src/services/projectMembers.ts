@@ -138,9 +138,10 @@ export async function addProjectMember({
   try {
     await addProjectEvent(projectId, {
       type: "member.added",
-      origin: options.invitedBy ? "ui" : "system",
-      actorId: options.invitedBy || null,
-      actorName: options.actorName || options.invitedBy || "System",
+      origin: invitedBy ? "ui" : "system",
+      actorId: invitedBy || null,
+      actorName:
+        profileData.nickname || profileData.fullName || invitedBy || "System",
       payload: {
         memberId: userId,
         memberName:

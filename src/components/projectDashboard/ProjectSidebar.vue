@@ -95,17 +95,7 @@ const navItems = computed<DashboardNavItem[]>(() => [
   },
 ]);
 
-const sidebarProjects = computed(() =>
-  projectList.value.map((project, index) => ({
-    key: project.id,
-    label: project.label,
-    to: project.to,
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
+const sidebarProjects = computed(() => projectList.value);
 
 const profileInfo = computed<DashboardProfileInfo>(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
@@ -117,14 +107,17 @@ async function loadProjectList() {
   const snap = await getDocs(
     collection(db, "userProjects", user.value.uid, "projects"),
   );
-  projectList.value = snap.docs.map((docSnap) => ({
-    id: docSnap.id,
+  projectList.value = snap.docs.map((docSnap, index) => ({
+    key: docSnap.id,
     label: (docSnap.data().projectName as string) || "Project",
     to: {
       name: ROUTE_NAMES.projectDashboard,
       params: { projectId: docSnap.id },
     },
-    accent: "primary",
+    accent: ["primary", "secondary", "accent"][index % 3] as
+      | "primary"
+      | "secondary"
+      | "accent",
   }));
 }
 
