@@ -176,7 +176,7 @@ const notifications = computed<NotificationItem[]>(() => {
           : now;
       list.push({
         id: `timeline-${post.id}`,
-        title: "タイムラインでのメンション",
+        title: "ログでのメンション",
         body: post.body,
         type: "mention",
         createdAt: ts,
@@ -423,7 +423,7 @@ onBeforeUnmount(() => {
               />
               <div>
                 <p>メンション通知</p>
-                <p class="muted">スレッド/タイムラインの@メンションを通知</p>
+                <p class="muted">スレッド/ログの@メンションを通知</p>
               </div>
             </label>
             <label class="toggle">
@@ -457,7 +457,7 @@ onBeforeUnmount(() => {
               <p class="eyebrow">メンション/締切/アサイン</p>
               <h2>最近の通知</h2>
               <p class="muted">
-                スレッド、タイムライン、タスクからの重要なお知らせをまとめました。
+                スレッド、ログ、タスクからの重要なお知らせをまとめました。
               </p>
             </div>
           </header>

@@ -151,7 +151,7 @@ const navItems = computed<DashboardNavItem[]>(() => [
   },
   {
     key: "timeline",
-    label: "タイムライン",
+    label: "ログ",
     to: {
       name: ROUTE_NAMES.projectTimeline,
       params: { projectId: projectId.value },

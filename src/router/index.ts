@@ -23,7 +23,6 @@ import ProjectMembersPage from "@/pages/projects/ProjectMembersPage.vue";
 import ProjectNotificationsPage from "@/pages/projects/ProjectNotificationsPage.vue";
 import ProjectRolesPage from "@/pages/projects/ProjectRolesPage.vue";
 import ProjectSettingsPage from "@/pages/projects/ProjectSettingsPage.vue";
-import ProjectTimelinePage from "@/pages/projects/ProjectTimelinePage.vue";
 import SecretAccessPage from "@/pages/secret/SecretAccessPage.vue";
 import SecretChatPage from "@/pages/secret/SecretChatPage.vue";
 import MyTasksPage from "@/pages/tasks/MyTasksPage.vue";
@@ -121,12 +120,12 @@ export const router = createRouter({
       path: "/projects/:projectId/activity",
       name: ROUTE_NAMES.projectActivity,
       component: ProjectActivityLogPage,
-      meta: { requiresAuth: true, section: "activity" },
+      meta: { requiresAuth: true, section: "timeline" },
     },
     {
       path: "/projects/:projectId/timeline",
       name: ROUTE_NAMES.projectTimeline,
-      component: ProjectTimelinePage,
+      component: ProjectActivityLogPage,
       meta: { requiresAuth: true, section: "timeline" },
     },
     {

@@ -321,12 +321,20 @@ function goToTask(task: DecoratedTask) {
  */
 async function toggleComplete(task: DecoratedTask) {
   const next = (task as any).status === "done" ? "todo" : "done";
-  await updateTask(task.projectId, task.id, { status: next } as any);
+  await updateTask(task.projectId, task.id, { status: next } as any, {
+    userId: user.value?.uid ?? null,
+    actorName: profile.value?.nickname || profile.value?.fullName || "",
+    origin: "ui",
+  });
   await loadTasks();
 }
 
 async function removeTask(task: DecoratedTask) {
-  await deleteTask(task.projectId, task.id);
+  await deleteTask(task.projectId, task.id, {
+    userId: user.value?.uid ?? null,
+    actorName: profile.value?.nickname || profile.value?.fullName || "",
+    origin: "ui",
+  });
   await loadTasks();
 }
 

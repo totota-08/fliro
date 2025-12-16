@@ -1,5 +1,6 @@
 import { database, db } from "@/lib/firebase";
 import { buildPermissionsFromRoles } from "@/constants/roles";
+import { addProjectEvent } from "@/services/projectActivityLogService";
 import { ref, remove, set } from "firebase/database";
 import {
   collection,
@@ -9,6 +10,9 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.services.projectMembers");
 
 export interface ProjectMember {
   userId: string;
@@ -37,6 +41,7 @@ interface AddProjectMemberOptions {
     email?: string;
     avatarUrl?: string;
   };
+  actorName?: string;
 }
 
 function getPermissionsFromRole(role: ProjectMember["role"]) {
@@ -129,15 +134,57 @@ export async function addProjectMember({
     role,
     joinedAt: Date.now(),
   });
+
+  try {
+    await addProjectEvent(projectId, {
+      type: "member.added",
+      origin: options.invitedBy ? "ui" : "system",
+      actorId: options.invitedBy || null,
+      actorName: options.actorName || options.invitedBy || "System",
+      payload: {
+        memberId: userId,
+        memberName:
+          profileData.nickname ||
+          profileData.fullName ||
+          profileData.email ||
+          userId,
+      },
+    });
+  } catch (error) {
+    logger.error`Failed to log member.added: ${error}`;
+  }
 }
 
-export async function removeProjectMember(projectId: string, userId: string) {
+export async function removeProjectMember(
+  projectId: string,
+  userId: string,
+  actor?: {
+    id?: string | null;
+    name?: string;
+    origin?: "ui" | "command" | "bot" | "system";
+  },
+) {
   await deleteDoc(doc(db, "projects", projectId, "members", userId));
   await deleteDoc(doc(db, "userProjects", userId, "projects", projectId));
 
   // Remove from Realtime Database
   const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
   await remove(rtdbRef);
+
+  try {
+    await addProjectEvent(projectId, {
+      type: "member.removed",
+      origin: actor?.origin ?? "ui",
+      actorId: actor?.id ?? null,
+      actorName: actor?.name || actor?.id || "System",
+      payload: {
+        memberId: userId,
+        memberName: userId,
+      },
+    });
+  } catch (error) {
+    logger.error`Failed to log member.removed: ${error}`;
+  }
 }
 
 export async function updateProjectMemberRole(
