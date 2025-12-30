@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
@@ -30,15 +30,8 @@ import {
 } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import {
   computed,
   onBeforeUnmount,
@@ -68,7 +61,6 @@ type DashboardNotification = {
 };
 
 const project = ref<ProjectDoc | null>(null);
-const projectList = ref<{ id: string; name: string }[]>([]);
 const members = ref<MemberEntry[]>([]);
 const { getDisplayName } = useUserDisplay(members);
 const tasks = ref<TaskDoc[]>([]);
@@ -108,89 +100,6 @@ let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 let stopChat: (() => void) | null = null;
 let stopCategories: (() => void) | null = null;
-
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "チャット",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "timeline",
-        label: "ログ",
-        to: {
-          name: ROUTE_NAMES.projectTimeline,
-          params: { projectId: projectId.value },
-        },
-        icon: "tasks",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-      {
-        key: "debug",
-        label: "デバッグ",
-        to: {
-          name: ROUTE_NAMES.projectDebug,
-          params: { projectId: projectId.value },
-        },
-        icon: "debug",
-      },
-    ] satisfies DashboardNavItem[],
-);
-
-const sidebarProjects = computed(() =>
-  projectList.value.map((entry, index) => ({
-    key: entry.id,
-    label: entry.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
 
 const filteredTasks = computed(() => {
   let list = [...tasks.value];
@@ -481,17 +390,6 @@ watch(showMyTasksOnly, (flag) => {
   taskView.value = flag ? "mine" : "all";
 });
 
-async function loadProjectList() {
-  if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    name: (docSnap.data().projectName as string) || "Project",
-  }));
-}
-
 function watchProject() {
   stopProject = onSnapshot(doc(db, "projects", projectId.value), (snapshot) => {
     if (!snapshot.exists()) return;
@@ -746,7 +644,6 @@ onMounted(() => {
   if (window.matchMedia("(max-width: 1200px)").matches) {
     isSidebarOpen.value = false;
   }
-  loadProjectList();
   resetWatchers();
 });
 
@@ -770,11 +667,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
-    <DashboardSidebar
+    <ProjectSidebar
       :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
+      :project-id="projectId"
       brand-subtitle="プロジェクト"
       @close="closeSidebar"
     />

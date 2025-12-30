@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProject } from "@/firebase/projectService";
 import { db } from "@/lib/firebase";
@@ -16,7 +16,6 @@ import {
 } from "@/services/projectMembers";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import {
   addDoc,
@@ -118,91 +117,9 @@ function selectCommand(cmd: string) {
 // UI state
 const customThreadFormOpen = ref(false);
 const customThreadForm = ref({ name: "", description: "" });
-const projectList = ref<{ id: string; name: string }[]>([]);
-
 let unsubscribeChat: (() => void) | null = null;
 let unsubscribeMembers: (() => void) | null = null;
 let unsubscribeCustomChannels: (() => void) | null = null;
-
-const navItems = computed<DashboardNavItem[]>(() => [
-  {
-    key: "dashboard",
-    label: "ダッシュボード",
-    to: {
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: projectId.value },
-    },
-    icon: "dashboard",
-  },
-  {
-    key: "tasks",
-    label: "マイタスク",
-    to: { name: ROUTE_NAMES.myTasks },
-    icon: "tasks",
-  },
-  {
-    key: "team",
-    label: "チャット",
-    to: {
-      name: ROUTE_NAMES.projectThreads,
-      params: { projectId: projectId.value },
-    },
-    icon: "team",
-  },
-  {
-    key: "timeline",
-    label: "ログ",
-    to: {
-      name: ROUTE_NAMES.projectTimeline,
-      params: { projectId: projectId.value },
-    },
-    icon: "tasks",
-  },
-  {
-    key: "members",
-    label: "メンバー",
-    to: {
-      name: ROUTE_NAMES.projectMembers,
-      params: { projectId: projectId.value },
-    },
-    icon: "members",
-  },
-  {
-    key: "settings",
-    label: "設定",
-    to: {
-      name: ROUTE_NAMES.projectSettings,
-      params: { projectId: projectId.value },
-    },
-    icon: "settings",
-  },
-  {
-    key: "debug",
-    label: "デバッグ",
-    to: {
-      name: ROUTE_NAMES.projectDebug,
-      params: { projectId: projectId.value },
-    },
-    icon: "debug",
-  },
-]);
-
-const sidebarProjects = computed(() =>
-  projectList.value.map((entry, index) => ({
-    key: entry.id,
-    label: entry.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || "ユーザー",
-  email: profile.value?.email || "",
-}));
 
 // Channel Logic
 const channels = computed<ChatChannel[]>(() => {
@@ -465,11 +382,9 @@ watch(channels, (list) => {
 
 <template>
   <div class="chat-page">
-    <DashboardSidebar
+    <ProjectSidebar
       :open="true"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
+      :project-id="projectId"
       brand-subtitle="プロジェクト"
     />
 

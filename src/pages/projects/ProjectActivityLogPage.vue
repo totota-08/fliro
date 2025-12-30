@@ -1,23 +1,17 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import WeeklyEventSparkline from "@/components/projectActivity/WeeklyEventSparkline.vue";
-import { appName } from "@/constants/appMeta";
-import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
 import {
   fetchProjectEventsPage,
   listenProjectEvents,
   type ProjectEventCursor,
 } from "@/services/projectActivityLogService";
 import type { ProjectEvent, ProjectEventCategory } from "@/types/projectEvent";
-import { useAuthStore } from "@/store/auth";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import {
   categorizeProjectEvent,
   getEventTemplate,
   iconPath,
 } from "@/utils/projectEventTemplate";
-import { collection, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -70,10 +64,7 @@ const iconMap: Record<string, IconDef> = {
 };
 
 const route = useRoute();
-const { profile, user } = useAuthStore();
-
 const projectId = ref(String(route.params.projectId || ""));
-const projectList = ref<{ id: string; name: string }[]>([]);
 const filterType = ref<ProjectEventCategory | "all">("all");
 const loading = ref(true);
 const loadingMore = ref(false);
@@ -83,83 +74,6 @@ const olderEvents = ref<ProjectEvent[]>([]);
 const liveCursor = ref<ProjectEventCursor>(null);
 const pagingCursor = ref<ProjectEventCursor>(null);
 let stopEvents: (() => void) | null = null;
-
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "チャット",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "timeline",
-        label: "ログ",
-        to: {
-          name: ROUTE_NAMES.projectTimeline,
-          params: { projectId: projectId.value },
-        },
-        icon: "tasks",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-    ] satisfies DashboardNavItem[],
-);
-
-const sidebarProjects = computed(() =>
-  projectList.value.map((project, index) => ({
-    key: project.id,
-    label: project.name,
-    to: {
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: project.id },
-    },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
 
 const events = computed(() => [...liveEvents.value, ...olderEvents.value]);
 
@@ -290,17 +204,6 @@ function iconPathForEvent(event: ProjectEvent) {
   return iconForEvent(event).path;
 }
 
-async function loadProjectList() {
-  if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    name: (docSnap.data().projectName as string) || "Project",
-  }));
-}
-
 function startListen() {
   stopEvents?.();
   olderEvents.value = [];
@@ -366,7 +269,6 @@ function formatTimestamp(value: any) {
 }
 
 onMounted(() => {
-  loadProjectList();
   startListen();
 });
 
@@ -387,11 +289,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="activity-shell">
-    <DashboardSidebar
+    <ProjectSidebar
       :open="true"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
+      :project-id="projectId"
       brand-subtitle="ログ"
     />
     <main class="activity-shell__main">

@@ -12,10 +12,8 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import {
-  addProjectEvent,
-  type ProjectEventOrigin,
-} from "@/services/projectActivityLogService";
+import { addProjectEvent } from "@/services/projectActivityLogService";
+import type { ProjectEventOrigin } from "@/types/projectEvent";
 
 const logger = getLogger("app.services.task");
 
@@ -133,7 +131,6 @@ export async function createTask(
           dueDate: payload.dueDate ?? null,
           status: payload.status ?? "todo",
           categoryId: payload.categoryId ?? null,
-          categoryName: payload.categoryName ?? null,
           progress: payload.progress ?? 0,
         },
       });
@@ -209,8 +206,8 @@ export async function updateTask(
     }
 
     const after: TaskDoc = {
-      ...before,
-      ...updates,
+      ...(before as TaskDoc),
+      ...(updates as any),
     };
 
     const eventsQueue: Array<{
