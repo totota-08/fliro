@@ -31,7 +31,7 @@ type DecoratedEvent = {
 
 type IconDef = { path: string; bg: string; color: string };
 
-const iconMap: Record<string, IconDef> = {
+const iconMap = {
   task: {
     path: iconPath("task"),
     bg: "var(--surface-muted, #eef2f7)",
@@ -67,7 +67,7 @@ const iconMap: Record<string, IconDef> = {
     bg: "var(--surface-muted, #eef2f7)",
     color: "#0b2e33",
   },
-};
+} satisfies Record<string, IconDef>;
 
 const route = useRoute();
 const { profile, user } = useAuthStore();
@@ -78,6 +78,8 @@ const filterType = ref<ProjectEventCategory | "all">("all");
 const loading = ref(true);
 const loadingMore = ref(false);
 const hasMore = ref(true);
+const previewLimit = 5;
+const isLogExpanded = ref(false);
 const liveEvents = ref<ProjectEvent[]>([]);
 const olderEvents = ref<ProjectEvent[]>([]);
 const liveCursor = ref<ProjectEventCursor>(null);
@@ -181,6 +183,22 @@ const decoratedEvents = computed<DecoratedEvent[]>(() =>
       return entry.category === filterType.value;
     }),
 );
+
+const displayedEvents = computed(() =>
+  isLogExpanded.value
+    ? decoratedEvents.value
+    : decoratedEvents.value.slice(0, previewLimit),
+);
+
+const showLoadMoreButton = computed(() => {
+  if (loading.value) return false;
+  return !isLogExpanded.value && decoratedEvents.value.length >= previewLimit;
+});
+
+const loadMoreLabel = computed(() => {
+  if (!isLogExpanded.value) return "さらに読み込む";
+  return loadingMore.value ? "読み込み中..." : "さらに読み込む";
+});
 
 function toMidnight(date: Date) {
   const d = new Date(date);
@@ -354,6 +372,14 @@ async function loadMore() {
   }
 }
 
+function handleLoadMoreAction() {
+  if (!isLogExpanded.value) {
+    isLogExpanded.value = true;
+    return;
+  }
+  loadMore();
+}
+
 function formatTimestamp(value: any) {
   if (!value) return "--:--";
   if (typeof value.toDate === "function") {
@@ -376,6 +402,7 @@ watch(
     if (!newId) return;
     projectId.value = String(newId);
     loading.value = true;
+    isLogExpanded.value = false;
     startListen();
   },
 );
@@ -427,9 +454,13 @@ onBeforeUnmount(() => {
             <div v-else-if="!decoratedEvents.length" class="log-state">
               該当するイベントがありません。
             </div>
-            <ul v-else class="log-rows">
+            <ul
+              v-else
+              class="log-rows"
+              :class="{ 'is-scrollable': isLogExpanded }"
+            >
               <li
-                v-for="item in decoratedEvents"
+                v-for="item in displayedEvents"
                 :key="item.event.id"
                 class="log-row"
               >
@@ -458,14 +489,14 @@ onBeforeUnmount(() => {
               </li>
             </ul>
 
-            <div v-if="hasMore && !loading" class="log-load-more">
+            <div v-if="showLoadMoreButton" class="log-load-more">
               <button
                 type="button"
-                class="log-load-more__btn"
+                class="log-load-more__btn log-more-btn"
                 :disabled="loadingMore"
-                @click="loadMore"
+                @click="handleLoadMoreAction"
               >
-                {{ loadingMore ? "読み込み中..." : "さらに読み込む" }}
+                {{ loadMoreLabel }}
               </button>
             </div>
           </section>
@@ -634,6 +665,12 @@ onBeforeUnmount(() => {
   border-radius: 0.75rem;
   overflow: hidden;
   background: #fff;
+}
+
+.log-rows.is-scrollable {
+  max-height: 60vh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .log-row {
