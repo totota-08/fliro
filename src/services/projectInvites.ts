@@ -16,10 +16,16 @@ interface CreateInviteOptions {
   maxUses?: number | null;
 }
 
+type InviteRole = "admin" | "member" | "viewer";
+
 export interface ProjectInviteDoc {
   projectId: string;
+  projectName?: string | null;
   token: string;
   createdBy: string;
+  invitedBy?: string;
+  type?: "email" | "link";
+  role?: InviteRole;
   createdAt: Date | null;
   acceptedAt?: Date | null;
   acceptedBy?: string;
@@ -29,6 +35,7 @@ export interface ProjectInviteDoc {
   maxUses?: number | null;
   usedCount?: number | null;
   acceptedEmail?: string | null;
+  email?: string | null;
 }
 
 function createToken() {
@@ -59,6 +66,10 @@ export async function createProjectInvite({
 }: CreateInviteOptions) {
   const token = createToken();
   const ref = doc(db, "projectInvites", token);
+  const projectSnap = await getDoc(doc(db, "projects", projectId));
+  const projectName = projectSnap.exists()
+    ? (projectSnap.data().name as string)
+    : "プロジェクト";
   const passwordHash = password?.trim()
     ? await hashInvitePassword(password.trim())
     : null;
@@ -70,9 +81,11 @@ export async function createProjectInvite({
     typeof maxUses === "number" && maxUses > 0
       ? Math.max(1, Math.floor(maxUses))
       : null;
-  await setDoc(ref, {
+  const inviteData = {
     projectId,
+    projectName,
     createdBy,
+    invitedBy: createdBy,
     token,
     passwordHash,
     createdAt: serverTimestamp(),
@@ -80,8 +93,23 @@ export async function createProjectInvite({
     expiresAt,
     maxUses: sanitizedMaxUses,
     usedCount: 0,
-  });
+    role: "member",
+    type: "link",
+  };
+  await setDoc(ref, inviteData);
   return token;
+}
+
+async function resolveInviteByToken(token: string) {
+  const inviteRef = doc(db, "projectInvites", token);
+  const inviteSnap = await getDoc(inviteRef);
+  if (!inviteSnap.exists()) return null;
+  return { ref: inviteRef, data: inviteSnap.data() as ProjectInviteDoc };
+}
+
+export async function fetchInviteByToken(token: string) {
+  const resolved = await resolveInviteByToken(token);
+  return resolved?.data ?? null;
 }
 
 export async function redeemInvite(
@@ -90,12 +118,11 @@ export async function redeemInvite(
   email: string,
   options?: { password?: string },
 ) {
-  const ref = doc(db, "projectInvites", token);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
+  const resolved = await resolveInviteByToken(token);
+  if (!resolved) {
     throw new Error("招待リンクが無効です。");
   }
-  const data = snap.data() as ProjectInviteDoc;
+  const { data, ref } = resolved;
 
   let expiresAtMillis: number | null = null;
   const rawExpires = (data as any).expiresAt;
@@ -132,15 +159,15 @@ export async function redeemInvite(
     return data.projectId;
   }
 
-  const projectSnap = await getDoc(doc(db, "projects", data.projectId));
-  const projectName = projectSnap.exists()
-    ? (projectSnap.data().name as string)
-    : undefined;
+  const projectName = data.projectName ?? undefined;
+  const rawRole = typeof data.role === "string" ? data.role : "member";
+  const safeRole: InviteRole =
+    rawRole === "admin" || rawRole === "viewer" ? rawRole : "member";
 
   await addProjectMember({
     projectId: data.projectId,
     userId,
-    role: "member",
+    role: safeRole,
     invitedBy: data.createdBy,
     projectName,
   });
