@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
-import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildPermissionsFromRoles } from "@/constants/roles";
@@ -16,7 +16,7 @@ import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectMembers");
 type MemberRole = "owner" | "admin" | "member" | "viewer";
@@ -35,6 +35,7 @@ type MemberDisplay = {
 };
 
 const route = useRoute();
+const router = useRouter();
 const { user, profile } = useAuthStore();
 const projectId = ref(String(route.params.projectId || ""));
 const project = ref<ProjectDoc | null>(null);
@@ -42,6 +43,7 @@ const projectList = ref<{ id: string; name: string }[]>([]);
 const members = ref<MemberDisplay[]>([]);
 const removingMemberId = ref("");
 const updatingRoleId = ref("");
+const selectedMemberId = ref<string | null>(null);
 const isSidebarOpen = ref(true);
 const latestInviteLink = ref("");
 const inviteNotification = ref("");
@@ -136,6 +138,19 @@ const memberStats = computed(() => {
   return { total, adminCount, online };
 });
 
+const queryMemberId = computed(() => {
+  const value = route.query.memberId;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0] || null;
+  return null;
+});
+
+const selectedMember = computed(
+  () =>
+    members.value.find((member) => member.userId === selectedMemberId.value) ??
+    null,
+);
+
 const currentPermissions = computed(() => {
   const currentId = user.value?.uid;
   if (!currentId) return buildPermissionsFromRoles([]);
@@ -150,6 +165,39 @@ const canManageMembers = computed(
     currentPermissions.value.canInviteMembers ||
     currentPermissions.value.canManageMembers,
 );
+
+function setMemberQuery(memberId: string | null) {
+  const nextQuery = { ...route.query };
+  if (memberId) {
+    nextQuery.memberId = memberId;
+  } else {
+    delete nextQuery.memberId;
+  }
+  void router.replace({ query: nextQuery });
+}
+
+function openMemberPanel(member: MemberDisplay) {
+  selectedMemberId.value = member.userId;
+  if (queryMemberId.value !== member.userId) {
+    setMemberQuery(member.userId);
+  }
+}
+
+function closeMemberPanel() {
+  if (selectedMemberId.value) {
+    selectedMemberId.value = null;
+  }
+  if (queryMemberId.value) {
+    setMemberQuery(null);
+  }
+}
+
+function getRoleLabel(role: MemberRole) {
+  if (role === "owner") return "Owner";
+  if (role === "admin") return "Admin";
+  if (role === "member") return "Member";
+  return "Viewer";
+}
 
 async function loadProjectList() {
   if (!user.value) return;
@@ -275,12 +323,6 @@ async function handleChangeRole(member: MemberDisplay, nextRole: MemberRole) {
   }
 }
 
-function onRoleChange(member: MemberDisplay, event: Event) {
-  const target = event.target as HTMLSelectElement;
-  const value = (target?.value as MemberRole) || member.role;
-  void handleChangeRole(member, value);
-}
-
 function getStatusLabel(timestamp?: { seconds: number }) {
   if (!timestamp?.seconds) return "オフライン";
   const diff = Date.now() - timestamp.seconds * 1000;
@@ -301,6 +343,26 @@ function getInitials(name: string) {
   return trimmed.length <= 2 ? trimmed : trimmed.slice(0, 2);
 }
 
+watch(
+  [queryMemberId, members],
+  ([memberId, list]) => {
+    if (!memberId) {
+      selectedMemberId.value = null;
+      return;
+    }
+    const exists = list.some((member) => member.userId === memberId);
+    if (exists) {
+      selectedMemberId.value = memberId;
+      return;
+    }
+    selectedMemberId.value = null;
+    if (queryMemberId.value) {
+      setMemberQuery(null);
+    }
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   if (window.matchMedia("(max-width: 1200px)").matches) {
     isSidebarOpen.value = false;
@@ -314,6 +376,7 @@ watch(
   (newId) => {
     if (!newId) return;
     projectId.value = String(newId);
+    closeMemberPanel();
     resetWatchers();
   },
 );
@@ -410,7 +473,17 @@ onBeforeUnmount(() => {
             <li
               v-for="member in members"
               :key="member.userId"
-              class="team-member"
+              :class="[
+                'team-member',
+                'team-member--clickable',
+                { 'team-member--selected': member.userId === selectedMemberId },
+              ]"
+              role="button"
+              tabindex="0"
+              :aria-label="`${member.displayName}の詳細を開く`"
+              @click="openMemberPanel(member)"
+              @keydown.enter.prevent="openMemberPanel(member)"
+              @keydown.space.prevent="openMemberPanel(member)"
             >
               <div class="team-member__persona">
                 <div class="avatar" aria-hidden="true">
@@ -425,23 +498,9 @@ onBeforeUnmount(() => {
               </div>
 
               <div class="team-member__role">
-                <label class="sr-only" :for="`role-${member.userId}`"
-                  >ロール</label
-                >
-                <select
-                  v-if="canManageMembers && member.role !== 'owner'"
-                  :id="`role-${member.userId}`"
-                  :value="member.role"
-                  :disabled="updatingRoleId === member.userId"
-                  @change="onRoleChange(member, $event)"
-                >
-                  <option v-for="role in roleOptions" :key="role" :value="role">
-                    {{ role }}
-                  </option>
-                </select>
-                <span v-else class="badge" :class="`role-${member.role}`">{{
-                  member.role
-                }}</span>
+                <span class="badge" :class="`role-${member.role}`">
+                  {{ getRoleLabel(member.role) }}
+                </span>
               </div>
 
               <div class="team-member__details">
@@ -450,27 +509,6 @@ onBeforeUnmount(() => {
                   :class="`status-${member.statusClass}`"
                   >{{ member.statusLabel }}</span
                 >
-                <span class="badge badge--muted">role: {{ member.role }}</span>
-              </div>
-
-              <div class="team-member__actions">
-                <AppButton
-                  v-if="
-                    canManageMembers &&
-                    member.role !== 'owner' &&
-                    member.userId !== user?.uid
-                  "
-                  variant="outline"
-                  :loading="removingMemberId === member.userId"
-                  @click="handleRemoveMember(member)"
-                >
-                  削除
-                </AppButton>
-                <span v-else class="team-member__note">
-                  {{
-                    member.role === "owner" ? "オーナー" : "アクセス権限なし"
-                  }}
-                </span>
               </div>
             </li>
             <li v-if="!members.length" class="team-member team-member--empty">
@@ -480,6 +518,22 @@ onBeforeUnmount(() => {
           <p v-if="memberActionError" class="team-member__error">
             {{ memberActionError }}
           </p>
+
+          <MemberDetailPanel
+            :open="Boolean(selectedMember)"
+            :member="selectedMember"
+            :role-options="roleOptions"
+            :can-edit-role="currentPermissions.canEditRoles"
+            :can-remove="currentPermissions.canManageMembers"
+            :current-user-id="user?.uid"
+            :updating-role-id="updatingRoleId"
+            :removing-member-id="removingMemberId"
+            @close="closeMemberPanel"
+            @role-change="
+              (role) => selectedMember && handleChangeRole(selectedMember, role)
+            "
+            @remove="() => selectedMember && handleRemoveMember(selectedMember)"
+          />
         </section>
 
         <section id="member-invite" class="invite-panel">
@@ -593,10 +647,30 @@ onBeforeUnmount(() => {
   border-radius: 1.25rem;
   padding: 1rem;
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) 200px 1fr auto;
+  grid-template-columns: minmax(240px, 2fr) 160px 1fr;
   gap: 1rem;
   align-items: center;
   background: #fff;
+}
+
+.team-member--clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.team-member--clickable:hover {
+  border-color: var(--border);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--text) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.team-member--selected {
+  border-color: var(--primary);
+  background: var(--surface-elevated);
+  box-shadow: 0 16px 28px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .team-member--empty {
@@ -640,13 +714,6 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-.team-member__role select {
-  min-width: 160px;
-  border-radius: 0.85rem;
-  border: 1px solid rgba(11, 46, 51, 0.1);
-  padding: 0.55rem 0.75rem;
-}
-
 .badge {
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
@@ -671,12 +738,6 @@ onBeforeUnmount(() => {
   color: #496167;
 }
 
-.badge--muted {
-  background: rgba(11, 46, 51, 0.04);
-  color: #496167;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-}
-
 .status-indicator {
   font-size: 0.85rem;
   font-weight: 600;
@@ -692,15 +753,6 @@ onBeforeUnmount(() => {
 
 .status-indicator.status-offline {
   color: #9da8b6;
-}
-
-.team-member__actions {
-  margin-left: auto;
-}
-
-.team-member__note {
-  color: var(--text-muted);
-  font-size: 0.85rem;
 }
 
 .team-member__error {
@@ -774,10 +826,6 @@ onBeforeUnmount(() => {
   .team-member {
     grid-template-columns: 1fr;
     align-items: flex-start;
-  }
-
-  .team-member__actions {
-    margin-left: 0;
   }
 }
 </style>
