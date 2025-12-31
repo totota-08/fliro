@@ -41,14 +41,24 @@ const projectId = ref(String(route.params.projectId || ""));
 const project = ref<ProjectDoc | null>(null);
 const projectList = ref<{ id: string; name: string }[]>([]);
 const members = ref<MemberDisplay[]>([]);
-const removingMemberId = ref("");
-const updatingRoleId = ref("");
 const selectedMemberId = ref<string | null>(null);
 const isSidebarOpen = ref(true);
 const latestInviteLink = ref("");
 const inviteNotification = ref("");
-const memberActionError = ref("");
+const memberQuery = ref("");
+const isInviteOpen = ref(false);
 const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
+const roleOrder: MemberRole[] = ["owner", "admin", "member", "viewer"];
+
+const saveRoleHandler = async (role: MemberRole) => {
+  if (!selectedMember.value) return;
+  await handleSaveRole(selectedMember.value, role);
+};
+
+const removeMemberHandler = async () => {
+  if (!selectedMember.value) return;
+  await handleRemoveMember(selectedMember.value);
+};
 
 let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
@@ -138,6 +148,74 @@ const memberStats = computed(() => {
   return { total, adminCount, online };
 });
 
+const filteredMembers = computed(() => {
+  const query = memberQuery.value.trim().toLowerCase();
+  if (!query) return members.value;
+  return members.value.filter((member) => {
+    const targets = [member.displayName, member.email, member.userId, member.id]
+      .filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      )
+      .map((value) => value.toLowerCase());
+    return targets.some((value) => value.includes(query));
+  });
+});
+
+const roleBreakdown = computed(() => {
+  const counts: Record<MemberRole, number> = {
+    owner: 0,
+    admin: 0,
+    member: 0,
+    viewer: 0,
+  };
+  members.value.forEach((member) => {
+    counts[member.role] = (counts[member.role] ?? 0) + 1;
+  });
+  return counts;
+});
+
+const active24hCount = computed(() => {
+  const now = Date.now();
+  return members.value.filter((member) => {
+    const seconds = member.lastAccessedAt?.seconds;
+    if (typeof seconds !== "number") return false;
+    return now - seconds * 1000 <= 1000 * 60 * 60 * 24;
+  }).length;
+});
+
+const missingEmailCount = computed(() => {
+  return members.value.filter((member) => {
+    if (!member.email) return true;
+    return member.email.trim().length === 0;
+  }).length;
+});
+
+const inviteStatus = computed(() =>
+  latestInviteLink.value ? "作成済み" : "未作成",
+);
+
+const recentAccessMembers = computed(() => {
+  return [...members.value]
+    .sort((a, b) => {
+      const aSeconds =
+        typeof a.lastAccessedAt?.seconds === "number"
+          ? a.lastAccessedAt.seconds
+          : null;
+      const bSeconds =
+        typeof b.lastAccessedAt?.seconds === "number"
+          ? b.lastAccessedAt.seconds
+          : null;
+      if (aSeconds !== null && bSeconds !== null) {
+        return bSeconds - aSeconds;
+      }
+      if (aSeconds !== null) return -1;
+      if (bSeconds !== null) return 1;
+      return 0;
+    })
+    .slice(0, 5);
+});
+
 const queryMemberId = computed(() => {
   const value = route.query.memberId;
   if (typeof value === "string") return value;
@@ -154,10 +232,14 @@ const selectedMember = computed(
 const currentPermissions = computed(() => {
   const currentId = user.value?.uid;
   if (!currentId) return buildPermissionsFromRoles([]);
-  return (
-    members.value.find((member) => member.userId === currentId)?.permissions ??
-    buildPermissionsFromRoles([])
-  );
+  const memberPermissions = members.value.find(
+    (member) => member.userId === currentId,
+  )?.permissions;
+  if (memberPermissions) return memberPermissions;
+  if (project.value?.ownerUserId === currentId) {
+    return buildPermissionsFromRoles(["owner"]);
+  }
+  return buildPermissionsFromRoles([]);
 });
 const canManageMembers = computed(
   () =>
@@ -227,13 +309,20 @@ function watchProject() {
         const permissions =
           data.permissions ?? buildPermissionsFromRoles(roles);
         const statusLabel = getStatusLabel(data.lastAccessedAt);
+        const displayName =
+          data.displayName ||
+          data.name ||
+          data.userName ||
+          data.username ||
+          data.nickname ||
+          data.fullName ||
+          `メンバー ${userId.slice(-4)}`;
         return {
           id: docSnap.id,
           userId,
           role,
           roles,
-          displayName:
-            data.nickname || data.fullName || `メンバー ${userId.slice(-4)}`,
+          displayName,
           email: data.email || null,
           avatarUrl: data.avatarUrl || null,
           statusLabel,
@@ -267,9 +356,24 @@ function toggleSidebar() {
   isSidebarOpen.value = !isSidebarOpen.value;
 }
 
+function openInviteModal() {
+  isInviteOpen.value = true;
+}
+
+function closeInviteModal() {
+  isInviteOpen.value = false;
+}
+
 function scrollToInvite() {
-  const target = document.getElementById("member-invite");
-  target?.scrollIntoView({ behavior: "smooth" });
+  if (!canManageMembers.value) return;
+  openInviteModal();
+}
+
+function goToTimeline() {
+  void router.push({
+    name: ROUTE_NAMES.projectTimeline,
+    params: { projectId: projectId.value },
+  });
 }
 
 function handleLinkGenerated(link: string) {
@@ -278,48 +382,80 @@ function handleLinkGenerated(link: string) {
     "共有リンクを作成しました。リンクをコピーしてメンバーに共有してください。";
 }
 
+function handleInviteKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    closeInviteModal();
+  }
+}
+
+function formatRelativeTime(timestamp?: {
+  seconds: number;
+  nanoseconds: number;
+}) {
+  if (!timestamp?.seconds) return "—";
+  const diffMs = Math.max(0, Date.now() - timestamp.seconds * 1000);
+  if (diffMs < 1000 * 60 * 5) return "たった今";
+  if (diffMs < 1000 * 60 * 60) {
+    return `${Math.floor(diffMs / (1000 * 60))}分前`;
+  }
+  if (diffMs < 1000 * 60 * 60 * 24) {
+    return `${Math.floor(diffMs / (1000 * 60 * 60))}時間前`;
+  }
+  return `${Math.floor(diffMs / (1000 * 60 * 60 * 24))}日前`;
+}
+
 async function handleRemoveMember(member: MemberDisplay) {
-  if (!canManageMembers.value) return;
-  if (member.role === "owner" || member.userId === user.value?.uid) return;
-  if (!confirm(`「${member.displayName}」をプロジェクトから削除しますか？`))
-    return;
-  removingMemberId.value = member.userId;
+  if (!canManageMembers.value) {
+    const error = new Error("permission-denied") as { code?: string };
+    error.code = "permission-denied";
+    throw error;
+  }
+  if (member.role === "owner" || member.userId === user.value?.uid) {
+    const error = new Error("permission-denied") as { code?: string };
+    error.code = "permission-denied";
+    throw error;
+  }
   try {
     await removeProjectMember(projectId.value, member.userId, {
       id: user.value?.uid ?? null,
       name: profile.value?.nickname || profile.value?.fullName || "",
       origin: "ui",
     });
-    memberActionError.value = "";
   } catch (error) {
     logger.error`Failed to remove member: ${error}`;
-    memberActionError.value = "メンバーの削除に失敗しました。";
-  } finally {
-    removingMemberId.value = "";
+    throw error;
   }
 }
 
-async function handleChangeRole(member: MemberDisplay, nextRole: MemberRole) {
-  if (!canManageMembers.value) return;
-  if (member.role === "owner") return;
-  if (member.userId === user.value?.uid && nextRole !== member.role) {
-    if (
-      !confirm(
-        "自分のロールを変更すると管理権限を失う可能性があります。続行しますか？",
-      )
-    ) {
-      return;
-    }
+async function handleSaveRole(member: MemberDisplay, nextRole: MemberRole) {
+  if (!currentPermissions.value.canEditRoles) {
+    const error = new Error("permission-denied") as { code?: string };
+    error.code = "permission-denied";
+    throw error;
   }
-  updatingRoleId.value = member.userId;
+  if (member.role === "owner") {
+    const error = new Error("permission-denied") as { code?: string };
+    error.code = "permission-denied";
+    throw error;
+  }
   try {
-    await updateProjectMemberRole(projectId.value, member.userId, nextRole);
-    memberActionError.value = "";
+    const actorName =
+      profile.value?.nickname ||
+      profile.value?.fullName ||
+      user.value?.uid ||
+      "System";
+    await updateProjectMemberRole(projectId.value, member.userId, nextRole, {
+      previousRole: member.role,
+      memberName: member.displayName || member.email || member.userId,
+      actor: {
+        id: user.value?.uid ?? null,
+        name: actorName,
+        origin: "ui",
+      },
+    });
   } catch (error) {
     logger.error`Failed to update role: ${error}`;
-    memberActionError.value = "ロールの更新に失敗しました。";
-  } finally {
-    updatingRoleId.value = "";
+    throw error;
   }
 }
 
@@ -381,9 +517,20 @@ watch(
   },
 );
 
+watch(isInviteOpen, (open) => {
+  if (typeof window === "undefined") return;
+  window.removeEventListener("keydown", handleInviteKeydown);
+  if (open) {
+    window.addEventListener("keydown", handleInviteKeydown);
+  }
+});
+
 onBeforeUnmount(() => {
   stopProject?.();
   stopMembers?.();
+  if (typeof window !== "undefined") {
+    window.removeEventListener("keydown", handleInviteKeydown);
+  }
 });
 </script>
 
@@ -438,9 +585,10 @@ onBeforeUnmount(() => {
               <p>メンバーの状態と権限をまとめて確認できます。</p>
             </div>
             <button
+              v-if="canManageMembers"
               type="button"
               class="team-page__invite"
-              @click="scrollToInvite"
+              @click="openInviteModal"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path
@@ -469,56 +617,198 @@ onBeforeUnmount(() => {
             </article>
           </div>
 
-          <ul class="team-member__list">
-            <li
-              v-for="member in members"
-              :key="member.userId"
-              :class="[
-                'team-member',
-                'team-member--clickable',
-                { 'team-member--selected': member.userId === selectedMemberId },
-              ]"
-              role="button"
-              tabindex="0"
-              :aria-label="`${member.displayName}の詳細を開く`"
-              @click="openMemberPanel(member)"
-              @keydown.enter.prevent="openMemberPanel(member)"
-              @keydown.space.prevent="openMemberPanel(member)"
-            >
-              <div class="team-member__persona">
-                <div class="avatar" aria-hidden="true">
-                  <span>{{ getInitials(member.displayName) }}</span>
-                </div>
+          <div class="team-page__layout">
+            <div class="team-page__members">
+              <div class="team-page__members-header">
                 <div>
-                  <p class="team-member__name">{{ member.displayName }}</p>
-                  <p class="team-member__email">
-                    {{ member.email || "メール未登録" }}
+                  <h3>メンバー一覧</h3>
+                  <p class="team-page__members-count">
+                    表示: {{ filteredMembers.length }} / {{ members.length }}
                   </p>
                 </div>
+                <div class="team-page__search">
+                  <label class="sr-only" for="member-search">
+                    メンバーを検索
+                  </label>
+                  <input
+                    id="member-search"
+                    v-model="memberQuery"
+                    type="search"
+                    placeholder="名前・メール・IDで検索"
+                    autocomplete="off"
+                  />
+                </div>
               </div>
+              <div class="team-page__members-list">
+                <ul class="team-member__list">
+                  <li
+                    v-for="member in filteredMembers"
+                    :key="member.userId"
+                    :class="[
+                      'team-member',
+                      'team-member--clickable',
+                      {
+                        'team-member--selected':
+                          member.userId === selectedMemberId,
+                      },
+                    ]"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="`${member.displayName}の詳細を開く`"
+                    @click="openMemberPanel(member)"
+                    @keydown.enter.prevent="openMemberPanel(member)"
+                    @keydown.space.prevent="openMemberPanel(member)"
+                  >
+                    <div class="team-member__persona">
+                      <div class="avatar" aria-hidden="true">
+                        <span>{{ getInitials(member.displayName) }}</span>
+                      </div>
+                      <div>
+                        <p class="team-member__name">
+                          {{ member.displayName }}
+                        </p>
+                        <p class="team-member__email">
+                          {{ member.email || "メール未登録" }}
+                        </p>
+                      </div>
+                    </div>
 
-              <div class="team-member__role">
-                <span class="badge" :class="`role-${member.role}`">
-                  {{ getRoleLabel(member.role) }}
-                </span>
+                    <div class="team-member__role">
+                      <span class="badge" :class="`role-${member.role}`">
+                        {{ getRoleLabel(member.role) }}
+                      </span>
+                    </div>
+
+                    <div class="team-member__details">
+                      <span
+                        class="status-indicator"
+                        :class="`status-${member.statusClass}`"
+                        >{{ member.statusLabel }}</span
+                      >
+                    </div>
+                  </li>
+                  <li
+                    v-if="!filteredMembers.length"
+                    class="team-member team-member--empty"
+                  >
+                    {{
+                      members.length
+                        ? "検索結果がありません。"
+                        : "まだメンバーがいません。"
+                    }}
+                  </li>
+                </ul>
               </div>
+            </div>
 
-              <div class="team-member__details">
-                <span
-                  class="status-indicator"
-                  :class="`status-${member.statusClass}`"
-                  >{{ member.statusLabel }}</span
+            <aside class="team-page__aside">
+              <section class="team-page__aside-card">
+                <h3>チームの状態</h3>
+                <div class="team-page__summary-grid">
+                  <div class="team-page__summary-item">
+                    <p>オンライン</p>
+                    <strong>{{ memberStats.online }}</strong>
+                  </div>
+                  <div class="team-page__summary-item">
+                    <p>アクティブ(24h)</p>
+                    <strong>{{ active24hCount }}</strong>
+                  </div>
+                  <div class="team-page__summary-item">
+                    <p>メール未登録</p>
+                    <strong>{{ missingEmailCount }}</strong>
+                  </div>
+                  <div
+                    class="team-page__summary-item team-page__summary-item--status"
+                  >
+                    <p>招待リンク</p>
+                    <span class="team-page__summary-badge">
+                      {{ inviteStatus }}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="team-page__summary-link"
+                  :disabled="!canManageMembers"
+                  @click="scrollToInvite"
                 >
-              </div>
-            </li>
-            <li v-if="!members.length" class="team-member team-member--empty">
-              まだメンバーがいません。
-            </li>
-          </ul>
-          <p v-if="memberActionError" class="team-member__error">
-            {{ memberActionError }}
-          </p>
+                  招待リンクへ
+                </button>
+              </section>
 
+              <section class="team-page__aside-card">
+                <h3>ロール内訳</h3>
+                <ul class="team-page__role-list">
+                  <li
+                    v-for="role in roleOrder"
+                    :key="role"
+                    class="team-page__role-row"
+                  >
+                    <span class="badge" :class="`role-${role}`">
+                      {{ getRoleLabel(role) }}
+                    </span>
+                    <span class="team-page__role-count">
+                      {{ roleBreakdown[role] }}
+                    </span>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="team-page__aside-card">
+                <h3>最近アクセス</h3>
+                <ul class="team-page__recent-list">
+                  <li
+                    v-for="member in recentAccessMembers"
+                    :key="member.userId"
+                    class="team-page__recent-row"
+                  >
+                    <div class="avatar avatar--sm" aria-hidden="true">
+                      <span>{{ getInitials(member.displayName) }}</span>
+                    </div>
+                    <div class="team-page__recent-info">
+                      <p class="team-page__recent-name">
+                        {{ member.displayName }}
+                      </p>
+                      <p class="team-page__recent-meta">
+                        <span>{{
+                          formatRelativeTime(member.lastAccessedAt)
+                        }}</span>
+                        <span class="team-page__recent-sep">・</span>
+                        <span>{{ member.statusLabel }}</span>
+                      </p>
+                    </div>
+                  </li>
+                  <li
+                    v-if="!recentAccessMembers.length"
+                    class="team-page__recent-empty"
+                  >
+                    最近アクセスがありません。
+                  </li>
+                </ul>
+              </section>
+
+              <section class="team-page__aside-card">
+                <h3>クイック操作</h3>
+                <div class="team-page__actions">
+                  <button
+                    type="button"
+                    class="team-page__action-button"
+                    :disabled="!canManageMembers"
+                    @click="scrollToInvite"
+                  >
+                    メンバーを招待
+                  </button>
+                  <button
+                    type="button"
+                    class="team-page__action-button team-page__action-button--ghost"
+                    @click="goToTimeline"
+                  >
+                    ログを見る
+                  </button>
+                </div>
+              </section>
+            </aside>
+          </div>
           <MemberDetailPanel
             :open="Boolean(selectedMember)"
             :member="selectedMember"
@@ -526,53 +816,92 @@ onBeforeUnmount(() => {
             :can-edit-role="currentPermissions.canEditRoles"
             :can-remove="currentPermissions.canManageMembers"
             :current-user-id="user?.uid"
-            :updating-role-id="updatingRoleId"
-            :removing-member-id="removingMemberId"
+            :save-role="saveRoleHandler"
+            :remove-member="removeMemberHandler"
             @close="closeMemberPanel"
-            @role-change="
-              (role) => selectedMember && handleChangeRole(selectedMember, role)
-            "
-            @remove="() => selectedMember && handleRemoveMember(selectedMember)"
           />
-        </section>
-
-        <section id="member-invite" class="invite-panel">
-          <header>
-            <div>
-              <h3>参加リンクを共有</h3>
-              <p>
-                リンクをコピーして共有すると、メンバーはこのプロジェクトに参加できます。
-              </p>
-            </div>
-            <p class="invite-panel__hint">
-              必要に応じてパスワードを設定してください。
-            </p>
-          </header>
-
-          <ProjectInviteForm
-            :project-id="projectId"
-            @generated="handleLinkGenerated"
-          />
-
-          <p v-if="latestInviteLink" class="invite-panel__link">
-            {{ latestInviteLink }}
-          </p>
-          <p v-if="inviteNotification" class="invite-panel__message">
-            {{ inviteNotification }}
-          </p>
         </section>
       </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="isInviteOpen"
+      class="invite-modal__overlay"
+      @click="closeInviteModal"
+    >
+      <div
+        class="invite-modal__panel invite-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invite-dialog-title"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="invite-modal__close"
+          aria-label="閉じる"
+          @click="closeInviteModal"
+        >
+          ✕
+        </button>
+        <header>
+          <div>
+            <h3 id="invite-dialog-title">参加リンクを共有</h3>
+            <p>
+              リンクをコピーして共有すると、メンバーはこのプロジェクトに参加できます。
+            </p>
+          </div>
+          <p class="invite-panel__hint">
+            必要に応じてパスワードを設定してください。
+          </p>
+        </header>
+
+        <ProjectInviteForm
+          :project-id="projectId"
+          @generated="handleLinkGenerated"
+        />
+
+        <p v-if="latestInviteLink" class="invite-panel__link">
+          {{ latestInviteLink }}
+        </p>
+        <p v-if="inviteNotification" class="invite-panel__message">
+          {{ inviteNotification }}
+        </p>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
 @import "@/pages/demo/styles/demo-shell.css";
 
+.demo__main {
+  overflow: hidden;
+}
+
+.demo__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  height: calc(100vh - 64px);
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+@supports (height: 100dvh) {
+  .demo__content {
+    height: calc(100dvh - 64px);
+  }
+}
+
 .team-page {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .team-page__header {
@@ -633,6 +962,255 @@ onBeforeUnmount(() => {
   color: #0b2e33;
 }
 
+.team-page__members {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.team-page__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.team-page__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 96px;
+  align-self: start;
+}
+
+.team-page__aside-card {
+  border: 1px solid var(--border-light);
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-page__aside-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+
+.team-page__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.team-page__summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.team-page__summary-grid p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.team-page__summary-grid strong {
+  font-size: 1.3rem;
+  color: var(--text-strong);
+}
+
+.team-page__summary-item--status {
+  justify-content: space-between;
+}
+
+.team-page__summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--surface-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.team-page__summary-link {
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text);
+  border-radius: 0.85rem;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.team-page__summary-link:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.team-page__summary-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.team-page__role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.team-page__role-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team-page__role-count {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.team-page__recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.team-page__recent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.team-page__recent-info {
+  min-width: 0;
+}
+
+.team-page__recent-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.team-page__recent-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.team-page__recent-sep {
+  opacity: 0.6;
+}
+
+.team-page__recent-empty {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.team-page__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.team-page__action-button {
+  border: 1px solid var(--border-light);
+  background: var(--surface-card);
+  color: var(--text);
+  border-radius: 0.85rem;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.team-page__action-button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.team-page__action-button--ghost {
+  background: transparent;
+}
+
+.team-page__action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.team-page__members-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.team-page__members-header h3 {
+  margin: 0;
+}
+
+.team-page__members-count {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.team-page__search {
+  width: 100%;
+  max-width: 320px;
+}
+
+.team-page__search input {
+  width: 100%;
+  border-radius: 0.85rem;
+  border: 1px solid var(--border-light);
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  background: var(--surface-card);
+  color: var(--text);
+}
+
+.team-page__search input:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.team-page__members-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
 .team-member__list {
   list-style: none;
   margin: 0;
@@ -668,9 +1246,21 @@ onBeforeUnmount(() => {
 }
 
 .team-member--selected {
+  position: relative;
   border-color: var(--primary);
   background: var(--surface-elevated);
-  box-shadow: 0 16px 28px color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.team-member--selected::before {
+  content: "";
+  position: absolute;
+  left: 0.35rem;
+  top: 0.65rem;
+  bottom: 0.65rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--primary);
 }
 
 .team-member--empty {
@@ -694,6 +1284,12 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   font-weight: 700;
+}
+
+.avatar--sm {
+  width: 36px;
+  height: 36px;
+  font-size: 0.75rem;
 }
 
 .team-member__name {
@@ -755,12 +1351,6 @@ onBeforeUnmount(() => {
   color: #9da8b6;
 }
 
-.team-member__error {
-  margin: 0.5rem 0 0;
-  color: #d64545;
-  font-weight: 600;
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -781,6 +1371,45 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.invite-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 6rem 1rem 1rem;
+  z-index: 9999;
+  overflow: auto;
+}
+
+.invite-modal__panel {
+  width: min(640px, 100%);
+  position: relative;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+}
+
+.invite-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  border-radius: 0.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.invite-modal__close:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .invite-panel__hint {
@@ -823,9 +1452,28 @@ onBeforeUnmount(() => {
     align-items: flex-start;
   }
 
+  .team-page__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .team-page__aside {
+    position: static;
+  }
+
+  .team-page__members-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .team-member {
     grid-template-columns: 1fr;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .invite-modal__overlay {
+    padding: 5rem 1rem 1rem;
   }
 }
 </style>
