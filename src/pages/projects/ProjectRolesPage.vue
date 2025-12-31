@@ -2,15 +2,14 @@
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
 import {
   listenProjectMembers,
   updateProjectMemberRole,
   type ProjectMember,
 } from "@/services/projectMembers";
+import { getProjectRole } from "@/services/projectAccess";
 import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
-import { doc, getDoc } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -104,20 +103,15 @@ const profileInfo = computed(() => ({
   email: profile.value?.email || "",
 }));
 
-const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
+const roleOptions: MemberRole[] = ["admin", "member", "guest"];
 
 async function evaluatePermissions() {
   if (!user.value) {
     canEdit.value = false;
     return;
   }
-  const snap = await getDoc(
-    doc(db, "projects", projectId.value, "members", user.value.uid),
-  );
-  const data = snap.data();
-  canEdit.value = Boolean(
-    data?.role === "admin" || data?.projectRole === "owner",
-  );
+  const role = await getProjectRole(projectId.value, user.value.uid);
+  canEdit.value = Boolean(role === "owner" || role === "admin");
 }
 
 function watchMembers() {
@@ -229,7 +223,7 @@ onBeforeUnmount(() => {
             <li>
               <strong>member</strong> — タスク作成・更新、スレッド参加が可能
             </li>
-            <li><strong>viewer</strong> — 閲覧のみ</li>
+            <li><strong>guest</strong> — 閲覧のみ</li>
           </ul>
         </section>
 
@@ -475,7 +469,7 @@ onBeforeUnmount(() => {
   color: #0b2e33;
 }
 
-.badge-viewer {
+.badge-guest {
   background: rgba(148, 163, 184, 0.2);
   color: #1f2937;
 }

@@ -17,7 +17,10 @@ import {
   // updateProjectMessage,
   type ChatMessage,
 } from "@/services/projectChat";
-import type { ProjectMember } from "@/services/projectMembers";
+import {
+  listenProjectMembers,
+  type ProjectMember,
+} from "@/services/projectMembers";
 import {
   listenTaskCategories,
   type TaskCategory,
@@ -31,7 +34,7 @@ import {
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
-import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import {
   computed,
   onBeforeUnmount,
@@ -395,44 +398,18 @@ function watchProject() {
     if (!snapshot.exists()) return;
     project.value = snapshot.data() as ProjectDoc;
   });
-  stopMembers = onSnapshot(
-    collection(db, "projects", projectId.value, "members"),
-    async (snapshot) => {
-      const promises = snapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data() as any;
-        const memberId = data.userId || docSnap.id;
-        let name = data.nickname || data.fullName;
-
-        if (!name) {
-          try {
-            const profileSnap = await getDoc(doc(db, "profiles", memberId));
-            if (profileSnap.exists()) {
-              const profile = profileSnap.data();
-              name = profile.nickname || profile.fullName;
-            }
-          } catch (e) {
-            logger.error`Failed to fetch profile for ${memberId}: ${e}`;
-          }
-        }
-
-        return {
-          id: memberId,
-          name: name || docSnap.id,
-          userId: memberId,
-          role: (data.role as ProjectMember["role"]) || "member",
-          projectRole:
-            (data.projectRole as ProjectMember["projectRole"]) || "member",
-          nickname: data.nickname,
-          fullName: data.fullName,
-          displayName: data.nickname || data.fullName || name || docSnap.id,
-          email: data.email,
-          lastAccessedAt: data.lastAccessedAt,
-        };
-      });
-
-      members.value = await Promise.all(promises);
-    },
-  );
+  stopMembers = listenProjectMembers(projectId.value, (list) => {
+    members.value = list.map((member) => ({
+      ...member,
+      id: member.userId,
+      name:
+        member.displayName ||
+        member.nickname ||
+        member.fullName ||
+        member.email ||
+        member.userId,
+    }));
+  });
 }
 
 function watchTasks() {

@@ -3,19 +3,19 @@ import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
 import {
   deleteProject,
   fetchProject,
   updateProjectMetadata,
 } from "@/firebase/projectService";
+import { getProjectRole } from "@/services/projectAccess";
+import { listUserProjectRefs } from "@/services/projectRefs";
 import { updateProjectSettings } from "@/services/projectSettings";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -154,12 +154,10 @@ const summaryInfo = computed(() => {
 
 async function loadProjectList() {
   if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap, index) => ({
-    id: docSnap.id,
-    name: (docSnap.data().projectName as string) || `Project ${index + 1}`,
+  const refs = await listUserProjectRefs(user.value.uid);
+  projectList.value = refs.map((refItem, index) => ({
+    id: refItem.id,
+    name: refItem.projectName || `Project ${index + 1}`,
   }));
 }
 
@@ -197,20 +195,8 @@ async function evaluatePermissions() {
     return;
   }
   try {
-    const memberSnap = await getDoc(
-      doc(db, "projects", projectId.value, "members", user.value.uid),
-    );
-    if (!memberSnap.exists()) {
-      canManage.value = false;
-      return;
-    }
-    const data = memberSnap.data() as any;
-    const permissions = data.permissions;
-    if (permissions && typeof permissions.canManageSettings === "boolean") {
-      canManage.value = permissions.canManageSettings;
-    } else {
-      canManage.value = data.projectRole === "owner" || data.role === "admin";
-    }
+    const role = await getProjectRole(projectId.value, user.value.uid);
+    canManage.value = Boolean(role === "owner" || role === "admin");
   } catch (error) {
     logger.error`Failed to evaluate permissions: ${error}`;
     canManage.value = false;

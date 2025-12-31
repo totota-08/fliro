@@ -4,10 +4,9 @@ import AuthFormField from "@/components/ui/AuthFormField.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { createProject } from "@/firebase/projectService";
-import { fetchScaleStats } from "@/services/statsService";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.CreateProject");
@@ -44,15 +43,6 @@ const progressPercent = computed(
   () => ((currentStepIndex.value + 1) / stepOrder.length) * 100,
 );
 const basicValid = computed(() => name.value.trim().length > 0);
-const scaleStats = ref<{ users: number; projects: number } | null>(null);
-
-onMounted(async () => {
-  try {
-    scaleStats.value = await fetchScaleStats();
-  } catch (error) {
-    logger.warn`Failed to fetch stats: ${error}`;
-  }
-});
 
 async function handleSubmit() {
   if (!user.value) {
