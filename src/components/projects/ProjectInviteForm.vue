@@ -10,9 +10,11 @@ const props = withDefaults(
   defineProps<{
     projectId: string;
     label?: string;
+    projectName?: string | null;
   }>(),
   {
     label: "プロジェクト参加リンク",
+    projectName: null,
   },
 );
 
@@ -65,6 +67,7 @@ async function handleGenerate() {
   try {
     const token = await createProjectInvite({
       projectId: props.projectId,
+      projectName: props.projectName,
       createdBy: user.value.uid,
       password: enablePassword.value ? password.value.trim() : null,
       expiresInHours: expiry.value ?? null,

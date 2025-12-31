@@ -98,6 +98,15 @@ const navItems = computed<DashboardNavItem[]>(
         icon: "members",
       },
       {
+        key: "invites",
+        label: "招待リンク",
+        to: {
+          name: ROUTE_NAMES.projectInvites,
+          params: { projectId: projectId.value },
+        },
+        icon: "invites",
+      },
+      {
         key: "settings",
         label: "設定",
         to: {

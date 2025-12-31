@@ -44,7 +44,6 @@ const members = ref<MemberDisplay[]>([]);
 const selectedMemberId = ref<string | null>(null);
 const isSidebarOpen = ref(true);
 const latestInviteLink = ref("");
-const inviteNotification = ref("");
 const memberQuery = ref("");
 const isInviteOpen = ref(false);
 const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
@@ -107,6 +106,15 @@ const navItems = computed<DashboardNavItem[]>(
           params: { projectId: projectId.value },
         },
         icon: "members",
+      },
+      {
+        key: "invites",
+        label: "招待リンク",
+        to: {
+          name: ROUTE_NAMES.projectInvites,
+          params: { projectId: projectId.value },
+        },
+        icon: "invites",
       },
       {
         key: "settings",
@@ -364,9 +372,11 @@ function closeInviteModal() {
   isInviteOpen.value = false;
 }
 
-function scrollToInvite() {
-  if (!canManageMembers.value) return;
-  openInviteModal();
+function goToInvites() {
+  void router.push({
+    name: ROUTE_NAMES.projectInvites,
+    params: { projectId: projectId.value },
+  });
 }
 
 function goToTimeline() {
@@ -378,8 +388,6 @@ function goToTimeline() {
 
 function handleLinkGenerated(link: string) {
   latestInviteLink.value = link;
-  inviteNotification.value =
-    "共有リンクを作成しました。リンクをコピーしてメンバーに共有してください。";
 }
 
 function handleInviteKeydown(event: KeyboardEvent) {
@@ -729,8 +737,7 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   class="team-page__summary-link"
-                  :disabled="!canManageMembers"
-                  @click="scrollToInvite"
+                  @click="goToInvites"
                 >
                   招待リンクへ
                 </button>
@@ -794,7 +801,7 @@ onBeforeUnmount(() => {
                     type="button"
                     class="team-page__action-button"
                     :disabled="!canManageMembers"
-                    @click="scrollToInvite"
+                    @click="openInviteModal"
                   >
                     メンバーを招待
                   </button>
@@ -860,15 +867,9 @@ onBeforeUnmount(() => {
 
         <ProjectInviteForm
           :project-id="projectId"
+          :project-name="project?.name"
           @generated="handleLinkGenerated"
         />
-
-        <p v-if="latestInviteLink" class="invite-panel__link">
-          {{ latestInviteLink }}
-        </p>
-        <p v-if="inviteNotification" class="invite-panel__message">
-          {{ inviteNotification }}
-        </p>
       </div>
     </div>
   </Teleport>
@@ -1418,26 +1419,10 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
 }
 
-.invite-panel__link {
-  border: 1px solid #b8e3e9;
-  border-radius: 0.85rem;
-  padding: 0.75rem 1rem;
-  background: #f5fbfb;
-  word-break: break-all;
-  font-size: 0.9rem;
-  color: #0b2e33;
-}
-
 .invite-panel__actions {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.invite-panel__message {
-  color: #0b2e33;
-  margin: 0;
-  font-weight: 600;
 }
 
 .invite-panel__error {

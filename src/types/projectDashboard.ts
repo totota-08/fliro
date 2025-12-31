@@ -5,6 +5,7 @@ export type DashboardNavKey =
   | "tasks"
   | "team"
   | "members"
+  | "invites"
   | "settings"
   | "debug"
   | "activity"

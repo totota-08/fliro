@@ -230,22 +230,44 @@ service cloud.firestore {
       allow read: if true;
 
       allow update: if isSignedIn()
-                    && request.resource.data.projectId == resource.data.projectId
-                    && request.resource.data.projectName == resource.data.projectName
-                    && request.resource.data.createdBy == resource.data.createdBy
-                    && request.resource.data.createdAt == resource.data.createdAt
-                    && (resource.data.expiresAt == null 
-                        || resource.data.expiresAt > request.time)
-                    && (resource.data.maxUses == null 
-                        || resource.data.usedCount < resource.data.maxUses)
-                    && resource.data.status == 'pending'
-                    && request.resource.data.status == 'accepted'
-                    && request.resource.data.acceptedBy == request.auth.uid
-                    && request.resource.data.acceptedAt is timestamp
-                    && request.resource.data.usedCount == resource.data.usedCount + 1
-                    && request.resource.data.maxUses == resource.data.maxUses
-                    && request.resource.data.expiresAt == resource.data.expiresAt
-                    && request.resource.data.passwordHash == resource.data.passwordHash;
+                    && (
+                      (
+                        request.resource.data.projectId == resource.data.projectId
+                        && request.resource.data.projectName == resource.data.projectName
+                        && request.resource.data.createdBy == resource.data.createdBy
+                        && request.resource.data.createdAt == resource.data.createdAt
+                        && (resource.data.expiresAt == null
+                            || resource.data.expiresAt > request.time)
+                        && (resource.data.maxUses == null
+                            || resource.data.usedCount < resource.data.maxUses)
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'accepted'
+                        && request.resource.data.acceptedBy == request.auth.uid
+                        && request.resource.data.acceptedAt is timestamp
+                        && request.resource.data.usedCount == resource.data.usedCount + 1
+                        && request.resource.data.maxUses == resource.data.maxUses
+                        && request.resource.data.expiresAt == resource.data.expiresAt
+                        && request.resource.data.passwordHash == resource.data.passwordHash
+                      )
+                      || (
+                        (isProjectOwner(resource.data.projectId) || canInviteMembers(resource.data.projectId))
+                        && request.resource.data.projectId == resource.data.projectId
+                        && request.resource.data.projectName == resource.data.projectName
+                        && request.resource.data.createdBy == resource.data.createdBy
+                        && request.resource.data.createdAt == resource.data.createdAt
+                        && request.resource.data.token == resource.data.token
+                        && request.resource.data.status == resource.data.status
+                        && request.resource.data.passwordHash == resource.data.passwordHash
+                        && request.resource.data.expiresAt == resource.data.expiresAt
+                        && request.resource.data.maxUses == resource.data.maxUses
+                        && request.resource.data.usedCount == resource.data.usedCount
+                        && resource.data.revokedAt == null
+                        && request.resource.data.revokedAt is timestamp
+                        && request.resource.data.revokedBy is map
+                        && request.resource.data.revokedBy.id == request.auth.uid
+                        && request.resource.data.revokedBy.name is string
+                      )
+                    );
     }
   }
 }

@@ -19,6 +19,7 @@ import ProjectActivityLogPage from "@/pages/projects/ProjectActivityLogPage.vue"
 import ProjectCategoriesPage from "@/pages/projects/ProjectCategoriesPage.vue";
 import ProjectChatPage from "@/pages/projects/ProjectChatPage.vue";
 import ProjectDashboardPage from "@/pages/projects/ProjectDashboardPage.vue";
+import ProjectInvitesPage from "@/pages/projects/ProjectInvitesPage.vue";
 import ProjectMembersPage from "@/pages/projects/ProjectMembersPage.vue";
 import ProjectNotificationsPage from "@/pages/projects/ProjectNotificationsPage.vue";
 import ProjectRolesPage from "@/pages/projects/ProjectRolesPage.vue";
@@ -103,6 +104,12 @@ export const router = createRouter({
       name: ROUTE_NAMES.projectMembers,
       component: ProjectMembersPage,
       meta: { requiresAuth: true, section: "members" },
+    },
+    {
+      path: "/projects/:projectId/invites",
+      name: ROUTE_NAMES.projectInvites,
+      component: ProjectInvitesPage,
+      meta: { requiresAuth: true, section: "invites" },
     },
     {
       path: "/projects/:projectId/roles",
