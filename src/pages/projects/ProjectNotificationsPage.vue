@@ -3,18 +3,17 @@ import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
 import { listenProjectChat, type ChatMessage } from "@/services/projectChat";
 import {
   listenProjectMembers,
   type ProjectMember,
 } from "@/services/projectMembers";
+import { listUserProjectRefs } from "@/services/projectRefs";
 import { listenTimeline, type TimelinePost } from "@/services/timelineService";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
-import { collection, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -301,12 +300,10 @@ function resetWatchers() {
 
 async function loadProjectList() {
   if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    name: (docSnap.data().projectName as string) || "Project",
+  const refs = await listUserProjectRefs(user.value.uid);
+  projectList.value = refs.map((refItem) => ({
+    id: refItem.id,
+    name: refItem.projectName || "Project",
   }));
 }
 

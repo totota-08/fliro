@@ -2,7 +2,6 @@
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
 import {
   addTaskCategory,
   deleteTaskCategory,
@@ -10,9 +9,9 @@ import {
   renameTaskCategory,
   type TaskCategory,
 } from "@/services/taskCategoryService";
+import { getProjectRole } from "@/services/projectAccess";
 import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
-import { doc, getDoc } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -93,13 +92,8 @@ async function evaluatePermissions() {
     canEdit.value = false;
     return;
   }
-  const memberSnap = await getDoc(
-    doc(db, "projects", projectId.value, "members", user.value.uid),
-  );
-  const data = memberSnap.data();
-  canEdit.value = Boolean(
-    data?.role === "admin" || data?.projectRole === "owner",
-  );
+  const role = await getProjectRole(projectId.value, user.value.uid);
+  canEdit.value = Boolean(role === "owner" || role === "admin");
 }
 
 function watchCategories() {

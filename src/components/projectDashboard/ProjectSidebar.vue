@@ -2,14 +2,13 @@
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
+import { listUserProjectRefs } from "@/services/projectRefs";
 import { useAuthStore } from "@/store/auth";
 import type {
   DashboardNavItem,
   DashboardProfileInfo,
   DashboardProjectItem,
 } from "@/types/projectDashboard";
-import { collection, getDocs } from "firebase/firestore";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -104,15 +103,13 @@ const profileInfo = computed<DashboardProfileInfo>(() => ({
 
 async function loadProjectList() {
   if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap, index) => ({
-    key: docSnap.id,
-    label: (docSnap.data().projectName as string) || "Project",
+  const refs = await listUserProjectRefs(user.value.uid);
+  projectList.value = refs.map((refItem, index) => ({
+    key: refItem.id,
+    label: refItem.projectName || "Project",
     to: {
       name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: docSnap.id },
+      params: { projectId: refItem.id },
     },
     accent: ["primary", "secondary", "accent"][index % 3] as
       | "primary"

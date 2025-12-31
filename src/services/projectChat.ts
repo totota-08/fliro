@@ -1,4 +1,9 @@
 import { database, db } from "@/lib/firebase";
+import {
+  normalizeProjectRoles,
+  normalizeRole,
+  resolveRoleFromProjectRoles,
+} from "@/constants/roles";
 import { getLogger } from "@logtape/logtape";
 import {
   ref as dbRef,
@@ -87,10 +92,21 @@ async function ensureRealtimeMember(projectId: string, userId: string) {
         doc(db, "projects", projectId, "members", userId),
       );
       const data = memberDoc.exists() ? memberDoc.data() : null;
+      let role = normalizeRole((data as any)?.role ?? "member");
+
+      if (!data || !(data as any)?.role) {
+        const projectSnap = await getDoc(doc(db, "projects", projectId));
+        if (projectSnap.exists()) {
+          const roles = normalizeProjectRoles(
+            (projectSnap.data() as any)?.roles,
+          );
+          role = resolveRoleFromProjectRoles(roles, userId) ?? role;
+        }
+      }
 
       const joinedAt = (data as any)?.joinedAt;
       await setValue(memberRef, {
-        role: (data?.role as string) || "member",
+        role,
         joinedAt:
           typeof joinedAt?.seconds === "number"
             ? joinedAt.seconds * 1000

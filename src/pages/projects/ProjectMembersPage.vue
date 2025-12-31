@@ -4,34 +4,38 @@ import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildPermissionsFromRoles } from "@/constants/roles";
+import { buildPermissionsFromRole, normalizeRole } from "@/constants/roles";
 import { db } from "@/lib/firebase";
 import {
+  listenProjectMembers,
   removeProjectMember,
+  syncProjectRolesFromMembers,
   updateProjectMemberRole,
 } from "@/services/projectMembers";
+import { listUserProjectRefs } from "@/services/projectRefs";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectMembers");
-type MemberRole = "owner" | "admin" | "member" | "viewer";
+type MemberRole = "owner" | "admin" | "member" | "guest";
 type MemberDisplay = {
   id: string;
   userId: string;
   role: MemberRole;
-  roles: string[];
   displayName: string;
+  nickname?: string | null;
+  fullName?: string | null;
   email?: string;
   avatarUrl?: string;
   statusLabel: string;
   statusClass: "online" | "away" | "offline";
   lastAccessedAt?: { seconds: number; nanoseconds: number };
-  permissions: ReturnType<typeof buildPermissionsFromRoles>;
+  permissions: ReturnType<typeof buildPermissionsFromRole>;
 };
 
 const route = useRoute();
@@ -46,7 +50,10 @@ const isSidebarOpen = ref(true);
 const latestInviteLink = ref("");
 const inviteNotification = ref("");
 const memberActionError = ref("");
-const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
+const roleOptions: MemberRole[] = ["admin", "member", "guest"];
+const hasSyncedRoles = ref(false);
+const profileNameCache = new Map<string, string>();
+const profileFetchQueue = new Map<string, Promise<string | null>>();
 
 let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
@@ -136,73 +143,76 @@ const memberStats = computed(() => {
   return { total, adminCount, online };
 });
 
-const currentPermissions = computed(() => {
+const currentRole = computed<MemberRole>(() => {
   const currentId = user.value?.uid;
-  if (!currentId) return buildPermissionsFromRoles([]);
-  return (
-    members.value.find((member) => member.userId === currentId)?.permissions ??
-    buildPermissionsFromRoles([])
-  );
+  if (!currentId) return "guest";
+  const member = members.value.find((entry) => entry.userId === currentId);
+  return normalizeRole(member?.role ?? "guest") as MemberRole;
 });
+const currentPermissions = computed(() =>
+  buildPermissionsFromRole(currentRole.value),
+);
 const canManageMembers = computed(
   () =>
-    currentPermissions.value.canEditRoles ||
     currentPermissions.value.canInviteMembers ||
+    currentPermissions.value.canEditRoles ||
     currentPermissions.value.canManageMembers,
 );
 
 async function loadProjectList() {
   if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    name: (docSnap.data().projectName as string) || "Project",
-  }));
+  try {
+    const refs = await listUserProjectRefs(user.value.uid);
+    projectList.value = refs.map((refItem) => ({
+      id: refItem.id,
+      name: refItem.projectName || "Project",
+    }));
+  } catch (error) {
+    logger.warn`Failed to load project refs: ${error}`;
+    projectList.value = [];
+  }
 }
 
 function watchProject() {
-  stopProject = onSnapshot(doc(db, "projects", projectId.value), (snapshot) => {
-    if (!snapshot.exists()) return;
-    project.value = snapshot.data() as ProjectDoc;
-  });
-
-  stopMembers = onSnapshot(
-    collection(db, "projects", projectId.value, "members"),
+  stopProject = onSnapshot(
+    doc(db, "projects", projectId.value),
     (snapshot) => {
-      const list = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as any;
-        const userId = data.userId || docSnap.id;
-        const role: MemberRole = data.role || "member";
-        const roles = (data.roles as string[] | undefined) ?? [role];
-        const permissions =
-          data.permissions ?? buildPermissionsFromRoles(roles);
-        const statusLabel = getStatusLabel(data.lastAccessedAt);
-        return {
-          id: docSnap.id,
-          userId,
-          role,
-          roles,
-          displayName:
-            data.nickname || data.fullName || `メンバー ${userId.slice(-4)}`,
-          email: data.email || null,
-          avatarUrl: data.avatarUrl || null,
-          statusLabel,
-          statusClass: getStatusClass(statusLabel),
-          lastAccessedAt: data.lastAccessedAt,
-          permissions,
-        } satisfies MemberDisplay;
-      });
-      const rank: Record<MemberRole, number> = {
-        owner: 0,
-        admin: 1,
-        member: 2,
-        viewer: 3,
-      };
-      members.value = list.sort((a, b) => rank[a.role] - rank[b.role]);
+      if (!snapshot.exists()) return;
+      project.value = snapshot.data() as ProjectDoc;
+    },
+    (error) => {
+      logger.warn`Failed to listen project: ${error}`;
     },
   );
+
+  stopMembers = listenProjectMembers(projectId.value, (list) => {
+    members.value = list.map((member) => {
+      const statusLabel = getStatusLabel(member.lastAccessedAt);
+      const cachedName = profileNameCache.get(member.userId);
+      return {
+        id: member.userId,
+        userId: member.userId,
+        role: normalizeRole(member.role) as MemberRole,
+        displayName:
+          cachedName ||
+          member.displayName ||
+          member.nickname ||
+          member.fullName ||
+          `メンバー ${member.userId.slice(-4)}`,
+        nickname: member.nickname ?? null,
+        fullName: member.fullName ?? null,
+        email: member.email || null,
+        avatarUrl: member.avatarUrl || null,
+        statusLabel,
+        statusClass: getStatusClass(statusLabel),
+        lastAccessedAt: member.lastAccessedAt,
+        permissions: buildPermissionsFromRole(
+          normalizeRole(member.role) as MemberRole,
+        ),
+      } satisfies MemberDisplay;
+    });
+    void hydrateMemberNames(members.value);
+  });
 }
 
 function resetWatchers() {
@@ -301,6 +311,66 @@ function getInitials(name: string) {
   return trimmed.length <= 2 ? trimmed : trimmed.slice(0, 2);
 }
 
+function shouldResolveProfileName(member: MemberDisplay) {
+  if (!member.userId) return false;
+  if (member.nickname || member.fullName) return false;
+  const fallback = member.displayName || "";
+  if (!fallback) return true;
+  if (fallback === member.userId) return true;
+  if (member.email && fallback === member.email) return true;
+  if (fallback.startsWith("メンバー ")) return true;
+  return false;
+}
+
+function pickProfileName(data: Record<string, unknown>) {
+  const nickname = typeof data.nickname === "string" ? data.nickname : "";
+  const fullName = typeof data.fullName === "string" ? data.fullName : "";
+  const displayName =
+    typeof data.displayName === "string" ? data.displayName : "";
+  return nickname || fullName || displayName || "";
+}
+
+async function fetchProfileName(userId: string) {
+  if (profileNameCache.has(userId)) {
+    return profileNameCache.get(userId) || null;
+  }
+  if (profileFetchQueue.has(userId)) {
+    return profileFetchQueue.get(userId) || null;
+  }
+  const promise = (async () => {
+    try {
+      const snap = await getDoc(doc(db, "profiles", userId));
+      if (!snap.exists()) return null;
+      const name = pickProfileName(snap.data() as Record<string, unknown>);
+      if (name) profileNameCache.set(userId, name);
+      return name || null;
+    } catch (error) {
+      logger.warn`Failed to fetch profile for ${userId}: ${error}`;
+      return null;
+    } finally {
+      profileFetchQueue.delete(userId);
+    }
+  })();
+  profileFetchQueue.set(userId, promise);
+  return promise;
+}
+
+async function hydrateMemberNames(list: MemberDisplay[]) {
+  const candidates = list.filter((member) => shouldResolveProfileName(member));
+  if (!candidates.length) return;
+  await Promise.all(
+    candidates.map(async (member) => {
+      const name = await fetchProfileName(member.userId);
+      if (!name) return;
+      members.value = members.value.map((entry) => {
+        if (entry.userId !== member.userId) return entry;
+        if (!shouldResolveProfileName(entry)) return entry;
+        return { ...entry, displayName: name };
+      });
+    }),
+  );
+}
+
 onMounted(() => {
   if (window.matchMedia("(max-width: 1200px)").matches) {
     isSidebarOpen.value = false;
@@ -309,11 +379,25 @@ onMounted(() => {
   resetWatchers();
 });
 
+watch(currentRole, async (role) => {
+  if (hasSyncedRoles.value) return;
+  if (role === "owner") {
+    hasSyncedRoles.value = true;
+    try {
+      await syncProjectRolesFromMembers(projectId.value);
+    } catch (error) {
+      logger.warn`Failed to sync project roles: ${error}`;
+      hasSyncedRoles.value = false;
+    }
+  }
+});
+
 watch(
   () => route.params.projectId,
   (newId) => {
     if (!newId) return;
     projectId.value = String(newId);
+    hasSyncedRoles.value = false;
     resetWatchers();
   },
 );
@@ -377,6 +461,12 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="team-page__invite"
+              :disabled="!currentPermissions.canInviteMembers"
+              :title="
+                currentPermissions.canInviteMembers
+                  ? undefined
+                  : '管理者のみ利用できます'
+              "
               @click="scrollToInvite"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -497,6 +587,7 @@ onBeforeUnmount(() => {
 
           <ProjectInviteForm
             :project-id="projectId"
+            :disabled="!currentPermissions.canInviteMembers"
             @generated="handleLinkGenerated"
           />
 
@@ -666,7 +757,7 @@ onBeforeUnmount(() => {
 }
 
 .badge.role-member,
-.badge.role-viewer {
+.badge.role-guest {
   background: rgba(11, 46, 51, 0.05);
   color: #496167;
 }
