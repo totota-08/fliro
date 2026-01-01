@@ -3,7 +3,6 @@ import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
-import { listUserProjectRefs } from "@/services/projectRefs";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs, query } from "firebase/firestore";
@@ -35,15 +34,18 @@ async function fetchTasks() {
   try {
     const items: TaskDoc[] = [];
     const projectItems: { id: string; name: string; role?: string }[] = [];
-    const projectRefs = await listUserProjectRefs(user.value.uid);
-    projectCount.value = projectRefs.length;
-    for (const refItem of projectRefs) {
-      const projectId = refItem.id;
-      const projectName = refItem.projectName || "プロジェクト";
+    const projectsSnap = await getDocs(
+      collection(db, "userProjects", user.value.uid, "projects"),
+    );
+    projectCount.value = projectsSnap.size;
+    for (const docSnap of projectsSnap.docs) {
+      const projectId = docSnap.id;
+      const projectName =
+        (docSnap.data().projectName as string) || "プロジェクト";
       projectItems.push({
         id: projectId,
         name: projectName,
-        role: refItem.role as string,
+        role: docSnap.data().role as string,
       });
       const tasksSnap = await getDocs(
         query(collection(db, "projects", projectId, "tasks")),
