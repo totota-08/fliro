@@ -15,23 +15,12 @@ onMounted(async () => {
 <template>
   <LoadingScreen :loading="isLoading" />
   <RouterView v-slot="{ Component }">
-    <transition name="fade-slide" mode="out-in">
+    <transition name="page-fade" mode="out-in">
       <component :is="Component" />
     </transition>
   </RouterView>
 </template>
 
 <style scoped>
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition:
-    opacity 0.25s ease,
-    transform 0.3s ease;
-}
-
-.fade-slide-enter-from,
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(12px);
-}
+/* Scoped styles removed in favor of global motion.css */
 </style>

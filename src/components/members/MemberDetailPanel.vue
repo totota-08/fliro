@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AppButton from "@/components/ui/AppButton.vue";
+import ButtonLoading from "@/components/loading/ButtonLoading.vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 type MemberRole = "owner" | "admin" | "member" | "viewer";
@@ -352,7 +352,7 @@ async function handleRemove() {
 </script>
 
 <template>
-  <Transition name="member-panel">
+  <Transition name="panel-slide-right">
     <div v-if="open && member" class="member-panel">
       <button
         type="button"
@@ -465,34 +465,34 @@ async function handleRemove() {
             {{ saveSuccess }}
           </p>
           <div class="member-panel__actions">
-            <AppButton
+            <ButtonLoading
               :disabled="!canSave"
               :loading="isSaving"
               @click="handleSave"
             >
-              {{ isSaving ? "保存中..." : "保存" }}
-            </AppButton>
-            <AppButton
+              保存
+            </ButtonLoading>
+            <ButtonLoading
               variant="secondary"
               :disabled="!isDirty || isSaving"
               @click="handleDiscard"
             >
               変更を破棄
-            </AppButton>
+            </ButtonLoading>
           </div>
         </section>
 
         <section class="member-panel__section">
           <h4>メンバー操作</h4>
-          <AppButton
+          <ButtonLoading
             variant="outline"
             class="member-panel__danger"
             :disabled="!canRemoveCurrent || isRemoving"
             :loading="isRemoving"
             @click="handleRemove"
           >
-            {{ isRemoving ? "削除中..." : "メンバーを削除" }}
-          </AppButton>
+            メンバーを削除
+          </ButtonLoading>
           <p v-if="removeHint" class="member-panel__hint">{{ removeHint }}</p>
           <p v-if="removeError" class="member-panel__error">
             {{ removeError }}
@@ -504,21 +504,22 @@ async function handleRemove() {
 </template>
 
 <style scoped>
+/*
 .member-panel-enter-active,
 .member-panel-leave-active {
   transition: opacity 0.2s ease;
 }
-
 .member-panel-enter-from,
 .member-panel-leave-to {
   opacity: 0;
 }
-
 .member-panel-enter-from .member-panel__panel,
 .member-panel-leave-to .member-panel__panel {
   transform: translateX(12%);
   opacity: 0;
 }
+*/
+/* Replaced by global .panel-slide-right in motion.css */
 
 .member-panel {
   position: fixed;
@@ -548,10 +549,8 @@ async function handleRemove() {
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.5rem;
-  transform: translateX(0);
-  transition:
-    transform 0.25s ease,
-    opacity 0.25s ease;
+  /* transform: translateX(0); */ /* Managed by global transition now or default layout */
+  /* transition: transform 0.25s ease, opacity 0.25s ease; */ /* Removed local transition */
   outline: none;
 }
 

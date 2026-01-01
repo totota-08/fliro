@@ -1,11 +1,12 @@
+```vue
 <script setup lang="ts">
-import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
 import InviteLinksMiniCard from "@/components/invites/InviteLinksMiniCard.vue";
+import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
 import { appName } from "@/constants/appMeta";
-import { ROUTE_NAMES } from "@/constants/routes";
 import { buildPermissionsFromRoles } from "@/constants/roles";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import {
   removeProjectMember,
