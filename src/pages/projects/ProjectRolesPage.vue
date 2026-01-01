@@ -139,7 +139,20 @@ async function changeRole(member: ProjectMember, next: MemberRole) {
   if (!canEdit.value || member.role === "owner") return;
   updating.value = member.userId;
   try {
-    await updateProjectMemberRole(projectId.value, member.userId, next);
+    const actorName =
+      profile.value?.nickname ||
+      profile.value?.fullName ||
+      user.value?.uid ||
+      "System";
+    await updateProjectMemberRole(projectId.value, member.userId, next, {
+      previousRole: member.role,
+      memberName: member.displayName || member.userId,
+      actor: {
+        id: user.value?.uid ?? null,
+        name: actorName,
+        origin: "ui",
+      },
+    });
   } finally {
     updating.value = null;
   }

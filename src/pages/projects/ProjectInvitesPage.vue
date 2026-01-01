@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import InviteCreateDrawer from "@/components/invites/InviteCreateDrawer.vue";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
-import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildPermissionsFromRoles } from "@/constants/roles";
@@ -19,7 +20,13 @@ import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -45,6 +52,7 @@ const inviteQuery = ref("");
 const loading = ref(true);
 const loadingMore = ref(false);
 const hasMore = ref(true);
+const isCreateOpen = ref(false);
 const actionMessage = ref("");
 const actionError = ref("");
 const revokeTarget = ref<string | null>(null);
@@ -158,11 +166,12 @@ const currentPermissions = computed(() => {
   return buildPermissionsFromRoles([]);
 });
 
-const canManageInvites = computed(
+const canCreateInvite = computed(
   () =>
     currentPermissions.value.canInviteMembers ||
     currentPermissions.value.canManageMembers,
 );
+const canManageInvites = computed(() => canCreateInvite.value);
 
 const liveInvites = ref<ProjectInvite[]>([]);
 const olderInvites = ref<ProjectInvite[]>([]);
@@ -338,28 +347,62 @@ function watchProject() {
 
   stopMembers = onSnapshot(
     collection(db, "projects", projectId.value, "members"),
-    (snapshot) => {
-      const list = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as any;
-        const userId = data.userId || docSnap.id;
-        const role = (data.role as string) || "member";
-        const roles = (data.roles as string[] | undefined) ?? [role];
-        const permissions =
-          data.permissions ?? buildPermissionsFromRoles(roles);
-        const displayName =
-          data.displayName ||
-          data.name ||
-          data.userName ||
-          data.username ||
-          data.nickname ||
-          data.fullName ||
-          `メンバー ${docSnap.id.slice(-4)}`;
-        return {
-          userId,
-          displayName,
-          permissions,
-        } satisfies MemberSummary;
-      });
+    async (snapshot) => {
+      const list = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data() as any;
+          const userId = data.userId || docSnap.id;
+          const role = (data.role as string) || "member";
+          const roles = (data.roles as string[] | undefined) ?? [role];
+          const permissions =
+            data.permissions ?? buildPermissionsFromRoles(roles);
+          const baseName = [
+            data.displayName,
+            data.name,
+            data.userName,
+            data.username,
+            data.nickname,
+            data.fullName,
+          ].find(
+            (value): value is string =>
+              typeof value === "string" && value.trim().length > 0,
+          );
+          let displayName = baseName ? baseName.trim() : "";
+          const looksLikeUid =
+            displayName === userId || displayName === docSnap.id;
+
+          if (!displayName || looksLikeUid) {
+            try {
+              const profileSnap = await getDoc(doc(db, "profiles", userId));
+              if (profileSnap.exists()) {
+                const profile = profileSnap.data() as {
+                  nickname?: string;
+                  fullName?: string;
+                };
+                const profileName = [profile.nickname, profile.fullName].find(
+                  (value): value is string =>
+                    typeof value === "string" && value.trim().length > 0,
+                );
+                if (profileName) {
+                  displayName = profileName.trim();
+                }
+              }
+            } catch (error) {
+              logger.error`Failed to fetch profile for ${userId}: ${error}`;
+            }
+          }
+
+          if (!displayName) {
+            displayName = `メンバー ${userId.slice(-4)}`;
+          }
+
+          return {
+            userId,
+            displayName,
+            permissions,
+          } satisfies MemberSummary;
+        }),
+      );
       members.value = list;
     },
   );
@@ -425,6 +468,19 @@ function toggleSidebar() {
 
 function closeSidebar() {
   isSidebarOpen.value = false;
+}
+
+function openCreateDrawer() {
+  if (!canCreateInvite.value) return;
+  isCreateOpen.value = true;
+}
+
+function closeCreateDrawer() {
+  isCreateOpen.value = false;
+}
+
+function handleInviteCreated(_link: string) {
+  setActionMessage("招待リンクを作成しました。");
 }
 
 onMounted(() => {
@@ -506,26 +562,37 @@ onBeforeUnmount(() => {
               <h2>招待リンク</h2>
               <p>招待リンクの発行状況と無効化を管理できます。</p>
             </div>
+            <div
+              class="invites-page__header-action"
+              :title="!canCreateInvite ? '作成権限がありません' : undefined"
+            >
+              <AppButton
+                class="invites-page__create-button"
+                :disabled="!canCreateInvite"
+                :aria-disabled="!canCreateInvite ? 'true' : undefined"
+                @click="openCreateDrawer"
+              >
+                <svg
+                  v-if="!canCreateInvite"
+                  class="invites-page__lock-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M7 10V7a5 5 0 0110 0v3" />
+                  <rect x="5" y="10" width="14" height="10" rx="2" />
+                </svg>
+                招待リンクを作成
+              </AppButton>
+            </div>
           </header>
 
-          <section class="invites-page__create">
-            <div>
-              <h3>新規発行</h3>
-              <p>必要に応じてパスワードや期限を設定してください。</p>
-            </div>
-            <div v-if="canManageInvites" class="invites-page__form">
-              <ProjectInviteForm
-                :project-id="projectId"
-                :project-name="project?.name"
-              />
-            </div>
-            <p v-else class="invites-page__note">
-              招待リンクを作成する権限がありません。
-            </p>
-          </section>
-
           <section class="invites-page__list">
-            <div class="invites-page__controls">
+            <div class="invites-page__toolbar">
               <div class="invites-page__filters">
                 <label class="small-label" for="invite-status">
                   ステータス
@@ -552,6 +619,10 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <p v-if="!canCreateInvite" class="invites-page__permission">
+              招待リンクを作成する権限がありません。
+            </p>
+
             <p v-if="actionMessage" class="invites-page__message">
               {{ actionMessage }}
             </p>
@@ -564,11 +635,11 @@ onBeforeUnmount(() => {
                 <thead>
                   <tr>
                     <th>ステータス</th>
-                    <th>作成日</th>
-                    <th>有効期限</th>
-                    <th>利用回数</th>
-                    <th>パスワード</th>
-                    <th>作成者</th>
+                    <th class="col-created">作成日</th>
+                    <th class="col-expiry">有効期限</th>
+                    <th class="col-uses">利用回数</th>
+                    <th class="col-password">パスワード</th>
+                    <th class="col-creator">作成者</th>
                     <th class="actions">操作</th>
                   </tr>
                 </thead>
@@ -588,11 +659,15 @@ onBeforeUnmount(() => {
                         {{ statusLabel(buildInviteStatus(invite)) }}
                       </span>
                     </td>
-                    <td>{{ formatDate(invite.createdAt) }}</td>
-                    <td>{{ formatExpiry(invite) }}</td>
-                    <td>{{ formatUses(invite) }}</td>
-                    <td>{{ invite.passwordHash ? "あり" : "なし" }}</td>
-                    <td>{{ getCreatorName(invite) }}</td>
+                    <td class="col-created">
+                      {{ formatDate(invite.createdAt) }}
+                    </td>
+                    <td class="col-expiry">{{ formatExpiry(invite) }}</td>
+                    <td class="col-uses">{{ formatUses(invite) }}</td>
+                    <td class="col-password">
+                      {{ invite.passwordHash ? "あり" : "なし" }}
+                    </td>
+                    <td class="col-creator">{{ getCreatorName(invite) }}</td>
                     <td class="actions">
                       <button type="button" @click="copyInvite(invite)">
                         コピー
@@ -630,6 +705,15 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </div>
+
+    <InviteCreateDrawer
+      :open="isCreateOpen"
+      :can-create="canCreateInvite"
+      :project-id="projectId"
+      :project-name="project?.name"
+      @close="closeCreateDrawer"
+      @created="handleInviteCreated"
+    />
   </div>
 </template>
 
@@ -658,8 +742,16 @@ onBeforeUnmount(() => {
 .invites-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
   min-height: 0;
+}
+
+.invites-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .invites-page__header h2 {
@@ -671,27 +763,17 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
 }
 
-.invites-page__create {
-  border: 1px solid var(--border-light);
-  border-radius: 1.25rem;
-  padding: 1.5rem;
-  background: var(--surface-card);
-  display: grid;
-  gap: 1rem;
+.invites-page__header-action {
+  display: inline-flex;
 }
 
-.invites-page__create h3 {
-  margin: 0;
+.invites-page__create-button {
+  white-space: nowrap;
 }
 
-.invites-page__create p {
-  margin: 0.35rem 0 0;
-  color: var(--text-muted);
-}
-
-.invites-page__note {
-  margin: 0;
-  color: var(--text-muted);
+.invites-page__lock-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .invites-page__list {
@@ -701,7 +783,7 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
-.invites-page__controls {
+.invites-page__toolbar {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -736,6 +818,12 @@ onBeforeUnmount(() => {
   font-size: 0.95rem;
   background: var(--surface-card);
   color: var(--text);
+}
+
+.invites-page__permission {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .invites-page__message,
@@ -774,9 +862,14 @@ onBeforeUnmount(() => {
 }
 
 .invites-page__table th {
-  background: var(--surface-muted);
-  color: var(--text-muted);
-  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 10%, white);
+  color: var(--text);
+  font-weight: 700;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.invites-page__table td {
+  color: var(--text);
 }
 
 .invites-page__table tr:last-child td {
@@ -834,8 +927,8 @@ onBeforeUnmount(() => {
 }
 
 .invites-page__status.status-expired {
-  color: var(--accent-warning);
-  border-color: color-mix(in srgb, var(--accent-warning) 40%, transparent);
+  color: var(--accent-danger);
+  border-color: color-mix(in srgb, var(--accent-danger) 40%, transparent);
 }
 
 .invites-page__status.status-revoked {
@@ -865,11 +958,23 @@ onBeforeUnmount(() => {
 
 @media (max-width: 960px) {
   .invites-page__table {
-    overflow: auto;
+    overflow: hidden;
   }
 
   .invites-page__table table {
-    min-width: 720px;
+    min-width: 0;
+  }
+
+  .invites-page__table .col-uses,
+  .invites-page__table .col-password {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .invites-page__table .col-expiry,
+  .invites-page__table .col-creator {
+    display: none;
   }
 }
 </style>

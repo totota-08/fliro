@@ -23,8 +23,8 @@ const props = withDefaults(
     canEditRole: boolean;
     canRemove: boolean;
     currentUserId?: string | null;
-    updatingRoleId?: string;
-    removingMemberId?: string;
+    saveRole?: (role: MemberRole) => Promise<void>;
+    removeMember?: () => Promise<void>;
   }>(),
   {
     open: false,
@@ -32,20 +32,27 @@ const props = withDefaults(
     canEditRole: false,
     canRemove: false,
     currentUserId: null,
-    updatingRoleId: "",
-    removingMemberId: "",
+    saveRole: undefined,
+    removeMember: undefined,
   },
 );
 
 const emit = defineEmits<{
   (e: "close"): void;
-  (e: "role-change", value: MemberRole): void;
-  (e: "remove"): void;
 }>();
 
 const panelRef = ref<HTMLElement | null>(null);
 const copyMessage = ref("");
+const saveSuccess = ref("");
+const removeError = ref("");
+const draftRole = ref<MemberRole | null>(null);
+const baseRole = ref<MemberRole | null>(null);
+const isSaving = ref(false);
+const isRemoving = ref(false);
+const bodyOverflow = ref<string | null>(null);
+const bodyPaddingRight = ref<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
+let successTimer: ReturnType<typeof setTimeout> | null = null;
 
 const isOwner = computed(() => props.member?.role === "owner");
 const isSelf = computed(() =>
@@ -55,16 +62,36 @@ const canEditCurrentRole = computed(() => props.canEditRole && !isOwner.value);
 const canRemoveCurrent = computed(
   () => props.canRemove && !isOwner.value && !isSelf.value,
 );
-const isUpdating = computed(
+const isDirty = computed(
   () =>
-    Boolean(props.member?.userId) &&
-    props.member?.userId === props.updatingRoleId,
+    Boolean(props.member) &&
+    draftRole.value !== null &&
+    baseRole.value !== null &&
+    draftRole.value !== baseRole.value,
 );
-const isRemoving = computed(
+const canSave = computed(
   () =>
-    Boolean(props.member?.userId) &&
-    props.member?.userId === props.removingMemberId,
+    Boolean(props.saveRole) &&
+    canEditCurrentRole.value &&
+    isDirty.value &&
+    !isSaving.value,
 );
+
+const primaryName = computed(() => {
+  if (!props.member) return "";
+  const name = props.member.displayName?.trim();
+  if (name) return name;
+  const shortId = props.member.userId?.slice(-4) || "";
+  return `メンバー ${shortId}`;
+});
+
+const initials = computed(() => {
+  if (!props.member) return "??";
+  const raw = primaryName.value;
+  if (!raw) return "??";
+  const trimmed = raw.trim();
+  return trimmed.length <= 2 ? trimmed : trimmed.slice(0, 2);
+});
 
 const lastAccessedLabel = computed(() => {
   const timestamp = props.member?.lastAccessedAt;
@@ -97,9 +124,87 @@ const roleLabel = (role: MemberRole) => {
 
 const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === "Escape") {
-    emit("close");
+    requestClose();
   }
 };
+
+function clearSuccessMessage() {
+  saveSuccess.value = "";
+  if (successTimer) {
+    clearTimeout(successTimer);
+    successTimer = null;
+  }
+}
+
+function showSuccess(message: string) {
+  saveSuccess.value = message;
+  if (successTimer) {
+    clearTimeout(successTimer);
+  }
+  successTimer = setTimeout(() => {
+    saveSuccess.value = "";
+  }, 2500);
+}
+
+function formatErrorDetail(error: unknown) {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  const err = error as { code?: string; name?: string; message?: string };
+  const parts = [];
+  if (err.code) parts.push(`code: ${err.code}`);
+  if (err.name) parts.push(`name: ${err.name}`);
+  if (err.message) parts.push(`message: ${err.message}`);
+  if (!parts.length) return JSON.stringify(error);
+  return parts.join(" / ");
+}
+
+// Keep draft/base roles aligned with the selected member.
+function syncDraft(member: PanelMember | null) {
+  if (!member) {
+    baseRole.value = null;
+    draftRole.value = null;
+    removeError.value = "";
+    clearSuccessMessage();
+    return;
+  }
+  baseRole.value = member.role;
+  draftRole.value = member.role;
+  removeError.value = "";
+  clearSuccessMessage();
+}
+
+// Prevent background scroll while the panel is open.
+function lockBodyScroll() {
+  if (typeof document === "undefined") return;
+  const body = document.body;
+  if (bodyOverflow.value === null) {
+    bodyOverflow.value = body.style.overflow;
+    bodyPaddingRight.value = body.style.paddingRight;
+  }
+  body.style.overflow = "hidden";
+}
+
+function unlockBodyScroll() {
+  if (typeof document === "undefined") return;
+  const body = document.body;
+  if (bodyOverflow.value !== null) {
+    body.style.overflow = bodyOverflow.value;
+    bodyOverflow.value = null;
+  }
+  if (bodyPaddingRight.value !== null) {
+    body.style.paddingRight = bodyPaddingRight.value;
+    bodyPaddingRight.value = null;
+  }
+}
+
+function requestClose() {
+  if (isSaving.value) return;
+  // if (isDirty.value) {
+  //   const shouldDiscard = confirm("変更を破棄して閉じますか？");
+  //   if (!shouldDiscard) return;
+  // }
+  emit("close");
+}
 
 watch(
   () => props.open,
@@ -108,9 +213,13 @@ watch(
     window.removeEventListener("keydown", handleKeydown);
     if (open) {
       window.addEventListener("keydown", handleKeydown);
+      lockBodyScroll();
+      syncDraft(props.member);
       void nextTick(() => {
         panelRef.value?.focus();
       });
+    } else {
+      unlockBodyScroll();
     }
   },
   { immediate: true },
@@ -123,14 +232,32 @@ onBeforeUnmount(() => {
   if (copyTimer) {
     clearTimeout(copyTimer);
   }
+  if (successTimer) {
+    clearTimeout(successTimer);
+  }
+  unlockBodyScroll();
 });
 
-function handleRoleChange(event: Event) {
-  const target = event.target as HTMLSelectElement;
-  const value = (target?.value as MemberRole) || props.member?.role;
-  if (!value) return;
-  emit("role-change", value);
-}
+watch(
+  () => props.member?.userId,
+  (memberId, prevMemberId) => {
+    if (!props.open) return;
+    if (memberId && memberId !== prevMemberId) {
+      syncDraft(props.member);
+    }
+  },
+);
+
+watch(
+  () => props.member?.role,
+  (role) => {
+    if (!props.member || role === undefined) return;
+    if (!isDirty.value) {
+      baseRole.value = role;
+      draftRole.value = role;
+    }
+  },
+);
 
 function setCopyMessage(message: string) {
   copyMessage.value = message;
@@ -171,6 +298,57 @@ async function handleCopy() {
     setCopyMessage("コピーに失敗しました。");
   }
 }
+
+function handleDiscard() {
+  if (!props.member) return;
+  draftRole.value = baseRole.value ?? props.member.role;
+  clearSuccessMessage();
+}
+
+async function handleSave() {
+  if (!props.member || !draftRole.value) return;
+  if (!canEditCurrentRole.value) return;
+  if (!props.saveRole) return;
+  if (isSelf.value && draftRole.value !== baseRole.value) {
+    const confirmed = confirm(
+      "自分のロールを変更すると管理権限を失う可能性があります。続行しますか？",
+    );
+    if (!confirmed) return;
+  }
+  isSaving.value = true;
+  clearSuccessMessage();
+  try {
+    await props.saveRole(draftRole.value);
+    baseRole.value = draftRole.value;
+    showSuccess("更新しました。");
+  } catch {
+    // Ignore role update errors per request.
+  } finally {
+    isSaving.value = false;
+  }
+}
+
+async function handleRemove() {
+  if (!props.member || !props.removeMember) return;
+  if (!canRemoveCurrent.value) {
+    removeError.value = removeHint.value || "削除できません。";
+    return;
+  }
+  const confirmed = confirm(
+    `「${primaryName.value}」をプロジェクトから削除しますか？`,
+  );
+  if (!confirmed) return;
+  isRemoving.value = true;
+  removeError.value = "";
+  try {
+    await props.removeMember();
+  } catch (error) {
+    removeError.value =
+      formatErrorDetail(error) || "メンバーの削除に失敗しました。";
+  } finally {
+    isRemoving.value = false;
+  }
+}
 </script>
 
 <template>
@@ -180,30 +358,43 @@ async function handleCopy() {
         type="button"
         class="member-panel__overlay"
         aria-label="閉じる"
-        @click="emit('close')"
+        @click="requestClose"
       />
       <aside ref="panelRef" class="member-panel__panel" tabindex="-1">
         <header class="member-panel__header">
-          <div>
-            <p class="member-panel__eyebrow">メンバー詳細</p>
-            <h3 class="member-panel__title">{{ member.displayName }}</h3>
-            <div class="member-panel__status">
-              <span
-                class="status-indicator"
-                :class="`status-${member.statusClass}`"
-              >
-                {{ member.statusLabel }}
-              </span>
-              <span class="badge" :class="`role-${member.role}`">
-                {{ roleLabel(member.role) }}
-              </span>
+          <div class="member-panel__identity">
+            <div class="member-panel__avatar" aria-hidden="true">
+              <img
+                v-if="member.avatarUrl"
+                :src="member.avatarUrl"
+                alt=""
+                class="member-panel__avatar-img"
+              />
+              <span v-else>{{ initials }}</span>
+            </div>
+            <div>
+              <p class="member-panel__eyebrow">メンバー詳細</p>
+              <h3 class="member-panel__title">{{ primaryName }}</h3>
+              <div class="member-panel__status">
+                <span
+                  class="status-dot"
+                  :class="`status-${member.statusClass}`"
+                  aria-hidden="true"
+                />
+                <span class="member-panel__status-text">
+                  {{ member.statusLabel }}
+                </span>
+                <span class="badge" :class="`role-${member.role}`">
+                  {{ roleLabel(member.role) }}
+                </span>
+              </div>
             </div>
           </div>
           <button
             type="button"
             class="member-panel__close"
             aria-label="閉じる"
-            @click="emit('close')"
+            @click="requestClose"
           >
             ✕
           </button>
@@ -212,15 +403,33 @@ async function handleCopy() {
         <section class="member-panel__section">
           <h4>基本情報</h4>
           <div class="member-panel__row">
-            <span>ユーザーID</span>
+            <span class="member-panel__label">ユーザーID</span>
             <div class="member-panel__row-value">
               <span class="member-panel__mono">{{ member.userId }}</span>
               <button
                 type="button"
-                class="member-panel__copy"
+                class="member-panel__icon-button"
+                aria-label="ユーザーIDをコピー"
                 @click="handleCopy"
               >
-                コピー
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M9 9h9v10H9z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M6 5h9v3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
               </button>
             </div>
           </div>
@@ -228,11 +437,11 @@ async function handleCopy() {
             {{ copyMessage }}
           </p>
           <div class="member-panel__row">
-            <span>メール</span>
+            <span class="member-panel__label">メール</span>
             <span>{{ member.email || "—" }}</span>
           </div>
           <div class="member-panel__row">
-            <span>最終アクセス</span>
+            <span class="member-panel__label">最終アクセス</span>
             <span>{{ lastAccessedLabel }}</span>
           </div>
         </section>
@@ -244,28 +453,50 @@ async function handleCopy() {
           </div>
           <select
             v-else
-            :value="member.role"
-            :disabled="!canEditCurrentRole || isUpdating"
-            @change="handleRoleChange"
+            v-model="draftRole"
+            :disabled="!canEditCurrentRole || isSaving"
           >
             <option v-for="role in roleOptions" :key="role" :value="role">
               {{ roleLabel(role) }}
             </option>
           </select>
           <p v-if="roleHint" class="member-panel__hint">{{ roleHint }}</p>
+          <p v-if="saveSuccess" class="member-panel__success">
+            {{ saveSuccess }}
+          </p>
+          <div class="member-panel__actions">
+            <AppButton
+              :disabled="!canSave"
+              :loading="isSaving"
+              @click="handleSave"
+            >
+              {{ isSaving ? "保存中..." : "保存" }}
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              :disabled="!isDirty || isSaving"
+              @click="handleDiscard"
+            >
+              変更を破棄
+            </AppButton>
+          </div>
         </section>
 
         <section class="member-panel__section">
           <h4>メンバー操作</h4>
           <AppButton
             variant="outline"
+            class="member-panel__danger"
             :disabled="!canRemoveCurrent || isRemoving"
             :loading="isRemoving"
-            @click="emit('remove')"
+            @click="handleRemove"
           >
-            メンバーを削除
+            {{ isRemoving ? "削除中..." : "メンバーを削除" }}
           </AppButton>
           <p v-if="removeHint" class="member-panel__hint">{{ removeHint }}</p>
+          <p v-if="removeError" class="member-panel__error">
+            {{ removeError }}
+          </p>
         </section>
       </aside>
     </div>
@@ -331,6 +562,31 @@ async function handleCopy() {
   align-items: flex-start;
 }
 
+.member-panel__identity {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+}
+
+.member-panel__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.member-panel__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .member-panel__eyebrow {
   margin: 0;
   font-size: 0.8rem;
@@ -340,8 +596,8 @@ async function handleCopy() {
 }
 
 .member-panel__title {
-  margin: 0.35rem 0 0;
-  font-size: 1.2rem;
+  margin: 0.2rem 0 0;
+  font-size: 1.25rem;
   color: var(--text-strong);
 }
 
@@ -350,6 +606,30 @@ async function handleCopy() {
   gap: 0.5rem;
   align-items: center;
   margin-top: 0.5rem;
+}
+
+.member-panel__status-text {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.status-dot.status-online {
+  background: var(--accent-success);
+}
+
+.status-dot.status-away {
+  background: var(--accent-warning);
+}
+
+.status-dot.status-offline {
+  background: var(--text-muted);
 }
 
 .member-panel__close {
@@ -367,6 +647,11 @@ async function handleCopy() {
   gap: 0.75rem;
 }
 
+.member-panel__section + .member-panel__section {
+  border-top: 1px solid var(--border-light);
+  padding-top: 1rem;
+}
+
 .member-panel__section h4 {
   margin: 0;
   font-size: 1rem;
@@ -374,11 +659,19 @@ async function handleCopy() {
 }
 
 .member-panel__row {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  align-items: center;
+  gap: 0.75rem;
   font-size: 0.95rem;
   color: var(--text);
+}
+
+.member-panel__label {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .member-panel__row-value {
@@ -397,13 +690,31 @@ async function handleCopy() {
   color: var(--text-muted);
 }
 
-.member-panel__copy {
-  border: none;
+.member-panel__icon-button {
+  border: 1px solid var(--border-light);
   background: transparent;
-  color: var(--primary);
-  font-weight: 600;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 0;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.member-panel__icon-button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.member-panel__icon-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .member-panel__section select {
@@ -421,10 +732,51 @@ async function handleCopy() {
   cursor: not-allowed;
 }
 
+.member-panel__actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .member-panel__hint {
   margin: 0;
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.member-panel__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent-danger);
+}
+
+.member-panel__success {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent-success);
+}
+
+.member-panel__error-detail summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.member-panel__error-detail-text {
+  margin: 0.4rem 0 0;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  word-break: break-all;
+}
+
+.member-panel__danger {
+  border-color: color-mix(in srgb, var(--accent-danger) 65%, transparent);
+  color: var(--accent-danger);
+}
+
+.member-panel__danger:hover {
+  background: color-mix(in srgb, var(--accent-danger) 12%, transparent);
 }
 
 .badge {
@@ -448,23 +800,6 @@ async function handleCopy() {
 .badge.role-member,
 .badge.role-viewer {
   background: color-mix(in srgb, var(--primary-strong) 6%, transparent);
-  color: var(--text-muted);
-}
-
-.status-indicator {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.status-indicator.status-online {
-  color: var(--accent-success);
-}
-
-.status-indicator.status-away {
-  color: var(--accent-warning);
-}
-
-.status-indicator.status-offline {
   color: var(--text-muted);
 }
 

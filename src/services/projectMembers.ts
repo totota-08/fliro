@@ -44,6 +44,16 @@ interface AddProjectMemberOptions {
   actorName?: string;
 }
 
+interface UpdateMemberRoleOptions {
+  actor?: {
+    id?: string | null;
+    name?: string;
+    origin?: "ui" | "command" | "bot" | "system";
+  };
+  previousRole?: ProjectMember["role"];
+  memberName?: string;
+}
+
 function getPermissionsFromRole(role: ProjectMember["role"]) {
   const isAdmin = role === "owner" || role === "admin";
   return {
@@ -166,7 +176,11 @@ export async function removeProjectMember(
   },
 ) {
   await deleteDoc(doc(db, "projects", projectId, "members", userId));
-  await deleteDoc(doc(db, "userProjects", userId, "projects", projectId));
+  try {
+    await deleteDoc(doc(db, "userProjects", userId, "projects", projectId));
+  } catch (error) {
+    logger.warn`Failed to delete userProjects for ${userId}: ${error}`;
+  }
 
   // Remove from Realtime Database
   const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
@@ -192,6 +206,7 @@ export async function updateProjectMemberRole(
   projectId: string,
   userId: string,
   role: ProjectMember["role"],
+  options?: UpdateMemberRoleOptions,
 ) {
   const permissions = getPermissionsFromRole(role);
   await setDoc(
@@ -209,11 +224,34 @@ export async function updateProjectMemberRole(
       lastAccessedAt: serverTimestamp(),
     },
     { merge: true },
-  );
+  ).catch((error) => {
+    logger.warn`Failed to update userProjects for ${userId}: ${error}`;
+  });
+
+  try {
+    if (!options?.previousRole || options.previousRole !== role) {
+      await addProjectEvent(projectId, {
+        type: "member.role_changed",
+        origin: options?.actor?.origin ?? "ui",
+        actorId: options?.actor?.id ?? null,
+        actorName: options?.actor?.name || options?.actor?.id || "System",
+        payload: {
+          memberId: userId,
+          memberName: options?.memberName ?? userId,
+          fromRole: options?.previousRole ?? null,
+          toRole: role,
+        },
+      });
+    }
+  } catch (error) {
+    logger.error`Failed to log member.role_changed: ${error}`;
+  }
 
   const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
   await set(rtdbRef, {
     role,
     joinedAt: Date.now(),
+  }).catch((error) => {
+    logger.warn`Failed to update realtime member for ${userId}: ${error}`;
   });
 }

@@ -189,7 +189,18 @@ service cloud.firestore {
                     && request.resource.data.projectName is string
                     && request.resource.data.role is string
                     && request.resource.data.lastAccessedAt is timestamp;
-      allow read, update, delete: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn()
+                    && (request.auth.uid == userId
+                        || isProjectOwner(projectId)
+                        || canInviteMembers(projectId))
+                    && request.resource.data.projectName is string
+                    && request.resource.data.role is string
+                    && request.resource.data.lastAccessedAt is timestamp;
+      allow delete: if isSignedIn()
+                    && (request.auth.uid == userId
+                        || isProjectOwner(projectId)
+                        || canInviteMembers(projectId));
     }
 
     match /pendingInvites/{inviteId} {

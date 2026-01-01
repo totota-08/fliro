@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
+import InviteLinksMiniCard from "@/components/invites/InviteLinksMiniCard.vue";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
 import { appName } from "@/constants/appMeta";
@@ -14,7 +15,13 @@ import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -106,15 +113,6 @@ const navItems = computed<DashboardNavItem[]>(
           params: { projectId: projectId.value },
         },
         icon: "members",
-      },
-      {
-        key: "invites",
-        label: "招待リンク",
-        to: {
-          name: ROUTE_NAMES.projectInvites,
-          params: { projectId: projectId.value },
-        },
-        icon: "invites",
       },
       {
         key: "settings",
@@ -249,6 +247,11 @@ const currentPermissions = computed(() => {
   }
   return buildPermissionsFromRoles([]);
 });
+const canManageInvites = computed(
+  () =>
+    currentPermissions.value.canInviteMembers ||
+    currentPermissions.value.canManageMembers,
+);
 const canManageMembers = computed(
   () =>
     currentPermissions.value.canEditRoles ||
@@ -308,37 +311,71 @@ function watchProject() {
 
   stopMembers = onSnapshot(
     collection(db, "projects", projectId.value, "members"),
-    (snapshot) => {
-      const list = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as any;
-        const userId = data.userId || docSnap.id;
-        const role: MemberRole = data.role || "member";
-        const roles = (data.roles as string[] | undefined) ?? [role];
-        const permissions =
-          data.permissions ?? buildPermissionsFromRoles(roles);
-        const statusLabel = getStatusLabel(data.lastAccessedAt);
-        const displayName =
-          data.displayName ||
-          data.name ||
-          data.userName ||
-          data.username ||
-          data.nickname ||
-          data.fullName ||
-          `メンバー ${userId.slice(-4)}`;
-        return {
-          id: docSnap.id,
-          userId,
-          role,
-          roles,
-          displayName,
-          email: data.email || null,
-          avatarUrl: data.avatarUrl || null,
-          statusLabel,
-          statusClass: getStatusClass(statusLabel),
-          lastAccessedAt: data.lastAccessedAt,
-          permissions,
-        } satisfies MemberDisplay;
-      });
+    async (snapshot) => {
+      const list = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data() as any;
+          const userId = data.userId || docSnap.id;
+          const role: MemberRole = data.role || "member";
+          const roles = (data.roles as string[] | undefined) ?? [role];
+          const permissions =
+            data.permissions ?? buildPermissionsFromRoles(roles);
+          const statusLabel = getStatusLabel(data.lastAccessedAt);
+          const baseName = [
+            data.displayName,
+            data.name,
+            data.userName,
+            data.username,
+            data.nickname,
+            data.fullName,
+          ].find(
+            (value): value is string =>
+              typeof value === "string" && value.trim().length > 0,
+          );
+          let displayName = baseName ? baseName.trim() : "";
+          const looksLikeUid =
+            displayName === userId || displayName === docSnap.id;
+
+          if (!displayName || looksLikeUid) {
+            try {
+              const profileSnap = await getDoc(doc(db, "profiles", userId));
+              if (profileSnap.exists()) {
+                const profile = profileSnap.data() as {
+                  nickname?: string;
+                  fullName?: string;
+                };
+                const profileName = [profile.nickname, profile.fullName].find(
+                  (value): value is string =>
+                    typeof value === "string" && value.trim().length > 0,
+                );
+                if (profileName) {
+                  displayName = profileName.trim();
+                }
+              }
+            } catch (error) {
+              logger.error`Failed to fetch profile for ${userId}: ${error}`;
+            }
+          }
+
+          if (!displayName) {
+            displayName = `メンバー ${userId.slice(-4)}`;
+          }
+
+          return {
+            id: docSnap.id,
+            userId,
+            role,
+            roles,
+            displayName,
+            email: data.email || null,
+            avatarUrl: data.avatarUrl || null,
+            statusLabel,
+            statusClass: getStatusClass(statusLabel),
+            lastAccessedAt: data.lastAccessedAt,
+            permissions,
+          } satisfies MemberDisplay;
+        }),
+      );
       const rank: Record<MemberRole, number> = {
         owner: 0,
         admin: 1,
@@ -543,336 +580,355 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="プロジェクト"
-      @close="closeSidebar"
-    />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+  <div class="project-members-page">
+    <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
+      <DashboardSidebar
+        :open="isSidebarOpen"
+        :nav-items="navItems"
+        :projects="sidebarProjects"
+        :profile="profileInfo"
+        brand-subtitle="プロジェクト"
+        @close="closeSidebar"
+      />
+      <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
 
-    <div class="demo__main">
-      <header class="demo__topbar">
-        <div class="demo__topbar-left">
-          <button
-            type="button"
-            class="demo__menu-button"
-            @click="toggleSidebar"
-          >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              aria-hidden="true"
-              class="demo__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-          <div>
-            <p class="demo__breadcrumb">プロジェクト &gt; メンバー</p>
-            <h1 class="demo__heading">{{ project?.name || "プロジェクト" }}</h1>
-          </div>
-        </div>
-      </header>
-
-      <div class="demo__content demo__content--condensed">
-        <section class="team-page">
-          <header class="team-page__header">
-            <div>
-              <h2>チーム</h2>
-              <p>メンバーの状態と権限をまとめて確認できます。</p>
-            </div>
+      <div class="demo__main">
+        <header class="demo__topbar">
+          <div class="demo__topbar-left">
             <button
-              v-if="canManageMembers"
               type="button"
-              class="team-page__invite"
-              @click="openInviteModal"
+              class="demo__menu-button"
+              @click="toggleSidebar"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <span class="sr-only">サイドバーを切り替え</span>
+              <svg
+                aria-hidden="true"
+                class="demo__menu-icon"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path
-                  d="M12 5v14M5 12h14"
-                  stroke-width="1.7"
                   stroke-linecap="round"
                   stroke-linejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
-              メンバーを招待
             </button>
-          </header>
-
-          <div class="team-page__stats">
-            <article>
-              <p>総メンバー</p>
-              <strong>{{ memberStats.total }}</strong>
-            </article>
-            <article>
-              <p>管理者</p>
-              <strong>{{ memberStats.adminCount }}</strong>
-            </article>
-            <article>
-              <p>オンライン</p>
-              <strong>{{ memberStats.online }}</strong>
-            </article>
-          </div>
-
-          <div class="team-page__layout">
-            <div class="team-page__members">
-              <div class="team-page__members-header">
-                <div>
-                  <h3>メンバー一覧</h3>
-                  <p class="team-page__members-count">
-                    表示: {{ filteredMembers.length }} / {{ members.length }}
-                  </p>
-                </div>
-                <div class="team-page__search">
-                  <label class="sr-only" for="member-search">
-                    メンバーを検索
-                  </label>
-                  <input
-                    id="member-search"
-                    v-model="memberQuery"
-                    type="search"
-                    placeholder="名前・メール・IDで検索"
-                    autocomplete="off"
-                  />
-                </div>
-              </div>
-              <div class="team-page__members-list">
-                <ul class="team-member__list">
-                  <li
-                    v-for="member in filteredMembers"
-                    :key="member.userId"
-                    :class="[
-                      'team-member',
-                      'team-member--clickable',
-                      {
-                        'team-member--selected':
-                          member.userId === selectedMemberId,
-                      },
-                    ]"
-                    role="button"
-                    tabindex="0"
-                    :aria-label="`${member.displayName}の詳細を開く`"
-                    @click="openMemberPanel(member)"
-                    @keydown.enter.prevent="openMemberPanel(member)"
-                    @keydown.space.prevent="openMemberPanel(member)"
-                  >
-                    <div class="team-member__persona">
-                      <div class="avatar" aria-hidden="true">
-                        <span>{{ getInitials(member.displayName) }}</span>
-                      </div>
-                      <div>
-                        <p class="team-member__name">
-                          {{ member.displayName }}
-                        </p>
-                        <p class="team-member__email">
-                          {{ member.email || "メール未登録" }}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="team-member__role">
-                      <span class="badge" :class="`role-${member.role}`">
-                        {{ getRoleLabel(member.role) }}
-                      </span>
-                    </div>
-
-                    <div class="team-member__details">
-                      <span
-                        class="status-indicator"
-                        :class="`status-${member.statusClass}`"
-                        >{{ member.statusLabel }}</span
-                      >
-                    </div>
-                  </li>
-                  <li
-                    v-if="!filteredMembers.length"
-                    class="team-member team-member--empty"
-                  >
-                    {{
-                      members.length
-                        ? "検索結果がありません。"
-                        : "まだメンバーがいません。"
-                    }}
-                  </li>
-                </ul>
-              </div>
+            <div>
+              <p class="demo__breadcrumb">プロジェクト &gt; メンバー</p>
+              <h1 class="demo__heading">
+                {{ project?.name || "プロジェクト" }}
+              </h1>
             </div>
-
-            <aside class="team-page__aside">
-              <section class="team-page__aside-card">
-                <h3>チームの状態</h3>
-                <div class="team-page__summary-grid">
-                  <div class="team-page__summary-item">
-                    <p>オンライン</p>
-                    <strong>{{ memberStats.online }}</strong>
-                  </div>
-                  <div class="team-page__summary-item">
-                    <p>アクティブ(24h)</p>
-                    <strong>{{ active24hCount }}</strong>
-                  </div>
-                  <div class="team-page__summary-item">
-                    <p>メール未登録</p>
-                    <strong>{{ missingEmailCount }}</strong>
-                  </div>
-                  <div
-                    class="team-page__summary-item team-page__summary-item--status"
-                  >
-                    <p>招待リンク</p>
-                    <span class="team-page__summary-badge">
-                      {{ inviteStatus }}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  class="team-page__summary-link"
-                  @click="goToInvites"
-                >
-                  招待リンクへ
-                </button>
-              </section>
-
-              <section class="team-page__aside-card">
-                <h3>ロール内訳</h3>
-                <ul class="team-page__role-list">
-                  <li
-                    v-for="role in roleOrder"
-                    :key="role"
-                    class="team-page__role-row"
-                  >
-                    <span class="badge" :class="`role-${role}`">
-                      {{ getRoleLabel(role) }}
-                    </span>
-                    <span class="team-page__role-count">
-                      {{ roleBreakdown[role] }}
-                    </span>
-                  </li>
-                </ul>
-              </section>
-
-              <section class="team-page__aside-card">
-                <h3>最近アクセス</h3>
-                <ul class="team-page__recent-list">
-                  <li
-                    v-for="member in recentAccessMembers"
-                    :key="member.userId"
-                    class="team-page__recent-row"
-                  >
-                    <div class="avatar avatar--sm" aria-hidden="true">
-                      <span>{{ getInitials(member.displayName) }}</span>
-                    </div>
-                    <div class="team-page__recent-info">
-                      <p class="team-page__recent-name">
-                        {{ member.displayName }}
-                      </p>
-                      <p class="team-page__recent-meta">
-                        <span>{{
-                          formatRelativeTime(member.lastAccessedAt)
-                        }}</span>
-                        <span class="team-page__recent-sep">・</span>
-                        <span>{{ member.statusLabel }}</span>
-                      </p>
-                    </div>
-                  </li>
-                  <li
-                    v-if="!recentAccessMembers.length"
-                    class="team-page__recent-empty"
-                  >
-                    最近アクセスがありません。
-                  </li>
-                </ul>
-              </section>
-
-              <section class="team-page__aside-card">
-                <h3>クイック操作</h3>
-                <div class="team-page__actions">
-                  <button
-                    type="button"
-                    class="team-page__action-button"
-                    :disabled="!canManageMembers"
-                    @click="openInviteModal"
-                  >
-                    メンバーを招待
-                  </button>
-                  <button
-                    type="button"
-                    class="team-page__action-button team-page__action-button--ghost"
-                    @click="goToTimeline"
-                  >
-                    ログを見る
-                  </button>
-                </div>
-              </section>
-            </aside>
           </div>
-          <MemberDetailPanel
-            :open="Boolean(selectedMember)"
-            :member="selectedMember"
-            :role-options="roleOptions"
-            :can-edit-role="currentPermissions.canEditRoles"
-            :can-remove="currentPermissions.canManageMembers"
-            :current-user-id="user?.uid"
-            :save-role="saveRoleHandler"
-            :remove-member="removeMemberHandler"
-            @close="closeMemberPanel"
-          />
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <Teleport to="body">
-    <div
-      v-if="isInviteOpen"
-      class="invite-modal__overlay"
-      @click="closeInviteModal"
-    >
-      <div
-        class="invite-modal__panel invite-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="invite-dialog-title"
-        @click.stop
-      >
-        <button
-          type="button"
-          class="invite-modal__close"
-          aria-label="閉じる"
-          @click="closeInviteModal"
-        >
-          ✕
-        </button>
-        <header>
-          <div>
-            <h3 id="invite-dialog-title">参加リンクを共有</h3>
-            <p>
-              リンクをコピーして共有すると、メンバーはこのプロジェクトに参加できます。
-            </p>
-          </div>
-          <p class="invite-panel__hint">
-            必要に応じてパスワードを設定してください。
-          </p>
         </header>
 
-        <ProjectInviteForm
-          :project-id="projectId"
-          :project-name="project?.name"
-          @generated="handleLinkGenerated"
-        />
+        <div class="demo__content demo__content--condensed">
+          <section class="team-page">
+            <header class="team-page__header">
+              <div>
+                <h2>チーム</h2>
+                <p>メンバーの状態と権限をまとめて確認できます。</p>
+              </div>
+              <div v-if="canManageMembers" class="team-page__header-actions">
+                <button
+                  type="button"
+                  class="team-page__invite"
+                  @click="openInviteModal"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path
+                      d="M12 5v14M5 12h14"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  メンバーを招待
+                </button>
+                <button
+                  v-if="canManageInvites"
+                  type="button"
+                  class="team-page__invite-link"
+                  @click="goToInvites"
+                >
+                  招待リンク管理 →
+                </button>
+              </div>
+            </header>
+
+            <div class="team-page__stats">
+              <article>
+                <p>総メンバー</p>
+                <strong>{{ memberStats.total }}</strong>
+              </article>
+              <article>
+                <p>管理者</p>
+                <strong>{{ memberStats.adminCount }}</strong>
+              </article>
+              <article>
+                <p>オンライン</p>
+                <strong>{{ memberStats.online }}</strong>
+              </article>
+            </div>
+
+            <div class="team-page__layout">
+              <div class="team-page__members">
+                <div class="team-page__members-header">
+                  <div>
+                    <h3>メンバー一覧</h3>
+                    <p class="team-page__members-count">
+                      表示: {{ filteredMembers.length }} / {{ members.length }}
+                    </p>
+                  </div>
+                  <div class="team-page__search">
+                    <label class="sr-only" for="member-search">
+                      メンバーを検索
+                    </label>
+                    <input
+                      id="member-search"
+                      v-model="memberQuery"
+                      type="search"
+                      placeholder="名前・メール・IDで検索"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+                <div class="team-page__members-list">
+                  <ul class="team-member__list">
+                    <li
+                      v-for="member in filteredMembers"
+                      :key="member.userId"
+                      :class="[
+                        'team-member',
+                        'team-member--clickable',
+                        {
+                          'team-member--selected':
+                            member.userId === selectedMemberId,
+                        },
+                      ]"
+                      role="button"
+                      tabindex="0"
+                      :aria-label="`${member.displayName}の詳細を開く`"
+                      @click="openMemberPanel(member)"
+                      @keydown.enter.prevent="openMemberPanel(member)"
+                      @keydown.space.prevent="openMemberPanel(member)"
+                    >
+                      <div class="team-member__persona">
+                        <div class="avatar" aria-hidden="true">
+                          <span>{{ getInitials(member.displayName) }}</span>
+                        </div>
+                        <div>
+                          <p class="team-member__name">
+                            {{ member.displayName }}
+                          </p>
+                          <p class="team-member__email">
+                            {{ member.email || "メール未登録" }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="team-member__role">
+                        <span class="badge" :class="`role-${member.role}`">
+                          {{ getRoleLabel(member.role) }}
+                        </span>
+                      </div>
+
+                      <div class="team-member__details">
+                        <span
+                          class="status-indicator"
+                          :class="`status-${member.statusClass}`"
+                          >{{ member.statusLabel }}</span
+                        >
+                      </div>
+                    </li>
+                    <li
+                      v-if="!filteredMembers.length"
+                      class="team-member team-member--empty"
+                    >
+                      {{
+                        members.length
+                          ? "検索結果がありません。"
+                          : "まだメンバーがいません。"
+                      }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <aside class="team-page__aside">
+                <section class="team-page__aside-card">
+                  <h3>チームの状態</h3>
+                  <div class="team-page__summary-grid">
+                    <div class="team-page__summary-item">
+                      <p>オンライン</p>
+                      <strong>{{ memberStats.online }}</strong>
+                    </div>
+                    <div class="team-page__summary-item">
+                      <p>アクティブ(24h)</p>
+                      <strong>{{ active24hCount }}</strong>
+                    </div>
+                    <div class="team-page__summary-item">
+                      <p>メール未登録</p>
+                      <strong>{{ missingEmailCount }}</strong>
+                    </div>
+                    <div
+                      class="team-page__summary-item team-page__summary-item--status"
+                    >
+                      <p>招待リンク</p>
+                      <span class="team-page__summary-badge">
+                        {{ inviteStatus }}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    v-if="canManageInvites"
+                    type="button"
+                    class="team-page__summary-link"
+                    @click="goToInvites"
+                  >
+                    招待リンクへ
+                  </button>
+                </section>
+
+                <InviteLinksMiniCard
+                  :project-id="projectId"
+                  :can-manage="canManageInvites"
+                />
+
+                <section class="team-page__aside-card">
+                  <h3>ロール内訳</h3>
+                  <ul class="team-page__role-list">
+                    <li
+                      v-for="role in roleOrder"
+                      :key="role"
+                      class="team-page__role-row"
+                    >
+                      <span class="badge" :class="`role-${role}`">
+                        {{ getRoleLabel(role) }}
+                      </span>
+                      <span class="team-page__role-count">
+                        {{ roleBreakdown[role] }}
+                      </span>
+                    </li>
+                  </ul>
+                </section>
+
+                <section class="team-page__aside-card">
+                  <h3>最近アクセス</h3>
+                  <ul class="team-page__recent-list">
+                    <li
+                      v-for="member in recentAccessMembers"
+                      :key="member.userId"
+                      class="team-page__recent-row"
+                    >
+                      <div class="avatar avatar--sm" aria-hidden="true">
+                        <span>{{ getInitials(member.displayName) }}</span>
+                      </div>
+                      <div class="team-page__recent-info">
+                        <p class="team-page__recent-name">
+                          {{ member.displayName }}
+                        </p>
+                        <p class="team-page__recent-meta">
+                          <span>{{
+                            formatRelativeTime(member.lastAccessedAt)
+                          }}</span>
+                          <span class="team-page__recent-sep">・</span>
+                          <span>{{ member.statusLabel }}</span>
+                        </p>
+                      </div>
+                    </li>
+                    <li
+                      v-if="!recentAccessMembers.length"
+                      class="team-page__recent-empty"
+                    >
+                      最近アクセスがありません。
+                    </li>
+                  </ul>
+                </section>
+
+                <section class="team-page__aside-card">
+                  <h3>クイック操作</h3>
+                  <div class="team-page__actions">
+                    <button
+                      type="button"
+                      class="team-page__action-button"
+                      :disabled="!canManageMembers"
+                      @click="openInviteModal"
+                    >
+                      メンバーを招待
+                    </button>
+                    <button
+                      type="button"
+                      class="team-page__action-button team-page__action-button--ghost"
+                      @click="goToTimeline"
+                    >
+                      ログを見る
+                    </button>
+                  </div>
+                </section>
+              </aside>
+            </div>
+            <MemberDetailPanel
+              :open="Boolean(selectedMember)"
+              :member="selectedMember"
+              :role-options="roleOptions"
+              :can-edit-role="currentPermissions.canEditRoles"
+              :can-remove="currentPermissions.canManageMembers"
+              :current-user-id="user?.uid"
+              :save-role="saveRoleHandler"
+              :remove-member="removeMemberHandler"
+              @close="closeMemberPanel"
+            />
+          </section>
+        </div>
       </div>
     </div>
-  </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="isInviteOpen"
+        class="invite-modal__overlay"
+        @click="closeInviteModal"
+      >
+        <div
+          class="invite-modal__panel invite-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invite-dialog-title"
+          @click.stop
+        >
+          <button
+            type="button"
+            class="invite-modal__close"
+            aria-label="閉じる"
+            @click="closeInviteModal"
+          >
+            ✕
+          </button>
+          <header>
+            <div>
+              <h3 id="invite-dialog-title">参加リンクを共有</h3>
+              <p>
+                リンクをコピーして共有すると、メンバーはこのプロジェクトに参加できます。
+              </p>
+            </div>
+            <p class="invite-panel__hint">
+              必要に応じてパスワードを設定してください。
+            </p>
+          </header>
+
+          <ProjectInviteForm
+            :project-id="projectId"
+            :project-name="project?.name"
+            @generated="handleLinkGenerated"
+          />
+        </div>
+      </div>
+    </Teleport>
+  </div>
 </template>
 
 <style scoped>
@@ -912,6 +968,12 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.team-page__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .team-page__header h2 {
   margin: 0;
 }
@@ -937,6 +999,20 @@ onBeforeUnmount(() => {
 .team-page__invite svg {
   width: 1.25rem;
   height: 1.25rem;
+}
+
+.team-page__invite-link {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.team-page__invite-link:hover {
+  color: var(--primary);
 }
 
 .team-page__stats {

@@ -18,6 +18,13 @@ const STATUS_LABEL: Record<string, string> = {
   done: "完了",
 };
 
+const ROLE_LABEL: Record<string, string> = {
+  owner: "オーナー",
+  admin: "管理者",
+  member: "メンバー",
+  viewer: "閲覧者",
+};
+
 const CATEGORY_MAP: Record<ProjectEventType, ProjectEventCategory> = {
   "task.created": "task",
   "task.status_changed": "task",
@@ -29,6 +36,7 @@ const CATEGORY_MAP: Record<ProjectEventType, ProjectEventCategory> = {
   "decision.made": "decision",
   "member.added": "member",
   "member.removed": "member",
+  "member.role_changed": "member",
   "bot.command_executed": "bot",
   "bot.error": "bot",
 };
@@ -46,6 +54,11 @@ function formatDateValue(value: unknown) {
 
 function statusLabel(status?: string) {
   return STATUS_LABEL[status || ""] ?? status ?? "不明";
+}
+
+function roleLabel(role?: string | null) {
+  if (!role) return "未設定";
+  return ROLE_LABEL[role] ?? role;
 }
 
 function formatAssignee(name?: string | null) {
@@ -140,6 +153,13 @@ export function getEventTemplate(event: ProjectEvent): EventTemplate {
         icon: "user",
         title: "メンバー削除",
         description: `${event.actorName} が ${payload.memberName || payload.memberId || "メンバー"} を削除しました`,
+        category,
+      };
+    case "member.role_changed":
+      return {
+        icon: "user",
+        title: "ロール変更",
+        description: `${event.actorName} が ${payload.memberName || payload.memberId || "メンバー"} のロールを ${roleLabel(payload.fromRole)} → ${roleLabel(payload.toRole)} に変更しました`,
         category,
       };
     case "bot.command_executed":
