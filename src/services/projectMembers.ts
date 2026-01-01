@@ -1,6 +1,7 @@
-import { database, db } from "@/lib/firebase";
 import { buildPermissionsFromRoles } from "@/constants/roles";
+import { database, db } from "@/lib/firebase";
 import { addProjectEvent } from "@/services/projectActivityLogService";
+import { getLogger } from "@logtape/logtape";
 import { ref, remove, set } from "firebase/database";
 import {
   collection,
@@ -10,7 +11,6 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger("app.services.projectMembers");
 
@@ -175,6 +175,14 @@ export async function removeProjectMember(
     origin?: "ui" | "command" | "bot" | "system";
   },
 ) {
+  if (actor?.id === userId && actor?.origin !== "system") {
+    throw new Error("permission-denied: cannot remove self");
+  }
+
+  if (actor?.id === userId && actor?.origin !== "system") {
+    throw new Error("permission-denied: cannot remove self");
+  }
+
   await deleteDoc(doc(db, "projects", projectId, "members", userId));
   try {
     await deleteDoc(doc(db, "userProjects", userId, "projects", projectId));

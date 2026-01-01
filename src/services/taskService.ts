@@ -1,4 +1,6 @@
 import { db } from "@/lib/firebase";
+import { addProjectEvent } from "@/services/projectActivityLogService";
+import type { ProjectEventOrigin } from "@/types/projectEvent";
 import { getLogger } from "@logtape/logtape";
 import {
   addDoc,
@@ -9,11 +11,9 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
-import { addProjectEvent } from "@/services/projectActivityLogService";
-import type { ProjectEventOrigin } from "@/types/projectEvent";
 
 const logger = getLogger("app.services.task");
 
@@ -159,158 +159,139 @@ export async function updateTask(
   const actorId = context?.userId ?? null;
   const actorName = context?.actorName ?? context?.userId ?? "Unknown";
   const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+  let eventsQueue: Array<{
+    type: TaskEventType;
+    payload: Record<string, any>;
+  }> = [];
 
-  let before: TaskDoc | null = null;
   try {
-    const snap = await getDoc(taskRef);
-    if (snap.exists()) {
-      before = {
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(taskRef);
+      if (!snap.exists()) {
+        throw new Error("task-not-found");
+      }
+      const before: TaskDoc = {
         id: snap.id,
         projectId,
         ...(snap.data() as Omit<TaskDoc, "id" | "projectId">),
       };
-    }
-  } catch (error) {
-    logger.error`Failed to fetch task before update ${taskId}: ${error}`;
-  }
 
-  try {
-    await updateDoc(taskRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
-    logger.debug`Task ${taskId} updated successfully`;
-
-    if (!before) {
-      if (Object.keys(updates).length === 0) return;
-      try {
-        await addProjectEvent(projectId, {
-          type: "task.updated",
-          origin,
-          actorId,
-          actorName,
-          payload: {
-            taskId: taskId,
-            taskTitle: updates.title,
-            changes: Object.entries(updates).map(([field, value]) => ({
-              field,
-              from: null,
-              to: value,
-            })),
-          },
-        });
-      } catch (eventError) {
-        logger.error`Failed to add task.updated event (no before data): ${eventError}`;
-      }
-      return;
-    }
-
-    const after: TaskDoc = {
-      ...(before as TaskDoc),
-      ...(updates as any),
-    };
-
-    const eventsQueue: Array<{
-      type: TaskEventType;
-      payload: Record<string, any>;
-    }> = [];
-
-    if (updates.status && updates.status !== before.status) {
-      eventsQueue.push({
-        type: "task.status_changed",
-        payload: {
-          taskId,
-          taskTitle: after.title,
-          fromStatus: before.status,
-          toStatus: updates.status,
-        },
+      transaction.update(taskRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
       });
-    }
 
-    if (
-      typeof updates.progress === "number" &&
-      !Number.isNaN(updates.progress) &&
-      (before.progress ?? 0) !== updates.progress
-    ) {
-      eventsQueue.push({
-        type: "task.progress_changed",
-        payload: {
-          taskId,
-          taskTitle: after.title,
-          fromProgress: before.progress ?? 0,
-          toProgress: updates.progress,
-        },
-      });
-    }
+      // Calculate events within transaction to ensure 'before' is consistent
+      eventsQueue = []; // Reset queue on retry
 
-    const assigneeChanged =
-      Object.prototype.hasOwnProperty.call(updates, "assigneeId") ||
-      Object.prototype.hasOwnProperty.call(updates, "assigneeName");
-    if (
-      assigneeChanged &&
-      (before.assigneeId !== after.assigneeId ||
-        before.assigneeName !== after.assigneeName)
-    ) {
-      eventsQueue.push({
-        type: "task.assigned",
-        payload: {
-          taskId,
-          taskTitle: after.title,
-          fromAssigneeId: before.assigneeId ?? null,
-          fromAssigneeName: before.assigneeName ?? null,
-          toAssigneeId: after.assigneeId ?? null,
-          toAssigneeName: after.assigneeName ?? null,
-        },
-      });
-    }
+      const after: TaskDoc = {
+        ...before,
+        ...(updates as any),
+      };
 
-    const dueChanged = Object.prototype.hasOwnProperty.call(updates, "dueDate");
-    if (dueChanged) {
-      const fromDue =
-        before.dueDate && "seconds" in before.dueDate
-          ? before.dueDate
-          : (before.dueDate ?? null);
-      const toDue = updates.dueDate ?? after.dueDate ?? null;
-      if (JSON.stringify(fromDue) !== JSON.stringify(toDue)) {
+      if (updates.status && updates.status !== before.status) {
         eventsQueue.push({
-          type: "task.due_changed",
+          type: "task.status_changed",
           payload: {
             taskId,
             taskTitle: after.title,
-            fromDueDate: fromDue,
-            toDueDate: toDue,
+            fromStatus: before.status,
+            toStatus: updates.status,
           },
         });
       }
-    }
 
-    const remainingChanges: Array<{ field: string; from: any; to: any }> = [];
-    const tracked = [
-      "status",
-      "progress",
-      "assigneeId",
-      "assigneeName",
-      "dueDate",
-    ];
-    Object.entries(updates).forEach(([field, value]) => {
-      if (tracked.includes(field)) return;
-      const previous = (before as any)[field];
-      if (JSON.stringify(previous) !== JSON.stringify(value)) {
-        remainingChanges.push({ field, from: previous ?? null, to: value });
+      if (
+        typeof updates.progress === "number" &&
+        !Number.isNaN(updates.progress) &&
+        (before.progress ?? 0) !== updates.progress
+      ) {
+        eventsQueue.push({
+          type: "task.progress_changed",
+          payload: {
+            taskId,
+            taskTitle: after.title,
+            fromProgress: before.progress ?? 0,
+            toProgress: updates.progress,
+          },
+        });
+      }
+
+      const assigneeChanged =
+        Object.prototype.hasOwnProperty.call(updates, "assigneeId") ||
+        Object.prototype.hasOwnProperty.call(updates, "assigneeName");
+      if (
+        assigneeChanged &&
+        (before.assigneeId !== after.assigneeId ||
+          before.assigneeName !== after.assigneeName)
+      ) {
+        eventsQueue.push({
+          type: "task.assigned",
+          payload: {
+            taskId,
+            taskTitle: after.title,
+            fromAssigneeId: before.assigneeId ?? null,
+            fromAssigneeName: before.assigneeName ?? null,
+            toAssigneeId: after.assigneeId ?? null,
+            toAssigneeName: after.assigneeName ?? null,
+          },
+        });
+      }
+
+      const dueChanged = Object.prototype.hasOwnProperty.call(
+        updates,
+        "dueDate",
+      );
+      if (dueChanged) {
+        const fromDue =
+          before.dueDate && "seconds" in before.dueDate
+            ? before.dueDate
+            : (before.dueDate ?? null);
+        const toDue = updates.dueDate ?? after.dueDate ?? null;
+        if (JSON.stringify(fromDue) !== JSON.stringify(toDue)) {
+          eventsQueue.push({
+            type: "task.due_changed",
+            payload: {
+              taskId,
+              taskTitle: after.title,
+              fromDueDate: fromDue,
+              toDueDate: toDue,
+            },
+          });
+        }
+      }
+
+      const remainingChanges: Array<{ field: string; from: any; to: any }> = [];
+      const tracked = [
+        "status",
+        "progress",
+        "assigneeId",
+        "assigneeName",
+        "dueDate",
+      ];
+      Object.entries(updates).forEach(([field, value]) => {
+        if (tracked.includes(field)) return;
+        const previous = (before as any)[field];
+        if (JSON.stringify(previous) !== JSON.stringify(value)) {
+          remainingChanges.push({ field, from: previous ?? null, to: value });
+        }
+      });
+
+      if (remainingChanges.length) {
+        eventsQueue.push({
+          type: "task.updated",
+          payload: {
+            taskId,
+            taskTitle: after.title,
+            changes: remainingChanges,
+          },
+        });
       }
     });
 
-    if (remainingChanges.length) {
-      eventsQueue.push({
-        type: "task.updated",
-        payload: {
-          taskId,
-          taskTitle: after.title,
-          changes: remainingChanges,
-        },
-      });
-    }
+    logger.debug`Task ${taskId} updated successfully via transaction`;
 
+    // Dispatch events after transaction success
     for (const entry of eventsQueue) {
       try {
         await addProjectEvent(projectId, {
