@@ -1,3 +1,5 @@
+import { db } from "@/lib/firebase";
+import { addProjectMember } from "@/services/projectMembers";
 import {
   collection,
   deleteDoc,
@@ -16,8 +18,6 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { addProjectMember } from "@/services/projectMembers";
 
 interface CreateInviteOptions {
   projectId: string;
@@ -254,6 +254,14 @@ export async function redeemInvite(
   const data = snap.data() as ProjectInviteDoc;
   if (data.revokedAt) {
     throw new Error("invite-revoked");
+  }
+
+  // Check if already a member
+  const userProjectSnap = await getDoc(
+    doc(db, "userProjects", userId, "projects", data.projectId),
+  );
+  if (userProjectSnap.exists()) {
+    return data.projectId;
   }
 
   let expiresAtMillis: number | null = null;
