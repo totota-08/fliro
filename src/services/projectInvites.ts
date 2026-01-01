@@ -1,3 +1,5 @@
+import { db } from "@/lib/firebase";
+import { addProjectMember } from "@/services/projectMembers";
 import {
   collection,
   deleteDoc,
@@ -16,8 +18,6 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { addProjectMember } from "@/services/projectMembers";
 
 interface CreateInviteOptions {
   projectId: string;
@@ -102,7 +102,7 @@ export async function createProjectInvite({
     }
   }
   if (!resolvedProjectName) {
-    resolvedProjectName = "Project";
+    resolvedProjectName = "未設定のプロジェクト";
   }
   const passwordHash = password?.trim()
     ? await hashInvitePassword(password.trim())
@@ -194,7 +194,7 @@ export function listenProjectInvites(
       snapshot.docs.length && snapshot.docs[snapshot.docs.length - 1]
         ? snapshot.docs[snapshot.docs.length - 1]
         : null;
-    options?.onCursor?.(cursor);
+    options?.onCursor?.(cursor || null);
     callback(list);
   });
 }
@@ -215,8 +215,8 @@ export async function fetchProjectInvitesPage(
   const snapshot = await getDocs(q);
   const invites = snapshot.docs.map(mapInvite);
   const nextCursor =
-    snapshot.docs.length > 0 && snapshot.docs[snapshot.docs.length - 1]
-      ? snapshot.docs[snapshot.docs.length - 1]
+    snapshot.docs.length > 0
+      ? snapshot.docs[snapshot.docs.length - 1] || null
       : null;
   return { invites, nextCursor };
 }
