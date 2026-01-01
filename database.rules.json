@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "projects": {
+      "$projectId": {
+        "members": {
+          "$uid": {
+            ".read": "$uid === auth.uid",
+            ".write": "$uid === auth.uid",
+            ".validate": "newData.hasChildren(['role'])"
+          }
+        },
+        "realtimeChat": {
+          ".read": "auth != null && root.child('projects/'+$projectId+'/members/'+auth.uid).exists()",
+          ".write": "auth != null && root.child('projects/'+$projectId+'/members/'+auth.uid).exists()",
+          ".indexOn": ["createdAt"]
+        }
+      }
+    }
+  }
+}
