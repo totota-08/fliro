@@ -307,9 +307,12 @@ async function deleteCustomThread(threadId: string) {
 
 function scrollToBottom() {
   nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-    }
+    // Use requestAnimationFrame to ensure layout is done
+    requestAnimationFrame(() => {
+      if (chatContainer.value) {
+        chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+      }
+    });
   });
 }
 
