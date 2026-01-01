@@ -1,26 +1,15 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
-import AuthBrand from "@/components/ui/AuthBrand.vue";
-import AuthCredentialFields from "@/components/ui/AuthCredentialFields.vue";
-import AuthFormField from "@/components/ui/AuthFormField.vue";
+import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import {
-  loginWithEmail,
-  refreshCurrentUser,
-  registerCredentials,
-  resendVerificationEmail,
-} from "@/firebase/authService";
+import { loginWithEmail, registerCredentials } from "@/firebase/authService";
+import { db } from "@/lib/firebase";
 import { getCurrentUser } from "@/lib/getCurrentUser";
-import {
-  completeProfileSetup,
-  updateAccountAvatar,
-} from "@/services/accountActions";
-import { redeemInvite, fetchInviteByToken } from "@/services/projectInvites";
+import { redeemInvite } from "@/services/projectInvites";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.invite.InviteAccept");
@@ -40,7 +29,6 @@ type InvitePreview = {
   expiresAtLabel?: string;
   remainingUses?: number | null;
 };
-type SignUpStep = "credentials" | "verify" | "profile";
 
 const projectPreview = ref<InvitePreview | null>(null);
 const requiresPassword = ref(false);
@@ -48,151 +36,12 @@ const passwordInput = ref("");
 const authMode = ref<"signup" | "login">("signup");
 const emailInput = ref("");
 const passwordAuthInput = ref("");
-const authRequired = ref(false);
-const signUpStep = ref<SignUpStep>("credentials");
-const signupCompleted = ref(false);
-const signupFlowActive = ref(false);
-const credentialForm = reactive({
-  email: "",
-  password: "",
-});
-const credentialConfirm = ref("");
-const credentialLoading = ref(false);
-const credentialError = ref("");
-const credentialEmail = ref("");
-const verificationMessage = ref("");
-const verificationError = ref("");
-const resendLoading = ref(false);
-const verificationChecking = ref(false);
-const profileForm = reactive({
-  fullName: "",
-  nickname: "",
-  birthday: "",
-  jobRole: "",
-  jobTitle: "",
-});
-const profileLoading = ref(false);
-const profileError = ref("");
-const avatarFile = ref<File | null>(null);
-const avatarPreview = ref<string | null>(null);
+const passwordAuthConfirm = ref("");
 
 const isExpired = ref(false);
 const isUsageLimited = ref(false);
 
-const jobOptions = [
-  { value: "", label: "職業を選択してください" },
-  { value: "engineer", label: "エンジニア" },
-  { value: "designer", label: "デザイナー" },
-  { value: "product", label: "プロダクトマネージャー" },
-  { value: "marketing", label: "マーケター" },
-  { value: "sales", label: "営業" },
-  { value: "cs", label: "カスタマーサクセス" },
-  { value: "other", label: "その他" },
-];
-
-const credentialValid = computed(() => {
-  return (
-    credentialForm.email.includes("@") && credentialForm.password.length >= 6
-  );
-});
-
-const profileValid = computed(() => {
-  return (
-    profileForm.fullName.trim().length > 1 &&
-    Boolean(profileForm.birthday) &&
-    Boolean(profileForm.jobRole)
-  );
-});
-
-const stepOrder: SignUpStep[] = ["credentials", "verify", "profile"];
-const stepLabels: Record<SignUpStep, string> = {
-  credentials: "メールアドレス登録",
-  verify: "メール認証",
-  profile: "プロフィール設定",
-};
-
-const currentStepIndex = computed(() => {
-  return Math.max(stepOrder.indexOf(signUpStep.value), 0);
-});
-
-const progressPercent = computed(() => {
-  return ((currentStepIndex.value + 1) / stepOrder.length) * 100;
-});
-
-const canJoin = computed(
-  () =>
-    Boolean(projectPreview.value) && !isExpired.value && !isUsageLimited.value,
-);
-const canProceed = computed(() => {
-  if (loading.value || joinProcessing.value) return false;
-  if (authRequired.value && !projectPreview.value) {
-    if (authMode.value === "login") {
-      return Boolean(emailInput.value.trim() && passwordAuthInput.value.trim());
-    }
-    return false;
-  }
-  if (!canJoin.value) return false;
-  if (authMode.value === "signup") {
-    if (!signupFlowActive.value) return Boolean(user.value);
-    return Boolean(user.value && signupCompleted.value);
-  }
-  if (!user.value) {
-    return Boolean(emailInput.value.trim() && passwordAuthInput.value.trim());
-  }
-  return true;
-});
-const showAuthGate = computed(
-  () =>
-    (!user.value && (authRequired.value || Boolean(projectPreview.value))) ||
-    (authMode.value === "signup" &&
-      signupFlowActive.value &&
-      !signupCompleted.value),
-);
-const showJoinButton = computed(() => {
-  if (
-    authMode.value === "signup" &&
-    signupFlowActive.value &&
-    !signupCompleted.value
-  ) {
-    return false;
-  }
-  return (
-    Boolean(user.value) || authMode.value === "login" || signupCompleted.value
-  );
-});
-
-function isPermissionDenied(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const code = (error as { code?: string }).code;
-  if (code === "permission-denied") return true;
-  const message = (error as { message?: string }).message;
-  return typeof message === "string" && message.includes("permission-denied");
-}
-
-function describeError(error: unknown) {
-  if (!error) return "unknown error";
-  if (error instanceof Error) {
-    const code =
-      typeof (error as { code?: string }).code === "string"
-        ? (error as { code?: string }).code
-        : undefined;
-    return JSON.stringify({
-      name: error.name,
-      message: error.message,
-      code,
-      stack: error.stack,
-    });
-  }
-  if (typeof error === "object") {
-    const record = error as Record<string, unknown>;
-    return JSON.stringify({
-      name: typeof record.name === "string" ? record.name : undefined,
-      message: typeof record.message === "string" ? record.message : undefined,
-      code: typeof record.code === "string" ? record.code : undefined,
-    });
-  }
-  return String(error);
-}
+const canJoin = computed(() => !isExpired.value && !isUsageLimited.value);
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -214,58 +63,19 @@ onMounted(async () => {
   await loadInviteDetails();
 });
 
-watch(authMode, (mode) => {
-  if (mode === "signup") {
-    signUpStep.value = "credentials";
-    signupCompleted.value = false;
-    signupFlowActive.value = false;
-    credentialError.value = "";
-    verificationMessage.value = "";
-    verificationError.value = "";
-    profileError.value = "";
-    if (!credentialForm.email && emailInput.value) {
-      credentialForm.email = emailInput.value;
-    }
-    credentialForm.password = "";
-    credentialConfirm.value = "";
-  } else {
-    if (!emailInput.value && credentialForm.email) {
-      emailInput.value = credentialForm.email;
-    }
-    signupCompleted.value = false;
-    signupFlowActive.value = false;
-    passwordAuthInput.value = "";
-  }
-});
-
 async function loadInviteDetails() {
   loading.value = true;
   errorMsg.value = "";
   successMsg.value = "";
-  authRequired.value = false;
-  projectPreview.value = null;
-  isExpired.value = false;
-  isUsageLimited.value = false;
-  requiresPassword.value = false;
 
   try {
-    const invite = await fetchInviteByToken(token);
-    if (!invite) {
+    const inviteSnap = await getDoc(doc(db, "projectInvites", token));
+    if (!inviteSnap.exists()) {
       errorMsg.value = "招待リンクが無効です。";
       return;
     }
-    let projectName =
-      typeof invite.projectName === "string" ? invite.projectName : undefined;
-    if (!projectName) {
-      try {
-        const projectSnap = await getDoc(doc(db, "projects", invite.projectId));
-        projectName = projectSnap.exists()
-          ? (projectSnap.data().name as string)
-          : undefined;
-      } catch {
-        projectName = undefined;
-      }
-    }
+    const invite = inviteSnap.data() as any;
+    const projectSnap = await getDoc(doc(db, "projects", invite.projectId));
     const expiresMillis = toMillis(invite.expiresAt);
     const usedCount =
       typeof invite.usedCount === "number" ? invite.usedCount : 0;
@@ -282,7 +92,9 @@ async function loadInviteDetails() {
 
     projectPreview.value = {
       projectId: invite.projectId,
-      name: projectName,
+      name: projectSnap.exists()
+        ? (projectSnap.data().name as string)
+        : undefined,
       requiresPassword: Boolean(invite.passwordHash),
       expiresAtLabel: expiresMillis
         ? formatDate(new Date(expiresMillis))
@@ -298,197 +110,35 @@ async function loadInviteDetails() {
       successMsg.value = "招待リンクを読み込みました。";
     }
   } catch (error) {
-    const detail = describeError(error);
-    logger.error`Failed to load invite: ${detail}`;
-    logger.error`Invite load context: ${JSON.stringify({
-      tokenLength: token.length,
-      authed: Boolean(user.value),
-    })}`;
-    console.error("Failed to load invite", error);
-    if (!user.value && isPermissionDenied(error)) {
-      authRequired.value = true;
-      errorMsg.value = "招待を受けるにはアカウントを作成してください。";
-      return;
-    }
+    console.error(error);
     errorMsg.value = "招待情報を読み込めませんでした。";
   } finally {
     loading.value = false;
   }
 }
 
-const handleCredentialSubmit = async () => {
-  if (!credentialValid.value || credentialLoading.value) return;
-  if (credentialForm.password !== credentialConfirm.value) {
-    credentialError.value = "パスワードが一致しません。";
-    return;
-  }
-
-  credentialLoading.value = true;
-  credentialError.value = "";
-
-  try {
-    await registerCredentials({
-      email: credentialForm.email.trim(),
-      password: credentialForm.password.trim(),
-    });
-    signupFlowActive.value = true;
-    credentialEmail.value = credentialForm.email.trim();
-    emailInput.value = credentialEmail.value;
-    verificationMessage.value =
-      "認証メールを送信しました。受信ボックスをご確認ください。";
-    signUpStep.value = "verify";
-  } catch (error) {
-    logger.error`Credential registration failed: ${error}`;
-    credentialError.value = mapFirebaseError(error);
-  } finally {
-    credentialLoading.value = false;
-  }
-};
-
-const handleResend = async () => {
-  if (resendLoading.value) return;
-  resendLoading.value = true;
-  verificationMessage.value = "";
-  verificationError.value = "";
-
-  try {
-    await resendVerificationEmail();
-    verificationMessage.value = "認証メールを再送しました。";
-  } catch (error) {
-    logger.error`Resend verification failed: ${error}`;
-    verificationError.value = "認証メールの再送に失敗しました。";
-  } finally {
-    resendLoading.value = false;
-  }
-};
-
-const checkVerificationStatus = async () => {
-  if (verificationChecking.value) return;
-  verificationChecking.value = true;
-  verificationError.value = "";
-
-  try {
-    const refreshed = await refreshCurrentUser();
-    if (refreshed?.emailVerified) {
-      signUpStep.value = "profile";
-      hydrateProfileFromUser(refreshed);
-      return;
-    }
-    verificationError.value =
-      "まだメール認証が確認できません。確認後に再度お試しください。";
-  } catch (error) {
-    logger.error`Verification check failed: ${error}`;
-    verificationError.value = "認証状態を確認できませんでした。";
-  } finally {
-    verificationChecking.value = false;
-  }
-};
-
-const handleProfileSubmit = async () => {
-  if (!profileValid.value || profileLoading.value) return;
-
-  profileLoading.value = true;
-  profileError.value = "";
-
-  try {
-    const nickname = buildNickname(profileForm.fullName, profileForm.nickname);
-    await completeProfileSetup({
-      fullName: profileForm.fullName,
-      nickname,
-      birthday: profileForm.birthday,
-      jobRole: profileForm.jobRole,
-      jobTitle: profileForm.jobTitle,
-    });
-
-    if (avatarFile.value) {
-      await updateAccountAvatar(avatarFile.value);
-    }
-
-    signupCompleted.value = true;
-    await loadInviteDetails();
-  } catch (error) {
-    logger.error`Profile submission failed: ${error}`;
-    profileError.value = "プロフィールの保存に失敗しました。";
-  } finally {
-    profileLoading.value = false;
-  }
-};
-
-const handleAvatarChange = (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0] ?? null;
-  avatarFile.value = file;
-
-  if (file) {
-    avatarPreview.value = URL.createObjectURL(file);
-  } else {
-    avatarPreview.value = null;
-  }
-};
-
-const hydrateProfileFromUser = (current = user.value) => {
-  if (!current) return;
-
-  if (!profileForm.fullName && current.displayName) {
-    profileForm.fullName = current.displayName;
-  }
-
-  if (!profileForm.nickname && current.displayName) {
-    profileForm.nickname = current.displayName;
-  }
-};
-
-function buildNickname(fullName: string, nickname?: string) {
-  const trimmed = nickname?.trim();
-  if (trimmed) {
-    return trimmed;
-  }
-
-  const tokens = fullName.trim().split(/\s+/).filter(Boolean);
-
-  if (tokens.length >= 2) {
-    return `${extractInitial(tokens[0] ?? fullName)}${extractInitial(tokens[1] ?? tokens[0] ?? fullName)}`;
-  }
-
-  const initial = extractInitial(fullName);
-  return initial.padEnd(2, initial);
-}
-
-function extractInitial(value: string) {
-  const ascii = value.match(/[A-Za-z]/);
-  if (ascii) {
-    return ascii[0].toUpperCase();
-  }
-  return value.trim().charAt(0).toUpperCase() || "U";
-}
-
-function mapFirebaseError(error: unknown) {
-  if (typeof error === "object" && error && "code" in error) {
-    const code = String((error as { code?: string }).code);
-    if (code === "auth/email-already-in-use")
-      return "このメールアドレスは既に登録されています。";
-    if (code === "auth/invalid-email")
-      return "メールアドレスの形式を確認してください。";
-    if (code === "auth/weak-password")
-      return "パスワードは 6 文字以上で設定してください。";
-  }
-  return "リクエストを処理できませんでした。時間を置いて再度お試しください。";
-}
-
 async function ensureAuthenticatedUser() {
   const currentUser = user.value ?? (await getCurrentUser());
   if (currentUser) return currentUser;
 
-  if (authMode.value !== "login") {
-    throw new Error("アカウント作成を完了してください。");
-  }
   if (!emailInput.value.trim() || !passwordAuthInput.value.trim()) {
     throw new Error("メールアドレスとパスワードを入力してください。");
   }
-  await loginWithEmail({
-    email: emailInput.value.trim(),
-    password: passwordAuthInput.value.trim(),
-  });
+
+  if (authMode.value === "signup") {
+    if (passwordAuthInput.value !== passwordAuthConfirm.value) {
+      throw new Error("パスワードが一致しません。");
+    }
+    await registerCredentials({
+      email: emailInput.value.trim(),
+      password: passwordAuthInput.value.trim(),
+    });
+  } else {
+    await loginWithEmail({
+      email: emailInput.value.trim(),
+      password: passwordAuthInput.value.trim(),
+    });
+  }
 
   const authed = await getCurrentUser();
   if (!authed) {
@@ -498,49 +148,26 @@ async function ensureAuthenticatedUser() {
 }
 
 async function handleJoin() {
-  if (!projectPreview.value && !authRequired.value) return;
-  if (projectPreview.value && !canJoin.value) return;
-  if (
-    projectPreview.value &&
-    requiresPassword.value &&
-    !passwordInput.value.trim()
-  ) {
+  if (!projectPreview.value) return;
+  if (!canJoin.value) return;
+  if (requiresPassword.value && !passwordInput.value.trim()) {
     errorMsg.value = "パスワードを入力してください。";
-    return;
-  }
-  if (
-    authMode.value === "signup" &&
-    signupFlowActive.value &&
-    !signupCompleted.value
-  ) {
-    errorMsg.value = "アカウント作成を完了してください。";
     return;
   }
 
   joinProcessing.value = true;
   errorMsg.value = "";
   try {
-    const needsAuth = authRequired.value && !user.value;
     const inviteUser = await ensureAuthenticatedUser();
     await loadInviteDetails();
-    if (needsAuth) {
-      if (projectPreview.value) {
-        successMsg.value = "招待情報を読み込みました。内容を確認してください。";
-      } else {
-        errorMsg.value = "招待情報を読み込めませんでした。";
-      }
-      return;
-    }
     if (!canJoin.value) {
       errorMsg.value = "再確認の結果、この招待リンクは利用できません。";
       return;
     }
-    const fallbackEmail =
-      credentialForm.email.trim() || emailInput.value.trim();
     const projectId = await redeemInvite(
       token,
       inviteUser.uid,
-      inviteUser.email ?? fallbackEmail,
+      inviteUser.email ?? emailInput.value.trim(),
       {
         password: passwordInput.value.trim() || undefined,
       },
@@ -573,265 +200,112 @@ async function handleJoin() {
 </script>
 
 <template>
-  <div class="signup-shell">
-    <section class="signup-card">
-      <AuthBrand
-        title="プロジェクトへの招待"
-        description="招待内容を確認して参加しましょう"
-      />
+  <div class="invite-shell">
+    <section class="invite-card">
+      <p class="invite-eyebrow">Project Invitation</p>
+      <h1>{{ appName }} プロジェクトへの招待</h1>
 
-      <div v-if="loading" class="invite-loading">読み込み中...</div>
-      <p v-else-if="errorMsg && !showAuthGate" class="form-error">
-        {{ errorMsg }}
-      </p>
+      <div v-if="loading">読み込み中...</div>
+      <p v-else-if="errorMsg" class="error">{{ errorMsg }}</p>
 
       <template v-else>
-        <div class="invite-content">
-          <p v-if="errorMsg" class="form-error">{{ errorMsg }}</p>
-
-          <template v-if="projectPreview">
-            <p class="invite-lead">以下のプロジェクトに参加しますか？</p>
-            <dl class="invite-details">
-              <div>
-                <dt>招待先</dt>
-                <dd>{{ projectPreview?.name || projectPreview?.projectId }}</dd>
-              </div>
-              <div>
-                <dt>パスワード</dt>
-                <dd>{{ requiresPassword ? "入力が必要です" : "不要" }}</dd>
-              </div>
-              <div>
-                <dt>有効期限</dt>
-                <dd>{{ projectPreview?.expiresAtLabel || "不明" }}</dd>
-              </div>
-              <div>
-                <dt>残り利用回数</dt>
-                <dd>{{ projectPreview?.remainingUses ?? "無制限" }}</dd>
-              </div>
-            </dl>
-
-            <div v-if="requiresPassword" class="invite-password">
-              <AuthFormField
-                v-model="passwordInput"
-                label="参加パスワード"
-                type="password"
-                placeholder="リンク作成時のパスワードを入力"
-              />
-            </div>
-          </template>
-
-          <div v-if="showAuthGate" class="invite-auth">
-            <template v-if="authMode === 'login'">
-              <form class="signup-form" @submit.prevent="handleJoin">
-                <AuthCredentialFields
-                  variant="invite"
-                  v-model:email="emailInput"
-                  v-model:password="passwordAuthInput"
-                />
-                <p class="auth-switch">
-                  <button
-                    type="button"
-                    class="text-link"
-                    @click="authMode = 'signup'"
-                  >
-                    アカウントをお持ちでない場合はこちら
-                  </button>
-                </p>
-              </form>
-            </template>
-            <template v-else>
-              <div class="signup-progress">
-                <div class="signup-progress__labels">
-                  <span
-                    >ステップ {{ currentStepIndex + 1 }} /
-                    {{ stepOrder.length }}</span
-                  >
-                  <span>{{ stepLabels[signUpStep] }}</span>
-                </div>
-                <div class="signup-progress__bar">
-                  <div
-                    class="signup-progress__value"
-                    :style="{ width: `${progressPercent}%` }"
-                  />
-                </div>
-              </div>
-
-              <Transition name="slide-fade" mode="out-in">
-                <form
-                  v-if="signUpStep === 'credentials'"
-                  key="credentials"
-                  class="signup-form"
-                  @submit.prevent="handleCredentialSubmit"
-                >
-                  <AuthCredentialFields
-                    variant="invite"
-                    v-model:email="credentialForm.email"
-                    v-model:password="credentialForm.password"
-                    v-model:confirm="credentialConfirm"
-                    :show-confirm="true"
-                    password-placeholder="8文字以上"
-                    password-hint="8文字以上、英数字を含む"
-                  />
-
-                  <p v-if="credentialError" class="form-error">
-                    {{ credentialError }}
-                  </p>
-
-                  <AppButton
-                    type="submit"
-                    variant="primary"
-                    block
-                    :disabled="!credentialValid || credentialLoading"
-                    :loading="credentialLoading"
-                  >
-                    認証メールを送信
-                  </AppButton>
-                </form>
-
-                <div
-                  v-else-if="signUpStep === 'verify'"
-                  key="verify"
-                  class="verify-step"
-                >
-                  <p>
-                    <strong>{{ credentialEmail }}</strong>
-                    宛に認証メールを送信しました。受信ボックスからリンクをクリックして認証を完了してください。
-                  </p>
-                  <p v-if="verificationMessage" class="verify-step__message">
-                    {{ verificationMessage }}
-                  </p>
-                  <p v-if="verificationError" class="form-error">
-                    {{ verificationError }}
-                  </p>
-                  <div class="verify-step__actions">
-                    <AppButton
-                      type="button"
-                      variant="secondary"
-                      :disabled="resendLoading"
-                      :loading="resendLoading"
-                      @click="handleResend"
-                    >
-                      認証メールを再送
-                    </AppButton>
-                    <AppButton
-                      type="button"
-                      variant="primary"
-                      :disabled="verificationChecking"
-                      :loading="verificationChecking"
-                      @click="checkVerificationStatus"
-                    >
-                      認証を確認
-                    </AppButton>
-                  </div>
-                </div>
-
-                <form
-                  v-else
-                  key="profile"
-                  class="signup-form"
-                  @submit.prevent="handleProfileSubmit"
-                >
-                  <AuthFormField
-                    v-model="profileForm.fullName"
-                    label="本名"
-                    type="text"
-                    placeholder="山田 太郎"
-                    required
-                  />
-
-                  <AuthFormField
-                    v-model="profileForm.nickname"
-                    label="ニックネーム (任意)"
-                    type="text"
-                    placeholder="任意で入力"
-                  />
-
-                  <AuthFormField
-                    v-model="profileForm.birthday"
-                    label="生年月日"
-                    type="date"
-                    required
-                  />
-
-                  <div class="job-field">
-                    <label class="job-field__label" for="jobRole">職業</label>
-                    <select id="jobRole" v-model="profileForm.jobRole" required>
-                      <option
-                        v-for="option in jobOptions"
-                        :key="option.value"
-                        :value="option.value"
-                      >
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </div>
-
-                  <AuthFormField
-                    v-model="profileForm.jobTitle"
-                    label="役職 (任意)"
-                    type="text"
-                    placeholder="例: プロジェクトマネージャー"
-                  />
-
-                  <div class="avatar-field">
-                    <span>アイコン</span>
-                    <label class="avatar-field__upload">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        @change="handleAvatarChange"
-                      />
-                      画像を選択
-                    </label>
-                    <p class="avatar-field__hint">
-                      アップロードは任意です。PNG / JPG / WEBP
-                      などに対応しています。
-                    </p>
-                    <div v-if="avatarPreview" class="avatar-field__preview">
-                      <img :src="avatarPreview" alt="アイコンのプレビュー" />
-                    </div>
-                  </div>
-
-                  <p v-if="profileError" class="form-error">
-                    {{ profileError }}
-                  </p>
-
-                  <AppButton
-                    type="submit"
-                    variant="primary"
-                    block
-                    :disabled="!profileValid || profileLoading"
-                    :loading="profileLoading"
-                  >
-                    プロフィールを登録
-                  </AppButton>
-                </form>
-              </Transition>
-              <p class="auth-switch">
-                <button
-                  type="button"
-                  class="text-link"
-                  @click="authMode = 'login'"
-                >
-                  アカウントがある場合はこちら
-                </button>
-              </p>
-            </template>
+        <p>以下のプロジェクトに参加しますか？</p>
+        <dl>
+          <div>
+            <dt>招待先</dt>
+            <dd>{{ projectPreview?.name || projectPreview?.projectId }}</dd>
           </div>
+          <div>
+            <dt>パスワード</dt>
+            <dd>{{ requiresPassword ? "入力が必要です" : "不要" }}</dd>
+          </div>
+          <div>
+            <dt>有効期限</dt>
+            <dd>{{ projectPreview?.expiresAtLabel || "不明" }}</dd>
+          </div>
+          <div>
+            <dt>残り利用回数</dt>
+            <dd>{{ projectPreview?.remainingUses ?? "無制限" }}</dd>
+          </div>
+        </dl>
 
-          <div v-if="successMsg" class="invite-success">{{ successMsg }}</div>
+        <div v-if="requiresPassword" class="password-block">
+          <label>
+            <span>参加パスワード</span>
+            <input
+              v-model="passwordInput"
+              type="password"
+              placeholder="リンク作成時のパスワードを入力"
+            />
+          </label>
+        </div>
 
-          <div class="actions">
-            <AppButton
-              v-if="showJoinButton"
-              variant="primary"
-              :loading="joinProcessing || loading"
-              :disabled="!canProceed"
-              @click="handleJoin"
+        <div v-if="!user" class="auth-card">
+          <div class="auth-toggle">
+            <button
+              type="button"
+              :class="{ 'is-active': authMode === 'signup' }"
+              @click="authMode = 'signup'"
             >
-              {{ user || signupCompleted ? "参加する" : "ログインして参加" }}
-            </AppButton>
+              新規登録
+            </button>
+            <button
+              type="button"
+              :class="{ 'is-active': authMode === 'login' }"
+              @click="authMode = 'login'"
+            >
+              ログイン
+            </button>
           </div>
+
+          <label>
+            <span>メールアドレス</span>
+            <input
+              v-model="emailInput"
+              type="email"
+              placeholder="you@example.com"
+            />
+          </label>
+
+          <label>
+            <span>パスワード</span>
+            <input
+              v-model="passwordAuthInput"
+              type="password"
+              placeholder="6文字以上"
+            />
+          </label>
+
+          <label v-if="authMode === 'signup'">
+            <span>パスワード確認</span>
+            <input
+              v-model="passwordAuthConfirm"
+              type="password"
+              placeholder="もう一度入力"
+            />
+          </label>
+        </div>
+
+        <div v-if="successMsg" class="success">{{ successMsg }}</div>
+
+        <div class="actions">
+          <AppButton variant="secondary" :to="{ name: ROUTE_NAMES.home }"
+            >ホームに戻る</AppButton
+          >
+          <AppButton
+            variant="primary"
+            :loading="joinProcessing || loading"
+            :disabled="!canJoin"
+            @click="handleJoin"
+          >
+            {{
+              user
+                ? "参加する"
+                : authMode === "signup"
+                  ? "アカウントを作成して参加"
+                  : "ログインして参加"
+            }}
+          </AppButton>
         </div>
       </template>
     </section>
@@ -839,259 +313,135 @@ async function handleJoin() {
 </template>
 
 <style scoped>
-.signup-shell {
-  min-height: calc(100vh - 4rem);
-  background: linear-gradient(
-    135deg,
-    rgba(184, 227, 233, 0.35),
-    #fff,
-    rgba(147, 177, 181, 0.35)
-  );
+.invite-shell {
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  background: radial-gradient(circle at top, #e3f6f8, #fff);
+  padding: 2rem;
 }
 
-.signup-card {
-  width: min(500px, 100%);
+.invite-card {
   background: #fff;
+  border: 2px solid #b8e3e9;
   border-radius: 1.5rem;
-  padding: 2.5rem;
-  border: 1px solid rgba(147, 177, 181, 0.35);
-  box-shadow: 0 40px 70px rgba(11, 46, 51, 0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.invite-content {
+  padding: 2rem;
+  max-width: 560px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.invite-loading {
+.invite-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
   color: #4f7c82;
-  font-weight: 600;
-}
-
-.invite-lead {
-  color: #4f7c82;
-  font-weight: 600;
   margin: 0;
 }
 
-.invite-details {
+h1 {
+  margin: 0;
+  color: #0b2e33;
+}
+
+dl {
   margin: 0;
   display: grid;
   gap: 0.5rem;
 }
 
-.invite-details dt {
+dt {
   font-size: 0.85rem;
   color: #4f7c82;
 }
 
-.invite-details dd {
+dd {
   margin: 0;
-  font-weight: 600;
-}
-
-.invite-auth {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.signup-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.signup-progress__labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  color: #4f7c82;
-  font-weight: 600;
-}
-
-.signup-progress__bar {
-  width: 100%;
-  height: 0.4rem;
-  border-radius: 999px;
-  background: rgba(147, 177, 181, 0.3);
-  overflow: hidden;
-}
-
-.signup-progress__value {
-  height: 100%;
-  background: linear-gradient(90deg, #4f7c82, #0b2e33);
-  border-radius: 999px;
-  transition: width 200ms ease;
-}
-
-.signup-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.auth-switch {
-  text-align: center;
-  font-size: 0.95rem;
-  color: #4f7c82;
-  margin: 0;
-}
-
-.text-link {
-  border: none;
-  background: none;
-  padding: 0;
-  font-weight: 600;
-  color: #4f7c82;
-  cursor: pointer;
-}
-
-.text-link:focus {
-  outline: none;
-}
-
-.verify-step {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  text-align: left;
-  color: #4f7c82;
-}
-
-.verify-step__message {
-  color: #0b2e33;
-  font-weight: 600;
-}
-
-.verify-step__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.avatar-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.avatar-field__upload {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border: 1px dashed #93b1b5;
-  border-radius: 0.85rem;
-  color: #4f7c82;
-  cursor: pointer;
-}
-
-.avatar-field__upload input {
-  display: none;
-}
-
-.avatar-field__hint {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #93b1b5;
-}
-
-.job-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.job-field__label {
-  font-weight: 600;
-  color: #0b2e33;
-}
-
-.job-field select {
-  border: 1px solid #93b1b5;
-  border-radius: 0.85rem;
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  background: #fff;
-  color: #0b2e33;
-}
-
-.job-field select:focus {
-  outline: none;
-  border-color: #4f7c82;
-  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.2);
-}
-
-.avatar-field__preview img {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #b8e3e9;
-}
-
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 240ms ease;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
-.invite-success {
-  color: #0b2e33;
   font-weight: 600;
 }
 
 .actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.75rem;
   justify-content: flex-end;
 }
 
-.form-error {
-  background: rgba(214, 69, 69, 0.08);
-  border: 1px solid rgba(214, 69, 69, 0.35);
-  color: #d64545;
-  padding: 0.75rem 1rem;
+.password-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.password-block span {
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.password-block input {
+  border: 2px solid #b8e3e9;
   border-radius: 0.9rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+}
+
+.password-block input:focus {
+  outline: none;
+  border-color: #4f7c82;
+  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.2);
+}
+
+.auth-card {
+  border: 1px solid #d7e2ef;
+  border-radius: 1rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: #f7fbfc;
+}
+
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+  color: #0b2e33;
+}
+
+.auth-card input {
+  border: 1px solid #d7e2ef;
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.auth-toggle {
+  display: inline-flex;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.auth-toggle button {
+  border: 1px solid #d7e2ef;
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+
+.auth-toggle button.is-active {
+  background: rgba(79, 124, 130, 0.16);
+  border-color: #4f7c82;
+}
+
+.error {
+  color: #d64545;
   font-weight: 600;
 }
 
-.invite-password :deep(.auth-field) {
-  margin-bottom: 0;
-}
-
-@media (max-width: 600px) {
-  .signup-card {
-    padding: 2rem 1.5rem;
-  }
-
-  .verify-step__actions {
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 480px) {
-  .actions {
-    justify-content: stretch;
-  }
-
-  .actions :deep(.app-button) {
-    width: 100%;
-  }
+.success {
+  color: #2f855a;
+  font-weight: 600;
 }
 </style>
