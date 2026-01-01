@@ -169,7 +169,7 @@ const handleNavigate = () => {
                 />
               </svg>
               <svg
-                v-else-if="item.icon === 'members'"
+                v-else-if="item.icon === 'members' || item.icon === 'invites'"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

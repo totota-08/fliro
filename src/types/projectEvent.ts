@@ -9,6 +9,7 @@ export type ProjectEventType =
   | "decision.made"
   | "member.added"
   | "member.removed"
+  | "member.role_changed"
   | "bot.command_executed"
   | "bot.error";
 

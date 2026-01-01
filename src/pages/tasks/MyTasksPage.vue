@@ -3,7 +3,6 @@ import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
-import { listUserProjectRefs } from "@/services/projectRefs";
 import { deleteTask, updateTask, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
@@ -119,11 +118,13 @@ async function loadTasks() {
     const projectEntries: { id: string; name: string }[] = [];
     const items: TaskDoc[] = [];
 
-    const projectRefs = await listUserProjectRefs(user.value.uid);
+    const projectsSnap = await getDocs(
+      collection(db, "userProjects", user.value.uid, "projects"),
+    );
 
-    for (const refItem of projectRefs) {
-      const name = refItem.projectName || "プロジェクト";
-      const projectId = refItem.id;
+    for (const docSnap of projectsSnap.docs) {
+      const name = (docSnap.data().projectName as string) || "プロジェクト";
+      const projectId = docSnap.id;
       projectEntries.push({ id: projectId, name });
 
       const taskSnap = await getDocs(

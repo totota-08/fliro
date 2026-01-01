@@ -1,5 +1,3 @@
-import type { RoleKey, ProjectRolesMap } from "@/constants/roles";
-
 export type ProjectStatus = "active" | "archived" | "completed";
 
 export interface ProjectSettings {
@@ -30,8 +28,6 @@ export interface ProjectDoc {
   completedAt?: Date;
   settings: ProjectSettings;
   stats: ProjectStatsCache;
-  roles?: ProjectRolesMap;
-  roleVersion?: number;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
@@ -39,9 +35,18 @@ export interface ProjectDoc {
 
 export interface ProjectMemberDoc {
   userId: string;
-  role: RoleKey;
-  projectRole?: "owner" | "member";
-  status?: "active" | "removed";
+  role: "owner" | "admin" | "member" | "viewer";
+  projectRole: "owner" | "member";
+  roles?: string[];
+  permissions: {
+    canEditProject: boolean;
+    canDeleteTasks: boolean;
+    canInviteMembers: boolean;
+    canManageSettings: boolean;
+    canEditRoles: boolean;
+    canManageTasks: boolean;
+    canManageMembers: boolean;
+  };
   invitedBy: string;
   joinedAt: Date;
   lastAccessedAt: Date;
@@ -49,9 +54,8 @@ export interface ProjectMemberDoc {
 
 export interface UserProjectEntryDoc {
   projectName: string;
-  role: RoleKey;
-  joinedAt?: Date;
-  lastViewedAt?: Date;
+  role: ProjectMemberDoc["role"];
+  lastAccessedAt: Date;
 }
 
 export interface CreateProjectPayload {

@@ -34,13 +34,6 @@ export async function createProject(
       totalMembers: 1,
       lastActivityAt: serverTimestamp(),
     },
-    roles: {
-      owner: [currentUserId],
-      admin: [],
-      member: [],
-      guest: [],
-    },
-    roleVersion: 2,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -56,6 +49,8 @@ export async function createProject(
     projectId: projRef.id,
     userId: currentUserId,
     role: "owner",
+    projectRole: "owner",
+    roles: ["admin"],
     invitedBy: currentUserId,
     projectName: projectBase.name,
   });
@@ -105,7 +100,7 @@ export async function deleteProject(projectId: string) {
     membersSnap.docs.map(async (member) => {
       const memberId = member.id;
       await deleteDoc(doc(db, "projects", projectId, "members", memberId));
-      await deleteDoc(doc(db, "users", memberId, "projectRefs", projectId));
+      await deleteDoc(doc(db, "userProjects", memberId, "projects", projectId));
     }),
   );
 

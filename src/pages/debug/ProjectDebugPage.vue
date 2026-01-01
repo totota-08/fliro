@@ -106,6 +106,7 @@ function sendDebugNotification() {
       <h2>メンバー招待</h2>
       <ProjectInviteForm
         :project-id="projectId"
+        :project-name="project?.name"
         @generated="handleLinkGenerated"
       />
       <p v-if="latestLink" class="info">{{ latestLink }}</p>

@@ -2,14 +2,15 @@
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/lib/firebase";
 import {
   listenProjectMembers,
   updateProjectMemberRole,
   type ProjectMember,
 } from "@/services/projectMembers";
-import { getProjectRole } from "@/services/projectAccess";
 import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
+import { doc, getDoc } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -72,6 +73,15 @@ const navItems = computed<DashboardNavItem[]>(
         icon: "members",
       },
       {
+        key: "invites",
+        label: "招待リンク",
+        to: {
+          name: ROUTE_NAMES.projectInvites,
+          params: { projectId: projectId.value },
+        },
+        icon: "invites",
+      },
+      {
         key: "settings",
         label: "設定",
         to: {
@@ -103,15 +113,20 @@ const profileInfo = computed(() => ({
   email: profile.value?.email || "",
 }));
 
-const roleOptions: MemberRole[] = ["admin", "member", "guest"];
+const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
 
 async function evaluatePermissions() {
   if (!user.value) {
     canEdit.value = false;
     return;
   }
-  const role = await getProjectRole(projectId.value, user.value.uid);
-  canEdit.value = Boolean(role === "owner" || role === "admin");
+  const snap = await getDoc(
+    doc(db, "projects", projectId.value, "members", user.value.uid),
+  );
+  const data = snap.data();
+  canEdit.value = Boolean(
+    data?.role === "admin" || data?.projectRole === "owner",
+  );
 }
 
 function watchMembers() {
@@ -124,7 +139,20 @@ async function changeRole(member: ProjectMember, next: MemberRole) {
   if (!canEdit.value || member.role === "owner") return;
   updating.value = member.userId;
   try {
-    await updateProjectMemberRole(projectId.value, member.userId, next);
+    const actorName =
+      profile.value?.nickname ||
+      profile.value?.fullName ||
+      user.value?.uid ||
+      "System";
+    await updateProjectMemberRole(projectId.value, member.userId, next, {
+      previousRole: member.role,
+      memberName: member.displayName || member.userId,
+      actor: {
+        id: user.value?.uid ?? null,
+        name: actorName,
+        origin: "ui",
+      },
+    });
   } finally {
     updating.value = null;
   }
@@ -223,7 +251,7 @@ onBeforeUnmount(() => {
             <li>
               <strong>member</strong> — タスク作成・更新、スレッド参加が可能
             </li>
-            <li><strong>guest</strong> — 閲覧のみ</li>
+            <li><strong>viewer</strong> — 閲覧のみ</li>
           </ul>
         </section>
 
@@ -469,7 +497,7 @@ onBeforeUnmount(() => {
   color: #0b2e33;
 }
 
-.badge-guest {
+.badge-viewer {
   background: rgba(148, 163, 184, 0.2);
   color: #1f2937;
 }
