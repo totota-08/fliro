@@ -66,6 +66,7 @@ const project = ref<ProjectDoc | null>(null);
 const projectMembers = ref<ProjectMember[]>([]);
 const customChannels = ref<ChatChannel[]>([]);
 const chatContainer = ref<HTMLElement | null>(null);
+const composerInput = ref<HTMLInputElement | null>(null);
 const activeChannelId = ref("general");
 
 // Command Autocomplete
@@ -111,8 +112,8 @@ function selectCommand(cmd: string) {
     input.value = `${cmd} `;
   }
   showCommandSuggestions.value = false;
-  const inputEl = document.querySelector(".composer-input") as HTMLInputElement;
-  inputEl?.focus();
+  showCommandSuggestions.value = false;
+  composerInput.value?.focus();
 }
 // UI state
 const customThreadFormOpen = ref(false);
@@ -526,6 +527,7 @@ watch(channels, (list) => {
               </button>
             </div>
             <input
+              ref="composerInput"
               v-model="input"
               @keydown.enter="handleSend"
               placeholder="メッセージを送信..."
