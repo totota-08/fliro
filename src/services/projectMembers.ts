@@ -179,6 +179,10 @@ export async function removeProjectMember(
     throw new Error("permission-denied: cannot remove self");
   }
 
+  if (actor?.id === userId && actor?.origin !== "system") {
+    throw new Error("permission-denied: cannot remove self");
+  }
+
   await deleteDoc(doc(db, "projects", projectId, "members", userId));
   try {
     await deleteDoc(doc(db, "userProjects", userId, "projects", projectId));
