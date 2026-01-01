@@ -10,11 +10,11 @@ const props = withDefaults(
   defineProps<{
     projectId: string;
     label?: string;
-    disabled?: boolean;
+    projectName?: string | null;
   }>(),
   {
     label: "プロジェクト参加リンク",
-    disabled: false,
+    projectName: null,
   },
 );
 
@@ -32,17 +32,13 @@ const expiryOptions = [
   { label: "期限なし", value: null },
 ];
 const expiry = ref<number | null>(24 * 7);
-const maxUses = ref<string | number | null>("");
+const maxUses = ref<string>("");
 const generating = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 const generatedLink = ref("");
 
 async function handleGenerate() {
-  if (props.disabled) {
-    errorMessage.value = "リンクを作成する権限がありません。";
-    return;
-  }
   if (!user.value) {
     errorMessage.value = "リンクを作成するにはログインが必要です。";
     return;
@@ -55,17 +51,12 @@ async function handleGenerate() {
     errorMessage.value = "パスワードは4文字以上で入力してください。";
     return;
   }
-  const rawMaxUses = maxUses.value;
-  const normalizedMaxUses =
-    rawMaxUses === null || rawMaxUses === undefined
-      ? ""
-      : String(rawMaxUses).trim();
-  const maxUsesNumber = normalizedMaxUses ? Number(normalizedMaxUses) : null;
+  const maxUsesNumber = maxUses.value.trim()
+    ? Number(maxUses.value.trim())
+    : null;
   if (
     maxUsesNumber !== null &&
-    (!Number.isFinite(maxUsesNumber) ||
-      maxUsesNumber < 1 ||
-      !Number.isInteger(maxUsesNumber))
+    (!Number.isFinite(maxUsesNumber) || maxUsesNumber < 1)
   ) {
     errorMessage.value = "利用回数は1以上の数値を入力してください。";
     return;
@@ -76,6 +67,7 @@ async function handleGenerate() {
   try {
     const token = await createProjectInvite({
       projectId: props.projectId,
+      projectName: props.projectName,
       createdBy: user.value.uid,
       password: enablePassword.value ? password.value.trim() : null,
       expiresInHours: expiry.value ?? null,
@@ -153,11 +145,7 @@ function tryFallbackCopy(text: string) {
 
     <div class="invite-options">
       <label class="toggle">
-        <input
-          type="checkbox"
-          v-model="enablePassword"
-          :disabled="props.disabled"
-        />
+        <input type="checkbox" v-model="enablePassword" />
         <span>パスワードを設定する</span>
       </label>
 
@@ -165,12 +153,11 @@ function tryFallbackCopy(text: string) {
         v-if="enablePassword"
         v-model="password"
         type="password"
-        :disabled="props.disabled"
         placeholder="共有用パスワード（4文字以上）"
       />
 
       <label class="small-label">有効期限</label>
-      <select v-model="expiry" :disabled="props.disabled">
+      <select v-model="expiry">
         <option
           v-for="opt in expiryOptions"
           :key="String(opt.value)"
@@ -181,21 +168,11 @@ function tryFallbackCopy(text: string) {
       </select>
 
       <label class="small-label">利用回数上限（任意・未入力で無制限）</label>
-      <input
-        v-model="maxUses"
-        type="number"
-        min="1"
-        placeholder="例) 10"
-        :disabled="props.disabled"
-      />
+      <input v-model="maxUses" type="number" min="1" placeholder="例) 10" />
     </div>
 
     <div class="invite-actions">
-      <button
-        type="button"
-        :disabled="generating || props.disabled"
-        @click="handleGenerate"
-      >
+      <button type="button" :disabled="generating" @click="handleGenerate">
         {{ generating ? "生成中..." : "参加リンクを生成" }}
       </button>
     </div>

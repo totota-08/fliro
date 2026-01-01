@@ -14,6 +14,7 @@ export const ROUTE_NAMES = {
   projectRoles: "project-roles",
   projectCategories: "project-categories",
   projectTimeline: "project-timeline",
+  projectInvites: "project-invites",
   projectSettings: "project-settings",
   projectActivity: "project-activity",
   projectNotifications: "project-notifications",

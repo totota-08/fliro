@@ -2,13 +2,14 @@
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { listUserProjectRefs } from "@/services/projectRefs";
+import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
 import type {
   DashboardNavItem,
   DashboardProfileInfo,
   DashboardProjectItem,
 } from "@/types/projectDashboard";
+import { collection, getDocs } from "firebase/firestore";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -84,6 +85,15 @@ const navItems = computed<DashboardNavItem[]>(() => [
     icon: "members",
   },
   {
+    key: "invites",
+    label: "招待リンク",
+    to: {
+      name: ROUTE_NAMES.projectInvites,
+      params: { projectId: props.projectId },
+    },
+    icon: "invites",
+  },
+  {
     key: "settings",
     label: "設定",
     to: {
@@ -103,13 +113,15 @@ const profileInfo = computed<DashboardProfileInfo>(() => ({
 
 async function loadProjectList() {
   if (!user.value) return;
-  const refs = await listUserProjectRefs(user.value.uid);
-  projectList.value = refs.map((refItem, index) => ({
-    key: refItem.id,
-    label: refItem.projectName || "Project",
+  const snap = await getDocs(
+    collection(db, "userProjects", user.value.uid, "projects"),
+  );
+  projectList.value = snap.docs.map((docSnap, index) => ({
+    key: docSnap.id,
+    label: (docSnap.data().projectName as string) || "Project",
     to: {
       name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: refItem.id },
+      params: { projectId: docSnap.id },
     },
     accent: ["primary", "secondary", "accent"][index % 3] as
       | "primary"
