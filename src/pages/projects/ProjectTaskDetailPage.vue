@@ -12,6 +12,10 @@ import {
   type TaskDoc,
   type TaskStatus,
 } from "@/services/taskService";
+import {
+  listenTaskCategories,
+  type TaskCategory,
+} from "@/services/taskCategoryService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -31,9 +35,11 @@ const messages = ref<TaskDiscussionMessage[]>([]);
 const input = ref("");
 const sending = ref(false);
 const messageLimit = ref(20);
+const categories = ref<TaskCategory[]>([]);
 
 let stopTask: (() => void) | null = null;
 let stopDiscussion: (() => void) | null = null;
+let stopCategories: (() => void) | null = null;
 
 // Derived State
 const decisions = computed(() =>
@@ -67,6 +73,14 @@ const activityLog = computed(() => {
     });
   }
   return logs.sort((a, b) => b.date - a.date);
+});
+
+const categoryLabel = computed(() => {
+  if (!task.value?.categoryId) return "未分類";
+  const matched = categories.value.find(
+    (category) => category.id === task.value?.categoryId,
+  );
+  return matched?.name || task.value?.categoryName || "未分類";
 });
 
 // Methods
@@ -146,11 +160,16 @@ onMounted(async () => {
       messages.value = msgs;
     },
   );
+
+  stopCategories = listenTaskCategories(projectId.value, (list) => {
+    categories.value = list;
+  });
 });
 
 onBeforeUnmount(() => {
   stopTask?.();
   stopDiscussion?.();
+  stopCategories?.();
 });
 </script>
 
@@ -177,6 +196,10 @@ onBeforeUnmount(() => {
               <span class="value">{{
                 formatDate(task.dueDate) || "期限なし"
               }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">カテゴリ</span>
+              <span class="value">{{ categoryLabel }}</span>
             </div>
           </div>
         </div>
