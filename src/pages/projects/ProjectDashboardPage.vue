@@ -149,9 +149,7 @@ const summaryCards = computed<SummaryCard[]>(() => {
   const inProgress = tasks.value.filter(
     (task) => task.status === "in-progress",
   ).length;
-  const overdue = tasks.value.filter(
-    (task) => task.dueDate?.seconds && task.dueDate.seconds * 1000 < Date.now(),
-  ).length;
+  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
 
   return [
     {
