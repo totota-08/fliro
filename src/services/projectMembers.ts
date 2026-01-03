@@ -55,13 +55,8 @@ interface UpdateMemberRoleOptions {
 }
 
 function getPermissionsFromRole(role: ProjectMember["role"]) {
-  const isAdmin = role === "owner" || role === "admin";
-  return {
-    canEditProject: isAdmin,
-    canDeleteTasks: isAdmin,
-    canInviteMembers: isAdmin,
-    canManageSettings: role === "owner",
-  };
+  const grantedRoles = [role === "owner" ? "admin" : role];
+  return buildPermissionsFromRoles(grantedRoles);
 }
 
 export function listenProjectMembers(
@@ -216,11 +211,13 @@ export async function updateProjectMemberRole(
   role: ProjectMember["role"],
   options?: UpdateMemberRoleOptions,
 ) {
+  const grantedRoles = [role === "owner" ? "admin" : role];
   const permissions = getPermissionsFromRole(role);
   await setDoc(
     doc(db, "projects", projectId, "members", userId),
     {
       role,
+      roles: grantedRoles,
       permissions,
     },
     { merge: true },

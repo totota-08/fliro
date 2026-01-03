@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
+import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import {
@@ -124,6 +125,14 @@ async function evaluatePermissions() {
     doc(db, "projects", projectId.value, "members", user.value.uid),
   );
   const data = snap.data();
+  if (data?.permissions && typeof data.permissions.canEditRoles === "boolean") {
+    canEdit.value = data.permissions.canEditRoles;
+    return;
+  }
+  if (Array.isArray(data?.roles)) {
+    canEdit.value = buildPermissionsFromRoles(data.roles).canEditRoles;
+    return;
+  }
   canEdit.value = Boolean(
     data?.role === "admin" || data?.projectRole === "owner",
   );
