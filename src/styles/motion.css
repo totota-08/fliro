@@ -1,0 +1,176 @@
+/* Motion Variables */
+:root {
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-page: 180ms;
+  --duration-panel: 240ms;
+}
+
+/* Page Fade Transition (Router View) */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition:
+    opacity var(--duration-page) var(--ease-standard),
+    transform var(--duration-page) var(--ease-standard);
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  /* transform: translateY(0); */ /* Leave transform optional per spec, keeping it simple to avoid jump */
+}
+
+/* Panel Slide Right Transition */
+.panel-slide-right-enter-active,
+.panel-slide-right-leave-active {
+  transition: opacity var(--duration-panel) var(--ease-standard);
+}
+
+.panel-slide-right-enter-active .member-panel__panel,
+.panel-slide-right-leave-active .member-panel__panel {
+  /* Targeting internal panel div if nested */
+  transition: transform var(--duration-panel) var(--ease-standard);
+}
+/* Also handle if applied directly to single element, though usually it's a wrapper */
+.panel-slide-right-enter-active,
+.panel-slide-right-leave-active {
+  transition: opacity var(--duration-panel) var(--ease-standard);
+}
+
+.panel-slide-right-enter-from,
+.panel-slide-right-leave-to {
+  opacity: 0;
+}
+
+.panel-slide-right-enter-from .member-panel__panel,
+.panel-slide-right-leave-to .member-panel__panel {
+  transform: translateX(16px);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-page: 1ms;
+    --duration-panel: 1ms;
+  }
+
+  .page-fade-enter-active,
+  .page-fade-leave-active,
+  .panel-slide-right-enter-active,
+  .panel-slide-right-leave-active,
+  .panel-slide-right-enter-active .member-panel__panel,
+  .panel-slide-right-leave-active .member-panel__panel {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .page-fade-enter-from,
+  .page-fade-leave-to,
+  .panel-slide-right-enter-from,
+  .panel-slide-right-leave-to {
+    transform: none !important;
+    opacity: 0 !important; /* Still need opacity change for visibility toggle, but instant */
+  }
+}
+
+/* Skeleton Utilities */
+.skeleton {
+  background-color: var(--border-light, #e2e8f0); /* Fallback color */
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Pulse Animation */
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.4);
+  animation: skeleton-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  opacity: 0;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+    display: none;
+  }
+}
+
+.skeleton--text {
+  height: 1em;
+  width: 100%;
+  margin-bottom: 0.5em;
+}
+
+.skeleton--avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.skeleton--card {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.skeleton--row {
+  width: 100%;
+  height: 48px;
+  margin-bottom: 8px;
+}
+
+/* Button Loading Dots */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: loading-dot 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+.loading-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes loading-dot {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-dots span {
+    animation: none;
+    transform: scale(1);
+  }
+}
