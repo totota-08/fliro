@@ -44,6 +44,8 @@ const isSidebarOpen = ref(true);
 const permissionState = ref<NotificationPermission>(
   typeof Notification !== "undefined" ? Notification.permission : "default",
 );
+const notifiedIds = new Set<string>();
+let notificationsBootstrapped = false;
 
 let stopTasks: (() => void) | null = null;
 let stopTimeline: (() => void) | null = null;
@@ -235,6 +237,29 @@ const groupedNotifications = computed(() => {
   });
   return groups;
 });
+
+watch(
+  notifications,
+  (items) => {
+    if (typeof Notification === "undefined") return;
+    if (permissionState.value !== "granted") return;
+    if (!notificationsBootstrapped) {
+      items.forEach((item) => notifiedIds.add(item.id));
+      notificationsBootstrapped = true;
+      return;
+    }
+    items.forEach((item) => {
+      if (notifiedIds.has(item.id)) return;
+      notifiedIds.add(item.id);
+      try {
+        new Notification(item.title, { body: item.body });
+      } catch (error) {
+        logger.warn`ブラウザ通知の表示に失敗しました: ${error}`;
+      }
+    });
+  },
+  { immediate: true },
+);
 
 function requestPushPermission() {
   if (typeof Notification === "undefined") return;
