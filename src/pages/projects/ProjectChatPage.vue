@@ -14,6 +14,7 @@ import {
   listenProjectMembers,
   type ProjectMember,
 } from "@/services/projectMembers";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -43,7 +44,7 @@ type ChatChannel = {
   id: string;
   name: string;
   description?: string;
-  type: "general" | "custom";
+  type: "general" | "custom" | "task";
   createdBy?: string;
   isPublic?: boolean;
   allowedUserIds?: string[];
@@ -64,6 +65,7 @@ const messages = ref<ChatMessage[]>([]);
 const input = ref("");
 const project = ref<ProjectDoc | null>(null);
 const projectMembers = ref<ProjectMember[]>([]);
+const tasks = ref<TaskDoc[]>([]);
 const customChannels = ref<ChatChannel[]>([]);
 const chatContainer = ref<HTMLElement | null>(null);
 const composerInput = ref<HTMLInputElement | null>(null);
@@ -121,10 +123,22 @@ const customThreadForm = ref({ name: "", description: "" });
 let unsubscribeChat: (() => void) | null = null;
 let unsubscribeMembers: (() => void) | null = null;
 let unsubscribeCustomChannels: (() => void) | null = null;
+let unsubscribeTasks: (() => void) | null = null;
 
 // Channel Logic
+const taskChannels = computed<ChatChannel[]>(() =>
+  tasks.value
+    .filter((task) => task.hasThread !== false)
+    .map((task) => ({
+      id: task.id,
+      name: task.threadName || task.title || "無題のタスク",
+      description: task.status,
+      type: "task",
+    })),
+);
+
 const channels = computed<ChatChannel[]>(() => {
-  return [defaultChannel, ...customChannels.value];
+  return [defaultChannel, ...taskChannels.value, ...customChannels.value];
 });
 
 const currentChannel = computed<ChatChannel>(() => {
@@ -133,11 +147,24 @@ const currentChannel = computed<ChatChannel>(() => {
   );
 });
 
-const currentChannelMessages = computed(() =>
-  messages.value.filter(
-    (m) => (m.channelId || "general") === activeChannelId.value,
-  ),
-);
+const currentTask = computed(() => {
+  if (currentChannel.value.type !== "task") return null;
+  return (
+    tasks.value.find((task) => task.id === currentChannel.value.id) || null
+  );
+});
+
+const currentChannelMessages = computed(() => {
+  if (currentChannel.value.type === "task") {
+    return messages.value.filter(
+      (m) => m.linkedTaskId === currentChannel.value.id,
+    );
+  }
+  return messages.value.filter(
+    (m) =>
+      (m.channelId || "general") === activeChannelId.value && !m.linkedTaskId,
+  );
+});
 
 function selectChannel(id: string) {
   if (activeChannelId.value === id) return;
@@ -155,6 +182,12 @@ function watchChat() {
 function watchMembers() {
   unsubscribeMembers = listenProjectMembers(projectId.value, (list) => {
     projectMembers.value = list;
+  });
+}
+
+function watchTasks() {
+  unsubscribeTasks = listenTasks(projectId.value, (list) => {
+    tasks.value = list;
   });
 }
 
@@ -186,15 +219,18 @@ function stopWatchers() {
   unsubscribeChat?.();
   unsubscribeMembers?.();
   unsubscribeCustomChannels?.();
+  unsubscribeTasks?.();
   unsubscribeChat = null;
   unsubscribeMembers = null;
   unsubscribeCustomChannels = null;
+  unsubscribeTasks = null;
 }
 
 async function refreshProjectContext() {
   stopWatchers();
   messages.value = [];
   projectMembers.value = [];
+  tasks.value = [];
   customChannels.value = [];
   project.value = null;
 
@@ -209,6 +245,7 @@ async function refreshProjectContext() {
 
   watchChat();
   watchMembers();
+  watchTasks();
   watchCustomChannels();
 }
 
@@ -217,6 +254,8 @@ async function refreshProjectContext() {
 async function handleSend() {
   const text = input.value.trim();
   if (!text || !user.value) return;
+  const activeTaskId =
+    currentChannel.value.type === "task" ? currentChannel.value.id : null;
 
   // Check for commands
   if (text.startsWith("/")) {
@@ -237,7 +276,11 @@ async function handleSend() {
           result.result.message || "コマンドを実行しました",
           activeChannelId.value,
           undefined,
-          { isBot: true, linkedTaskId: result.result.linkedTaskId },
+          {
+            isBot: true,
+            linkedTaskId: activeTaskId || result.result.linkedTaskId,
+            isTask: Boolean(activeTaskId),
+          },
         );
       }
       input.value = "";
@@ -253,6 +296,8 @@ async function handleSend() {
       profile.value?.nickname || profile.value?.fullName || "ユーザー",
       text,
       activeChannelId.value, // Explicitly set channelId
+      undefined,
+      activeTaskId ? { linkedTaskId: activeTaskId, isTask: true } : undefined,
     );
     input.value = "";
     scrollToBottom();
@@ -329,6 +374,19 @@ function formatTime(createdAt: ChatMessage["createdAt"]) {
     return "";
   }
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function taskStatusLabel(status?: string) {
+  if (status === "todo") return "未着手";
+  if (status === "in-progress") return "進行中";
+  if (status === "review") return "レビュー";
+  if (status === "done") return "完了";
+  return "未設定";
+}
+
+function formatDueDate(dueDate?: { seconds: number; nanoseconds: number }) {
+  if (!dueDate?.seconds) return "—";
+  return new Date(dueDate.seconds * 1000).toLocaleString();
 }
 
 function formatMessage(text: string) {
@@ -412,6 +470,30 @@ watch(channels, (list) => {
             >
               # {{ defaultChannel.name }}
             </button>
+          </div>
+
+          <div class="panel-section">
+            <div class="section-header">
+              <h3 class="section-title">タスク</h3>
+              <span class="section-count">{{ taskChannels.length }}</span>
+            </div>
+            <div class="thread-list">
+              <button
+                v-for="taskChannel in taskChannels"
+                :key="taskChannel.id"
+                class="channel-item"
+                :class="{ active: activeChannelId === taskChannel.id }"
+                @click="selectChannel(taskChannel.id)"
+              >
+                <span class="channel-name"># {{ taskChannel.name }}</span>
+                <span class="task-status">{{
+                  taskStatusLabel(taskChannel.description)
+                }}</span>
+              </button>
+            </div>
+            <p v-if="!taskChannels.length" class="empty-text">
+              タスクのスレッドがありません。
+            </p>
           </div>
 
           <div class="panel-section">
@@ -545,6 +627,43 @@ watch(channels, (list) => {
             </button>
           </div>
         </main>
+
+        <aside class="task-panel">
+          <header class="task-panel__header">
+            <h3>タスク詳細</h3>
+            <button
+              v-if="currentTask"
+              type="button"
+              class="task-panel__link"
+              @click="openTask(currentTask.id)"
+            >
+              詳細を開く →
+            </button>
+          </header>
+
+          <div v-if="currentTask" class="task-panel__body">
+            <h4 class="task-panel__title">{{ currentTask.title }}</h4>
+            <p class="task-panel__meta">
+              ステータス:
+              <span class="task-panel__badge">
+                {{ taskStatusLabel(currentTask.status) }}
+              </span>
+            </p>
+            <p class="task-panel__meta">
+              期限: {{ formatDueDate(currentTask.dueDate) }}
+            </p>
+            <p class="task-panel__meta">
+              担当: {{ currentTask.assigneeName || "未割当" }}
+            </p>
+            <p v-if="currentTask.description" class="task-panel__desc">
+              {{ currentTask.description }}
+            </p>
+          </div>
+
+          <div v-else class="task-panel__empty">
+            タスクスレッドを選択すると詳細が表示されます。
+          </div>
+        </aside>
       </div>
     </div>
   </div>
@@ -591,7 +710,7 @@ watch(channels, (list) => {
 .content-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px 1fr 320px;
   min-height: 0;
 }
 
@@ -647,6 +766,12 @@ watch(channels, (list) => {
   align-items: center;
 }
 
+.section-count {
+  font-size: 12px;
+  color: #94a3b8;
+  padding-right: 8px;
+}
+
 .add-btn {
   border: none;
   background: transparent;
@@ -696,6 +821,17 @@ watch(channels, (list) => {
 }
 .delete-thread-btn:hover {
   color: #ef4444;
+}
+
+.task-status {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.empty-text {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 4px 8px;
 }
 
 /* Chat Main */
@@ -866,7 +1002,84 @@ watch(channels, (list) => {
   cursor: not-allowed;
 }
 
+/* Task Panel */
+.task-panel {
+  border-left: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.task-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.task-panel__header h3 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.task-panel__link {
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-panel__title {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.task-panel__meta {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.task-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.task-panel__desc {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  white-space: pre-line;
+}
+
+.task-panel__empty {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
 /* Responsive */
+@media (max-width: 1100px) {
+  .content-grid {
+    grid-template-columns: 240px 1fr;
+  }
+  .task-panel {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   .content-grid {
     grid-template-columns: 1fr;
