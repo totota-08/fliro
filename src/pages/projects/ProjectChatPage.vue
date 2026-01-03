@@ -710,7 +710,7 @@ watch(channels, (list) => {
 .content-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr 320px;
+  grid-template-columns: minmax(240px, 260px) 1fr 320px;
   min-height: 0;
 }
 
@@ -723,6 +723,8 @@ watch(channels, (list) => {
   flex-direction: column;
   gap: 24px;
   overflow-y: auto;
+  min-width: 240px;
+  flex-shrink: 0;
 }
 
 .section-title {
@@ -1073,7 +1075,7 @@ watch(channels, (list) => {
 /* Responsive */
 @media (max-width: 1100px) {
   .content-grid {
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: minmax(220px, 240px) 1fr;
   }
   .task-panel {
     display: none;
