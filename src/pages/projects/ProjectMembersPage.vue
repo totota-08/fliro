@@ -1,4 +1,3 @@
-```vue
 <script setup lang="ts">
 import InviteLinksMiniCard from "@/components/invites/InviteLinksMiniCard.vue";
 import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
