@@ -1,3 +1,5 @@
+@import "../styles/theme.css";
+
 :root {
   font-family:
     "Inter",
@@ -9,29 +11,12 @@
     sans-serif;
   line-height: 1.6;
   font-weight: 400;
-  color: #0b2e33;
-  background-color: #b8e3e9;
+  color: var(--text);
+  background-color: var(--surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  --primary: #4f7c82;
-  --primary-strong: #0b2e33;
-  --surface: #b8e3e9;
-  --surface-muted: #93b1b5;
-  --surface-elevated: #f5fcff;
-  --surface-card: #ffffff;
-  --surface-panel: #f8fafc;
-  --border: rgba(11, 46, 51, 0.18);
-  --border-light: rgba(147, 177, 181, 0.35);
-  --border-strong: #e2e8f0;
-  --text: #0b2e33;
-  --text-muted: #94a3b8;
-  --text-strong: #0f172a;
-  --accent-success: #34a853;
-  --accent-warning: #f59e0b;
-  --accent-danger: #d64545;
 }
 
 body {
