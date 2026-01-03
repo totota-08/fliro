@@ -433,11 +433,11 @@ watch(
       <div v-if="!canEdit" class="admin-guard">
         <p class="admin-guard__title">管理者限定</p>
         <p class="admin-guard__desc">
-          この設定は管理者のみが編集できます。現在は閲覧専用モードです。
+          このページは管理者のみが利用できます。権限をご確認ください。
         </p>
       </div>
 
-      <div class="settings-container">
+      <div v-else class="settings-container">
         <div v-if="loading" class="loading-state">
           <div class="spinner"></div>
           <p>読み込み中...</p>
