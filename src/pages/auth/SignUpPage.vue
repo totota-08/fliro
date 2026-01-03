@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
 import AuthBrand from "@/components/ui/AuthBrand.vue";
+import AuthCredentialFields from "@/components/ui/AuthCredentialFields.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
 import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -322,21 +323,13 @@ function mapFirebaseError(error: unknown) {
             class="signup-form"
             @submit.prevent="handleCredentialSubmit"
           >
-            <AuthFormField
-              v-model="credentialForm.email"
-              label="メールアドレス"
-              type="email"
-              placeholder="you@example.com"
-              required
-            />
-
-            <AuthFormField
-              v-model="credentialForm.password"
-              label="パスワード"
-              type="password"
-              placeholder="8文字以上"
-              hint="8文字以上、英数字を含む"
-              required
+            <AuthCredentialFields
+              variant="signup"
+              v-model:email="credentialForm.email"
+              v-model:password="credentialForm.password"
+              email-placeholder="you@example.com"
+              password-placeholder="8文字以上"
+              password-hint="8文字以上、英数字を含む"
             />
 
             <p v-if="credentialError" class="form-error">
