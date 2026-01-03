@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
+import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
@@ -729,36 +729,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
         <NotificationBar :notifications="notificationsBar" />
-        <section class="dashboard-hero">
-          <div>
-            <p class="eyebrow">概要</p>
-            <h2>{{ project?.name || "プロジェクト" }}</h2>
-            <p class="muted">
-              {{
-                project?.description ||
-                "このプロジェクトの概要がここに表示されます。"
-              }}
-            </p>
-            <div class="hero-tags">
-              <span class="chip">タスク {{ tasks.length }}</span>
-              <span class="chip">メンバー {{ members.length }}</span>
-            </div>
-          </div>
-          <div class="hero-actions">
-            <button
-              type="button"
-              class="hero-btn hero-btn--ghost"
-              @click="
-                $router.push({
-                  name: ROUTE_NAMES.projectSettings,
-                  params: { projectId },
-                })
-              "
-            >
-              設定を開く
-            </button>
-          </div>
-        </section>
+
         <section class="dashboard__charts">
           <div class="chart-card chart-card--donut">
             <header class="chart-card__header">
@@ -1347,67 +1318,6 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.75rem;
-}
-
-.dashboard-hero {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1.25rem;
-  border-radius: 1rem;
-  background: linear-gradient(120deg, #f5fcff, #eef6f8);
-  border: 1px solid var(--border, rgba(11, 46, 51, 0.12));
-}
-
-.dashboard-hero h2 {
-  margin: 0.15rem 0;
-}
-
-.dashboard-hero .muted {
-  margin: 0;
-}
-
-.hero-tags {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.chip {
-  border-radius: 999px;
-  padding: 0.25rem 0.75rem;
-  background: rgba(11, 46, 51, 0.08);
-  color: #0b2e33;
-  font-weight: 600;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.hero-btn {
-  border: none;
-  border-radius: 0.9rem;
-  padding: 0.75rem 1rem;
-  background: #0b2e33;
-  color: #fff;
-  cursor: pointer;
-}
-
-.hero-btn--ghost {
-  background: #fff;
-  color: #0b2e33;
-  border: 1px solid rgba(11, 46, 51, 0.12);
-}
-
-.eyebrow {
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted, #4f7c82);
-  margin: 0;
-  font-size: 0.82rem;
 }
 
 .muted {
