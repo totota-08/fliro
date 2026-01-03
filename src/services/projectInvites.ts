@@ -166,6 +166,13 @@ export function buildInviteUrl(invite: ProjectInviteDoc & { id?: string }) {
   return `${window.location.origin}/invite/${token}`;
 }
 
+export async function fetchInviteByToken(token: string) {
+  const ref = doc(db, "projectInvites", token);
+  const snapshot = await getDoc(ref);
+  if (!snapshot.exists()) return null;
+  return snapshot.data() as ProjectInviteDoc;
+}
+
 function mapInvite(
   docSnap: QueryDocumentSnapshot<DocumentData>,
 ): ProjectInvite {
