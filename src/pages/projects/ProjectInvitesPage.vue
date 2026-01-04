@@ -2,10 +2,12 @@
 import InviteCreateDrawer from "@/components/invites/InviteCreateDrawer.vue";
 import ButtonLoading from "@/components/loading/ButtonLoading.vue";
 import PageSkeleton from "@/components/loading/PageSkeleton.vue";
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { buildProjectNavItems } from "@/constants/projectNav";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   buildInviteStatus,
@@ -19,7 +21,6 @@ import {
 } from "@/services/projectInvites";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import {
   collection,
@@ -29,7 +30,6 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectInvites");
 
@@ -40,14 +40,11 @@ type MemberSummary = {
   permissions: ReturnType<typeof buildPermissionsFromRoles>;
 };
 
-const route = useRoute();
-const router = useRouter();
 const { user, profile } = useAuthStore();
-const projectId = ref(String(route.params.projectId || ""));
+const { projectId } = useProjectIdRoute();
 const project = ref<ProjectDoc | null>(null);
 const projectList = ref<{ id: string; name: string }[]>([]);
 const members = ref<MemberSummary[]>([]);
-const isSidebarOpen = ref(true);
 const statusFilter = ref<InviteFilter>("all");
 const inviteQuery = ref("");
 const loading = ref(true);
@@ -64,71 +61,7 @@ let stopMembers: (() => void) | null = null;
 let stopInvites: (() => void) | null = null;
 let actionTimer: ReturnType<typeof setTimeout> | null = null;
 
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "スレッド",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "timeline",
-        label: "ログ",
-        to: {
-          name: ROUTE_NAMES.projectTimeline,
-          params: { projectId: projectId.value },
-        },
-        icon: "tasks",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "invites",
-        label: "招待リンク",
-        to: {
-          name: ROUTE_NAMES.projectInvites,
-          params: { projectId: projectId.value },
-        },
-        icon: "invites",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-    ] satisfies DashboardNavItem[],
-);
+const navItems = computed(() => buildProjectNavItems(projectId.value));
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
@@ -467,14 +400,6 @@ async function loadMoreInvites() {
   }
 }
 
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
-
 function openCreateDrawer() {
   if (!canCreateInvite.value) return;
   isCreateOpen.value = true;
@@ -489,23 +414,16 @@ function handleInviteCreated(_link: string) {
 }
 
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   loadProjectList();
   watchProject();
   watchInvites();
 });
 
-watch(
-  () => route.params.projectId,
-  (newId) => {
-    if (!newId) return;
-    projectId.value = String(newId);
-    watchProject();
-    watchInvites();
-  },
-);
+watch(projectId, (newId, oldId) => {
+  if (!newId || newId === oldId) return;
+  watchProject();
+  watchInvites();
+});
 
 onBeforeUnmount(() => {
   stopProject?.();
@@ -518,207 +436,172 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="プロジェクト"
-      @close="closeSidebar"
-    />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+    brand-subtitle="プロジェクト"
+  >
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; 招待リンク</p>
+      <h1 class="project-app-shell__heading">
+        {{ project?.name || "プロジェクト" }}
+      </h1>
+    </template>
 
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
-
-    <div class="demo__main">
-      <PageSkeleton v-if="isInitialLoading" variant="invites" />
-      <template v-else>
-        <header class="demo__topbar">
-          <div class="demo__topbar-left">
-            <button
-              type="button"
-              class="demo__menu-button"
-              @click="toggleSidebar"
+    <PageSkeleton v-if="isInitialLoading" variant="invites" />
+    <template v-else>
+      <div class="demo__content demo__content--condensed">
+        <section class="invites-page">
+          <header class="invites-page__header">
+            <div>
+              <h2>招待リンク</h2>
+              <p>招待リンクの発行状況と無効化を管理できます。</p>
+            </div>
+            <div
+              class="invites-page__header-action"
+              :title="!canCreateInvite ? '作成権限がありません' : undefined"
             >
-              <span class="sr-only">サイドバーを切り替え</span>
-              <svg
-                aria-hidden="true"
-                class="demo__menu-icon"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
+              <ButtonLoading
+                class="invites-page__create-button"
+                :disabled="!canCreateInvite"
+                :aria-disabled="!canCreateInvite ? 'true' : undefined"
+                @click="openCreateDrawer"
               >
-                <path
+                <svg
+                  v-if="!canCreateInvite"
+                  class="invites-page__lock-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-            <div>
-              <p class="demo__breadcrumb">プロジェクト &gt; 招待リンク</p>
-              <h1 class="demo__heading">
-                {{ project?.name || "プロジェクト" }}
-              </h1>
+                  aria-hidden="true"
+                >
+                  <path d="M7 10V7a5 5 0 0110 0v3" />
+                  <rect x="5" y="10" width="14" height="10" rx="2" />
+                </svg>
+                招待リンクを作成
+              </ButtonLoading>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <div class="demo__content demo__content--condensed">
-          <section class="invites-page">
-            <header class="invites-page__header">
-              <div>
-                <h2>招待リンク</h2>
-                <p>招待リンクの発行状況と無効化を管理できます。</p>
-              </div>
-              <div
-                class="invites-page__header-action"
-                :title="!canCreateInvite ? '作成権限がありません' : undefined"
-              >
-                <ButtonLoading
-                  class="invites-page__create-button"
-                  :disabled="!canCreateInvite"
-                  :aria-disabled="!canCreateInvite ? 'true' : undefined"
-                  @click="openCreateDrawer"
-                >
-                  <svg
-                    v-if="!canCreateInvite"
-                    class="invites-page__lock-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
+          <section class="invites-page__list">
+            <div class="invites-page__toolbar">
+              <div class="invites-page__filters">
+                <label class="small-label" for="invite-status">
+                  ステータス
+                </label>
+                <select id="invite-status" v-model="statusFilter">
+                  <option
+                    v-for="option in statusOptions"
+                    :key="option.value"
+                    :value="option.value"
                   >
-                    <path d="M7 10V7a5 5 0 0110 0v3" />
-                    <rect x="5" y="10" width="14" height="10" rx="2" />
-                  </svg>
-                  招待リンクを作成
-                </ButtonLoading>
+                    {{ option.label }}
+                  </option>
+                </select>
               </div>
-            </header>
-
-            <section class="invites-page__list">
-              <div class="invites-page__toolbar">
-                <div class="invites-page__filters">
-                  <label class="small-label" for="invite-status">
-                    ステータス
-                  </label>
-                  <select id="invite-status" v-model="statusFilter">
-                    <option
-                      v-for="option in statusOptions"
-                      :key="option.value"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="invites-page__search">
-                  <label class="sr-only" for="invite-search">検索</label>
-                  <input
-                    id="invite-search"
-                    v-model="inviteQuery"
-                    type="search"
-                    placeholder="ID / 作成者 / メモで検索"
-                    autocomplete="off"
-                  />
-                </div>
+              <div class="invites-page__search">
+                <label class="sr-only" for="invite-search">検索</label>
+                <input
+                  id="invite-search"
+                  v-model="inviteQuery"
+                  type="search"
+                  placeholder="ID / 作成者 / メモで検索"
+                  autocomplete="off"
+                />
               </div>
+            </div>
 
-              <p v-if="!canCreateInvite" class="invites-page__permission">
-                招待リンクを作成する権限がありません。
-              </p>
+            <p v-if="!canCreateInvite" class="invites-page__permission">
+              招待リンクを作成する権限がありません。
+            </p>
 
-              <p v-if="actionMessage" class="invites-page__message">
-                {{ actionMessage }}
-              </p>
-              <p v-if="actionError" class="invites-page__error">
-                {{ actionError }}
-              </p>
+            <p v-if="actionMessage" class="invites-page__message">
+              {{ actionMessage }}
+            </p>
+            <p v-if="actionError" class="invites-page__error">
+              {{ actionError }}
+            </p>
 
-              <div class="invites-page__table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>ステータス</th>
-                      <th class="col-created">作成日</th>
-                      <th class="col-expiry">有効期限</th>
-                      <th class="col-uses">利用回数</th>
-                      <th class="col-password">パスワード</th>
-                      <th class="col-creator">作成者</th>
-                      <th class="actions">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-if="loading">
-                      <td colspan="7" class="empty">読み込み中...</td>
-                    </tr>
-                    <tr v-else-if="!filteredInvites.length">
-                      <td colspan="7" class="empty">
-                        招待リンクがありません。
-                      </td>
-                    </tr>
-                    <tr v-for="invite in filteredInvites" :key="invite.id">
-                      <td>
-                        <span
-                          class="invites-page__status"
-                          :class="statusClass(buildInviteStatus(invite))"
-                        >
-                          {{ statusLabel(buildInviteStatus(invite)) }}
-                        </span>
-                      </td>
-                      <td class="col-created">
-                        {{ formatDate(invite.createdAt) }}
-                      </td>
-                      <td class="col-expiry">{{ formatExpiry(invite) }}</td>
-                      <td class="col-uses">{{ formatUses(invite) }}</td>
-                      <td class="col-password">
-                        {{ invite.passwordHash ? "あり" : "なし" }}
-                      </td>
-                      <td class="col-creator">{{ getCreatorName(invite) }}</td>
-                      <td class="actions">
-                        <button type="button" @click="copyInvite(invite)">
-                          コピー
-                        </button>
-                        <ButtonLoading
-                          variant="danger"
-                          size="small"
-                          :disabled="
-                            !canManageInvites ||
-                            buildInviteStatus(invite) !== 'active' ||
-                            revokeTarget === invite.id
-                          "
-                          :loading="revokeTarget === invite.id"
-                          @click="revokeInvite(invite)"
-                        >
-                          無効化
-                        </ButtonLoading>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div class="invites-page__table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ステータス</th>
+                    <th class="col-created">作成日</th>
+                    <th class="col-expiry">有効期限</th>
+                    <th class="col-uses">利用回数</th>
+                    <th class="col-password">パスワード</th>
+                    <th class="col-creator">作成者</th>
+                    <th class="actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="loading">
+                    <td colspan="7" class="empty">読み込み中...</td>
+                  </tr>
+                  <tr v-else-if="!filteredInvites.length">
+                    <td colspan="7" class="empty">招待リンクがありません。</td>
+                  </tr>
+                  <tr v-for="invite in filteredInvites" :key="invite.id">
+                    <td>
+                      <span
+                        class="invites-page__status"
+                        :class="statusClass(buildInviteStatus(invite))"
+                      >
+                        {{ statusLabel(buildInviteStatus(invite)) }}
+                      </span>
+                    </td>
+                    <td class="col-created">
+                      {{ formatDate(invite.createdAt) }}
+                    </td>
+                    <td class="col-expiry">{{ formatExpiry(invite) }}</td>
+                    <td class="col-uses">{{ formatUses(invite) }}</td>
+                    <td class="col-password">
+                      {{ invite.passwordHash ? "あり" : "なし" }}
+                    </td>
+                    <td class="col-creator">{{ getCreatorName(invite) }}</td>
+                    <td class="actions">
+                      <button type="button" @click="copyInvite(invite)">
+                        コピー
+                      </button>
+                      <ButtonLoading
+                        variant="danger"
+                        size="small"
+                        :disabled="
+                          !canManageInvites ||
+                          buildInviteStatus(invite) !== 'active' ||
+                          revokeTarget === invite.id
+                        "
+                        :loading="revokeTarget === invite.id"
+                        @click="revokeInvite(invite)"
+                      >
+                        無効化
+                      </ButtonLoading>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-              <div v-if="hasMore" class="invites-page__more">
-                <button
-                  type="button"
-                  class="invites-page__more-button"
-                  :disabled="loadingMore"
-                  @click="loadMoreInvites"
-                >
-                  {{ loadingMore ? "読み込み中..." : "さらに読み込む" }}
-                </button>
-              </div>
-            </section>
+            <div v-if="hasMore" class="invites-page__more">
+              <button
+                type="button"
+                class="invites-page__more-button"
+                :disabled="loadingMore"
+                @click="loadMoreInvites"
+              >
+                {{ loadingMore ? "読み込み中..." : "さらに読み込む" }}
+              </button>
+            </div>
           </section>
-        </div>
-      </template>
-    </div>
+        </section>
+      </div>
+    </template>
 
     <InviteCreateDrawer
       :open="isCreateOpen"
@@ -728,7 +611,7 @@ onBeforeUnmount(() => {
       @close="closeCreateDrawer"
       @created="handleInviteCreated"
     />
-  </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>

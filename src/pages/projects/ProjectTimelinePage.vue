@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { buildProjectNavItems } from "@/constants/projectNav";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   listenProjectMembers,
@@ -15,103 +17,25 @@ import {
 } from "@/services/timelineService";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
 import { collection, getDocs } from "firebase/firestore";
 
 const logger = getLogger("app.pages.projects.Timeline");
-const route = useRoute();
 const { user, profile } = useAuthStore();
-
-const projectId = ref(String(route.params.projectId || ""));
+const { projectId } = useProjectIdRoute();
 const projectList = ref<{ id: string; name: string }[]>([]);
 const timelinePosts = ref<TimelinePost[]>([]);
 const tasks = ref<TaskDoc[]>([]);
 const members = ref<ProjectMember[]>([]);
 const newPost = ref("");
 const posting = ref(false);
-const isSidebarOpen = ref(true);
 
 let stopTimeline: (() => void) | null = null;
 let stopTasks: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "スレッド",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "timeline",
-        label: "タイムライン",
-        to: {
-          name: ROUTE_NAMES.projectTimeline,
-          params: { projectId: projectId.value },
-        },
-        icon: "tasks",
-      },
-      {
-        key: "activity",
-        label: "活動ログ",
-        to: {
-          name: ROUTE_NAMES.projectActivity,
-          params: { projectId: projectId.value },
-        },
-        icon: "tasks",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "invites",
-        label: "招待リンク",
-        to: {
-          name: ROUTE_NAMES.projectInvites,
-          params: { projectId: projectId.value },
-        },
-        icon: "invites",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-    ] satisfies DashboardNavItem[],
-);
+const navItems = computed(() => buildProjectNavItems(projectId.value));
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
@@ -234,30 +158,15 @@ async function loadProjectList() {
   }));
 }
 
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   loadProjectList();
   resetWatchers();
 });
 
-watch(
-  () => route.params.projectId,
-  (newId) => {
-    if (!newId) return;
-    projectId.value = String(newId);
-    resetWatchers();
-  },
-);
+watch(projectId, (newId, oldId) => {
+  if (!newId || newId === oldId) return;
+  resetWatchers();
+});
 
 onBeforeUnmount(() => {
   stopTimeline?.();
@@ -267,129 +176,87 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    :class="[
-      'timeline-shell',
-      { 'timeline-shell--sidebar-collapsed': !isSidebarOpen },
-    ]"
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+    brand-subtitle="プロジェクト"
   >
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="プロジェクト"
-      @close="closeSidebar"
-    />
-    <div
-      v-if="isSidebarOpen"
-      class="timeline-shell__overlay"
-      @click="closeSidebar"
-    />
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">
+        プロジェクト &gt; タイムライン
+      </p>
+      <h1 class="project-app-shell__heading">タイムライン</h1>
+    </template>
 
-    <main class="timeline-shell__main">
-      <header class="timeline-shell__topbar">
-        <div class="timeline-shell__topbar-left">
-          <button
-            type="button"
-            class="timeline-shell__menu-button"
-            @click="toggleSidebar"
-          >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              aria-hidden="true"
-              class="timeline-shell__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-          <div>
-            <p class="timeline-shell__breadcrumb">
-              プロジェクト &gt; タイムライン
-            </p>
-            <h1 class="timeline-shell__heading">タイムライン</h1>
-          </div>
-        </div>
-      </header>
-
-      <div class="timeline-content">
-        <section class="timeline-compose">
-          <div>
-            <p class="eyebrow">フィード投稿</p>
-            <h2>チームの進捗を共有</h2>
-            <p class="muted">
-              締切前のボット投稿とメンバー投稿をまとめて表示します。
-            </p>
-          </div>
-          <textarea
-            v-model="newPost"
-            class="timeline-compose__input"
-            rows="3"
-            :placeholder="
-              canPost ? '今日の進捗や共有事項を投稿' : '閲覧のみ可能です'
-            "
-            :disabled="!canPost"
-          />
-          <div class="timeline-compose__actions">
-            <span v-if="!canPost" class="muted"
-              >閲覧権限のみのため投稿できません</span
-            >
-            <AppButton
-              variant="primary"
-              :disabled="!newPost.trim() || !canPost"
-              :loading="posting"
-              @click="submitPost"
-            >
-              投稿する
-            </AppButton>
-          </div>
-        </section>
-
-        <section class="timeline-feed">
-          <article
-            v-for="post in combinedFeed"
-            :key="post.id"
-            :class="['timeline-item', { 'timeline-item--bot': post.isBot }]"
-          >
-            <header class="timeline-item__header">
-              <div
-                class="timeline-item__avatar"
-                :data-bot="post.isBot ? 'bot' : ''"
-              >
-                <span>{{
-                  post.isBot ? "🤖" : (post.authorName || "??").slice(0, 2)
-                }}</span>
-              </div>
-              <div>
-                <p class="timeline-item__author">{{ post.authorName }}</p>
-                <p class="timeline-item__meta">
-                  {{ new Date(getCreatedAtMillis(post)).toLocaleString() }}
-                </p>
-              </div>
-            </header>
-            <p class="timeline-item__body">{{ post.body }}</p>
-            <div class="timeline-item__tags">
-              <span v-if="post.isBot" class="chip">Deadline Bot</span>
-              <span v-if="post.dueDate" class="chip chip--soft"
-                >期限: {{ post.dueDate }}</span
-              >
-            </div>
-          </article>
-          <p v-if="!combinedFeed.length" class="muted">
-            まだ投稿がありません。
+    <div class="timeline-content">
+      <section class="timeline-compose">
+        <div>
+          <p class="eyebrow">フィード投稿</p>
+          <h2>チームの進捗を共有</h2>
+          <p class="muted">
+            締切前のボット投稿とメンバー投稿をまとめて表示します。
           </p>
-        </section>
-      </div>
-    </main>
-  </div>
+        </div>
+        <textarea
+          v-model="newPost"
+          class="timeline-compose__input"
+          rows="3"
+          :placeholder="
+            canPost ? '今日の進捗や共有事項を投稿' : '閲覧のみ可能です'
+          "
+          :disabled="!canPost"
+        />
+        <div class="timeline-compose__actions">
+          <span v-if="!canPost" class="muted"
+            >閲覧権限のみのため投稿できません</span
+          >
+          <AppButton
+            variant="primary"
+            :disabled="!newPost.trim() || !canPost"
+            :loading="posting"
+            @click="submitPost"
+          >
+            投稿する
+          </AppButton>
+        </div>
+      </section>
+
+      <section class="timeline-feed">
+        <article
+          v-for="post in combinedFeed"
+          :key="post.id"
+          :class="['timeline-item', { 'timeline-item--bot': post.isBot }]"
+        >
+          <header class="timeline-item__header">
+            <div
+              class="timeline-item__avatar"
+              :data-bot="post.isBot ? 'bot' : ''"
+            >
+              <span>{{
+                post.isBot ? "🤖" : (post.authorName || "??").slice(0, 2)
+              }}</span>
+            </div>
+            <div>
+              <p class="timeline-item__author">{{ post.authorName }}</p>
+              <p class="timeline-item__meta">
+                {{ new Date(getCreatedAtMillis(post)).toLocaleString() }}
+              </p>
+            </div>
+          </header>
+          <p class="timeline-item__body">{{ post.body }}</p>
+          <div class="timeline-item__tags">
+            <span v-if="post.isBot" class="chip">Deadline Bot</span>
+            <span v-if="post.dueDate" class="chip chip--soft"
+              >期限: {{ post.dueDate }}</span
+            >
+          </div>
+        </article>
+        <p v-if="!combinedFeed.length" class="muted">まだ投稿がありません。</p>
+      </section>
+    </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>
