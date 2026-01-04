@@ -98,9 +98,9 @@ const navItems = computed<DashboardNavItem[]>(
       },
       {
         key: "timeline",
-        label: "ログ",
+        label: "アクティビティー",
         to: {
-          name: ROUTE_NAMES.projectTimeline,
+          name: ROUTE_NAMES.projectActivity,
           params: { projectId: projectId.value },
         },
         icon: "tasks",
@@ -416,9 +416,9 @@ function goToInvites() {
   });
 }
 
-function goToTimeline() {
+function goToActivity() {
   void router.push({
-    name: ROUTE_NAMES.projectTimeline,
+    name: ROUTE_NAMES.projectActivity,
     params: { projectId: projectId.value },
   });
 }
@@ -863,9 +863,9 @@ onBeforeUnmount(() => {
                     <button
                       type="button"
                       class="team-page__action-button team-page__action-button--ghost"
-                      @click="goToTimeline"
+                      @click="goToActivity"
                     >
-                      ログを見る
+                      アクティビティーを見る
                     </button>
                   </div>
                 </section>
