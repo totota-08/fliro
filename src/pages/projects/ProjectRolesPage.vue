@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { buildProjectNavItems } from "@/constants/projectNav";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   listenProjectMembers,
@@ -10,89 +12,21 @@ import {
   type ProjectMember,
 } from "@/services/projectMembers";
 import { useAuthStore } from "@/store/auth";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { doc, getDoc } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
 
-const route = useRoute();
 const { user, profile } = useAuthStore();
 
 type MemberRole = ProjectMember["role"];
 
-const projectId = ref(String(route.params.projectId || ""));
+const { projectId } = useProjectIdRoute();
 const members = ref<ProjectMember[]>([]);
-const isSidebarOpen = ref(true);
 const updating = ref<string | null>(null);
 const canEdit = ref(false);
 
 let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "スレッド",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "roles",
-        label: "ロール",
-        to: {
-          name: ROUTE_NAMES.projectRoles,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "invites",
-        label: "招待リンク",
-        to: {
-          name: ROUTE_NAMES.projectInvites,
-          params: { projectId: projectId.value },
-        },
-        icon: "invites",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-    ] satisfies DashboardNavItem[],
-);
+const navItems = computed(() => buildProjectNavItems(projectId.value));
 
 const sidebarProjects = computed(() =>
   members.value.map((member, index) => ({
@@ -167,32 +101,17 @@ async function changeRole(member: ProjectMember, next: MemberRole) {
   }
 }
 
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   evaluatePermissions();
   watchMembers();
 });
 
-watch(
-  () => route.params.projectId,
-  (newId) => {
-    if (!newId) return;
-    projectId.value = String(newId);
-    evaluatePermissions();
-    stopMembers?.();
-    watchMembers();
-  },
-);
+watch(projectId, (newId, oldId) => {
+  if (!newId || newId === oldId) return;
+  evaluatePermissions();
+  stopMembers?.();
+  watchMembers();
+});
 
 onBeforeUnmount(() => {
   stopMembers?.();
@@ -200,133 +119,89 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    :class="[
-      'roles-shell',
-      { 'roles-shell--sidebar-collapsed': !isSidebarOpen },
-    ]"
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+    brand-subtitle="ロール設定"
   >
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="ロール設定"
-      @close="closeSidebar"
-    />
-    <div
-      v-if="isSidebarOpen"
-      class="roles-shell__overlay"
-      @click="closeSidebar"
-    />
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; ロール</p>
+      <h1 class="project-app-shell__heading">ロール設定</h1>
+      <p class="muted">Discord風にメンバーのロールと権限を管理します。</p>
+    </template>
 
-    <main class="roles-shell__main">
-      <header class="roles-shell__topbar">
-        <div class="roles-shell__topbar-left">
-          <button
-            type="button"
-            class="roles-shell__menu-button"
-            @click="toggleSidebar"
-          >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              aria-hidden="true"
-              class="roles-shell__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
+    <div class="roles-content">
+      <section class="roles-legend">
+        <h3>ロール概要</h3>
+        <ul>
+          <li><strong>admin</strong> — すべての設定とメンバー管理が可能</li>
+          <li>
+            <strong>member</strong> — タスク作成・更新、スレッド参加が可能
+          </li>
+          <li><strong>viewer</strong> — 閲覧のみ</li>
+        </ul>
+      </section>
+
+      <section class="roles-card">
+        <header class="roles-card__header">
           <div>
-            <p class="roles-shell__breadcrumb">プロジェクト &gt; ロール</p>
-            <h1 class="roles-shell__heading">ロール設定</h1>
-            <p class="muted">Discord風にメンバーのロールと権限を管理します。</p>
+            <p class="eyebrow">Members</p>
+            <h2>メンバーごとのロール割り当て</h2>
           </div>
-        </div>
-      </header>
-
-      <div class="roles-content">
-        <section class="roles-legend">
-          <h3>ロール概要</h3>
-          <ul>
-            <li><strong>admin</strong> — すべての設定とメンバー管理が可能</li>
-            <li>
-              <strong>member</strong> — タスク作成・更新、スレッド参加が可能
-            </li>
-            <li><strong>viewer</strong> — 閲覧のみ</li>
-          </ul>
-        </section>
-
-        <section class="roles-card">
-          <header class="roles-card__header">
-            <div>
-              <p class="eyebrow">Members</p>
-              <h2>メンバーごとのロール割り当て</h2>
+        </header>
+        <ul class="roles-list">
+          <li v-for="member in members" :key="member.userId" class="roles-item">
+            <div class="roles-item__persona">
+              <div class="avatar" aria-hidden="true">
+                {{ (member.displayName || member.userId).slice(0, 2) }}
+              </div>
+              <div>
+                <p class="roles-item__name">
+                  {{ member.displayName || member.userId }}
+                </p>
+                <p class="roles-item__meta">
+                  {{ member.email || member.userId }}
+                </p>
+              </div>
             </div>
-          </header>
-          <ul class="roles-list">
-            <li
-              v-for="member in members"
-              :key="member.userId"
-              class="roles-item"
-            >
-              <div class="roles-item__persona">
-                <div class="avatar" aria-hidden="true">
-                  {{ (member.displayName || member.userId).slice(0, 2) }}
-                </div>
-                <div>
-                  <p class="roles-item__name">
-                    {{ member.displayName || member.userId }}
-                  </p>
-                  <p class="roles-item__meta">
-                    {{ member.email || member.userId }}
-                  </p>
-                </div>
-              </div>
-              <div class="roles-item__selector">
-                <label class="sr-only" :for="`role-${member.userId}`"
-                  >ロール</label
-                >
-                <select
-                  :id="`role-${member.userId}`"
-                  :value="member.role"
-                  :disabled="
-                    !canEdit ||
-                    member.role === 'owner' ||
-                    updating === member.userId
-                  "
-                  @change="
-                    changeRole(
-                      member,
-                      ($event.target as HTMLSelectElement).value as MemberRole,
-                    )
-                  "
-                >
-                  <option v-for="role in roleOptions" :key="role" :value="role">
-                    {{ role }}
-                  </option>
-                </select>
-              </div>
-              <span class="badge" :class="`badge-${member.role}`">{{
-                member.role
-              }}</span>
-            </li>
-            <li v-if="!members.length" class="roles-item roles-item--empty">
-              メンバーがいません。
-            </li>
-          </ul>
-          <p v-if="!canEdit" class="muted">管理者のみ変更できます。</p>
-        </section>
-      </div>
-    </main>
-  </div>
+            <div class="roles-item__selector">
+              <label class="sr-only" :for="`role-${member.userId}`"
+                >ロール</label
+              >
+              <select
+                :id="`role-${member.userId}`"
+                :value="member.role"
+                :disabled="
+                  !canEdit ||
+                  member.role === 'owner' ||
+                  updating === member.userId
+                "
+                @change="
+                  changeRole(
+                    member,
+                    ($event.target as HTMLSelectElement).value as MemberRole,
+                  )
+                "
+              >
+                <option v-for="role in roleOptions" :key="role" :value="role">
+                  {{ role }}
+                </option>
+              </select>
+            </div>
+            <span class="badge" :class="`badge-${member.role}`">{{
+              member.role
+            }}</span>
+          </li>
+          <li v-if="!members.length" class="roles-item roles-item--empty">
+            メンバーがいません。
+          </li>
+        </ul>
+        <p v-if="!canEdit" class="muted">管理者のみ変更できます。</p>
+      </section>
+    </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { buildProjectNavItems } from "@/constants/projectNav";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   deleteProject,
@@ -13,18 +15,16 @@ import { updateProjectSettings } from "@/services/projectSettings";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectSettings");
 
-const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
-const projectId = ref(String(route.params.projectId || ""));
+const { projectId } = useProjectIdRoute();
 const project = ref<ProjectDoc | null>(null);
 const projectList = ref<{ id: string; name: string }[]>([]);
 const loading = ref(true);
@@ -34,7 +34,6 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const deleteError = ref("");
 const deleteConfirmInput = ref("");
-const isSidebarOpen = ref(true);
 const canManage = ref(false);
 
 const aiEnabled = ref(false);
@@ -52,71 +51,7 @@ const form = ref({
   allowGuestView: false,
 });
 
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "スレッド",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "timeline",
-        label: "アクティビティー",
-        to: {
-          name: ROUTE_NAMES.projectActivity,
-          params: { projectId: projectId.value },
-        },
-        icon: "tasks",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "invites",
-        label: "招待リンク",
-        to: {
-          name: ROUTE_NAMES.projectInvites,
-          params: { projectId: projectId.value },
-        },
-        icon: "invites",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-    ] satisfies DashboardNavItem[],
-);
+const navItems = computed(() => buildProjectNavItems(projectId.value));
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
@@ -298,14 +233,6 @@ async function askAi() {
   }
 }
 
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
 async function handleSave() {
   if (!canEdit.value || !project.value) return;
   if (!form.value.name.trim()) {
@@ -358,9 +285,6 @@ async function handleDelete() {
 }
 
 onMounted(async () => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   await loadProjectList();
   await loadProject();
   watchTasks();
@@ -370,381 +294,338 @@ onBeforeUnmount(() => {
   stopTasks?.();
 });
 
-watch(
-  () => route.params.projectId,
-  async (newId) => {
-    if (!newId) return;
-    projectId.value = String(newId);
-    stopTasks?.();
-    await loadProject();
-    watchTasks();
-  },
-);
+watch(projectId, async (newId, oldId) => {
+  if (!newId || newId === oldId) return;
+  stopTasks?.();
+  await loadProject();
+  watchTasks();
+});
 </script>
 
 <template>
-  <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="プロジェクト設定"
-      @close="closeSidebar"
-    />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+    brand-subtitle="プロジェクト設定"
+  >
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; 設定</p>
+      <h1 class="project-app-shell__heading">{{ project?.name || "設定" }}</h1>
+    </template>
 
-    <div class="demo__main">
-      <header class="demo__topbar">
-        <div class="demo__topbar-left">
-          <button
-            type="button"
-            class="demo__menu-button"
-            @click="toggleSidebar"
-          >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              aria-hidden="true"
-              class="demo__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-          <div>
-            <nav class="demo__breadcrumb-nav">
-              <ol class="demo__breadcrumb-list">
-                <li>プロジェクト</li>
-                <li>設定</li>
-              </ol>
-            </nav>
-            <h1 class="demo__heading">{{ project?.name || "設定" }}</h1>
-          </div>
-        </div>
-      </header>
-
-      <div v-if="!canEdit" class="admin-guard">
-        <p class="admin-guard__title">管理者限定</p>
-        <p class="admin-guard__desc">
-          このページは管理者のみが利用できます。権限をご確認ください。
-        </p>
+    <div v-if="!canEdit" class="admin-guard">
+      <p class="admin-guard__title">管理者限定</p>
+      <p class="admin-guard__desc">
+        このページは管理者のみが利用できます。権限をご確認ください。
+      </p>
+    </div>
+    <div v-else class="settings-container">
+      <div v-if="loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>読み込み中...</p>
       </div>
 
-      <div v-else class="settings-container">
-        <div v-if="loading" class="loading-state">
-          <div class="spinner"></div>
-          <p>読み込み中...</p>
-        </div>
+      <div v-else-if="errorMessage" class="error-state">
+        <p>{{ errorMessage }}</p>
+      </div>
 
-        <div v-else-if="errorMessage" class="error-state">
-          <p>{{ errorMessage }}</p>
-        </div>
-
-        <template v-else>
-          <div class="settings-grid">
-            <!-- Main Settings Column -->
-            <div class="settings-main">
-              <section class="card" :class="{ 'is-disabled': !canEdit }">
-                <header class="card-header">
-                  <div class="card-header__icon">
-                    <svg
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                      />
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2>基本設定</h2>
-                    <p>プロジェクトの基本情報を管理します</p>
-                  </div>
-                </header>
-
-                <form @submit.prevent="handleSave" class="form-stack">
-                  <div class="form-group">
-                    <label for="projectName">プロジェクト名</label>
-                    <input
-                      id="projectName"
-                      v-model="form.name"
-                      type="text"
-                      :disabled="!canEdit"
-                      required
-                      class="form-input"
-                      placeholder="プロジェクト名を入力"
+      <template v-else>
+        <div class="settings-grid">
+          <!-- Main Settings Column -->
+          <div class="settings-main">
+            <section class="card" :class="{ 'is-disabled': !canEdit }">
+              <header class="card-header">
+                <div class="card-header__icon">
+                  <svg
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                     />
-                  </div>
-
-                  <div class="form-group">
-                    <label for="projectDesc">説明</label>
-                    <textarea
-                      id="projectDesc"
-                      v-model="form.description"
-                      rows="4"
-                      :disabled="!canEdit"
-                      class="form-textarea"
-                      placeholder="プロジェクトの目的や概要を入力してください"
-                    ></textarea>
-                  </div>
-
-                  <div class="form-toggles">
-                    <label class="toggle-switch">
-                      <input
-                        type="checkbox"
-                        v-model="form.isPublic"
-                        :disabled="!canEdit"
-                      />
-                      <span class="toggle-slider"></span>
-                      <span class="toggle-label">
-                        <span class="toggle-title">公開プロジェクト</span>
-                        <span class="toggle-desc"
-                          >誰でもこのプロジェクトを閲覧できるようになります</span
-                        >
-                      </span>
-                    </label>
-
-                    <label class="toggle-switch">
-                      <input
-                        type="checkbox"
-                        v-model="form.allowGuestView"
-                        :disabled="!canEdit"
-                      />
-                      <span class="toggle-slider"></span>
-                      <span class="toggle-label">
-                        <span class="toggle-title">ゲスト閲覧を許可</span>
-                        <span class="toggle-desc"
-                          >アカウントを持たないユーザーも閲覧可能にします</span
-                        >
-                      </span>
-                    </label>
-                  </div>
-
-                  <div class="form-actions">
-                    <AppButton
-                      type="submit"
-                      :loading="saving"
-                      :disabled="!canEdit"
-                      variant="primary"
-                    >
-                      変更を保存
-                    </AppButton>
-                    <transition name="fade">
-                      <span v-if="successMessage" class="success-badge">
-                        <svg
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          width="16"
-                          height="16"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        {{ successMessage }}
-                      </span>
-                    </transition>
-                  </div>
-                </form>
-              </section>
-
-              <section class="card" :class="{ 'is-disabled': !canEdit }">
-                <header class="card-header">
-                  <div class="card-header__icon">
-                    <svg
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2>AI アシスタント</h2>
-                    <p>OpenAI API を使用してタスクのサポートを行います</p>
-                  </div>
-                </header>
-
-                <div class="form-stack">
-                  <div class="form-toggles">
-                    <label class="toggle-switch">
-                      <input
-                        type="checkbox"
-                        v-model="aiEnabled"
-                        :disabled="!canEdit"
-                      />
-                      <span class="toggle-slider"></span>
-                      <span class="toggle-label">
-                        <span class="toggle-title"
-                          >AI アシスタントを有効化</span
-                        >
-                        <span class="toggle-desc"
-                          >タスクの内容に基づいてAIが回答します</span
-                        >
-                      </span>
-                    </label>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="aiKey">OpenAI API Key</label>
-                    <input
-                      id="aiKey"
-                      v-model="aiKey"
-                      type="password"
-                      :disabled="!canEdit"
-                      class="form-input"
-                      placeholder="sk-..."
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
-                  </div>
+                  </svg>
+                </div>
+                <div>
+                  <h2>基本設定</h2>
+                  <p>プロジェクトの基本情報を管理します</p>
+                </div>
+              </header>
 
+              <form @submit.prevent="handleSave" class="form-stack">
+                <div class="form-group">
+                  <label for="projectName">プロジェクト名</label>
+                  <input
+                    id="projectName"
+                    v-model="form.name"
+                    type="text"
+                    :disabled="!canEdit"
+                    required
+                    class="form-input"
+                    placeholder="プロジェクト名を入力"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="projectDesc">説明</label>
+                  <textarea
+                    id="projectDesc"
+                    v-model="form.description"
+                    rows="4"
+                    :disabled="!canEdit"
+                    class="form-textarea"
+                    placeholder="プロジェクトの目的や概要を入力してください"
+                  ></textarea>
+                </div>
+
+                <div class="form-toggles">
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      v-model="form.isPublic"
+                      :disabled="!canEdit"
+                    />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">
+                      <span class="toggle-title">公開プロジェクト</span>
+                      <span class="toggle-desc"
+                        >誰でもこのプロジェクトを閲覧できるようになります</span
+                      >
+                    </span>
+                  </label>
+
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      v-model="form.allowGuestView"
+                      :disabled="!canEdit"
+                    />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">
+                      <span class="toggle-title">ゲスト閲覧を許可</span>
+                      <span class="toggle-desc"
+                        >アカウントを持たないユーザーも閲覧可能にします</span
+                      >
+                    </span>
+                  </label>
+                </div>
+
+                <div class="form-actions">
+                  <AppButton
+                    type="submit"
+                    :loading="saving"
+                    :disabled="!canEdit"
+                    variant="primary"
+                  >
+                    変更を保存
+                  </AppButton>
+                  <transition name="fade">
+                    <span v-if="successMessage" class="success-badge">
+                      <svg
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        width="16"
+                        height="16"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      {{ successMessage }}
+                    </span>
+                  </transition>
+                </div>
+              </form>
+            </section>
+
+            <section class="card" :class="{ 'is-disabled': !canEdit }">
+              <header class="card-header">
+                <div class="card-header__icon">
+                  <svg
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h2>AI アシスタント</h2>
+                  <p>OpenAI API を使用してタスクのサポートを行います</p>
+                </div>
+              </header>
+
+              <div class="form-stack">
+                <div class="form-toggles">
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      v-model="aiEnabled"
+                      :disabled="!canEdit"
+                    />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">
+                      <span class="toggle-title">AI アシスタントを有効化</span>
+                      <span class="toggle-desc"
+                        >タスクの内容に基づいてAIが回答します</span
+                      >
+                    </span>
+                  </label>
+                </div>
+
+                <div class="form-group">
+                  <label for="aiKey">OpenAI API Key</label>
+                  <input
+                    id="aiKey"
+                    v-model="aiKey"
+                    type="password"
+                    :disabled="!canEdit"
+                    class="form-input"
+                    placeholder="sk-..."
+                  />
+                </div>
+
+                <div class="form-actions">
+                  <AppButton
+                    type="button"
+                    :disabled="!canEdit"
+                    variant="primary"
+                    @click="saveAiSettings"
+                  >
+                    設定を保存
+                  </AppButton>
+                </div>
+
+                <div v-if="aiEnabled" class="ai-playground">
+                  <h3>テストチャット</h3>
+                  <textarea
+                    v-model="aiPrompt"
+                    class="form-textarea"
+                    placeholder="タスクについて質問してください"
+                  ></textarea>
                   <div class="form-actions">
                     <AppButton
                       type="button"
-                      :disabled="!canEdit"
-                      variant="primary"
-                      @click="saveAiSettings"
+                      :disabled="aiLoading || !aiKey"
+                      @click="askAi"
                     >
-                      設定を保存
+                      {{ aiLoading ? "応答中..." : "AIに聞く" }}
                     </AppButton>
                   </div>
-
-                  <div v-if="aiEnabled" class="ai-playground">
-                    <h3>テストチャット</h3>
-                    <textarea
-                      v-model="aiPrompt"
-                      class="form-textarea"
-                      placeholder="タスクについて質問してください"
-                    ></textarea>
-                    <div class="form-actions">
-                      <AppButton
-                        type="button"
-                        :disabled="aiLoading || !aiKey"
-                        @click="askAi"
-                      >
-                        {{ aiLoading ? "応答中..." : "AIに聞く" }}
-                      </AppButton>
-                    </div>
-                    <div v-if="aiResponse" class="ai-response">
-                      <p>{{ aiResponse }}</p>
-                    </div>
+                  <div v-if="aiResponse" class="ai-response">
+                    <p>{{ aiResponse }}</p>
                   </div>
                 </div>
-              </section>
-
-              <section class="card card--danger">
-                <header class="card-header">
-                  <div class="card-header__icon danger-icon">
-                    <svg
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2>プロジェクトの削除</h2>
-                    <p>
-                      この操作は取り消すことができません。慎重に操作してください。
-                    </p>
-                  </div>
-                </header>
-
-                <div class="danger-content">
-                  <div class="danger-warning">
-                    <p>
-                      プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。
-                    </p>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="deleteConfirm"
-                      >確認のため、メールアドレスを入力してください</label
-                    >
-                    <input
-                      id="deleteConfirm"
-                      v-model="deleteConfirmInput"
-                      type="email"
-                      class="form-input danger-input"
-                      :placeholder="confirmEmail"
-                    />
-                  </div>
-
-                  <div class="danger-actions">
-                    <AppButton
-                      variant="secondary"
-                      class="danger-button"
-                      :disabled="!canDeleteProject || deleting"
-                      :loading="deleting"
-                      @click="handleDelete"
-                    >
-                      プロジェクトを削除
-                    </AppButton>
-                    <p v-if="deleteError" class="error-message">
-                      {{ deleteError }}
-                    </p>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <!-- Sidebar Info Column -->
-            <aside class="settings-sidebar">
-              <div class="info-card">
-                <h3>プロジェクト情報</h3>
-                <dl class="info-list">
-                  <div class="info-item">
-                    <dt>作成日</dt>
-                    <dd>{{ summaryInfo.created }}</dd>
-                  </div>
-                  <div class="info-item">
-                    <dt>オーナー</dt>
-                    <dd class="truncate" :title="summaryInfo.ownerId">
-                      {{ summaryInfo.ownerId }}
-                    </dd>
-                  </div>
-                  <div class="info-item">
-                    <dt>メンバー数</dt>
-                    <dd>{{ summaryInfo.members }}名</dd>
-                  </div>
-                </dl>
               </div>
-            </aside>
+            </section>
+
+            <section class="card card--danger">
+              <header class="card-header">
+                <div class="card-header__icon danger-icon">
+                  <svg
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h2>プロジェクトの削除</h2>
+                  <p>
+                    この操作は取り消すことができません。慎重に操作してください。
+                  </p>
+                </div>
+              </header>
+
+              <div class="danger-content">
+                <div class="danger-warning">
+                  <p>
+                    プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。
+                  </p>
+                </div>
+
+                <div class="form-group">
+                  <label for="deleteConfirm"
+                    >確認のため、メールアドレスを入力してください</label
+                  >
+                  <input
+                    id="deleteConfirm"
+                    v-model="deleteConfirmInput"
+                    type="email"
+                    class="form-input danger-input"
+                    :placeholder="confirmEmail"
+                  />
+                </div>
+
+                <div class="danger-actions">
+                  <AppButton
+                    variant="secondary"
+                    class="danger-button"
+                    :disabled="!canDeleteProject || deleting"
+                    :loading="deleting"
+                    @click="handleDelete"
+                  >
+                    プロジェクトを削除
+                  </AppButton>
+                  <p v-if="deleteError" class="error-message">
+                    {{ deleteError }}
+                  </p>
+                </div>
+              </div>
+            </section>
           </div>
-        </template>
-      </div>
+
+          <!-- Sidebar Info Column -->
+          <aside class="settings-sidebar">
+            <div class="info-card">
+              <h3>プロジェクト情報</h3>
+              <dl class="info-list">
+                <div class="info-item">
+                  <dt>作成日</dt>
+                  <dd>{{ summaryInfo.created }}</dd>
+                </div>
+                <div class="info-item">
+                  <dt>オーナー</dt>
+                  <dd class="truncate" :title="summaryInfo.ownerId">
+                    {{ summaryInfo.ownerId }}
+                  </dd>
+                </div>
+                <div class="info-item">
+                  <dt>メンバー数</dt>
+                  <dd>{{ summaryInfo.members }}名</dd>
+                </div>
+              </dl>
+            </div>
+          </aside>
+        </div>
+      </template>
     </div>
-  </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>

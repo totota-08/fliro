@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { buildProjectNavItems } from "@/constants/projectNav";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import { listenProjectChat, type ChatMessage } from "@/services/projectChat";
 import {
@@ -12,11 +14,10 @@ import {
 import { listenTimeline, type TimelinePost } from "@/services/timelineService";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 type NotificationType = "mention" | "deadline" | "assignment";
 
@@ -30,17 +31,14 @@ type NotificationItem = {
 };
 
 const logger = getLogger("app.pages.projects.Notifications");
-const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
-
-const projectId = ref(String(route.params.projectId || ""));
+const { projectId } = useProjectIdRoute();
 const projectList = ref<{ id: string; name: string }[]>([]);
 const tasks = ref<TaskDoc[]>([]);
 const timeline = ref<TimelinePost[]>([]);
 const chatMessages = ref<ChatMessage[]>([]);
 const members = ref<ProjectMember[]>([]);
-const isSidebarOpen = ref(true);
 const permissionState = ref<NotificationPermission>(
   typeof Notification !== "undefined" ? Notification.permission : "default",
 );
@@ -52,62 +50,7 @@ let stopTimeline: (() => void) | null = null;
 let stopChat: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 
-const navItems = computed<DashboardNavItem[]>(
-  () =>
-    [
-      {
-        key: "dashboard",
-        label: "ダッシュボード",
-        to: {
-          name: ROUTE_NAMES.projectDashboard,
-          params: { projectId: projectId.value },
-        },
-        icon: "dashboard",
-      },
-      {
-        key: "tasks",
-        label: "マイタスク",
-        to: { name: ROUTE_NAMES.myTasks },
-        icon: "tasks",
-      },
-      {
-        key: "team",
-        label: "スレッド",
-        to: {
-          name: ROUTE_NAMES.projectThreads,
-          params: { projectId: projectId.value },
-        },
-        icon: "team",
-      },
-      {
-        key: "members",
-        label: "メンバー",
-        to: {
-          name: ROUTE_NAMES.projectMembers,
-          params: { projectId: projectId.value },
-        },
-        icon: "members",
-      },
-      {
-        key: "invites",
-        label: "招待リンク",
-        to: {
-          name: ROUTE_NAMES.projectInvites,
-          params: { projectId: projectId.value },
-        },
-        icon: "invites",
-      },
-      {
-        key: "settings",
-        label: "設定",
-        to: {
-          name: ROUTE_NAMES.projectSettings,
-          params: { projectId: projectId.value },
-        },
-        icon: "settings",
-      },
-    ] satisfies DashboardNavItem[],
-);
+const navItems = computed(() => buildProjectNavItems(projectId.value));
 
 const sidebarProjects = computed(() =>
   projectList.value.map((project, index) => ({
@@ -344,31 +287,16 @@ async function loadProjectList() {
   }));
 }
 
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   loadSettings();
   loadProjectList();
   resetWatchers();
 });
 
-watch(
-  () => route.params.projectId,
-  (newId) => {
-    if (!newId) return;
-    projectId.value = String(newId);
-    resetWatchers();
-  },
-);
+watch(projectId, (newId, oldId) => {
+  if (!newId || newId === oldId) return;
+  resetWatchers();
+});
 
 onBeforeUnmount(() => {
   stopTasks?.();
@@ -379,197 +307,157 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    :class="[
-      'notify-shell',
-      { 'notify-shell--sidebar-collapsed': !isSidebarOpen },
-    ]"
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+    brand-subtitle="通知センター"
   >
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="通知センター"
-      @close="closeSidebar"
-    />
-    <div
-      v-if="isSidebarOpen"
-      class="notify-shell__overlay"
-      @click="closeSidebar"
-    />
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; 通知</p>
+      <h1 class="project-app-shell__heading">通知センター</h1>
+    </template>
+    <template #headerActions>
+      <AppButton variant="secondary" @click="requestPushPermission">
+        {{
+          permissionState === "granted"
+            ? "ブラウザ通知: ON"
+            : "ブラウザ通知を有効化"
+        }}
+      </AppButton>
+    </template>
 
-    <main class="notify-shell__main">
-      <header class="notify-shell__topbar">
-        <div class="notify-shell__topbar-left">
-          <button
-            type="button"
-            class="notify-shell__menu-button"
-            @click="toggleSidebar"
-          >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              aria-hidden="true"
-              class="notify-shell__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
+    <div class="notify-content">
+      <section class="notify-settings">
+        <header class="notify-settings__header">
           <div>
-            <p class="notify-shell__breadcrumb">プロジェクト &gt; 通知</p>
-            <h1 class="notify-shell__heading">通知センター</h1>
+            <p class="eyebrow">設定</p>
+            <h2>通知の種類</h2>
+            <p class="muted">バックログ風にON/OFFを切り替えられます。</p>
+          </div>
+        </header>
+        <div class="notify-settings__toggles">
+          <label class="toggle">
+            <input
+              v-model="notificationSettings.mention"
+              type="checkbox"
+              @change="persistSettings"
+            />
+            <div>
+              <p>メンション通知</p>
+              <p class="muted">スレッド/ログの@メンションを通知</p>
+            </div>
+          </label>
+          <label class="toggle">
+            <input
+              v-model="notificationSettings.deadline"
+              type="checkbox"
+              @change="persistSettings"
+            />
+            <div>
+              <p>締切通知</p>
+              <p class="muted">48時間以内のタスク締切を通知</p>
+            </div>
+          </label>
+          <label class="toggle">
+            <input
+              v-model="notificationSettings.assignment"
+              type="checkbox"
+              @change="persistSettings"
+            />
+            <div>
+              <p>アサイン通知</p>
+              <p class="muted">自分に割り当てられたタスクの通知</p>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <section class="notify-card">
+        <header class="notify-card__header">
+          <div>
+            <p class="eyebrow">メンション/締切/アサイン</p>
+            <h2>最近の通知</h2>
+            <p class="muted">
+              スレッド、ログ、タスクからの重要なお知らせをまとめました。
+            </p>
+          </div>
+        </header>
+
+        <div class="notify-grid">
+          <div class="notify-column">
+            <h3>メンション</h3>
+            <p class="muted">あなた宛てのメッセージ</p>
+            <div v-if="!groupedNotifications.mention.length" class="empty">
+              メンションはありません。
+            </div>
+            <article
+              v-for="item in groupedNotifications.mention"
+              :key="item.id"
+              class="notify-item"
+              @click="openNotification(item)"
+            >
+              <div class="notify-item__meta">
+                <span class="chip">mention</span>
+                <span class="muted">{{
+                  new Date(item.createdAt).toLocaleString()
+                }}</span>
+              </div>
+              <p class="notify-item__title">{{ item.title }}</p>
+              <p class="notify-item__body">{{ item.body }}</p>
+            </article>
+          </div>
+
+          <div class="notify-column">
+            <h3>締切</h3>
+            <p class="muted">期限が迫るタスク</p>
+            <div v-if="!groupedNotifications.deadline.length" class="empty">
+              締切通知はありません。
+            </div>
+            <article
+              v-for="item in groupedNotifications.deadline"
+              :key="item.id"
+              class="notify-item"
+              @click="openNotification(item)"
+            >
+              <div class="notify-item__meta">
+                <span class="chip chip--accent">deadline</span>
+                <span class="muted">{{
+                  new Date(item.createdAt).toLocaleString()
+                }}</span>
+              </div>
+              <p class="notify-item__title">{{ item.title }}</p>
+              <p class="notify-item__body">{{ item.body }}</p>
+            </article>
+          </div>
+
+          <div class="notify-column">
+            <h3>アサイン</h3>
+            <p class="muted">担当になったタスク</p>
+            <div v-if="!groupedNotifications.assignment.length" class="empty">
+              アサイン通知はありません。
+            </div>
+            <article
+              v-for="item in groupedNotifications.assignment"
+              :key="item.id"
+              class="notify-item"
+              @click="openNotification(item)"
+            >
+              <div class="notify-item__meta">
+                <span class="chip chip--soft">assignment</span>
+                <span class="muted">{{
+                  new Date(item.createdAt).toLocaleString()
+                }}</span>
+              </div>
+              <p class="notify-item__title">{{ item.title }}</p>
+              <p class="notify-item__body">{{ item.body }}</p>
+            </article>
           </div>
         </div>
-        <div class="notify-shell__actions">
-          <AppButton variant="secondary" @click="requestPushPermission">
-            {{
-              permissionState === "granted"
-                ? "ブラウザ通知: ON"
-                : "ブラウザ通知を有効化"
-            }}
-          </AppButton>
-        </div>
-      </header>
-
-      <div class="notify-content">
-        <section class="notify-settings">
-          <header class="notify-settings__header">
-            <div>
-              <p class="eyebrow">設定</p>
-              <h2>通知の種類</h2>
-              <p class="muted">バックログ風にON/OFFを切り替えられます。</p>
-            </div>
-          </header>
-          <div class="notify-settings__toggles">
-            <label class="toggle">
-              <input
-                v-model="notificationSettings.mention"
-                type="checkbox"
-                @change="persistSettings"
-              />
-              <div>
-                <p>メンション通知</p>
-                <p class="muted">スレッド/ログの@メンションを通知</p>
-              </div>
-            </label>
-            <label class="toggle">
-              <input
-                v-model="notificationSettings.deadline"
-                type="checkbox"
-                @change="persistSettings"
-              />
-              <div>
-                <p>締切通知</p>
-                <p class="muted">48時間以内のタスク締切を通知</p>
-              </div>
-            </label>
-            <label class="toggle">
-              <input
-                v-model="notificationSettings.assignment"
-                type="checkbox"
-                @change="persistSettings"
-              />
-              <div>
-                <p>アサイン通知</p>
-                <p class="muted">自分に割り当てられたタスクの通知</p>
-              </div>
-            </label>
-          </div>
-        </section>
-
-        <section class="notify-card">
-          <header class="notify-card__header">
-            <div>
-              <p class="eyebrow">メンション/締切/アサイン</p>
-              <h2>最近の通知</h2>
-              <p class="muted">
-                スレッド、ログ、タスクからの重要なお知らせをまとめました。
-              </p>
-            </div>
-          </header>
-
-          <div class="notify-grid">
-            <div class="notify-column">
-              <h3>メンション</h3>
-              <p class="muted">あなた宛てのメッセージ</p>
-              <div v-if="!groupedNotifications.mention.length" class="empty">
-                メンションはありません。
-              </div>
-              <article
-                v-for="item in groupedNotifications.mention"
-                :key="item.id"
-                class="notify-item"
-                @click="openNotification(item)"
-              >
-                <div class="notify-item__meta">
-                  <span class="chip">mention</span>
-                  <span class="muted">{{
-                    new Date(item.createdAt).toLocaleString()
-                  }}</span>
-                </div>
-                <p class="notify-item__title">{{ item.title }}</p>
-                <p class="notify-item__body">{{ item.body }}</p>
-              </article>
-            </div>
-
-            <div class="notify-column">
-              <h3>締切</h3>
-              <p class="muted">期限が迫るタスク</p>
-              <div v-if="!groupedNotifications.deadline.length" class="empty">
-                締切通知はありません。
-              </div>
-              <article
-                v-for="item in groupedNotifications.deadline"
-                :key="item.id"
-                class="notify-item"
-                @click="openNotification(item)"
-              >
-                <div class="notify-item__meta">
-                  <span class="chip chip--accent">deadline</span>
-                  <span class="muted">{{
-                    new Date(item.createdAt).toLocaleString()
-                  }}</span>
-                </div>
-                <p class="notify-item__title">{{ item.title }}</p>
-                <p class="notify-item__body">{{ item.body }}</p>
-              </article>
-            </div>
-
-            <div class="notify-column">
-              <h3>アサイン</h3>
-              <p class="muted">担当になったタスク</p>
-              <div v-if="!groupedNotifications.assignment.length" class="empty">
-                アサイン通知はありません。
-              </div>
-              <article
-                v-for="item in groupedNotifications.assignment"
-                :key="item.id"
-                class="notify-item"
-                @click="openNotification(item)"
-              >
-                <div class="notify-item__meta">
-                  <span class="chip chip--soft">assignment</span>
-                  <span class="muted">{{
-                    new Date(item.createdAt).toLocaleString()
-                  }}</span>
-                </div>
-                <p class="notify-item__title">{{ item.title }}</p>
-                <p class="notify-item__body">{{ item.body }}</p>
-              </article>
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
-  </div>
+      </section>
+    </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>
