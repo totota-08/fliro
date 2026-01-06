@@ -23,11 +23,18 @@ interface TaskDoc {
   projectName: string;
 }
 
+interface ProjectItem {
+  id: string;
+  name: string;
+  role?: string;
+  lastAccessedAt?: Date;
+}
+
 const { user, profile } = useAuthStore();
 const loading = ref(true);
 const taskList = ref<TaskDoc[]>([]);
 const projectCount = ref(0);
-const projects = ref<{ id: string; name: string; role?: string }[]>([]);
+const projects = ref<ProjectItem[]>([]);
 const keyBuffer = ref("");
 const SECRET = appName.toLowerCase();
 const router = useRouter();
@@ -37,19 +44,21 @@ async function fetchTasks() {
   loading.value = true;
   try {
     const items: TaskDoc[] = [];
-    const projectItems: { id: string; name: string; role?: string }[] = [];
+    const projectItems: ProjectItem[] = [];
     const projectsSnap = await getDocs(
       collection(db, "userProjects", user.value.uid, "projects"),
     );
     projectCount.value = projectsSnap.size;
     for (const docSnap of projectsSnap.docs) {
       const projectId = docSnap.id;
-      const projectName =
-        (docSnap.data().projectName as string) || "プロジェクト";
+      const data = docSnap.data();
+      const projectName = (data.projectName as string) || "プロジェクト";
+      const lastAccessedAt = data.lastAccessedAt?.toDate?.() || null;
       projectItems.push({
         id: projectId,
         name: projectName,
-        role: docSnap.data().role as string,
+        role: data.role as string,
+        lastAccessedAt,
       });
       const tasksSnap = await getDocs(
         query(collection(db, "projects", projectId, "tasks")),
@@ -103,6 +112,18 @@ function getRoleBadgeVariant(
   if (normalized === "admin") return "admin";
   if (normalized === "viewer") return "viewer";
   return "member";
+}
+
+function formatRelativeDate(date?: Date): string {
+  if (!date) return "";
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return "今日";
+  if (days === 1) return "昨日";
+  if (days < 7) return `${days}日前`;
+  if (days < 30) return `${Math.floor(days / 7)}週間前`;
+  return date.toLocaleDateString("ja-JP");
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -191,10 +212,18 @@ onBeforeUnmount(() => {
             class="project-item"
           >
             <div class="project-item__info">
-              <p class="project-item__name">{{ project.name }}</p>
-              <AppBadge :variant="getRoleBadgeVariant(project.role)" size="sm">
-                {{ project.role || "member" }}
-              </AppBadge>
+              <div class="project-item__header">
+                <p class="project-item__name">{{ project.name }}</p>
+                <AppBadge
+                  :variant="getRoleBadgeVariant(project.role)"
+                  size="sm"
+                >
+                  {{ project.role || "member" }}
+                </AppBadge>
+              </div>
+              <p v-if="project.lastAccessedAt" class="project-item__activity">
+                最終アクセス: {{ formatRelativeDate(project.lastAccessedAt) }}
+              </p>
             </div>
             <AppButton
               variant="outline"
@@ -342,15 +371,27 @@ onBeforeUnmount(() => {
 
 .project-item__info {
   display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
+  min-width: 0;
+}
+
+.project-item__header {
+  display: flex;
   align-items: center;
   gap: var(--ui-space-3, 0.75rem);
-  min-width: 0;
 }
 
 .project-item__name {
   margin: 0;
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text, #0b2e33);
+}
+
+.project-item__activity {
+  margin: 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 /* Tasks */
