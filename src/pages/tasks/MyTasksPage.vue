@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { appName } from "@/constants/appMeta";
+import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import { deleteTask, updateTask, type TaskDoc } from "@/services/taskService";
@@ -25,66 +26,29 @@ const projects = ref<{ id: string; name: string }[]>([]);
 
 /**
  * Sidebar 用ナビゲーション
+ * projectIdがない場合は項目をdisabledにする
  */
 const navItems = computed<DashboardNavItem[]>(() => {
   const firstProjectId = projects.value[0]?.id;
-  return [
-    {
-      key: "dashboard" as const,
-      label: "ダッシュボード",
-      to: firstProjectId
-        ? {
-            name: ROUTE_NAMES.projectDashboard,
-            params: { projectId: firstProjectId },
-          }
-        : undefined,
-      icon: "dashboard",
-      disabled: !firstProjectId,
-    },
-    {
-      key: "tasks",
-      label: "マイタスク",
-      to: { name: ROUTE_NAMES.myTasks },
-      icon: "tasks",
-    },
-    {
-      key: "team" as const,
-      label: "チャット",
-      icon: "team",
-      to: firstProjectId
-        ? {
-            name: ROUTE_NAMES.projectThreads,
-            params: { projectId: firstProjectId },
-          }
-        : undefined,
-      disabled: !firstProjectId,
-      tooltip: firstProjectId ? undefined : "プロジェクトを選択してください",
-    },
-    {
-      key: "members",
-      label: "メンバー",
-      icon: "members",
-      to: firstProjectId
-        ? {
-            name: ROUTE_NAMES.projectMembers,
-            params: { projectId: firstProjectId },
-          }
-        : undefined,
-      disabled: !firstProjectId,
-    },
-    {
-      key: "settings" as const,
-      label: "設定",
-      icon: "settings",
-      to: firstProjectId
-        ? {
-            name: ROUTE_NAMES.projectSettings,
-            params: { projectId: firstProjectId },
-          }
-        : undefined,
-      disabled: !firstProjectId,
-    },
-  ] satisfies DashboardNavItem[];
+
+  if (firstProjectId) {
+    return buildProjectNavItems(firstProjectId);
+  }
+
+  // プロジェクトがない場合、共通のナビ項目をdisabled状態で返す
+  return buildProjectNavItems("").map((item) => {
+    // マイタスクは常に有効
+    if (item.key === "tasks") {
+      return { ...item, to: { name: ROUTE_NAMES.myTasks } };
+    }
+    // 他の項目はdisabled
+    return {
+      ...item,
+      disabled: true,
+      to: undefined,
+      tooltip: "プロジェクトを選択してください",
+    };
+  });
 });
 
 const sidebarProjects = computed(() =>
