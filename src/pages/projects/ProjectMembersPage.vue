@@ -355,7 +355,7 @@ function goToInvites() {
 
 function goToTimeline() {
   void router.push({
-    name: ROUTE_NAMES.projectTimeline,
+    name: ROUTE_NAMES.projectActivity,
     params: { projectId: projectId.value },
   });
 }

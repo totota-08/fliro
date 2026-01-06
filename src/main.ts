@@ -1,6 +1,7 @@
 import { appName, appVersion } from "@/constants/appMeta";
 import { initAuthListener } from "@/store/auth";
 import "@/styles/motion.css";
+import "@/styles/ui-tokens.css";
 import { createApp } from "vue";
 import App from "./App.vue";
 import "./assets/reset.css";

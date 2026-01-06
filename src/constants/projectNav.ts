@@ -24,9 +24,9 @@ export function buildProjectNavItems(projectId: string): DashboardNavItem[] {
       icon: "team",
     },
     {
-      key: "timeline",
+      key: "activity",
       label: "ログ",
-      to: { name: ROUTE_NAMES.projectTimeline, params: projectParams },
+      to: { name: ROUTE_NAMES.projectActivity, params: projectParams },
       icon: "tasks",
     },
     {
