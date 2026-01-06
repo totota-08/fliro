@@ -57,9 +57,9 @@ export function listenProjectEvents(
         ...data,
       } as ProjectEvent;
     });
-    const cursor =
-      snapshot.docs.length && snapshot.docs[snapshot.docs.length - 1]
-        ? snapshot.docs[snapshot.docs.length - 1]
+    const cursor: ProjectEventCursor =
+      snapshot.docs.length > 0
+        ? snapshot.docs[snapshot.docs.length - 1] || null
         : null;
     options?.onCursor?.(cursor);
     callback(list);
@@ -93,9 +93,9 @@ export async function fetchProjectEventsPage(
     } as ProjectEvent;
   });
 
-  const nextCursor =
-    snapshot.docs.length > 0 && snapshot.docs[snapshot.docs.length - 1]
-      ? snapshot.docs[snapshot.docs.length - 1]
+  const nextCursor: ProjectEventCursor =
+    snapshot.docs.length > 0
+      ? snapshot.docs[snapshot.docs.length - 1] || null
       : null;
 
   return { events, nextCursor };

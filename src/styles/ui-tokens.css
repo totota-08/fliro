@@ -1,0 +1,155 @@
+/**
+ * UI Tokens - 共通デザインシステム
+ *
+ * このファイルは既存の theme.css を拡張し、より詳細なトークンを提供します。
+ * 既存のtheme.cssで定義されたトークンとの互換性を保ちます。
+ */
+
+:root {
+  /* === Colors === */
+  /* Brand Colors (既存と互換) */
+  --brand: var(--brand-900);
+  --brand-primary: var(--brand-600);
+
+  /* Functional Colors */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: #3b82f6;
+  --color-neutral: #64748b;
+
+  /* === Borders === */
+  --border-width: 1px;
+  --border-color: var(--border);
+  --border-light: var(--border-light, rgba(147, 177, 181, 0.35));
+  --border-strong: var(--border-strong, #e2e8f0);
+
+  /* === Radius === */
+  --radius-xs: 6px;
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Card specific radii */
+  --card-radius: var(--r-md);
+  --card-radius-lg: var(--r-lg);
+
+  /* === Shadows === */
+  --shadow-sm: 0 1px 2px rgba(11, 46, 51, 0.05);
+  --shadow-md: 0 4px 6px rgba(11, 46, 51, 0.07);
+  --shadow-lg: var(--shadow-1);
+  --shadow-xl: 0 20px 40px rgba(11, 46, 51, 0.12);
+
+  /* === Spacing === */
+  /* 8px scale (既存と互換) */
+  --gap-xs: var(--space-1); /* 4px */
+  --gap-sm: var(--space-2); /* 8px */
+  --gap-md: var(--space-3); /* 12px */
+  --gap-lg: var(--space-4); /* 16px */
+  --gap-xl: var(--space-5); /* 20px */
+  --gap-2xl: var(--space-6); /* 24px */
+  --gap-3xl: var(--space-7); /* 32px */
+  --gap-4xl: 40px;
+  --gap-5xl: 48px;
+
+  /* Layout spacing */
+  --layout-padding: var(--space-6);
+  --section-gap: var(--space-6);
+  --card-padding: var(--space-5);
+  --card-padding-sm: var(--space-4);
+
+  /* === Typography === */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-md: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* === Z-Index === */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+
+  /* === Transitions === */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 200ms ease-in-out;
+  --transition-slow: 300ms ease-in-out;
+
+  /* === Card Styles === */
+  --card-bg: var(--card);
+  --card-border: var(--border-width) solid var(--border-color);
+  --card-shadow: var(--shadow-sm);
+
+  /* === Page Layout === */
+  --page-max-width: 1280px;
+  --content-max-width: 960px;
+  --narrow-max-width: 720px;
+}
+
+/**
+ * Reduced Motion Support
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+  }
+}
+
+/**
+ * ユーティリティクラス
+ */
+.card {
+  background: var(--card-bg);
+  border: var(--card-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--card-padding);
+}
+
+.card--sm {
+  padding: var(--card-padding-sm);
+}
+
+.card--lg {
+  border-radius: var(--card-radius-lg);
+  padding: var(--gap-2xl);
+}
+
+.section-gap {
+  margin-bottom: var(--section-gap);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-strong {
+  color: var(--text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.eyebrow {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
