@@ -28,7 +28,16 @@ export function listenTaskCategories(
 }
 
 export async function addTaskCategory(projectId: string, name: string) {
-  await addDoc(collection(db, "projects", projectId, "categories"), { name });
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new Error("カテゴリ名は必須です");
+  }
+  if (trimmedName.length > 50) {
+    throw new Error("カテゴリ名は50文字以内にしてください");
+  }
+  await addDoc(collection(db, "projects", projectId, "categories"), {
+    name: trimmedName,
+  });
 }
 
 export async function renameTaskCategory(
@@ -36,8 +45,15 @@ export async function renameTaskCategory(
   categoryId: string,
   name: string,
 ) {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new Error("カテゴリ名は必須です");
+  }
+  if (trimmedName.length > 50) {
+    throw new Error("カテゴリ名は50文字以内にしてください");
+  }
   await updateDoc(doc(db, "projects", projectId, "categories", categoryId), {
-    name,
+    name: trimmedName,
   });
 }
 
