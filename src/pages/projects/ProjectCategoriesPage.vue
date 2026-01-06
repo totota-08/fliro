@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
+import { ProjectPermission } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
-import { db } from "@/lib/firebase";
 import {
   addTaskCategory,
   deleteTaskCategory,
@@ -12,16 +13,19 @@ import {
   type TaskCategory,
 } from "@/services/taskCategoryService";
 import { useAuthStore } from "@/store/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
-const { user, profile } = useAuthStore();
+const { profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const categories = ref<TaskCategory[]>([]);
 const newCategory = ref("");
-const canEdit = ref(false);
 
 let stopCategories: (() => void) | null = null;
+
+// useProjectAccess で権限管理を統一
+const { can } = useProjectAccess(projectId);
+
+const canEdit = computed(() => can(ProjectPermission.MANAGE_CATEGORIES));
 
 const navItems = computed(() => buildProjectNavItems(projectId.value));
 
@@ -29,20 +33,6 @@ const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
   email: profile.value?.email || "",
 }));
-
-async function evaluatePermissions() {
-  if (!user.value) {
-    canEdit.value = false;
-    return;
-  }
-  const memberSnap = await getDoc(
-    doc(db, "projects", projectId.value, "members", user.value.uid),
-  );
-  const data = memberSnap.data();
-  canEdit.value = Boolean(
-    data?.role === "admin" || data?.projectRole === "owner",
-  );
-}
 
 function watchCategories() {
   stopCategories = listenTaskCategories(projectId.value, (list) => {
@@ -70,13 +60,11 @@ async function removeCategory(category: TaskCategory) {
 }
 
 onMounted(() => {
-  evaluatePermissions();
   watchCategories();
 });
 
 watch(projectId, (newId, oldId) => {
   if (!newId || newId === oldId) return;
-  evaluatePermissions();
   stopCategories?.();
   watchCategories();
 });

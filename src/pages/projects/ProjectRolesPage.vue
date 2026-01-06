@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
-import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildProjectNavItems } from "@/constants/projectNav";
+import { ProjectPermission } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
-import { db } from "@/lib/firebase";
 import {
   listenProjectMembers,
   updateProjectMemberRole,
   type ProjectMember,
 } from "@/services/projectMembers";
 import { useAuthStore } from "@/store/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const { user, profile } = useAuthStore();
@@ -22,9 +21,13 @@ type MemberRole = ProjectMember["role"];
 const { projectId } = useProjectIdRoute();
 const members = ref<ProjectMember[]>([]);
 const updating = ref<string | null>(null);
-const canEdit = ref(false);
 
 let stopMembers: (() => void) | null = null;
+
+// useProjectAccess で権限管理を統一
+const { can } = useProjectAccess(projectId);
+
+const canEdit = computed(() => can(ProjectPermission.MANAGE_ROLES));
 
 const navItems = computed(() => buildProjectNavItems(projectId.value));
 
@@ -49,28 +52,6 @@ const profileInfo = computed(() => ({
 }));
 
 const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
-
-async function evaluatePermissions() {
-  if (!user.value) {
-    canEdit.value = false;
-    return;
-  }
-  const snap = await getDoc(
-    doc(db, "projects", projectId.value, "members", user.value.uid),
-  );
-  const data = snap.data();
-  if (data?.permissions && typeof data.permissions.canEditRoles === "boolean") {
-    canEdit.value = data.permissions.canEditRoles;
-    return;
-  }
-  if (Array.isArray(data?.roles)) {
-    canEdit.value = buildPermissionsFromRoles(data.roles).canEditRoles;
-    return;
-  }
-  canEdit.value = Boolean(
-    data?.role === "admin" || data?.projectRole === "owner",
-  );
-}
 
 function watchMembers() {
   stopMembers = listenProjectMembers(projectId.value, (list) => {
@@ -102,13 +83,11 @@ async function changeRole(member: ProjectMember, next: MemberRole) {
 }
 
 onMounted(() => {
-  evaluatePermissions();
   watchMembers();
 });
 
 watch(projectId, (newId, oldId) => {
   if (!newId || newId === oldId) return;
-  evaluatePermissions();
   stopMembers?.();
   watchMembers();
 });

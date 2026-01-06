@@ -6,7 +6,9 @@ import AppAlert from "@/components/ui/AppAlert.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildProjectNavItems } from "@/constants/projectNav";
+import { ProjectPermission } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
@@ -19,7 +21,7 @@ import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
@@ -37,7 +39,11 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const deleteError = ref("");
 const deleteConfirmInput = ref("");
-const canManage = ref(false);
+
+// useProjectAccess で権限管理を統一
+const { can } = useProjectAccess(projectId);
+
+const canManage = computed(() => can(ProjectPermission.MANAGE_SETTINGS));
 
 const aiEnabled = ref(false);
 const aiKey = ref("");
@@ -129,38 +135,11 @@ async function loadProject() {
     };
     aiEnabled.value = Boolean(fetched.settings?.aiChatEnabled);
     aiKey.value = fetched.settings?.aiApiKey ?? "";
-    await evaluatePermissions();
   } catch (error) {
     logger.error`Failed to load project settings: ${error}`;
     errorMessage.value = "設定情報の取得に失敗しました。";
   } finally {
     loading.value = false;
-  }
-}
-
-async function evaluatePermissions() {
-  if (!user.value) {
-    canManage.value = false;
-    return;
-  }
-  try {
-    const memberSnap = await getDoc(
-      doc(db, "projects", projectId.value, "members", user.value.uid),
-    );
-    if (!memberSnap.exists()) {
-      canManage.value = false;
-      return;
-    }
-    const data = memberSnap.data() as any;
-    const permissions = data.permissions;
-    if (permissions && typeof permissions.canManageSettings === "boolean") {
-      canManage.value = permissions.canManageSettings;
-    } else {
-      canManage.value = data.projectRole === "owner" || data.role === "admin";
-    }
-  } catch (error) {
-    logger.error`Failed to evaluate permissions: ${error}`;
-    canManage.value = false;
   }
 }
 
