@@ -1,5 +1,8 @@
+import ForbiddenPage from "@/components/errorPage/403.vue";
 import NotFoundPage from "@/components/errorPage/404.vue";
+import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 import HomePage from "@/pages/HomePage.vue";
 import MyPage from "@/pages/account/MyPage.vue";
@@ -193,6 +196,12 @@ export const router = createRouter({
       component: TeamPage,
     },
     {
+      path: "/forbidden",
+      name: ROUTE_NAMES.forbidden,
+      component: ForbiddenPage,
+      meta: { layout: "full" },
+    },
+    {
       path: "/:pathMatch(.*)*",
       name: ROUTE_NAMES.notFound,
       component: NotFoundPage,
@@ -246,6 +255,50 @@ router.beforeEach(async (to) => {
     }
 
     return { name: ROUTE_NAMES.myPage };
+  }
+
+  // プロジェクト権限チェック
+  const projectId = to.params.projectId as string | undefined;
+  const routeName = to.name as
+    | (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES]
+    | undefined;
+
+  if (projectId && routeName && user) {
+    const requiredPermission = ROUTE_REQUIRED_PERMISSIONS[routeName];
+
+    // undefined = 権限チェック不要, null = 認証のみ必要
+    if (requiredPermission !== undefined && requiredPermission !== null) {
+      try {
+        const access = await fetchProjectAccess(projectId, user.uid);
+
+        // プロジェクトにアクセス権がない場合
+        if (!access.hasAccess) {
+          return {
+            name: ROUTE_NAMES.forbidden,
+            query: {
+              projectId,
+              reason: "このプロジェクトのメンバーではありません。",
+            },
+          };
+        }
+
+        // owner/adminは全権限を持つ
+        if (!access.isOwner && !access.isAdmin) {
+          // TODO: 細かい権限チェックは将来的に実装
+          // 現時点ではmember/viewerも基本的なVIEW系は許可
+          // MANAGE系の権限チェックはここで追加可能
+        }
+      } catch (error) {
+        console.error("Permission check failed", error);
+        return {
+          name: ROUTE_NAMES.forbidden,
+          query: {
+            projectId,
+            reason: "権限の確認中にエラーが発生しました。",
+          },
+        };
+      }
+    }
   }
 
   return true;
