@@ -328,18 +328,24 @@ onBeforeUnmount(() => {
 
 .profile__stat {
   text-align: center;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-lg, 1rem);
+  min-width: 90px;
 }
 
 .profile__stat dt {
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .profile__stat dd {
   margin: var(--ui-space-1, 0.25rem) 0 0;
   font-size: var(--ui-text-2xl, 1.5rem);
   font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text-strong, #0f172a);
+  color: var(--ui-brand-700, #1a4a51);
 }
 
 /* Projects */
@@ -411,7 +417,13 @@ onBeforeUnmount(() => {
   padding: var(--ui-space-4, 1rem);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   border-radius: var(--ui-radius-md, 0.75rem);
-  background: var(--ui-surface-muted, #f1f5f9);
+  background: var(--ui-surface, #ffffff);
+  transition: var(--ui-transition-all);
+}
+
+.task-card:hover {
+  border-color: var(--ui-brand-300, #b8e3e9);
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .task-card__title {
