@@ -207,102 +207,51 @@ onBeforeUnmount(() => {
 <style scoped>
 @import "@/pages/demo/styles/demo-shell.css";
 
-.roles-shell {
-  display: flex;
-  min-height: 100vh;
-  background: #f6f8fa;
-}
-
-.roles-shell__overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.roles-shell__main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.roles-shell__topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-}
-
-.roles-shell__topbar-left {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.roles-shell__breadcrumb {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.roles-shell__heading {
-  margin: 0;
-}
-
-.roles-shell__menu-button {
-  border: none;
-  border-radius: 0.75rem;
-  background: #fff;
-  padding: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.roles-shell__menu-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
 .roles-content {
-  padding: 0 1.5rem 2rem;
+  padding: 0 var(--ui-space-6, 1.5rem) var(--ui-space-8, 2rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   max-width: 900px;
 }
 
 .roles-legend {
-  background: #fff;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1rem;
-  padding: 1rem 1.25rem;
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
 }
 
 .roles-legend h3 {
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--ui-space-2, 0.5rem);
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .roles-legend ul {
   margin: 0;
-  padding-left: 1.2rem;
-  color: var(--text-muted);
+  padding-left: var(--ui-space-5, 1.25rem);
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
+  line-height: var(--ui-leading-relaxed, 1.625);
 }
 
 .roles-card {
-  background: #fff;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1rem;
-  padding: 1.25rem;
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-5, 1.25rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .roles-card__header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .roles-list {
@@ -311,91 +260,111 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .roles-item {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 0.9rem;
-  padding: 0.75rem 0.9rem;
-  background: #fdfefe;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-surface, #ffffff);
   display: grid;
   grid-template-columns: 2fr 1fr auto;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
+  transition: var(--ui-transition-all);
+}
+
+.roles-item:hover {
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .roles-item--empty {
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .roles-item__persona {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .avatar {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  background: rgba(11, 46, 51, 0.12);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-brand-300, #b8e3e9);
+  color: var(--ui-brand-900, #0b2e33);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: var(--ui-font-bold, 700);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .roles-item__name {
   margin: 0;
-  font-weight: 700;
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text, #0b2e33);
 }
 
 .roles-item__meta {
-  margin: 0.15rem 0 0;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .roles-item__selector select {
-  border: 1px solid #d5dde5;
-  border-radius: 0.75rem;
-  padding: 0.55rem 0.8rem;
-  background: #f8fafc;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  font-size: var(--ui-text-sm, 0.875rem);
+  transition: var(--ui-transition-colors);
+}
+
+.roles-item__selector select:focus {
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .badge {
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-weight: 700;
+  border-radius: var(--ui-radius-full, 9999px);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  font-weight: var(--ui-font-bold, 700);
+  font-size: var(--ui-text-xs, 0.75rem);
   text-transform: capitalize;
 }
 
 .badge-admin {
   background: rgba(79, 124, 130, 0.2);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .badge-member {
-  background: rgba(11, 46, 51, 0.08);
-  color: #0b2e33;
+  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .badge-viewer {
   background: rgba(148, 163, 184, 0.2);
-  color: #1f2937;
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .eyebrow {
-  letter-spacing: 0.2em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .sr-only {
@@ -411,12 +380,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .roles-shell__topbar {
-    padding: 1rem;
-  }
-
   .roles-content {
-    padding: 0 1rem 2rem;
+    padding: 0 var(--ui-space-4, 1rem) var(--ui-space-8, 2rem);
   }
 
   .roles-item {
