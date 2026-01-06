@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
-import { buildPermissionsFromRoles } from "@/constants/roles";
+import {
+  buildPermissionsFromRoles,
+  ROLE_LABELS,
+  ROLE_DESCRIPTIONS,
+  AVAILABLE_ROLES,
+} from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
@@ -48,7 +53,8 @@ const profileInfo = computed(() => ({
   email: profile.value?.email || "",
 }));
 
-const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
+// owner は選択肢から除外
+const roleOptions = AVAILABLE_ROLES.filter((r) => r !== "admin" || true);
 
 async function evaluatePermissions() {
   if (!user.value) {
@@ -136,11 +142,10 @@ onBeforeUnmount(() => {
       <section class="roles-legend">
         <h3>ロール概要</h3>
         <ul>
-          <li><strong>admin</strong> — すべての設定とメンバー管理が可能</li>
-          <li>
-            <strong>member</strong> — タスク作成・更新、スレッド参加が可能
+          <li v-for="role in AVAILABLE_ROLES" :key="role">
+            <strong>{{ ROLE_LABELS[role] }}</strong> —
+            {{ ROLE_DESCRIPTIONS[role] }}
           </li>
-          <li><strong>viewer</strong> — 閲覧のみ</li>
         </ul>
       </section>
 
@@ -186,11 +191,12 @@ onBeforeUnmount(() => {
                 "
               >
                 <option v-for="role in roleOptions" :key="role" :value="role">
-                  {{ role }}
+                  {{ ROLE_LABELS[role] || role }}
                 </option>
               </select>
             </div>
             <span class="badge" :class="`badge-${member.role}`">{{
+              ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] ||
               member.role
             }}</span>
           </li>
@@ -371,9 +377,24 @@ onBeforeUnmount(() => {
   text-transform: capitalize;
 }
 
+.badge-owner {
+  background: rgba(234, 179, 8, 0.2);
+  color: #78350f;
+}
+
 .badge-admin {
   background: rgba(79, 124, 130, 0.2);
   color: #0b2e33;
+}
+
+.badge-manager {
+  background: rgba(34, 197, 94, 0.2);
+  color: #14532d;
+}
+
+.badge-pm {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1e3a8a;
 }
 
 .badge-member {
@@ -384,6 +405,11 @@ onBeforeUnmount(() => {
 .badge-viewer {
   background: rgba(148, 163, 184, 0.2);
   color: #1f2937;
+}
+
+.badge-observer {
+  background: rgba(148, 163, 184, 0.15);
+  color: #475569;
 }
 
 .muted {
