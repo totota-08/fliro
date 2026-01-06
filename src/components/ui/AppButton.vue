@@ -4,7 +4,8 @@ import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 const props = withDefaults(
   defineProps<{
-    variant?: "primary" | "secondary" | "outline";
+    variant?: "primary" | "secondary" | "outline" | "danger";
+    size?: "sm" | "md" | "lg";
     loading?: boolean;
     to?: RouteLocationRaw;
     type?: "button" | "submit" | "reset";
@@ -12,6 +13,7 @@ const props = withDefaults(
   }>(),
   {
     variant: "primary",
+    size: "md",
     loading: false,
     type: "button",
     block: false,
@@ -24,6 +26,7 @@ const isLink = computed(() => Boolean(props.to));
 const classes = computed(() => [
   "app-button",
   `app-button--${props.variant}`,
+  `app-button--${props.size}`,
   { "is-loading": props.loading, "is-block": props.block },
 ]);
 </script>
@@ -96,6 +99,36 @@ const classes = computed(() => [
   background: rgba(79, 124, 130, 0.08);
 }
 
+.app-button--danger {
+  background: #d64545;
+  border-color: #d64545;
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(214, 69, 69, 0.25);
+}
+
+.app-button--danger:not(:disabled):hover {
+  background: #b93333;
+  border-color: #b93333;
+  transform: translateY(-1px);
+}
+
+/* サイズバリアント */
+.app-button--sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.75rem;
+}
+
+.app-button--md {
+  padding: 0.85rem 1.6rem;
+  font-size: 1rem;
+}
+
+.app-button--lg {
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+}
+
 .app-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -120,6 +153,11 @@ const classes = computed(() => [
 .app-button--outline .app-button__spinner {
   border-color: rgba(11, 46, 51, 0.2);
   border-top-color: #0b2e33;
+}
+
+.app-button--danger .app-button__spinner {
+  border-color: rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
 }
 
 @keyframes spin {
