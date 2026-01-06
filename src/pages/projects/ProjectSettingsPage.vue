@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
+import AppInput from "@/components/ui/AppInput.vue";
+import AppTextarea from "@/components/ui/AppTextarea.vue";
+import AppAlert from "@/components/ui/AppAlert.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildProjectNavItems } from "@/constants/projectNav";
@@ -315,12 +318,10 @@ watch(projectId, async (newId, oldId) => {
       <h1 class="project-app-shell__heading">{{ project?.name || "設定" }}</h1>
     </template>
 
-    <div v-if="!canEdit" class="admin-guard">
-      <p class="admin-guard__title">管理者限定</p>
-      <p class="admin-guard__desc">
-        このページは管理者のみが利用できます。権限をご確認ください。
-      </p>
-    </div>
+    <AppAlert v-if="!canEdit" variant="warning" class="settings-alert">
+      <template #title>管理者限定</template>
+      このページは管理者のみが利用できます。権限をご確認ください。
+    </AppAlert>
     <div v-else class="settings-container">
       <div v-if="loading" class="loading-state">
         <div class="spinner"></div>
@@ -363,30 +364,23 @@ watch(projectId, async (newId, oldId) => {
               </header>
 
               <form @submit.prevent="handleSave" class="form-stack">
-                <div class="form-group">
-                  <label for="projectName">プロジェクト名</label>
-                  <input
-                    id="projectName"
-                    v-model="form.name"
-                    type="text"
-                    :disabled="!canEdit"
-                    required
-                    class="form-input"
-                    placeholder="プロジェクト名を入力"
-                  />
-                </div>
+                <AppInput
+                  id="projectName"
+                  v-model="form.name"
+                  label="プロジェクト名"
+                  :disabled="!canEdit"
+                  required
+                  placeholder="プロジェクト名を入力"
+                />
 
-                <div class="form-group">
-                  <label for="projectDesc">説明</label>
-                  <textarea
-                    id="projectDesc"
-                    v-model="form.description"
-                    rows="4"
-                    :disabled="!canEdit"
-                    class="form-textarea"
-                    placeholder="プロジェクトの目的や概要を入力してください"
-                  ></textarea>
-                </div>
+                <AppTextarea
+                  id="projectDesc"
+                  v-model="form.description"
+                  label="説明"
+                  :rows="4"
+                  :disabled="!canEdit"
+                  placeholder="プロジェクトの目的や概要を入力してください"
+                />
 
                 <div class="form-toggles">
                   <label class="toggle-switch">
@@ -492,17 +486,14 @@ watch(projectId, async (newId, oldId) => {
                   </label>
                 </div>
 
-                <div class="form-group">
-                  <label for="aiKey">OpenAI API Key</label>
-                  <input
-                    id="aiKey"
-                    v-model="aiKey"
-                    type="password"
-                    :disabled="!canEdit"
-                    class="form-input"
-                    placeholder="sk-..."
-                  />
-                </div>
+                <AppInput
+                  id="aiKey"
+                  v-model="aiKey"
+                  type="password"
+                  label="OpenAI API Key"
+                  :disabled="!canEdit"
+                  placeholder="sk-..."
+                />
 
                 <div class="form-actions">
                   <AppButton
@@ -517,11 +508,10 @@ watch(projectId, async (newId, oldId) => {
 
                 <div v-if="aiEnabled" class="ai-playground">
                   <h3>テストチャット</h3>
-                  <textarea
+                  <AppTextarea
                     v-model="aiPrompt"
-                    class="form-textarea"
                     placeholder="タスクについて質問してください"
-                  ></textarea>
+                  />
                   <div class="form-actions">
                     <AppButton
                       type="button"
@@ -569,32 +559,24 @@ watch(projectId, async (newId, oldId) => {
                   </p>
                 </div>
 
-                <div class="form-group">
-                  <label for="deleteConfirm"
-                    >確認のため、メールアドレスを入力してください</label
-                  >
-                  <input
-                    id="deleteConfirm"
-                    v-model="deleteConfirmInput"
-                    type="email"
-                    class="form-input danger-input"
-                    :placeholder="confirmEmail"
-                  />
-                </div>
+                <AppInput
+                  id="deleteConfirm"
+                  v-model="deleteConfirmInput"
+                  type="email"
+                  label="確認のため、メールアドレスを入力してください"
+                  :error="Boolean(deleteError)"
+                  :placeholder="confirmEmail"
+                />
 
                 <div class="danger-actions">
                   <AppButton
-                    variant="secondary"
-                    class="danger-button"
+                    variant="danger"
                     :disabled="!canDeleteProject || deleting"
                     :loading="deleting"
                     @click="handleDelete"
                   >
                     プロジェクトを削除
                   </AppButton>
-                  <p v-if="deleteError" class="error-message">
-                    {{ deleteError }}
-                  </p>
                 </div>
               </div>
             </section>
@@ -629,67 +611,50 @@ watch(projectId, async (newId, oldId) => {
 </template>
 
 <style scoped>
-@import "@/pages/demo/styles/demo-shell.css";
-
 /* Layout & Container */
-.admin-guard {
+.settings-alert {
   max-width: 760px;
-  margin: 0 auto 1rem;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #f59e0b33;
-  background: #fff7ed;
-}
-
-.admin-guard__title {
-  margin: 0;
-  font-weight: 700;
-  color: #b45309;
-}
-
-.admin-guard__desc {
-  margin: 0.15rem 0 0;
-  color: #92400e;
+  margin: 0 auto var(--ui-space-4, 1rem);
 }
 
 .settings-container {
   max-width: 760px;
   margin: 0 auto;
-  padding: 1.5rem;
-  animation: fadeIn 0.3s ease-out;
+  padding: var(--ui-space-6, 1.5rem);
+  animation: fadeIn var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
   align-items: start;
 }
 
 /* Cards */
 .card {
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e7eb;
+  background: var(--ui-surface, #ffffff);
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  box-shadow: var(--ui-shadow-md);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   overflow: hidden;
-  margin-bottom: 2rem;
+  margin-bottom: var(--ui-space-8, 2rem);
 }
 
 .card-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
+  padding: var(--ui-space-6, 1.5rem);
+  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .card-header__icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: #f0f9ff;
-  color: #0284c7;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-brand-100, #e5f6f8);
+  color: var(--ui-brand-600, #4f7c82);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -702,78 +667,41 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .card-header h2 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 0.25rem 0;
+  font-size: var(--ui-text-lg, 1.125rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
+  margin: 0 0 var(--ui-space-1, 0.25rem) 0;
 }
 
 .card-header p {
-  font-size: 0.875rem;
-  color: #6b7280;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
   margin: 0;
 }
 
 /* Forms */
 .form-stack {
-  padding: 1.5rem;
+  padding: var(--ui-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  color: #1f2937;
-  transition: all 0.2s;
-  background: #f9fafb;
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 100px;
+  gap: var(--ui-space-6, 1.5rem);
 }
 
 /* Toggles */
 .form-toggles {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #f3f4f6;
+  gap: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
 .toggle-switch {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   cursor: pointer;
 }
 
@@ -785,9 +713,9 @@ watch(projectId, async (newId, oldId) => {
   position: relative;
   width: 44px;
   height: 24px;
-  background-color: #e5e7eb;
-  border-radius: 24px;
-  transition: 0.3s;
+  background-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
+  border-radius: var(--ui-radius-full, 9999px);
+  transition: var(--ui-transition-colors);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -800,13 +728,13 @@ watch(projectId, async (newId, oldId) => {
   left: 2px;
   bottom: 2px;
   background-color: white;
-  border-radius: 50%;
-  transition: 0.3s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-radius: var(--ui-radius-full, 9999px);
+  transition: var(--ui-transition-transform);
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background-color: #3b82f6;
+  background-color: var(--ui-brand-600, #4f7c82);
 }
 
 .toggle-switch input:checked + .toggle-slider:before {
@@ -819,112 +747,96 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .toggle-title {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #1f2937;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #0b2e33);
 }
 
 .toggle-desc {
-  font-size: 0.8rem;
-  color: #6b7280;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 /* Actions */
 .form-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  gap: var(--ui-space-4, 1rem);
+  margin-top: var(--ui-space-2, 0.5rem);
 }
 
 .success-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  background: #ecfdf5;
-  color: #059669;
-  border-radius: 9999px;
-  font-size: 0.875rem;
-  font-weight: 500;
+  gap: var(--ui-space-1, 0.25rem);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  background: var(--ui-success-bg, #ecfdf5);
+  color: var(--ui-success, #16a34a);
+  border-radius: var(--ui-radius-full, 9999px);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
 }
 
 /* Danger Zone */
 .card--danger {
-  border-color: #fee2e2;
+  border-color: var(--ui-danger-bg, #fee2e2);
 }
 
 .card--danger .card-header {
-  background: #fef2f2;
-  border-bottom-color: #fee2e2;
+  background: var(--ui-danger-bg, #fee2e2);
+  border-bottom-color: var(--ui-danger-bg, #fee2e2);
 }
 
 .card--danger .card-header__icon {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(214, 69, 69, 0.1);
+  color: var(--ui-danger, #d64545);
 }
 
 .danger-content {
-  padding: 1.5rem;
+  padding: var(--ui-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
 }
 
 .danger-warning {
-  padding: 0.75rem;
-  background: #fff5f5;
-  border-radius: 6px;
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-danger-bg, #fee2e2);
+  border-radius: var(--ui-radius-sm, 0.5rem);
   color: #991b1b;
-  font-size: 0.875rem;
-  border-left: 4px solid #ef4444;
-}
-
-.danger-input {
-  border-color: #fca5a5;
-}
-
-.danger-input:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  font-size: var(--ui-text-sm, 0.875rem);
+  border-left: 4px solid var(--ui-danger, #d64545);
 }
 
 .danger-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   flex-wrap: wrap;
-}
-
-.error-message {
-  color: #dc2626;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin: 0;
 }
 
 /* Sidebar Info */
 .info-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--ui-surface, #ffffff);
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-6, 1.5rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .info-card h3 {
-  font-size: 0.875rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #6b7280;
-  margin: 0 0 1rem 0;
-  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-muted, #64748b);
+  margin: 0 0 var(--ui-space-4, 1rem) 0;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .info-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   margin: 0;
 }
 
@@ -932,16 +844,16 @@ watch(projectId, async (newId, oldId) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .info-item dt {
-  color: #6b7280;
+  color: var(--ui-text-muted, #64748b);
 }
 
 .info-item dd {
-  font-weight: 500;
-  color: #111827;
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text-strong, #0f172a);
   max-width: 150px;
 }
 
@@ -951,44 +863,24 @@ watch(projectId, async (newId, oldId) => {
   text-overflow: ellipsis;
 }
 
-/* Breadcrumb */
-.demo__breadcrumb-nav {
-  margin-bottom: 0.25rem;
-}
-
-.demo__breadcrumb-list {
-  display: flex;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.demo__breadcrumb-list li:not(:last-child)::after {
-  content: "/";
-  margin: 0 0.5rem;
-  color: #9ca3af;
-}
-
 /* Loading & Animations */
 .loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4rem;
-  color: #6b7280;
+  padding: var(--ui-space-16, 4rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
+  border: 3px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-top-color: var(--ui-brand-600, #4f7c82);
+  border-radius: var(--ui-radius-full, 9999px);
   animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
+  margin-bottom: var(--ui-space-4, 1rem);
 }
 
 @keyframes spin {
@@ -1010,7 +902,7 @@ watch(projectId, async (newId, oldId) => {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .fade-enter-from,
@@ -1019,26 +911,38 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .ai-playground {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #f3f4f6;
+  margin-top: var(--ui-space-6, 1.5rem);
+  padding-top: var(--ui-space-6, 1.5rem);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
 .ai-playground h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #374151;
-  margin: 0 0 1rem 0;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
+  margin: 0 0 var(--ui-space-4, 1rem) 0;
 }
 
 .ai-response {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #f0f9ff;
-  border-radius: 8px;
-  border: 1px solid #bae6fd;
-  color: #0c4a6e;
-  font-size: 0.95rem;
+  margin-top: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-brand-100, #e5f6f8);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-brand-200, #b8e3e9);
+  color: var(--ui-brand-900, #0b2e33);
+  font-size: var(--ui-text-sm, 0.875rem);
   white-space: pre-wrap;
+}
+
+.error-state {
+  padding: var(--ui-space-8, 2rem);
+  text-align: center;
+  color: var(--ui-danger, #d64545);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 </style>
