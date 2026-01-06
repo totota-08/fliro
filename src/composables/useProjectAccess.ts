@@ -1,3 +1,7 @@
+import {
+  type ProjectPermissionKey,
+  ROLE_DEFAULT_PERMISSIONS,
+} from "@/constants/permissions";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
@@ -125,16 +129,41 @@ export function useProjectAccess(projectId: Ref<string>) {
   const hasAccess = computed(() => memberData.value !== null);
 
   /**
-   * 特定の権限を持っているかを判定
-   * @param permissionKey - permissions オブジェクトのキー
+   * 現在のロールを取得
    */
-  function can(permissionKey: string): boolean {
+  const currentRole = computed(() => {
+    const role = memberData.value?.projectRole || memberData.value?.role || "";
+    return role.toLowerCase();
+  });
+
+  /**
+   * 特定の権限を持っているかを判定
+   * @param permissionKey - permissions オブジェクトのキー (ProjectPermissionKey or null)
+   *                        nullの場合はログインのみで許可
+   */
+  function can(permissionKey: ProjectPermissionKey | string | null): boolean {
+    // nullの場合はログインしていればOK
+    if (permissionKey === null) return !!user.value;
+
+    // プロジェクトメンバーでなければfalse
+    if (!hasAccess.value) return false;
+
     // owner は全権限を持つ
     if (isOwner.value) return true;
-    // admin も基本的に全権限を持つ（一部例外があれば追加）
+
+    // admin も基本的に全権限を持つ
     if (isAdmin.value) return true;
+
     // 明示的なpermissionsがあればそれを参照
     if (memberData.value?.permissions?.[permissionKey]) return true;
+
+    // ロールベースのデフォルト権限を確認
+    const role = currentRole.value;
+    const rolePermissions = ROLE_DEFAULT_PERMISSIONS[role];
+    if (rolePermissions?.includes(permissionKey as ProjectPermissionKey)) {
+      return true;
+    }
+
     return false;
   }
 
@@ -149,6 +178,7 @@ export function useProjectAccess(projectId: Ref<string>) {
     loading,
     memberData,
     project,
+    currentRole,
     isOwner,
     isAdmin,
     isMember,
