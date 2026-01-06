@@ -145,6 +145,7 @@ const filteredTasks = computed(() => {
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length;
   const done = tasks.value.filter((task) => task.status === "done").length;
+  const progressPercent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const inProgress = tasks.value.filter(
     (task) => task.status === "in-progress",
@@ -152,6 +153,13 @@ const summaryCards = computed<SummaryCard[]>(() => {
   const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
 
   return [
+    {
+      id: "progress",
+      label: "進捗率",
+      value: progressPercent,
+      caption: `${done}/${total} タスク完了`,
+      icon: "chart",
+    },
     {
       id: "done",
       label: "完了タスク",
