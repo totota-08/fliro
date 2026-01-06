@@ -28,6 +28,19 @@ const keyBuffer = ref("");
 const SECRET = appName.toLowerCase();
 const router = useRouter();
 
+function getRoleLabel(role?: string): string {
+  switch (role) {
+    case "owner":
+      return "オーナー";
+    case "admin":
+      return "管理者";
+    case "viewer":
+      return "閲覧者";
+    default:
+      return "メンバー";
+  }
+}
+
 async function fetchTasks() {
   if (!user.value) return;
   loading.value = true;
@@ -147,7 +160,7 @@ onBeforeUnmount(() => {
       <header>
         <div>
           <h2>参加中のプロジェクト</h2>
-          <p>クリックしてプロジェクトのデバッグ画面にアクセスできます。</p>
+          <p>クリックしてプロジェクトのダッシュボードにアクセスできます。</p>
         </div>
       </header>
       <div v-if="!projects.length" class="empty">
@@ -157,7 +170,7 @@ onBeforeUnmount(() => {
         <li v-for="project in projects" :key="project.id">
           <div>
             <p class="project-name">{{ project.name }}</p>
-            <p class="project-role">ロール: {{ project.role || "member" }}</p>
+            <p class="project-role">{{ getRoleLabel(project.role) }}</p>
           </div>
           <AppButton
             variant="outline"
