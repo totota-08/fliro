@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import DashboardChartsSection from "@/components/projectDashboard/DashboardChartsSection.vue";
 import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
+import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
 import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
+import TaskCreateModal, {
+  type TaskFormData,
+} from "@/components/tasks/TaskCreateModal.vue";
+import TaskPreviewDrawer from "@/components/tasks/TaskPreviewDrawer.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
@@ -82,18 +88,6 @@ const filters = reactive({
 const showMyTasksOnly = ref(false);
 const isSidebarOpen = ref(true);
 const isTaskModalOpen = ref(false);
-const isDescriptionExpanded = ref(false);
-
-const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
-
-const taskForm = reactive({
-  title: "",
-  description: "",
-  dueDate: "",
-  assigneeId: "",
-  categoryId: "",
-  progress: 0,
-});
 
 let stopTasks: (() => void) | null = null;
 let stopProject: (() => void) | null = null;
@@ -133,9 +127,6 @@ const filteredTasks = computed(() => {
       (task) => (task.categoryId || "none") === filters.category,
     );
   }
-  if (showMyTasksOnly.value && user.value) {
-    list = list.filter((task) => task.assigneeId === user.value?.uid);
-  }
   if (taskView.value === "mine" && user.value) {
     list = list.filter((task) => task.assigneeId === user.value?.uid);
   }
@@ -145,6 +136,7 @@ const filteredTasks = computed(() => {
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length;
   const done = tasks.value.filter((task) => task.status === "done").length;
+  const progressPercent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const inProgress = tasks.value.filter(
     (task) => task.status === "in-progress",
@@ -152,6 +144,13 @@ const summaryCards = computed<SummaryCard[]>(() => {
   const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
 
   return [
+    {
+      id: "progress",
+      label: "進捗率",
+      value: progressPercent,
+      caption: `${done}/${total} タスク完了`,
+      icon: "chart",
+    },
     {
       id: "done",
       label: "完了タスク",
@@ -177,120 +176,16 @@ const summaryCards = computed<SummaryCard[]>(() => {
   ];
 });
 
-const gaugeRadius = 80;
-const gaugeCircumference = Math.PI * gaugeRadius;
-
-const overallProgress = computed(() => {
-  const total = tasks.value.length;
-  if (!total) return 0;
-  const totalProgress = tasks.value.reduce((sum, task) => {
-    return sum + (task.progress ?? (task.status === "done" ? 100 : 0));
-  }, 0);
-  return Math.round(totalProgress / total);
-});
-
-const statusCounts = computed(() => {
-  const counts: Record<TaskStatus, number> = {
-    todo: 0,
-    "in-progress": 0,
-    review: 0,
-    done: 0,
-  };
-  tasks.value.forEach((task) => {
-    counts[task.status] = (counts[task.status] || 0) + 1;
-  });
-  return counts;
-});
-
-const maxStatusCount = computed(() => {
-  const values = Object.values(statusCounts.value);
-  return Math.max(1, ...values);
-});
-
-const healthScore = computed(() => {
-  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
-  const now = Date.now();
-  const soonThreshold = 3 * 24 * 60 * 60 * 1000;
-  const dueSoon = tasks.value.filter(
-    (task) =>
-      task.dueDate?.seconds &&
-      task.dueDate.seconds * 1000 - now <= soonThreshold &&
-      task.dueDate.seconds * 1000 > now,
-  ).length;
-  const progressPenalty = Math.max(0, 70 - overallProgress.value) * 0.4;
-  let score = 100;
-  score -= overdue * 12;
-  score -= dueSoon * 5;
-  score -= progressPenalty;
-  return Math.max(0, Math.min(100, Math.round(score)));
-});
-
-const healthColor = computed(() => {
-  if (healthScore.value >= 80) return "#16a34a";
-  if (healthScore.value >= 60) return "#f59e0b";
-  if (healthScore.value >= 40) return "#f97316";
-  return "#ef4444";
-});
-
-const gaugeDashoffset = computed(
-  () => gaugeCircumference * (1 - healthScore.value / 100),
-);
-const healthNeedleRotation = computed(
-  () => -90 + (healthScore.value / 100) * 180,
-);
-
-const gaugeSegments = [
-  { id: "danger", color: "#ef4444", size: 40 },
-  { id: "warn", color: "#f97316", size: 20 },
-  { id: "caution", color: "#f59e0b", size: 20 },
-  { id: "good", color: "#16a34a", size: 20 },
-];
-
-const gaugeSegmentStyles = computed(() => {
-  let offset = 0;
-  return gaugeSegments.map((segment) => {
-    const len = gaugeCircumference * (segment.size / 100);
-    const style = {
-      stroke: segment.color,
-      strokeDasharray: `${len} ${gaugeCircumference - len}`,
-      strokeDashoffset: `${-offset}`,
-    };
-    offset += len;
-    return style;
-  });
-});
-
-function formatDueDate(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return "未設定";
-  return new Date(task.dueDate.seconds * 1000).toLocaleDateString();
-}
-
 function isTaskOverdue(task: TaskDoc) {
   if (!task.dueDate?.seconds) return false;
   const due = task.dueDate.seconds * 1000;
   return due < Date.now() && task.status !== "done";
 }
 
-function taskStatusLabel(status: TaskStatus) {
-  if (status === "in-progress") return "進行中";
-  if (status === "review") return "レビュー";
-  if (status === "done") return "完了";
-  return "未着手";
-}
-
-function taskStatusClass(task: TaskDoc) {
-  const base = `task-row__status--${task.status}`;
-  return [base, { "is-overdue": isTaskOverdue(task) }];
-}
-
 function normalizeProgress(value: number | null | undefined) {
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
   const clamped = Math.min(100, Math.max(0, value));
   return Math.round(clamped / 25) * 25;
-}
-
-function taskProgress(task: TaskDoc) {
-  return normalizeProgress(task.progress ?? (task.status === "done" ? 100 : 0));
 }
 
 // const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
@@ -366,14 +261,6 @@ function dismissNotification(id: string) {
   next.add(id);
   dismissedNotificationIds.value = next;
   notifications.value = notifications.value.filter((entry) => entry.id !== id);
-}
-
-function resetFilters() {
-  filters.search = "";
-  filters.status = "all";
-  filters.assignee = "all";
-  filters.due = "all";
-  filters.category = "all";
 }
 
 watch(
@@ -473,18 +360,8 @@ function resetWatchers() {
   watchChat();
 }
 
-function resetTaskForm() {
-  taskForm.title = "";
-  taskForm.description = "";
-  taskForm.dueDate = "";
-  taskForm.assigneeId = "";
-  taskForm.categoryId = "";
-  taskForm.progress = 0;
-}
-
 function closeTaskModal() {
   isTaskModalOpen.value = false;
-  resetTaskForm();
 }
 
 function getMemberNameById(id?: string | null) {
@@ -493,24 +370,10 @@ function getMemberNameById(id?: string | null) {
   return member?.name || getDisplayName(id) || "";
 }
 
-function displayAssignee(task: TaskDoc) {
-  if (task.assigneeName) return task.assigneeName;
-  const memberName = getMemberNameById(task.assigneeId || "");
-  return memberName || task.assigneeId || "未割当";
-}
-
-function getCategoryName(categoryId?: string | null) {
-  if (!categoryId) return "未分類";
-  return (
-    categories.value.find((category) => category.id === categoryId)?.name ||
-    "未分類"
-  );
-}
-
-async function submitTaskForm() {
-  if (!user.value || !taskForm.title.trim()) return;
-  const assigneeId = taskForm.assigneeId || null;
-  const normalizedProgress = normalizeProgress(taskForm.progress);
+async function handleTaskSubmit(data: TaskFormData) {
+  if (!user.value || !data.title.trim()) return;
+  const assigneeId = data.assigneeId || null;
+  const normalizedProgress = normalizeProgress(data.progress);
 
   let initialStatus: TaskStatus = "todo";
   if (normalizedProgress === 100) initialStatus = "done";
@@ -519,10 +382,10 @@ async function submitTaskForm() {
   await createTask(
     projectId.value,
     {
-      title: taskForm.title.trim(),
-      description: taskForm.description.trim(),
-      dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
-      categoryId: taskForm.categoryId || null,
+      title: data.title.trim(),
+      description: data.description.trim(),
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      categoryId: data.categoryId || null,
       assigneeId,
       assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
       progress: normalizedProgress,
@@ -624,16 +487,6 @@ function closeSidebar() {
   isSidebarOpen.value = false;
 }
 
-function formatStatus(status: TaskStatus) {
-  const map: Record<TaskStatus, string> = {
-    todo: "未着手",
-    "in-progress": "進行中",
-    review: "レビュー",
-    done: "完了",
-  };
-  return map[status] || status;
-}
-
 function toggleSidebar() {
   isSidebarOpen.value = !isSidebarOpen.value;
 }
@@ -728,170 +581,7 @@ onBeforeUnmount(() => {
         </section>
         <NotificationBar :notifications="notificationsBar" />
 
-        <section class="dashboard__charts">
-          <div class="chart-card chart-card--donut">
-            <header class="chart-card__header">
-              <p class="chart-card__eyebrow">全体の進捗</p>
-              <h3>プロジェクト進捗</h3>
-              <span class="chart-card__meta">{{ tasks.length }}件のタスク</span>
-            </header>
-            <span class="chart-card__metric">{{ overallProgress }}%</span>
-            <div class="progress-chart">
-              <div class="progress-chart__track">
-                <div
-                  class="progress-chart__fill"
-                  :style="{ width: `${overallProgress}%` }"
-                />
-              </div>
-              <div class="progress-chart__labels">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="chart-card chart-card--bars">
-            <header class="chart-card__header">
-              <p class="chart-card__eyebrow">タスクの状況</p>
-              <h3>ステータス別タスク数</h3>
-            </header>
-            <ul class="status-bars">
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>未着手</span>
-                  <strong>{{ statusCounts.todo }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--todo"
-                    :style="{
-                      width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>進行中</span>
-                  <strong>{{ statusCounts["in-progress"] }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--progress"
-                    :style="{
-                      width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>レビュー</span>
-                  <strong>{{ statusCounts.review }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--review"
-                    :style="{
-                      width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>完了</span>
-                  <strong>{{ statusCounts.done }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--done"
-                    :style="{
-                      width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          <div class="chart-card chart-card--gauge">
-            <header class="chart-card__header">
-              <p class="chart-card__eyebrow">プロジェクトの危険度</p>
-              <h3>ヘルススコア</h3>
-              <span class="chart-card__meta">期限・進捗から算出</span>
-            </header>
-            <span class="chart-card__metric chart-card__metric--health"
-              >{{ healthScore }}%</span
-            >
-            <div class="gauge-chart">
-              <svg viewBox="0 0 200 120">
-                <path
-                  class="gauge-chart__base"
-                  d="M20 120 A80 80 0 0 1 180 120"
-                />
-                <path
-                  v-for="(segment, index) in gaugeSegments"
-                  :key="segment.id"
-                  class="gauge-chart__segment"
-                  d="M20 120 A80 80 0 0 1 180 120"
-                  :style="gaugeSegmentStyles[index]"
-                />
-                <path
-                  class="gauge-chart__value-path"
-                  d="M20 120 A80 80 0 0 1 180 120"
-                  :style="{
-                    strokeDasharray: `${gaugeCircumference}`,
-                    strokeDashoffset: `${gaugeDashoffset}`,
-                    stroke: healthColor,
-                  }"
-                />
-                <polygon
-                  class="gauge-chart__needle"
-                  points="100,28 96,120 104,120"
-                  :transform="`rotate(${healthNeedleRotation} 100 120)`"
-                />
-                <circle
-                  class="gauge-chart__needle-hub"
-                  cx="100"
-                  cy="120"
-                  r="6"
-                />
-              </svg>
-              <div class="gauge-chart__legend">
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--danger"
-                    aria-hidden="true"
-                  ></span>
-                  危険
-                </span>
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--warn"
-                    aria-hidden="true"
-                  ></span>
-                  要対応
-                </span>
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--caution"
-                    aria-hidden="true"
-                  ></span>
-                  注意
-                </span>
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--good"
-                    aria-hidden="true"
-                  ></span>
-                  良好
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
+        <DashboardChartsSection :tasks="tasks" />
 
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
@@ -902,119 +592,14 @@ onBeforeUnmount(() => {
         />
         <div class="demo__grid">
           <section class="demo__primary">
-            <div class="task-list">
-              <div class="task-list__header">
-                <div class="task-list__header-left">
-                  <h3>タスク一覧</h3>
-                  <p>{{ filteredTasks.length }}件のタスク</p>
-                </div>
-                <div class="task-list__filters">
-                  <select v-model="filters.status" class="task-filter-select">
-                    <option value="all">全て</option>
-                    <option value="todo">未着手</option>
-                    <option value="in-progress">進行中</option>
-                    <option value="done">完了</option>
-                  </select>
-                  <select v-model="filters.assignee" class="task-filter-select">
-                    <option value="all">担当者</option>
-                    <option
-                      v-for="member in members"
-                      :key="member.id"
-                      :value="member.id"
-                    >
-                      {{ member.name }}
-                    </option>
-                  </select>
-                  <select v-model="filters.due" class="task-filter-select">
-                    <option value="all">期限</option>
-                    <option value="today">今日</option>
-                    <option value="week">今週</option>
-                    <option value="overdue">期限切れ</option>
-                  </select>
-                  <select v-model="filters.category" class="task-filter-select">
-                    <option value="all">カテゴリ</option>
-                    <option value="none">未分類</option>
-                    <option
-                      v-for="category in categories"
-                      :key="category.id"
-                      :value="category.id"
-                    >
-                      {{ category.name }}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    class="filter-reset-btn"
-                    @click="resetFilters"
-                    title="フィルターをリセット"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path
-                        d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
-                      ></path>
-                      <path d="M21 3v5h-5"></path>
-                      <path
-                        d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
-                      ></path>
-                      <path d="M3 21v-5h5"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <ul class="task-list__items">
-                <li
-                  v-for="task in filteredTasks"
-                  :key="task.id"
-                  class="task-row"
-                  :class="{ 'is-overdue': isTaskOverdue(task) }"
-                  @click="selectTaskById(task.id)"
-                  @dblclick="navigateToTaskDetail(task.id)"
-                >
-                  <div class="task-row__content">
-                    <p class="task-row__title">{{ task.title }}</p>
-                    <span class="task-row__category">{{
-                      getCategoryName(task.categoryId)
-                    }}</span>
-                    <span class="task-row__assignee">{{
-                      displayAssignee(task)
-                    }}</span>
-                    <span
-                      class="task-row__status"
-                      :class="taskStatusClass(task)"
-                    >
-                      {{ taskStatusLabel(task.status) }}
-                    </span>
-                    <div class="task-row__progress">
-                      <div class="task-row__progress-bar">
-                        <div
-                          class="task-row__progress-fill"
-                          :style="{ width: `${taskProgress(task)}%` }"
-                        />
-                      </div>
-                      <span class="task-row__progress-value"
-                        >{{ taskProgress(task) }}%</span
-                      >
-                    </div>
-                    <span
-                      class="task-row__due"
-                      :class="{ 'task-row__due--overdue': isTaskOverdue(task) }"
-                    >
-                      {{ formatDueDate(task) }}
-                    </span>
-                  </div>
-                </li>
-              </ul>
-            </div>
+            <DashboardTaskList
+              v-model="filters"
+              :tasks="filteredTasks"
+              :members="members"
+              :categories="categories"
+              @select="selectTaskById"
+              @navigate="navigateToTaskDetail"
+            />
           </section>
 
           <!-- Temporarily commented out
@@ -1103,193 +688,19 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="isTaskModalOpen" class="task-modal">
-      <div class="task-modal__card">
-        <header>
-          <h3>新規タスク</h3>
-          <button type="button" @click="closeTaskModal">×</button>
-        </header>
-        <form class="task-modal__form" @submit.prevent="submitTaskForm">
-          <label>
-            タイトル
-            <input
-              v-model="taskForm.title"
-              type="text"
-              placeholder="例）デザインレビュー"
-              required
-            />
-          </label>
-          <label>
-            説明
-            <textarea
-              v-model="taskForm.description"
-              rows="3"
-              placeholder="タスクの詳細を入力"
-            ></textarea>
-          </label>
-          <label>
-            期限
-            <input v-model="taskForm.dueDate" type="date" />
-          </label>
-          <label>
-            カテゴリ
-            <select v-model="taskForm.categoryId">
-              <option value="">カテゴリなし</option>
-              <option
-                v-for="category in categories"
-                :key="category.id"
-                :value="category.id"
-              >
-                {{ category.name }}
-              </option>
-            </select>
-          </label>
-          <label>
-            担当者
-            <select v-model="taskForm.assigneeId">
-              <option value="">未割当</option>
-              <option
-                v-for="member in members"
-                :key="member.id"
-                :value="member.id"
-              >
-                {{ member.name }}
-              </option>
-            </select>
-          </label>
-          <section class="task-modal__section">
-            <div class="task-modal__range-header">
-              <p class="label">進捗率</p>
-              <span class="hint">{{ taskForm.progress }}%</span>
-            </div>
-            <div class="progress-picker">
-              <button
-                v-for="option in PROGRESS_OPTIONS"
-                :key="`modal-progress-${option}`"
-                type="button"
-                :class="[
-                  'progress-pill',
-                  { 'is-active': taskForm.progress === option },
-                ]"
-                @click="taskForm.progress = option"
-              >
-                {{ option }}%
-              </button>
-            </div>
-          </section>
+    <TaskCreateModal
+      :open="isTaskModalOpen"
+      :categories="categories"
+      :members="members"
+      @close="closeTaskModal"
+      @submit="handleTaskSubmit"
+    />
 
-          <footer>
-            <button type="button" class="ghost" @click="closeTaskModal">
-              キャンセル
-            </button>
-            <button type="submit">作成</button>
-          </footer>
-        </form>
-      </div>
-    </div>
-
-    <transition name="task-drawer">
-      <div v-if="selectedTask" class="task-drawer">
-        <div class="task-drawer__overlay" @click="selectedTask = null" />
-        <aside class="task-drawer__panel">
-          <header class="task-drawer__header">
-            <div>
-              <p class="task-drawer__eyebrow">タスク概要</p>
-              <h3>
-                <router-link
-                  :to="{
-                    name: ROUTE_NAMES.projectTaskDetail,
-                    params: { projectId: projectId, taskId: selectedTask.id },
-                    query: { from: 'dashboard' },
-                  }"
-                  class="task-drawer__title-link"
-                >
-                  {{ selectedTask.title }} ↗
-                </router-link>
-              </h3>
-              <p class="task-drawer__helper">
-                詳細は別ページで確認・議論できます
-              </p>
-            </div>
-            <button
-              type="button"
-              class="drawer-close"
-              @click="selectedTask = null"
-            >
-              ×
-            </button>
-          </header>
-
-          <div class="drawer-content">
-            <section class="task-drawer__section">
-              <p class="label">ステータス</p>
-              <div class="readonly-value">
-                <span :class="['status-badge', selectedTask.status]">
-                  {{ formatStatus(selectedTask.status) }}
-                </span>
-                <span class="muted" style="margin-left: 8px"
-                  >{{ selectedTask.progress }}%</span
-                >
-              </div>
-            </section>
-
-            <section class="task-drawer__section">
-              <p class="label">担当者</p>
-              <div class="readonly-value">
-                {{ selectedTask.assigneeName || "未割当" }}
-              </div>
-            </section>
-
-            <section class="task-drawer__section">
-              <p class="label">期限</p>
-              <div class="readonly-value">
-                {{
-                  selectedTask.dueDate
-                    ? new Date(
-                        selectedTask.dueDate.seconds * 1000,
-                      ).toLocaleDateString()
-                    : "未設定"
-                }}
-              </div>
-            </section>
-
-            <section class="task-drawer__section">
-              <p class="label">説明</p>
-              <div
-                class="description-preview"
-                :class="{ 'is-expanded': isDescriptionExpanded }"
-              >
-                {{ selectedTask.description || "説明はありません" }}
-              </div>
-              <button
-                v-if="
-                  (selectedTask.description || '').split('\n').length > 5 ||
-                  (selectedTask.description || '').length > 200
-                "
-                type="button"
-                class="description-toggle"
-                @click="isDescriptionExpanded = !isDescriptionExpanded"
-              >
-                {{ isDescriptionExpanded ? "閉じる" : "もっと見る" }}
-              </button>
-            </section>
-          </div>
-
-          <footer class="task-drawer__sticky-footer">
-            <router-link
-              :to="{
-                name: ROUTE_NAMES.projectTaskDetail,
-                params: { projectId: projectId, taskId: selectedTask.id },
-                query: { from: 'dashboard' },
-              }"
-              class="cta-button"
-            >
-              詳細ページを開く →
-            </router-link>
-          </footer>
-        </aside>
-      </div>
-    </transition>
+    <TaskPreviewDrawer
+      :task="selectedTask"
+      :project-id="projectId"
+      @close="selectedTask = null"
+    />
   </div>
 </template>
 
@@ -1297,326 +708,102 @@ onBeforeUnmount(() => {
 @import "@/pages/demo/styles/demo-shell.css";
 
 .demo__version {
-  padding: 0.35rem 0.65rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(11, 46, 51, 0.12);
-  background: rgba(11, 46, 51, 0.05);
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #0b2e33;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface-muted, #f1f5f9);
+  font-weight: var(--ui-font-bold, 700);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .demo__content {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
 }
 
 .demo__grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.75rem;
+  gap: var(--ui-space-7, 1.75rem);
 }
 
 .muted {
-  color: var(--text-muted, #4f7c82);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .top-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
 }
 
 .top-actions__new {
-  padding: 0.65rem 1rem;
-  border-radius: 0.9rem;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
   border: none;
-  background: #0b2e33;
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 10px 20px rgba(11, 46, 51, 0.2);
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
+  font-weight: var(--ui-font-semibold, 600);
+  box-shadow: var(--ui-shadow-md);
   cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: var(--ui-transition-all);
 }
 
 .top-actions__new:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 28px rgba(11, 46, 51, 0.25);
+  box-shadow: var(--ui-shadow-lg);
+}
+
+.top-actions__new:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
 }
 
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  font-weight: 600;
+  gap: var(--ui-space-1, 0.25rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .dashboard__alerts {
-  background: #fef3c7;
-  border-left: 4px solid #f59e0b;
-  border-radius: 1rem;
-  padding: 0.4rem 0.75rem;
+  background: var(--ui-warning-light, #fef3c7);
+  border-left: 4px solid var(--ui-warning, #f59e0b);
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-}
-
-.dashboard__charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
-  align-items: stretch;
-}
-
-.chart-card {
-  background: #fff;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.1rem;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 16px 32px rgba(11, 46, 51, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  position: relative;
-}
-
-.chart-card__header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.chart-card__header h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  color: #0b2e33;
-}
-
-.chart-card__eyebrow {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.chart-card__meta {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.chart-card__metric {
-  position: absolute;
-  top: 0.85rem;
-  right: 1rem;
-  background: #0b2e33;
-  color: #fff;
-  padding: 0.35rem 0.65rem;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 1rem;
-  box-shadow: 0 8px 16px rgba(11, 46, 51, 0.18);
-}
-
-.chart-card__metric--health {
-  background: #4f7c82;
-}
-
-.progress-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin-top: 0.25rem;
-}
-
-.progress-chart__track {
-  height: 14px;
-  border-radius: 999px;
-  background: rgba(11, 46, 51, 0.08);
-  overflow: hidden;
-}
-
-.progress-chart__fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #4f7c82, #0b2e33);
-  transition: width 0.3s ease;
-}
-
-.progress-chart__labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.status-bars {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.status-bars__row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.status-bars__label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.95rem;
-  color: #0b2e33;
-}
-
-.status-bars__label strong {
-  font-size: 1.05rem;
-}
-
-.status-bars__track {
-  background: rgba(11, 46, 51, 0.07);
-  border-radius: 999px;
-  overflow: hidden;
-  height: 0.6rem;
-}
-
-.status-bars__fill {
-  height: 100%;
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-.status-bars__fill--todo {
-  background: rgba(11, 46, 51, 0.28);
-}
-
-.status-bars__fill--progress {
-  background: #4f7c82;
-}
-
-.status-bars__fill--review {
-  background: #f59e0b;
-}
-
-.status-bars__fill--done {
-  background: #16a34a;
-}
-
-.gauge-chart {
-  position: relative;
-  padding: 0.25rem 0.1rem;
-}
-
-.gauge-chart svg {
-  width: 100%;
-  height: 160px;
-}
-
-.gauge-chart__base {
-  fill: none;
-  stroke: rgba(11, 46, 51, 0.08);
-  stroke-width: 20;
-  stroke-linecap: round;
-}
-
-.gauge-chart__segment {
-  fill: none;
-  stroke-width: 20;
-  stroke-linecap: butt;
-  opacity: 0.25;
-}
-
-.gauge-chart__value-path {
-  fill: none;
-  stroke: #4f7c82;
-  stroke-width: 20;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.4s ease;
-}
-
-.gauge-chart__needle {
-  fill: #000;
-  transition: transform 0.35s ease;
-}
-
-.gauge-chart__needle-hub {
-  fill: #fff;
-  stroke: #0b2e33;
-  stroke-width: 2;
-}
-
-.gauge-chart__legend {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.35rem;
-  text-align: left;
-  font-size: 0.88rem;
-  color: var(--text-muted);
-  margin-top: 0.15rem;
-}
-
-.gauge-chart__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  white-space: nowrap;
-}
-
-.gauge-chart__legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.gauge-chart__legend-dot--danger {
-  background: #ef4444;
-}
-
-.gauge-chart__legend-dot--warn {
-  background: #f97316;
-}
-
-.gauge-chart__legend-dot--caution {
-  background: #f59e0b;
-}
-
-.gauge-chart__legend-dot--good {
-  background: #16a34a;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .dashboard__alert {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.45rem 0.35rem 0.45rem 0.5rem;
+  gap: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-1, 0.25rem)
+    var(--ui-space-2, 0.5rem) var(--ui-space-2, 0.5rem);
 }
 
 .dashboard__alert p {
   margin: 0;
   color: #92400e;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .dashboard__alert-close {
   border: none;
   background: transparent;
   color: #b45309;
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-bold, 700);
   cursor: pointer;
-  padding: 0.25rem 0.35rem;
+  padding: var(--ui-space-1, 0.25rem);
   line-height: 1;
-  border-radius: 0.5rem;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease;
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  transition: var(--ui-transition-colors);
 }
 
 .dashboard__alert-close:hover {
@@ -1626,52 +813,53 @@ onBeforeUnmount(() => {
 
 .demo__primary {
   display: grid;
-  gap: 2rem;
+  gap: var(--ui-space-8, 2rem);
 }
 
 .demo__secondary {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--ui-space-5, 1.25rem);
 }
 
 .secondary-tabs {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .secondary-tab {
   flex: 1;
-  border: 1px solid rgba(11, 46, 51, 0.12);
-  border-radius: 1rem;
-  padding: 0.65rem 1rem;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  font-weight: 600;
-  color: #4f7c82;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-brand-600, #4f7c82);
+  transition: var(--ui-transition-all);
 }
 
 .secondary-tab.is-active {
-  background: #0b2e33;
-  color: #fff;
-  border-color: #0b2e33;
-  box-shadow: 0 12px 24px rgba(11, 46, 51, 0.18);
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
+  border-color: var(--ui-brand-900, #0b2e33);
+  box-shadow: var(--ui-shadow-lg);
 }
 
 .member-preview {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.25rem;
-  padding: 1.25rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-5, 1.25rem);
   background: #fffdf8;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .member-preview__header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   align-items: center;
 }
 
@@ -1680,37 +868,37 @@ onBeforeUnmount(() => {
 }
 
 .member-preview__header p {
-  margin: 0.25rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .member-preview__cta {
-  padding: 0.45rem 1rem;
-  font-size: 0.9rem;
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .member-preview__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .member-preview__stats div {
-  border-radius: 1rem;
-  padding: 0.75rem 1rem;
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   background: rgba(184, 227, 233, 0.3);
 }
 
 .member-preview__stats p {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .member-preview__stats strong {
-  font-size: 1.4rem;
-  color: #0b2e33;
+  font-size: var(--ui-text-2xl, 1.5rem);
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .member-preview__list {
@@ -1719,46 +907,46 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .member-chip {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
 }
 
 .member-chip__avatar {
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-full, 9999px);
   background: rgba(79, 124, 130, 0.15);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: var(--ui-font-bold, 700);
 }
 
 .member-chip__name {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .member-chip__meta {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .member-chip__status {
   margin-left: auto;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .member-chip__status.status-online {
-  color: #1d9160;
+  color: var(--ui-success, #16a34a);
 }
 
 .member-chip__status.status-away {
@@ -1766,97 +954,97 @@ onBeforeUnmount(() => {
 }
 
 .member-chip__status.status-offline {
-  color: #9da8b6;
+  color: var(--ui-text-muted, #64748b);
 }
 
 .task-list {
-  border: 1px solid var(--border-light);
-  border-radius: 1.5rem;
-  background: var(--surface-elevated, #fff);
-  padding: 1.25rem;
-  box-shadow: 0 16px 28px rgba(11, 46, 51, 0.08);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  background: var(--ui-surface, #ffffff);
+  padding: var(--ui-space-5, 1.25rem);
+  box-shadow: var(--ui-shadow-lg);
 }
 
 .task-list__header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid rgba(11, 46, 51, 0.08);
-  gap: 1.5rem;
+  margin-bottom: var(--ui-space-4, 1rem);
+  padding-bottom: var(--ui-space-4, 1rem);
+  border-bottom: 2px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  gap: var(--ui-space-6, 1.5rem);
   flex-wrap: wrap;
 }
 
 .task-list__header-left {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .task-list__header-left h3 {
   margin: 0;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--text-strong);
+  font-size: var(--ui-text-xl, 1.25rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .task-list__header-left p {
   margin: 0;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .task-list__filters {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--ui-space-2, 0.5rem);
   align-items: center;
   flex-wrap: nowrap;
 }
 
 .task-filter-select {
-  padding: 0.55rem 0.85rem;
-  border-radius: 0.7rem;
-  border: 1px solid rgba(11, 46, 51, 0.12);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   background: rgba(255, 255, 255, 0.8);
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #0b2e33;
-  transition: all 0.15s ease;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-brand-900, #0b2e33);
+  transition: var(--ui-transition-all);
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230b2e33' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.7rem center;
+  background-position: right var(--ui-space-3, 0.75rem) center;
   background-size: 10px;
   padding-right: 2.2rem;
   min-width: 110px;
 }
 
 .task-filter-select:hover {
-  border-color: rgba(11, 46, 51, 0.25);
-  background-color: #fff;
+  border-color: var(--ui-border-focus, #4f7c82);
+  background-color: var(--ui-surface, #ffffff);
 }
 
 .task-filter-select:focus {
   outline: none;
-  border-color: #4f7c82;
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.1);
+  border-color: var(--ui-border-focus, #4f7c82);
+  background-color: var(--ui-surface, #ffffff);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .filter-reset-btn {
-  padding: 0.55rem;
-  border-radius: 0.7rem;
-  border: 1px solid rgba(11, 46, 51, 0.15);
+  padding: var(--ui-space-2, 0.5rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4f7c82;
+  color: var(--ui-brand-600, #4f7c82);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--ui-transition-all);
 }
 
 .filter-reset-btn svg {
@@ -1864,9 +1052,9 @@ onBeforeUnmount(() => {
 }
 
 .filter-reset-btn:hover {
-  border-color: #4f7c82;
+  border-color: var(--ui-brand-600, #4f7c82);
   background: rgba(79, 124, 130, 0.08);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
   transform: rotate(-15deg);
 }
 
@@ -1880,39 +1068,37 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .task-row {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
   cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+  transition: var(--ui-transition-all);
 }
 
 .task-row:hover {
-  border-color: rgba(11, 46, 51, 0.2);
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
   background-color: rgba(184, 227, 233, 0.1);
 }
 
 .task-row__content {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 0.9fr 1.5fr 1fr;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   align-items: center;
 }
 
 @media (max-width: 768px) {
   .task-row__content {
     grid-template-columns: 1fr;
-    gap: 0.5rem;
+    gap: var(--ui-space-2, 0.5rem);
   }
 
   .task-row__title {
-    font-size: 1.1rem;
+    font-size: var(--ui-text-lg, 1.125rem);
   }
 
   .task-row__status {
@@ -1920,27 +1106,27 @@ onBeforeUnmount(() => {
   }
 
   .task-row__progress {
-    margin-top: 0.25rem;
+    margin-top: var(--ui-space-1, 0.25rem);
   }
 
   .task-row__due {
     text-align: left;
-    font-size: 0.85rem;
+    font-size: var(--ui-text-sm, 0.875rem);
   }
 }
 
 .task-row__title {
   margin: 0;
-  font-weight: 600;
-  color: var(--text-strong);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .task-row__assignee {
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1949,12 +1135,12 @@ onBeforeUnmount(() => {
 .task-row__category {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--ui-space-1, 0.25rem);
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-full, 9999px);
   background: rgba(11, 46, 51, 0.06);
-  color: var(--text-strong);
-  font-size: 0.85rem;
+  color: var(--ui-text-strong, #0f172a);
+  font-size: var(--ui-text-sm, 0.875rem);
   white-space: nowrap;
 }
 
@@ -1965,20 +1151,20 @@ onBeforeUnmount(() => {
   min-width: auto;
   padding: 0;
   border-radius: 0;
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-bold, 700);
   letter-spacing: 0.01em;
   border: none;
   background: transparent;
-  transition: color 0.2s ease;
+  transition: var(--ui-transition-colors);
 }
 
 .task-row__status--todo {
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .task-row__status--in-progress {
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .task-row__status--review {
@@ -1996,46 +1182,46 @@ onBeforeUnmount(() => {
 .task-row__progress {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .task-row__progress-bar {
   flex: 1;
-  height: 0.5rem;
+  height: var(--ui-space-2, 0.5rem);
   background: rgba(11, 46, 51, 0.1);
-  border-radius: 999px;
+  border-radius: var(--ui-radius-full, 9999px);
   overflow: hidden;
 }
 
 .task-row__progress-fill {
   height: 100%;
-  background: #4f7c82;
+  background: var(--ui-brand-600, #4f7c82);
   border-radius: inherit;
   transition: width 0.3s ease;
 }
 
 .task-row__progress-value {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-strong);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
   min-width: 3rem;
   text-align: right;
 }
 
 .task-row__due {
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
   text-align: right;
 }
 
 .task-row__due--overdue {
-  color: #b91c1c;
-  font-weight: 700;
+  color: var(--ui-danger, #ef4444);
+  font-weight: var(--ui-font-bold, 700);
 }
 
 .task-row.is-overdue {
   border-color: rgba(239, 68, 68, 0.25);
-  background-color: rgba(239, 68, 68, 0.05);
+  background-color: var(--ui-danger-light, #fef2f2);
 }
 
 .task-row.is-overdue:hover {
@@ -2044,75 +1230,91 @@ onBeforeUnmount(() => {
 }
 
 .status-pill {
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  border-radius: var(--ui-radius-full, 9999px);
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .status-pill--todo {
-  background: rgba(11, 46, 51, 0.08);
-  color: var(--text-strong);
+  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  color: var(--ui-text-strong, #0f172a);
 }
+
 .status-pill--progress {
   background: rgba(79, 124, 130, 0.2);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
+
 .status-pill--review {
   background: rgba(255, 202, 99, 0.25);
   color: #915a00;
 }
+
 .status-pill--done {
-  background: rgba(34, 197, 94, 0.25);
+  background: var(--ui-success-light, #dcfce7);
   color: #166534;
 }
 
 .ai-panel {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border-radius: 1rem;
-  border: 1px solid #e1e8f0;
+  margin-top: var(--ui-space-6, 1.5rem);
+  padding: var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-lg, 1rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  background: #fff;
+  gap: var(--ui-space-3, 0.75rem);
+  background: var(--ui-surface, #ffffff);
 }
 
 .chat-preview__header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.25rem;
-  margin-bottom: 0.75rem;
+  gap: var(--ui-space-1, 0.25rem);
+  margin-bottom: var(--ui-space-3, 0.75rem);
 }
 
 .chat-preview__header p {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .ai-panel textarea,
 .ai-panel input {
   width: 100%;
-  border-radius: 0.8rem;
-  border: 1px solid #d1dae8;
-  padding: 0.65rem 0.85rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: var(--ui-space-3, 0.75rem);
+}
+
+.ai-panel textarea:focus,
+.ai-panel input:focus {
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .ai-panel button {
   align-self: flex-start;
   border: none;
-  border-radius: 0.8rem;
-  padding: 0.6rem 1rem;
-  background: #0b2e33;
-  color: #fff;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
+  cursor: pointer;
+  transition: var(--ui-transition-all);
+}
+
+.ai-panel button:hover {
+  background: var(--ui-brand-800, #1a4a52);
 }
 
 .ai-response {
-  background: #f1f5f9;
-  border-radius: 0.8rem;
-  padding: 0.75rem;
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
   min-height: 80px;
 }
 
@@ -2123,19 +1325,19 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  z-index: 60;
+  padding: var(--ui-space-4, 1rem);
+  z-index: var(--ui-z-modal, 50);
 }
 
 .task-modal__card {
   width: min(520px, 100%);
-  background: #fff;
-  border-radius: 1.25rem;
-  padding: 1.5rem;
+  background: var(--ui-surface, #ffffff);
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-6, 1.5rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  box-shadow: 0 24px 48px rgba(11, 46, 51, 0.2);
+  gap: var(--ui-space-4, 1rem);
+  box-shadow: var(--ui-shadow-xl);
 }
 
 .task-modal__card header {
@@ -2147,46 +1349,55 @@ onBeforeUnmount(() => {
 .task-modal__card button {
   border: none;
   background: transparent;
-  font-size: 1.25rem;
+  font-size: var(--ui-text-xl, 1.25rem);
   cursor: pointer;
 }
 
 .task-modal__form {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .task-modal__form input,
 .task-modal__form textarea,
 .task-modal__form select {
   width: 100%;
-  border-radius: 0.8rem;
-  border: 1px solid #d1dae8;
-  padding: 0.65rem 0.85rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: var(--ui-space-3, 0.75rem);
+}
+
+.task-modal__form input:focus,
+.task-modal__form textarea:focus,
+.task-modal__form select:focus {
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .task-modal__form footer {
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .task-modal__form footer button {
   border: none;
-  border-radius: 0.8rem;
-  padding: 0.6rem 1.2rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-5, 1.25rem);
   cursor: pointer;
+  transition: var(--ui-transition-all);
 }
 
 .task-modal__form footer .ghost {
-  background: rgba(11, 46, 51, 0.08);
-  color: #0b2e33;
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .task-modal__form footer button:last-child {
-  background: #0b2e33;
-  color: #fff;
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
 }
 
 .task-modal__range-header {
@@ -2196,63 +1407,60 @@ onBeforeUnmount(() => {
 }
 
 .task-modal__range-header .hint {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .progress-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
+  gap: var(--ui-space-2, 0.5rem);
+  margin-top: var(--ui-space-2, 0.5rem);
 }
 
 .progress-pill {
-  border: 1px solid rgba(11, 46, 51, 0.2);
-  border-radius: 999px;
-  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-full, 9999px);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
   background: transparent;
   cursor: pointer;
-  font-size: 0.8rem;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
+  font-size: var(--ui-text-xs, 0.75rem);
+  transition: var(--ui-transition-all);
 }
 
 .progress-pill.is-active {
-  background: #4f7c82;
-  color: #fff;
-  border-color: #4f7c82;
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-surface, #ffffff);
+  border-color: var(--ui-brand-600, #4f7c82);
 }
 
 .task-modal__thread-toggle {
-  border: 1px solid #d1dae8;
-  border-radius: 1rem;
-  padding: 0.9rem 1rem;
-  background: #f7f9fc;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-surface-muted, #f1f5f9);
 }
 
 .thread-toggle {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   cursor: pointer;
 }
 
 .thread-toggle input {
-  margin-top: 0.35rem;
+  margin-top: var(--ui-space-1, 0.25rem);
 }
 
 .thread-toggle__title {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .thread-toggle__description {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .task-drawer-enter-active,
@@ -2276,7 +1484,7 @@ onBeforeUnmount(() => {
   inset: 0;
   display: flex;
   justify-content: flex-end;
-  z-index: 80;
+  z-index: var(--ui-z-modal, 50);
 }
 
 .task-drawer__overlay {
@@ -2286,16 +1494,14 @@ onBeforeUnmount(() => {
 
 .task-drawer__panel {
   width: clamp(280px, 85vw, 420px);
-  background: #fff;
-  box-shadow: -12px 0 28px rgba(11, 46, 51, 0.18);
+  background: var(--ui-surface, #ffffff);
+  box-shadow: var(--ui-shadow-xl);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.5rem;
+  gap: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-6, 1.5rem);
   transform: translateX(0);
-  transition:
-    transform 0.25s ease,
-    opacity 0.25s ease;
+  transition: var(--ui-transition-all);
 }
 
 .task-drawer__header {
@@ -2306,139 +1512,155 @@ onBeforeUnmount(() => {
 
 .task-drawer__eyebrow {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
   text-transform: uppercase;
 }
 
 .task-drawer__header h3 {
-  margin: 0.2rem 0 0;
+  margin: var(--ui-space-1, 0.25rem) 0 0;
 }
 
 .task-drawer__section {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .task-drawer__section .label {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .task-drawer__section textarea,
 .task-drawer__section input,
 .task-drawer__section select {
   width: 100%;
-  border: 1px solid #d1dae8;
-  border-radius: 0.8rem;
-  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
+}
+
+.task-drawer__section textarea:focus,
+.task-drawer__section input:focus,
+.task-drawer__section select:focus {
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .thread-section .thread-create-btn {
-  border: 1px dashed #4f7c82;
+  border: 1px dashed var(--ui-brand-600, #4f7c82);
   background: rgba(79, 124, 130, 0.08);
-  color: #0b2e33;
-  padding: 0.5rem 1rem;
-  border-radius: 0.8rem;
+  color: var(--ui-brand-900, #0b2e33);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
   cursor: pointer;
+  transition: var(--ui-transition-all);
+}
+
+.thread-section .thread-create-btn:hover {
+  background: rgba(79, 124, 130, 0.15);
 }
 
 .thread-form {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .thread-form input {
-  border-radius: 0.8rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
 }
 
 .thread-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .thread-actions button {
   border: none;
-  border-radius: 0.6rem;
-  padding: 0.45rem 0.9rem;
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
   cursor: pointer;
+  transition: var(--ui-transition-all);
 }
 
 .thread-actions .ghost {
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text, #0b2e33);
 }
 
 .thread-actions button:last-child {
-  background: #4f7c82;
-  color: #fff;
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-surface, #ffffff);
 }
 
 .thread-status {
-  background: #f0fdf4;
+  background: var(--ui-success-light, #dcfce7);
   border: 1px solid #bbf7d0;
-  border-radius: 0.9rem;
-  padding: 0.75rem 1rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
 }
 
 .thread-status .thread-name {
-  margin: 0.2rem 0 0;
-  font-weight: 600;
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .task-drawer__footer {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .task-drawer__footer button {
   border: none;
-  border-radius: 0.75rem;
-  padding: 0.6rem 1rem;
-  background: #0b2e33;
-  color: #fff;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
+  cursor: pointer;
+  transition: var(--ui-transition-all);
 }
 
 .task-drawer__footer .ghost {
-  background: rgba(11, 46, 51, 0.1);
-  color: #0b2e33;
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .task-drawer__footer .danger {
-  background: #d64545;
+  background: var(--ui-danger, #ef4444);
 }
 
 /* Task Drawer Tabs */
 .drawer-tabs {
   display: flex;
-  gap: 8px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(11, 46, 51, 0.12); /* --line */
-  margin-bottom: 16px;
+  gap: var(--ui-space-2, 0.5rem);
+  padding-bottom: var(--ui-space-3, 0.75rem);
+  border-bottom: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  margin-bottom: var(--ui-space-4, 1rem);
 }
 
 .drawer-tab {
-  border: 1px solid rgba(11, 46, 51, 0.12);
-  background: rgba(11, 46, 51, 0.04);
-  color: #0b2e33; /* --brand */
-  font-weight: 900;
-  padding: 8px 12px;
-  border-radius: 999px;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-brand-900, #0b2e33);
+  font-weight: var(--ui-font-bold, 700);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-full, 9999px);
   cursor: pointer;
-  transition: all 0.2s;
-  font-size: 13px;
+  transition: var(--ui-transition-all);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .drawer-tab.active {
-  background: #0b2e33; /* --brand */
-  color: #fff;
-  border-color: #0b2e33;
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
+  border-color: var(--ui-brand-900, #0b2e33);
 }
 
 .drawer-tab:hover:not(.active) {
@@ -2449,7 +1671,7 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--ui-space-5, 1.25rem);
   overflow-y: auto;
   min-height: 0;
 }
@@ -2460,42 +1682,33 @@ onBeforeUnmount(() => {
 }
 
 .drawer-close {
-  border: 1px solid rgba(11, 46, 51, 0.12);
-  background: #fff;
-  border-radius: 12px;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  border-radius: var(--ui-radius-md, 0.75rem);
   width: 36px;
   height: 36px;
   cursor: pointer;
-  font-weight: 900;
-  color: #0b2e33;
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-brand-900, #0b2e33);
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: var(--ui-text-xl, 1.25rem);
+  transition: var(--ui-transition-all);
+}
+
+.drawer-close:hover {
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .empty-placeholder {
-  padding: 20px;
-  border: 1px dashed rgba(11, 46, 51, 0.2);
-  border-radius: 16px;
-  background: rgba(11, 46, 51, 0.03);
-  color: #64748b;
+  padding: var(--ui-space-5, 1.25rem);
+  border: 1px dashed var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-lg, 1rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-muted, #64748b);
   text-align: center;
-  font-weight: 700;
-}
-
-/* Enhancements for Task List */
-.task-row {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.task-row:hover {
-  background: rgba(184, 227, 233, 0.18);
-  border-color: rgba(11, 46, 51, 0.18);
-}
-.task-row:hover {
-  background: rgba(184, 227, 233, 0.18);
-  border-color: rgba(11, 46, 51, 0.18);
+  font-weight: var(--ui-font-bold, 700);
 }
 
 .task-drawer__title-link {
@@ -2503,71 +1716,75 @@ onBeforeUnmount(() => {
   color: inherit;
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: var(--ui-space-1, 0.25rem);
+  transition: var(--ui-transition-colors);
 }
+
 .task-drawer__title-link:hover {
-  color: #0d9488; /* teal-600 */
+  color: var(--ui-brand-600, #4f7c82);
   text-decoration: underline;
 }
 
 .task-drawer__helper {
-  font-size: 11px;
-  color: #64748b;
-  margin: 4px 0 0 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+  margin: var(--ui-space-1, 0.25rem) 0 0 0;
 }
 
 .task-drawer__panel {
-  background: #f5fcff !important; /* Existing hero color */
-  border-left: 1px solid rgba(11, 46, 51, 0.08);
-  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+  background: var(--ui-surface-elevated, #f8fafc) !important;
+  border-left: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-lg);
 }
 
 .readonly-value {
-  padding: 8px 0;
-  color: #334155;
-  font-size: 15px;
+  padding: var(--ui-space-2, 0.5rem) 0;
+  color: var(--ui-text, #0b2e33);
+  font-size: var(--ui-text-base, 1rem);
   display: flex;
   align-items: center;
 }
 
 .description-preview {
   white-space: pre-wrap;
-  color: #475569; /* slate-600 */
-  font-size: 14px;
-  line-height: 1.5;
-  max-height: 100px; /* Collapsed height */
+  color: var(--ui-text, #0b2e33);
+  font-size: var(--ui-text-sm, 0.875rem);
+  line-height: var(--ui-leading-relaxed, 1.625);
+  max-height: 100px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.6);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(11, 46, 51, 0.08);
+  padding: var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   transition: max-height 0.3s ease;
 }
 
 .description-preview.is-expanded {
-  max-height: 500px; /* Expanded state */
+  max-height: 500px;
   overflow-y: auto;
 }
 
 .description-toggle {
   background: none;
   border: none;
-  color: #0d9488;
-  font-size: 12px;
+  color: var(--ui-brand-600, #4f7c82);
+  font-size: var(--ui-text-xs, 0.75rem);
   cursor: pointer;
-  padding: 4px 0;
-  margin-top: 4px;
-  font-weight: 600;
+  padding: var(--ui-space-1, 0.25rem) 0;
+  margin-top: var(--ui-space-1, 0.25rem);
+  font-weight: var(--ui-font-semibold, 600);
+  transition: var(--ui-transition-colors);
 }
+
 .description-toggle:hover {
   text-decoration: underline;
 }
 
 .task-drawer__sticky-footer {
   margin-top: auto;
-  padding: 16px 24px;
-  background: rgba(245, 252, 255, 0.95); /* Matches panel bg */
-  border-top: 1px solid rgba(11, 46, 51, 0.08);
+  padding: var(--ui-space-4, 1rem) var(--ui-space-6, 1.5rem);
+  background: var(--ui-surface-elevated, #f8fafc);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   display: flex;
   justify-content: center;
   position: sticky;
@@ -2579,18 +1796,18 @@ onBeforeUnmount(() => {
   width: 100%;
   justify-content: center;
   align-items: center;
-  padding: 10px 16px;
-  border: 1px solid #0d9488;
-  border-radius: 8px;
-  color: #0d9488;
-  font-weight: 600;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border: 1px solid var(--ui-brand-600, #4f7c82);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  color: var(--ui-brand-600, #4f7c82);
+  font-weight: var(--ui-font-semibold, 600);
   text-decoration: none;
-  font-size: 14px;
-  background: white;
-  transition: all 0.2s;
+  font-size: var(--ui-text-sm, 0.875rem);
+  background: var(--ui-surface, #ffffff);
+  transition: var(--ui-transition-all);
 }
 
 .cta-button:hover {
-  background: #f0fdfa; /* teal-50 */
+  background: rgba(79, 124, 130, 0.08);
 }
 </style>

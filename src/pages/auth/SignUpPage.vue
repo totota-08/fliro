@@ -487,67 +487,77 @@ function mapFirebaseError(error: unknown) {
   background: linear-gradient(
     135deg,
     rgba(184, 227, 233, 0.35),
-    #fff,
+    var(--ui-surface, #fff),
     rgba(147, 177, 181, 0.35)
   );
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: var(--ui-space-8, 2rem) var(--ui-space-4, 1rem);
+}
+
+@supports (min-height: 100dvh) {
+  .signup-shell {
+    min-height: calc(100dvh - 4rem);
+  }
 }
 
 .signup-card {
   width: min(500px, 100%);
-  background: #fff;
-  border-radius: 1.5rem;
-  padding: 2.5rem;
-  border: 1px solid rgba(147, 177, 181, 0.35);
-  box-shadow: 0 40px 70px rgba(11, 46, 51, 0.1);
+  background: var(--ui-surface, #ffffff);
+  border-radius: var(--ui-radius-2xl, 1.5rem);
+  padding: var(--ui-space-10, 2.5rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-2xl);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
 }
 
 .signup-progress {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .signup-progress__labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.9rem;
-  color: #4f7c82;
-  font-weight: 600;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-brand-600, #4f7c82);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .signup-progress__bar {
   width: 100%;
   height: 0.4rem;
-  border-radius: 999px;
-  background: rgba(147, 177, 181, 0.3);
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-border, rgba(11, 46, 51, 0.12));
   overflow: hidden;
 }
 
 .signup-progress__value {
   height: 100%;
-  background: linear-gradient(90deg, #4f7c82, #0b2e33);
-  border-radius: 999px;
-  transition: width 200ms ease;
+  background: linear-gradient(
+    90deg,
+    var(--ui-brand-600, #4f7c82),
+    var(--ui-brand-900, #0b2e33)
+  );
+  border-radius: var(--ui-radius-full, 9999px);
+  transition: width var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .signup-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .divider {
   position: relative;
   text-align: center;
-  color: #93b1b5;
-  font-size: 0.85rem;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .divider::before {
@@ -557,54 +567,60 @@ function mapFirebaseError(error: unknown) {
   left: 0;
   width: 100%;
   height: 1px;
-  background: rgba(147, 177, 181, 0.5);
+  background: var(--ui-border, rgba(11, 46, 51, 0.12));
 }
 
 .divider span {
-  background: #fff;
-  padding: 0 0.75rem;
+  background: var(--ui-surface, #ffffff);
+  padding: 0 var(--ui-space-3, 0.75rem);
   position: relative;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .provider-section {
-  margin-top: 0.5rem;
+  margin-top: var(--ui-space-2, 0.5rem);
 }
 
 .verify-step {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   text-align: left;
-  color: #4f7c82;
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .verify-step__message {
-  color: #0b2e33;
-  font-weight: 600;
+  color: var(--ui-brand-900, #0b2e33);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .verify-step__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .avatar-field {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .avatar-field__upload {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border: 1px dashed #93b1b5;
-  border-radius: 0.85rem;
-  color: #4f7c82;
+  gap: var(--ui-space-2, 0.5rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  border: 1px dashed var(--ui-border-strong, rgba(11, 46, 51, 0.2));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  color: var(--ui-brand-600, #4f7c82);
   cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.avatar-field__upload:hover {
+  border-color: var(--ui-brand-600, #4f7c82);
+  background: var(--ui-brand-100, #e5f6f8);
 }
 
 .avatar-field__upload input {
@@ -613,67 +629,75 @@ function mapFirebaseError(error: unknown) {
 
 .avatar-field__hint {
   margin: 0;
-  font-size: 0.85rem;
-  color: #93b1b5;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .job-field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .job-field__label {
-  font-weight: 600;
-  color: #0b2e33;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .job-field select {
-  border: 1px solid #93b1b5;
-  border-radius: 0.85rem;
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  background: #fff;
-  color: #0b2e33;
+  border: 1px solid var(--ui-border-strong, rgba(11, 46, 51, 0.2));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  font-size: var(--ui-text-base, 1rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  transition: var(--ui-transition-colors);
 }
 
 .job-field select:focus {
   outline: none;
-  border-color: #4f7c82;
-  box-shadow: 0 0 0 3px rgba(79, 124, 130, 0.2);
+  border-color: var(--ui-brand-600, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .avatar-field__preview img {
   width: 72px;
   height: 72px;
-  border-radius: 50%;
+  border-radius: var(--ui-radius-full, 9999px);
   object-fit: cover;
-  border: 2px solid #b8e3e9;
+  border: 2px solid var(--ui-brand-200, #b8e3e9);
 }
 
 .form-error {
-  background: rgba(214, 69, 69, 0.08);
+  background: var(--ui-danger-bg, rgba(214, 69, 69, 0.08));
   border: 1px solid rgba(214, 69, 69, 0.35);
-  color: #d64545;
-  padding: 0.75rem 1rem;
-  border-radius: 0.9rem;
-  font-weight: 600;
+  color: var(--ui-danger, #d64545);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .signup-footer {
   text-align: center;
-  font-size: 0.95rem;
-  color: #4f7c82;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .signup-footer a {
-  font-weight: 600;
-  color: #4f7c82;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-brand-600, #4f7c82);
+  text-decoration: none;
+  transition: var(--ui-transition-colors);
+}
+
+.signup-footer a:hover {
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .slide-fade-enter-active,
 .slide-fade-leave-active {
-  transition: all 240ms ease;
+  transition: all var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .slide-fade-enter-from,
@@ -684,7 +708,7 @@ function mapFirebaseError(error: unknown) {
 
 @media (max-width: 600px) {
   .signup-card {
-    padding: 2rem 1.5rem;
+    padding: var(--ui-space-8, 2rem) var(--ui-space-6, 1.5rem);
   }
 
   .verify-step__actions {
