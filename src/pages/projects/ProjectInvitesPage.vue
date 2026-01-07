@@ -5,7 +5,8 @@ import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import { appName } from "@/constants/appMeta";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
@@ -61,7 +62,11 @@ let stopMembers: (() => void) | null = null;
 let stopInvites: (() => void) | null = null;
 let actionTimer: ReturnType<typeof setTimeout> | null = null;
 
-const navItems = computed(() => buildProjectNavItems(projectId.value));
+// 権限フィルタリング付きナビゲーション
+const { can } = useProjectAccess(projectId);
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(projectId.value, can),
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
@@ -624,22 +629,22 @@ onBeforeUnmount(() => {
 .demo__content {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  height: calc(100vh - 64px);
+  gap: var(--ui-space-8, 2rem);
+  height: calc(100vh - var(--ui-topbar-height, 64px));
   min-height: 0;
   box-sizing: border-box;
 }
 
 @supports (height: 100dvh) {
   .demo__content {
-    height: calc(100dvh - 64px);
+    height: calc(100dvh - var(--ui-topbar-height, 64px));
   }
 }
 
 .invites-page {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--ui-space-5, 1.25rem);
   min-height: 0;
 }
 
@@ -647,17 +652,21 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   flex-wrap: wrap;
 }
 
 .invites-page__header h2 {
   margin: 0;
+  font-size: var(--ui-text-xl, 1.25rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .invites-page__header p {
-  margin: 0.35rem 0 0;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .invites-page__header-action {
@@ -676,14 +685,14 @@ onBeforeUnmount(() => {
 .invites-page__list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   min-height: 0;
 }
 
 .invites-page__toolbar {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -691,16 +700,23 @@ onBeforeUnmount(() => {
 .invites-page__filters {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .invites-page__filters select {
-  border-radius: 0.85rem;
-  border: 1px solid var(--border-light);
-  padding: 0.6rem 0.75rem;
-  font-size: 0.95rem;
-  background: var(--surface-card);
-  color: var(--text);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  transition: var(--ui-transition-colors);
+}
+
+.invites-page__filters select:focus {
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .invites-page__search {
@@ -709,64 +725,71 @@ onBeforeUnmount(() => {
 
 .invites-page__search input {
   width: 100%;
-  border-radius: 0.85rem;
-  border: 1px solid var(--border-light);
-  padding: 0.6rem 0.75rem;
-  font-size: 0.95rem;
-  background: var(--surface-card);
-  color: var(--text);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  transition: var(--ui-transition-colors);
+}
+
+.invites-page__search input:focus {
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .invites-page__permission {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-xs, 0.75rem);
 }
 
 .invites-page__message,
 .invites-page__error {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .invites-page__message {
-  color: var(--text-strong);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .invites-page__error {
-  color: var(--accent-danger);
+  color: var(--ui-danger, #d64545);
 }
 
 .invites-page__table {
-  border: 1px solid var(--border-light);
-  border-radius: 1rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
   overflow: hidden;
-  background: var(--surface-card);
+  background: var(--ui-surface, #ffffff);
 }
 
 .invites-page__table table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .invites-page__table th,
 .invites-page__table td {
-  padding: 0.85rem 0.9rem;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   text-align: left;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   vertical-align: middle;
 }
 
 .invites-page__table th {
-  background: color-mix(in srgb, var(--primary) 10%, white);
-  color: var(--text);
-  font-weight: 700;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: var(--ui-brand-100, #e5f6f8);
+  color: var(--ui-text-strong, #0f172a);
+  font-weight: var(--ui-font-bold, 700);
+  border-bottom: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
 }
 
 .invites-page__table td {
-  color: var(--text);
+  color: var(--ui-text, #0b2e33);
 }
 
 .invites-page__table tr:last-child td {
@@ -775,23 +798,24 @@ onBeforeUnmount(() => {
 
 .invites-page__table td.actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .invites-page__table td.actions button {
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   background: transparent;
-  color: var(--text);
-  border-radius: 0.7rem;
-  padding: 0.35rem 0.75rem;
+  color: var(--ui-text, #0b2e33);
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
   cursor: pointer;
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-xs, 0.75rem);
+  transition: var(--ui-transition-colors);
 }
 
 .invites-page__table td.actions button:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .invites-page__table td.actions button:disabled {
@@ -801,36 +825,39 @@ onBeforeUnmount(() => {
 
 .invites-page__table .empty {
   text-align: center;
-  color: var(--text-muted);
-  padding: 1.5rem;
+  color: var(--ui-text-muted, #64748b);
+  padding: var(--ui-space-6, 1.5rem);
 }
 
 .invites-page__status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem 0.7rem;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  border: 1px solid var(--border-light);
-  background: var(--surface-muted);
-  color: var(--text);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-full, 9999px);
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-xs, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text, #0b2e33);
 }
 
 .invites-page__status.status-active {
-  color: var(--accent-success);
-  border-color: color-mix(in srgb, var(--accent-success) 40%, transparent);
+  color: var(--ui-success, #16a34a);
+  background: var(--ui-success-light, #dcfce7);
+  border-color: rgba(22, 163, 74, 0.25);
 }
 
 .invites-page__status.status-expired {
-  color: var(--accent-danger);
-  border-color: color-mix(in srgb, var(--accent-danger) 40%, transparent);
+  color: var(--ui-danger, #d64545);
+  background: var(--ui-danger-light, #fee2e2);
+  border-color: rgba(214, 69, 69, 0.25);
 }
 
 .invites-page__status.status-revoked {
-  color: var(--accent-danger);
-  border-color: color-mix(in srgb, var(--accent-danger) 40%, transparent);
+  color: var(--ui-danger, #d64545);
+  background: var(--ui-danger-light, #fee2e2);
+  border-color: rgba(214, 69, 69, 0.25);
 }
 
 .invites-page__more {
@@ -839,13 +866,19 @@ onBeforeUnmount(() => {
 }
 
 .invites-page__more-button {
-  border: 1px solid var(--border-light);
-  background: transparent;
-  color: var(--text);
-  border-radius: 0.85rem;
-  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-5, 1.25rem);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
+  transition: var(--ui-transition-all);
+}
+
+.invites-page__more-button:hover:not(:disabled) {
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .invites-page__more-button:disabled {

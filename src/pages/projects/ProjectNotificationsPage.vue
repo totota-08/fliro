@@ -2,7 +2,8 @@
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
@@ -50,7 +51,11 @@ let stopTimeline: (() => void) | null = null;
 let stopChat: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 
-const navItems = computed(() => buildProjectNavItems(projectId.value));
+// 権限フィルタリング付きナビゲーション
+const { can } = useProjectAccess(projectId);
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(projectId.value, can),
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((project, index) => ({
@@ -463,111 +468,65 @@ onBeforeUnmount(() => {
 <style scoped>
 @import "@/pages/demo/styles/demo-shell.css";
 
-.notify-shell {
-  display: flex;
-  min-height: 100vh;
-  background: #f6f8fa;
-}
-
-.notify-shell__overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.notify-shell__main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.notify-shell__topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-}
-
-.notify-shell__topbar-left {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.notify-shell__breadcrumb {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.notify-shell__heading {
-  margin: 0;
-}
-
-.notify-shell__menu-button {
-  border: none;
-  border-radius: 0.75rem;
-  background: #fff;
-  padding: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.notify-shell__menu-icon {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
-.notify-shell__actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
 .notify-content {
-  padding: 0 1.5rem 2rem;
+  padding: 0 var(--ui-space-6, 1.5rem) var(--ui-space-8, 2rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .notify-card {
-  background: #fff;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1rem;
-  padding: 1.25rem;
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-5, 1.25rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .notify-settings {
-  background: #fff;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1rem;
-  padding: 1.25rem;
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-5, 1.25rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .notify-settings__toggles {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .toggle {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 0.85rem;
-  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
+  transition: var(--ui-transition-colors);
+}
+
+.toggle:hover {
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
 }
 
 .toggle input {
   width: 18px;
   height: 18px;
+  accent-color: var(--ui-brand-600, #4f7c82);
+}
+
+.toggle p {
+  margin: 0;
+}
+
+.toggle p:first-of-type {
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
 }
 
 .notify-card__header {
@@ -579,82 +538,95 @@ onBeforeUnmount(() => {
 .notify-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .notify-column h3 {
   margin: 0;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
   margin: 0;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .eyebrow {
-  letter-spacing: 0.2em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .notify-item {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 0.9rem;
-  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--ui-space-1, 0.25rem);
   cursor: pointer;
-  background: #fdfefe;
+  background: var(--ui-surface, #ffffff);
+  transition: var(--ui-transition-all);
 }
 
 .notify-item:hover {
-  border-color: rgba(11, 46, 51, 0.18);
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .notify-item__meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .notify-item__title {
   margin: 0;
-  font-weight: 700;
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .notify-item__body {
   margin: 0;
-  color: #344054;
-  line-height: 1.4;
+  color: var(--ui-text-muted, #64748b);
+  line-height: var(--ui-leading-normal, 1.5);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .chip {
-  border-radius: 999px;
-  padding: 0.15rem 0.65rem;
-  font-size: 0.85rem;
-  background: rgba(11, 46, 51, 0.08);
-  color: #0b2e33;
+  border-radius: var(--ui-radius-full, 9999px);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .chip--accent {
-  background: rgba(52, 168, 83, 0.18);
-  color: #166534;
+  background: var(--ui-success-light, #dcfce7);
+  color: var(--ui-success, #16a34a);
 }
 
 .chip--soft {
-  background: rgba(11, 46, 51, 0.05);
-  color: #496167;
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .empty {
-  border: 1px dashed rgba(11, 46, 51, 0.1);
-  border-radius: 0.8rem;
-  padding: 0.75rem;
-  color: var(--text-muted);
-  background: #f9fafb;
+  border: 1px dashed var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+  background: var(--ui-surface-muted, #f1f5f9);
+  text-align: center;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .sr-only {
@@ -670,12 +642,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .notify-shell__topbar {
-    padding: 1rem;
-  }
-
   .notify-content {
-    padding: 0 1rem 2rem;
+    padding: 0 var(--ui-space-4, 1rem) var(--ui-space-8, 2rem);
   }
 }
 </style>
