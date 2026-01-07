@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import DashboardChartsSection from "@/components/projectDashboard/DashboardChartsSection.vue";
+import DashboardInsights from "@/components/projectDashboard/DashboardInsights.vue";
 import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
@@ -88,6 +88,7 @@ const filters = reactive({
 const showMyTasksOnly = ref(false);
 const isSidebarOpen = ref(true);
 const isTaskModalOpen = ref(false);
+const insightsCollapsed = ref(true); // デフォルトで折りたたむ（Now First設計）
 
 let stopTasks: (() => void) | null = null;
 let stopProject: (() => void) | null = null;
@@ -133,47 +134,72 @@ const filteredTasks = computed(() => {
   return list;
 });
 
+// "Now First" 設計: アクション指向のサマリーカード
 const summaryCards = computed<SummaryCard[]>(() => {
   const total = tasks.value.length;
   const done = tasks.value.filter((task) => task.status === "done").length;
-  const progressPercent = total > 0 ? Math.round((done / total) * 100) : 0;
 
+  // 期限切れタスク
+  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
+
+  // 直近3日以内に期限が来るタスク
+  const now = Date.now();
+  const soonThreshold = 3 * 24 * 60 * 60 * 1000;
+  const dueSoon = tasks.value.filter((task) => {
+    if (!task.dueDate?.seconds || task.status === "done") return false;
+    const dueTime = task.dueDate.seconds * 1000;
+    return dueTime > now && dueTime - now <= soonThreshold;
+  }).length;
+
+  // 進行中タスク
   const inProgress = tasks.value.filter(
     (task) => task.status === "in-progress",
   ).length;
-  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
 
-  return [
-    {
-      id: "progress",
-      label: "進捗率",
-      value: progressPercent,
-      caption: `${done}/${total} タスク完了`,
-      icon: "chart",
-    },
-    {
-      id: "done",
-      label: "完了タスク",
-      value: String(done),
-      caption: `全${total}件中${done}件が完了`,
-      icon: "check",
-    },
-    {
-      id: "active",
-      label: "進行中",
-      value: String(inProgress),
-      caption: "現在作業中のタスク数",
-      icon: "activity",
-    },
-    {
+  const cards: SummaryCard[] = [];
+
+  // 期限切れがある場合は最優先で表示
+  if (overdue > 0) {
+    cards.push({
       id: "overdue",
       label: "期限切れ",
       value: String(overdue),
-      caption: "期限を超過したタスク",
-      tone: overdue > 0 ? "alert" : "neutral",
+      caption: "すぐに対応が必要",
+      tone: "alert",
       icon: "alert",
-    },
-  ];
+    });
+  }
+
+  // 直近期限タスク
+  cards.push({
+    id: "due-soon",
+    label: "直近の期限",
+    value: String(dueSoon),
+    caption: "3日以内に期限",
+    tone: dueSoon > 0 ? "alert" : "neutral",
+    icon: "activity",
+  });
+
+  // 進行中
+  cards.push({
+    id: "active",
+    label: "進行中",
+    value: String(inProgress),
+    caption: "現在作業中",
+    icon: "activity",
+  });
+
+  // 完了状況
+  cards.push({
+    id: "done",
+    label: "完了",
+    value: `${done}/${total}`,
+    caption: "タスク完了数",
+    tone: done === total && total > 0 ? "success" : "neutral",
+    icon: "check",
+  });
+
+  return cards;
 });
 
 function isTaskOverdue(task: TaskDoc) {
@@ -581,8 +607,7 @@ onBeforeUnmount(() => {
         </section>
         <NotificationBar :notifications="notificationsBar" />
 
-        <DashboardChartsSection :tasks="tasks" />
-
+        <!-- サマリーカード: Now First設計でアクション指向 -->
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
           :description="''"
@@ -590,6 +615,13 @@ onBeforeUnmount(() => {
           :rotate="false"
           :show-header="false"
         />
+
+        <!-- インサイト: デフォルトで折りたたみ（詳細は展開して確認） -->
+        <DashboardInsights
+          :tasks="tasks"
+          v-model:collapsed="insightsCollapsed"
+        />
+
         <div class="demo__grid">
           <section class="demo__primary">
             <DashboardTaskList
