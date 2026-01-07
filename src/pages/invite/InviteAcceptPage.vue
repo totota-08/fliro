@@ -972,6 +972,7 @@ async function handleJoin() {
 
 .text-link:focus {
   outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.2));
 }
 
 .verify-step {
