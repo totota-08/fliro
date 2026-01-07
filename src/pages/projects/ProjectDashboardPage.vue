@@ -676,7 +676,12 @@ onBeforeUnmount(() => {
       brand-subtitle="プロジェクト"
       @close="closeSidebar"
     />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="demo__overlay"
+      aria-hidden="true"
+      @click="closeSidebar"
+    />
 
     <div class="demo__main">
       <header class="demo__topbar">
@@ -1195,7 +1200,11 @@ onBeforeUnmount(() => {
 
     <transition name="task-drawer">
       <div v-if="selectedTask" class="task-drawer">
-        <div class="task-drawer__overlay" @click="selectedTask = null" />
+        <div
+          class="task-drawer__overlay"
+          aria-hidden="true"
+          @click="selectedTask = null"
+        />
         <aside class="task-drawer__panel">
           <header class="task-drawer__header">
             <div>
