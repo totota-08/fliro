@@ -458,14 +458,18 @@ function toggleCollapse() {
 .progress-chart__track {
   height: 14px;
   border-radius: 999px;
-  background: rgba(11, 46, 51, 0.08);
+  background: var(--ui-border-light);
   overflow: hidden;
 }
 
 .progress-chart__fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4f7c82, #0b2e33);
+  background: linear-gradient(
+    90deg,
+    var(--brand-600, #4f7c82),
+    var(--brand-900, #0b2e33)
+  );
   transition: width 0.3s ease;
 }
 
@@ -505,7 +509,7 @@ function toggleCollapse() {
 }
 
 .status-bars__track {
-  background: rgba(11, 46, 51, 0.07);
+  background: var(--ui-border-light);
   border-radius: 999px;
   overflow: hidden;
   height: 0.6rem;
@@ -518,19 +522,19 @@ function toggleCollapse() {
 }
 
 .status-bars__fill--todo {
-  background: rgba(11, 46, 51, 0.28);
+  background: var(--ui-border-strong);
 }
 
 .status-bars__fill--progress {
-  background: #4f7c82;
+  background: var(--brand-600, #4f7c82);
 }
 
 .status-bars__fill--review {
-  background: #f59e0b;
+  background: var(--warning, #f59e0b);
 }
 
 .status-bars__fill--done {
-  background: #16a34a;
+  background: var(--success, #16a34a);
 }
 
 /* Gauge Chart */
@@ -546,7 +550,7 @@ function toggleCollapse() {
 
 .gauge-chart__base {
   fill: none;
-  stroke: rgba(11, 46, 51, 0.08);
+  stroke: var(--ui-border-light);
   stroke-width: 20;
   stroke-linecap: round;
 }
@@ -560,20 +564,20 @@ function toggleCollapse() {
 
 .gauge-chart__value-path {
   fill: none;
-  stroke: #4f7c82;
+  stroke: var(--brand-600, #4f7c82);
   stroke-width: 20;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.4s ease;
 }
 
 .gauge-chart__needle {
-  fill: #000;
+  fill: var(--text, #0b2e33);
   transition: transform 0.35s ease;
 }
 
 .gauge-chart__needle-hub {
-  fill: #fff;
-  stroke: #0b2e33;
+  fill: var(--surface, #fff);
+  stroke: var(--brand-900, #0b2e33);
   stroke-width: 2;
 }
 
@@ -602,19 +606,19 @@ function toggleCollapse() {
 }
 
 .gauge-chart__legend-dot--danger {
-  background: #ef4444;
+  background: var(--danger, #ef4444);
 }
 
 .gauge-chart__legend-dot--warn {
-  background: #f97316;
+  background: var(--warn, #f97316);
 }
 
 .gauge-chart__legend-dot--caution {
-  background: #f59e0b;
+  background: var(--warning, #f59e0b);
 }
 
 .gauge-chart__legend-dot--good {
-  background: #16a34a;
+  background: var(--success, #16a34a);
 }
 
 /* Screen reader only */

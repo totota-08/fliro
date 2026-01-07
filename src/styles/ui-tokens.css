@@ -30,6 +30,8 @@
   --ui-success-light: #dcfce7;
   --ui-warning: #f59e0b;
   --ui-warning-light: #fef3c7;
+  --ui-warn: #f97316; /* Orange - 要対応レベル */
+  --ui-warn-light: #ffedd5;
   --ui-danger: #d64545;
   --ui-danger-light: #fee2e2;
   --ui-info: #0284c7;
