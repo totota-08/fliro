@@ -114,7 +114,6 @@ function selectCommand(cmd: string) {
     input.value = `${cmd} `;
   }
   showCommandSuggestions.value = false;
-  showCommandSuggestions.value = false;
   composerInput.value?.focus();
 }
 // UI state
