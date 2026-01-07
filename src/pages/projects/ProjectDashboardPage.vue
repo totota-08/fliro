@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import DashboardChartsSection from "@/components/projectDashboard/DashboardChartsSection.vue";
 import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
+import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
 import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
+import TaskCreateModal, {
+  type TaskFormData,
+} from "@/components/tasks/TaskCreateModal.vue";
+import TaskPreviewDrawer from "@/components/tasks/TaskPreviewDrawer.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
@@ -82,18 +88,6 @@ const filters = reactive({
 const showMyTasksOnly = ref(false);
 const isSidebarOpen = ref(true);
 const isTaskModalOpen = ref(false);
-const isDescriptionExpanded = ref(false);
-
-const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
-
-const taskForm = reactive({
-  title: "",
-  description: "",
-  dueDate: "",
-  assigneeId: "",
-  categoryId: "",
-  progress: 0,
-});
 
 let stopTasks: (() => void) | null = null;
 let stopProject: (() => void) | null = null;
@@ -182,120 +176,16 @@ const summaryCards = computed<SummaryCard[]>(() => {
   ];
 });
 
-const gaugeRadius = 80;
-const gaugeCircumference = Math.PI * gaugeRadius;
-
-const overallProgress = computed(() => {
-  const total = tasks.value.length;
-  if (!total) return 0;
-  const totalProgress = tasks.value.reduce((sum, task) => {
-    return sum + (task.progress ?? (task.status === "done" ? 100 : 0));
-  }, 0);
-  return Math.round(totalProgress / total);
-});
-
-const statusCounts = computed(() => {
-  const counts: Record<TaskStatus, number> = {
-    todo: 0,
-    "in-progress": 0,
-    review: 0,
-    done: 0,
-  };
-  tasks.value.forEach((task) => {
-    counts[task.status] = (counts[task.status] || 0) + 1;
-  });
-  return counts;
-});
-
-const maxStatusCount = computed(() => {
-  const values = Object.values(statusCounts.value);
-  return Math.max(1, ...values);
-});
-
-const healthScore = computed(() => {
-  const overdue = tasks.value.filter((task) => isTaskOverdue(task)).length;
-  const now = Date.now();
-  const soonThreshold = 3 * 24 * 60 * 60 * 1000;
-  const dueSoon = tasks.value.filter(
-    (task) =>
-      task.dueDate?.seconds &&
-      task.dueDate.seconds * 1000 - now <= soonThreshold &&
-      task.dueDate.seconds * 1000 > now,
-  ).length;
-  const progressPenalty = Math.max(0, 70 - overallProgress.value) * 0.4;
-  let score = 100;
-  score -= overdue * 12;
-  score -= dueSoon * 5;
-  score -= progressPenalty;
-  return Math.max(0, Math.min(100, Math.round(score)));
-});
-
-const healthColor = computed(() => {
-  if (healthScore.value >= 80) return "#16a34a";
-  if (healthScore.value >= 60) return "#f59e0b";
-  if (healthScore.value >= 40) return "#f97316";
-  return "#ef4444";
-});
-
-const gaugeDashoffset = computed(
-  () => gaugeCircumference * (1 - healthScore.value / 100),
-);
-const healthNeedleRotation = computed(
-  () => -90 + (healthScore.value / 100) * 180,
-);
-
-const gaugeSegments = [
-  { id: "danger", color: "#ef4444", size: 40 },
-  { id: "warn", color: "#f97316", size: 20 },
-  { id: "caution", color: "#f59e0b", size: 20 },
-  { id: "good", color: "#16a34a", size: 20 },
-];
-
-const gaugeSegmentStyles = computed(() => {
-  let offset = 0;
-  return gaugeSegments.map((segment) => {
-    const len = gaugeCircumference * (segment.size / 100);
-    const style = {
-      stroke: segment.color,
-      strokeDasharray: `${len} ${gaugeCircumference - len}`,
-      strokeDashoffset: `${-offset}`,
-    };
-    offset += len;
-    return style;
-  });
-});
-
-function formatDueDate(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return "未設定";
-  return new Date(task.dueDate.seconds * 1000).toLocaleDateString();
-}
-
 function isTaskOverdue(task: TaskDoc) {
   if (!task.dueDate?.seconds) return false;
   const due = task.dueDate.seconds * 1000;
   return due < Date.now() && task.status !== "done";
 }
 
-function taskStatusLabel(status: TaskStatus) {
-  if (status === "in-progress") return "進行中";
-  if (status === "review") return "レビュー";
-  if (status === "done") return "完了";
-  return "未着手";
-}
-
-function taskStatusClass(task: TaskDoc) {
-  const base = `task-row__status--${task.status}`;
-  return [base, { "is-overdue": isTaskOverdue(task) }];
-}
-
 function normalizeProgress(value: number | null | undefined) {
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
   const clamped = Math.min(100, Math.max(0, value));
   return Math.round(clamped / 25) * 25;
-}
-
-function taskProgress(task: TaskDoc) {
-  return normalizeProgress(task.progress ?? (task.status === "done" ? 100 : 0));
 }
 
 // const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
@@ -371,14 +261,6 @@ function dismissNotification(id: string) {
   next.add(id);
   dismissedNotificationIds.value = next;
   notifications.value = notifications.value.filter((entry) => entry.id !== id);
-}
-
-function resetFilters() {
-  filters.search = "";
-  filters.status = "all";
-  filters.assignee = "all";
-  filters.due = "all";
-  filters.category = "all";
 }
 
 watch(
@@ -478,18 +360,8 @@ function resetWatchers() {
   watchChat();
 }
 
-function resetTaskForm() {
-  taskForm.title = "";
-  taskForm.description = "";
-  taskForm.dueDate = "";
-  taskForm.assigneeId = "";
-  taskForm.categoryId = "";
-  taskForm.progress = 0;
-}
-
 function closeTaskModal() {
   isTaskModalOpen.value = false;
-  resetTaskForm();
 }
 
 function getMemberNameById(id?: string | null) {
@@ -498,24 +370,10 @@ function getMemberNameById(id?: string | null) {
   return member?.name || getDisplayName(id) || "";
 }
 
-function displayAssignee(task: TaskDoc) {
-  if (task.assigneeName) return task.assigneeName;
-  const memberName = getMemberNameById(task.assigneeId || "");
-  return memberName || task.assigneeId || "未割当";
-}
-
-function getCategoryName(categoryId?: string | null) {
-  if (!categoryId) return "未分類";
-  return (
-    categories.value.find((category) => category.id === categoryId)?.name ||
-    "未分類"
-  );
-}
-
-async function submitTaskForm() {
-  if (!user.value || !taskForm.title.trim()) return;
-  const assigneeId = taskForm.assigneeId || null;
-  const normalizedProgress = normalizeProgress(taskForm.progress);
+async function handleTaskSubmit(data: TaskFormData) {
+  if (!user.value || !data.title.trim()) return;
+  const assigneeId = data.assigneeId || null;
+  const normalizedProgress = normalizeProgress(data.progress);
 
   let initialStatus: TaskStatus = "todo";
   if (normalizedProgress === 100) initialStatus = "done";
@@ -524,10 +382,10 @@ async function submitTaskForm() {
   await createTask(
     projectId.value,
     {
-      title: taskForm.title.trim(),
-      description: taskForm.description.trim(),
-      dueDate: taskForm.dueDate ? new Date(taskForm.dueDate) : null,
-      categoryId: taskForm.categoryId || null,
+      title: data.title.trim(),
+      description: data.description.trim(),
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      categoryId: data.categoryId || null,
       assigneeId,
       assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
       progress: normalizedProgress,
@@ -629,16 +487,6 @@ function closeSidebar() {
   isSidebarOpen.value = false;
 }
 
-function formatStatus(status: TaskStatus) {
-  const map: Record<TaskStatus, string> = {
-    todo: "未着手",
-    "in-progress": "進行中",
-    review: "レビュー",
-    done: "完了",
-  };
-  return map[status] || status;
-}
-
 function toggleSidebar() {
   isSidebarOpen.value = !isSidebarOpen.value;
 }
@@ -733,170 +581,7 @@ onBeforeUnmount(() => {
         </section>
         <NotificationBar :notifications="notificationsBar" />
 
-        <section class="dashboard__charts">
-          <div class="chart-card chart-card--donut">
-            <header class="chart-card__header">
-              <p class="chart-card__eyebrow">全体の進捗</p>
-              <h3>プロジェクト進捗</h3>
-              <span class="chart-card__meta">{{ tasks.length }}件のタスク</span>
-            </header>
-            <span class="chart-card__metric">{{ overallProgress }}%</span>
-            <div class="progress-chart">
-              <div class="progress-chart__track">
-                <div
-                  class="progress-chart__fill"
-                  :style="{ width: `${overallProgress}%` }"
-                />
-              </div>
-              <div class="progress-chart__labels">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="chart-card chart-card--bars">
-            <header class="chart-card__header">
-              <p class="chart-card__eyebrow">タスクの状況</p>
-              <h3>ステータス別タスク数</h3>
-            </header>
-            <ul class="status-bars">
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>未着手</span>
-                  <strong>{{ statusCounts.todo }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--todo"
-                    :style="{
-                      width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>進行中</span>
-                  <strong>{{ statusCounts["in-progress"] }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--progress"
-                    :style="{
-                      width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>レビュー</span>
-                  <strong>{{ statusCounts.review }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--review"
-                    :style="{
-                      width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-              <li class="status-bars__row">
-                <div class="status-bars__label">
-                  <span>完了</span>
-                  <strong>{{ statusCounts.done }}</strong>
-                </div>
-                <div class="status-bars__track">
-                  <div
-                    class="status-bars__fill status-bars__fill--done"
-                    :style="{
-                      width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%`,
-                    }"
-                  />
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          <div class="chart-card chart-card--gauge">
-            <header class="chart-card__header">
-              <p class="chart-card__eyebrow">プロジェクトの危険度</p>
-              <h3>ヘルススコア</h3>
-              <span class="chart-card__meta">期限・進捗から算出</span>
-            </header>
-            <span class="chart-card__metric chart-card__metric--health"
-              >{{ healthScore }}%</span
-            >
-            <div class="gauge-chart">
-              <svg viewBox="0 0 200 120">
-                <path
-                  class="gauge-chart__base"
-                  d="M20 120 A80 80 0 0 1 180 120"
-                />
-                <path
-                  v-for="(segment, index) in gaugeSegments"
-                  :key="segment.id"
-                  class="gauge-chart__segment"
-                  d="M20 120 A80 80 0 0 1 180 120"
-                  :style="gaugeSegmentStyles[index]"
-                />
-                <path
-                  class="gauge-chart__value-path"
-                  d="M20 120 A80 80 0 0 1 180 120"
-                  :style="{
-                    strokeDasharray: `${gaugeCircumference}`,
-                    strokeDashoffset: `${gaugeDashoffset}`,
-                    stroke: healthColor,
-                  }"
-                />
-                <polygon
-                  class="gauge-chart__needle"
-                  points="100,28 96,120 104,120"
-                  :transform="`rotate(${healthNeedleRotation} 100 120)`"
-                />
-                <circle
-                  class="gauge-chart__needle-hub"
-                  cx="100"
-                  cy="120"
-                  r="6"
-                />
-              </svg>
-              <div class="gauge-chart__legend">
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--danger"
-                    aria-hidden="true"
-                  ></span>
-                  危険
-                </span>
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--warn"
-                    aria-hidden="true"
-                  ></span>
-                  要対応
-                </span>
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--caution"
-                    aria-hidden="true"
-                  ></span>
-                  注意
-                </span>
-                <span class="gauge-chart__legend-item">
-                  <span
-                    class="gauge-chart__legend-dot gauge-chart__legend-dot--good"
-                    aria-hidden="true"
-                  ></span>
-                  良好
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
+        <DashboardChartsSection :tasks="tasks" />
 
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
@@ -907,119 +592,14 @@ onBeforeUnmount(() => {
         />
         <div class="demo__grid">
           <section class="demo__primary">
-            <div class="task-list">
-              <div class="task-list__header">
-                <div class="task-list__header-left">
-                  <h3>タスク一覧</h3>
-                  <p>{{ filteredTasks.length }}件のタスク</p>
-                </div>
-                <div class="task-list__filters">
-                  <select v-model="filters.status" class="task-filter-select">
-                    <option value="all">全て</option>
-                    <option value="todo">未着手</option>
-                    <option value="in-progress">進行中</option>
-                    <option value="done">完了</option>
-                  </select>
-                  <select v-model="filters.assignee" class="task-filter-select">
-                    <option value="all">担当者</option>
-                    <option
-                      v-for="member in members"
-                      :key="member.id"
-                      :value="member.id"
-                    >
-                      {{ member.name }}
-                    </option>
-                  </select>
-                  <select v-model="filters.due" class="task-filter-select">
-                    <option value="all">期限</option>
-                    <option value="today">今日</option>
-                    <option value="week">今週</option>
-                    <option value="overdue">期限切れ</option>
-                  </select>
-                  <select v-model="filters.category" class="task-filter-select">
-                    <option value="all">カテゴリ</option>
-                    <option value="none">未分類</option>
-                    <option
-                      v-for="category in categories"
-                      :key="category.id"
-                      :value="category.id"
-                    >
-                      {{ category.name }}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    class="filter-reset-btn"
-                    @click="resetFilters"
-                    title="フィルターをリセット"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path
-                        d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
-                      ></path>
-                      <path d="M21 3v5h-5"></path>
-                      <path
-                        d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
-                      ></path>
-                      <path d="M3 21v-5h5"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <ul class="task-list__items">
-                <li
-                  v-for="task in filteredTasks"
-                  :key="task.id"
-                  class="task-row"
-                  :class="{ 'is-overdue': isTaskOverdue(task) }"
-                  @click="selectTaskById(task.id)"
-                  @dblclick="navigateToTaskDetail(task.id)"
-                >
-                  <div class="task-row__content">
-                    <p class="task-row__title">{{ task.title }}</p>
-                    <span class="task-row__category">{{
-                      getCategoryName(task.categoryId)
-                    }}</span>
-                    <span class="task-row__assignee">{{
-                      displayAssignee(task)
-                    }}</span>
-                    <span
-                      class="task-row__status"
-                      :class="taskStatusClass(task)"
-                    >
-                      {{ taskStatusLabel(task.status) }}
-                    </span>
-                    <div class="task-row__progress">
-                      <div class="task-row__progress-bar">
-                        <div
-                          class="task-row__progress-fill"
-                          :style="{ width: `${taskProgress(task)}%` }"
-                        />
-                      </div>
-                      <span class="task-row__progress-value"
-                        >{{ taskProgress(task) }}%</span
-                      >
-                    </div>
-                    <span
-                      class="task-row__due"
-                      :class="{ 'task-row__due--overdue': isTaskOverdue(task) }"
-                    >
-                      {{ formatDueDate(task) }}
-                    </span>
-                  </div>
-                </li>
-              </ul>
-            </div>
+            <DashboardTaskList
+              v-model="filters"
+              :tasks="filteredTasks"
+              :members="members"
+              :categories="categories"
+              @select="selectTaskById"
+              @navigate="navigateToTaskDetail"
+            />
           </section>
 
           <!-- Temporarily commented out
@@ -1108,193 +688,19 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="isTaskModalOpen" class="task-modal">
-      <div class="task-modal__card">
-        <header>
-          <h3>新規タスク</h3>
-          <button type="button" @click="closeTaskModal">×</button>
-        </header>
-        <form class="task-modal__form" @submit.prevent="submitTaskForm">
-          <label>
-            タイトル
-            <input
-              v-model="taskForm.title"
-              type="text"
-              placeholder="例）デザインレビュー"
-              required
-            />
-          </label>
-          <label>
-            説明
-            <textarea
-              v-model="taskForm.description"
-              rows="3"
-              placeholder="タスクの詳細を入力"
-            ></textarea>
-          </label>
-          <label>
-            期限
-            <input v-model="taskForm.dueDate" type="date" />
-          </label>
-          <label>
-            カテゴリ
-            <select v-model="taskForm.categoryId">
-              <option value="">カテゴリなし</option>
-              <option
-                v-for="category in categories"
-                :key="category.id"
-                :value="category.id"
-              >
-                {{ category.name }}
-              </option>
-            </select>
-          </label>
-          <label>
-            担当者
-            <select v-model="taskForm.assigneeId">
-              <option value="">未割当</option>
-              <option
-                v-for="member in members"
-                :key="member.id"
-                :value="member.id"
-              >
-                {{ member.name }}
-              </option>
-            </select>
-          </label>
-          <section class="task-modal__section">
-            <div class="task-modal__range-header">
-              <p class="label">進捗率</p>
-              <span class="hint">{{ taskForm.progress }}%</span>
-            </div>
-            <div class="progress-picker">
-              <button
-                v-for="option in PROGRESS_OPTIONS"
-                :key="`modal-progress-${option}`"
-                type="button"
-                :class="[
-                  'progress-pill',
-                  { 'is-active': taskForm.progress === option },
-                ]"
-                @click="taskForm.progress = option"
-              >
-                {{ option }}%
-              </button>
-            </div>
-          </section>
+    <TaskCreateModal
+      :open="isTaskModalOpen"
+      :categories="categories"
+      :members="members"
+      @close="closeTaskModal"
+      @submit="handleTaskSubmit"
+    />
 
-          <footer>
-            <button type="button" class="ghost" @click="closeTaskModal">
-              キャンセル
-            </button>
-            <button type="submit">作成</button>
-          </footer>
-        </form>
-      </div>
-    </div>
-
-    <transition name="task-drawer">
-      <div v-if="selectedTask" class="task-drawer">
-        <div class="task-drawer__overlay" @click="selectedTask = null" />
-        <aside class="task-drawer__panel">
-          <header class="task-drawer__header">
-            <div>
-              <p class="task-drawer__eyebrow">タスク概要</p>
-              <h3>
-                <router-link
-                  :to="{
-                    name: ROUTE_NAMES.projectTaskDetail,
-                    params: { projectId: projectId, taskId: selectedTask.id },
-                    query: { from: 'dashboard' },
-                  }"
-                  class="task-drawer__title-link"
-                >
-                  {{ selectedTask.title }} ↗
-                </router-link>
-              </h3>
-              <p class="task-drawer__helper">
-                詳細は別ページで確認・議論できます
-              </p>
-            </div>
-            <button
-              type="button"
-              class="drawer-close"
-              @click="selectedTask = null"
-            >
-              ×
-            </button>
-          </header>
-
-          <div class="drawer-content">
-            <section class="task-drawer__section">
-              <p class="label">ステータス</p>
-              <div class="readonly-value">
-                <span :class="['status-badge', selectedTask.status]">
-                  {{ formatStatus(selectedTask.status) }}
-                </span>
-                <span class="muted" style="margin-left: 8px"
-                  >{{ selectedTask.progress }}%</span
-                >
-              </div>
-            </section>
-
-            <section class="task-drawer__section">
-              <p class="label">担当者</p>
-              <div class="readonly-value">
-                {{ selectedTask.assigneeName || "未割当" }}
-              </div>
-            </section>
-
-            <section class="task-drawer__section">
-              <p class="label">期限</p>
-              <div class="readonly-value">
-                {{
-                  selectedTask.dueDate
-                    ? new Date(
-                        selectedTask.dueDate.seconds * 1000,
-                      ).toLocaleDateString()
-                    : "未設定"
-                }}
-              </div>
-            </section>
-
-            <section class="task-drawer__section">
-              <p class="label">説明</p>
-              <div
-                class="description-preview"
-                :class="{ 'is-expanded': isDescriptionExpanded }"
-              >
-                {{ selectedTask.description || "説明はありません" }}
-              </div>
-              <button
-                v-if="
-                  (selectedTask.description || '').split('\n').length > 5 ||
-                  (selectedTask.description || '').length > 200
-                "
-                type="button"
-                class="description-toggle"
-                @click="isDescriptionExpanded = !isDescriptionExpanded"
-              >
-                {{ isDescriptionExpanded ? "閉じる" : "もっと見る" }}
-              </button>
-            </section>
-          </div>
-
-          <footer class="task-drawer__sticky-footer">
-            <router-link
-              :to="{
-                name: ROUTE_NAMES.projectTaskDetail,
-                params: { projectId: projectId, taskId: selectedTask.id },
-                query: { from: 'dashboard' },
-              }"
-              class="cta-button"
-            >
-              詳細ページを開く →
-            </router-link>
-          </footer>
-        </aside>
-      </div>
-    </transition>
+    <TaskPreviewDrawer
+      :task="selectedTask"
+      :project-id="projectId"
+      @close="selectedTask = null"
+    />
   </div>
 </template>
 
@@ -1370,236 +776,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1, 0.25rem);
-}
-
-.dashboard__charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--ui-space-4, 1rem);
-  align-items: stretch;
-}
-
-.chart-card {
-  background: var(--ui-surface, #ffffff);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  box-shadow: var(--ui-shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-  position: relative;
-}
-
-.chart-card__header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-}
-
-.chart-card__header h3 {
-  margin: 0;
-  font-size: var(--ui-text-lg, 1.125rem);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.chart-card__eyebrow {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.chart-card__meta {
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.chart-card__metric {
-  position: absolute;
-  top: var(--ui-space-3, 0.75rem);
-  right: var(--ui-space-4, 1rem);
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  font-weight: var(--ui-font-bold, 700);
-  font-size: var(--ui-text-base, 1rem);
-  box-shadow: var(--ui-shadow-md);
-}
-
-.chart-card__metric--health {
-  background: var(--ui-brand-600, #4f7c82);
-}
-
-.progress-chart {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2, 0.5rem);
-  margin-top: var(--ui-space-1, 0.25rem);
-}
-
-.progress-chart__track {
-  height: 14px;
-  border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  overflow: hidden;
-}
-
-.progress-chart__fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    var(--ui-brand-600, #4f7c82),
-    var(--ui-brand-900, #0b2e33)
-  );
-  transition: width 0.3s ease;
-}
-
-.progress-chart__labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.status-bars {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.status-bars__row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-}
-
-.status-bars__label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.status-bars__label strong {
-  font-size: var(--ui-text-base, 1rem);
-}
-
-.status-bars__track {
-  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-full, 9999px);
-  overflow: hidden;
-  height: 0.6rem;
-}
-
-.status-bars__fill {
-  height: 100%;
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-.status-bars__fill--todo {
-  background: rgba(11, 46, 51, 0.28);
-}
-
-.status-bars__fill--progress {
-  background: var(--ui-brand-600, #4f7c82);
-}
-
-.status-bars__fill--review {
-  background: var(--ui-warning, #f59e0b);
-}
-
-.status-bars__fill--done {
-  background: var(--ui-success, #16a34a);
-}
-
-.gauge-chart {
-  position: relative;
-  padding: var(--ui-space-1, 0.25rem) 0.1rem;
-}
-
-.gauge-chart svg {
-  width: 100%;
-  height: 160px;
-}
-
-.gauge-chart__base {
-  fill: none;
-  stroke: var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  stroke-width: 20;
-  stroke-linecap: round;
-}
-
-.gauge-chart__segment {
-  fill: none;
-  stroke-width: 20;
-  stroke-linecap: butt;
-  opacity: 0.25;
-}
-
-.gauge-chart__value-path {
-  fill: none;
-  stroke: var(--ui-brand-600, #4f7c82);
-  stroke-width: 20;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.4s ease;
-}
-
-.gauge-chart__needle {
-  fill: var(--ui-text-strong, #0f172a);
-  transition: transform 0.35s ease;
-}
-
-.gauge-chart__needle-hub {
-  fill: var(--ui-surface, #ffffff);
-  stroke: var(--ui-brand-900, #0b2e33);
-  stroke-width: 2;
-}
-
-.gauge-chart__legend {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--ui-space-1, 0.25rem);
-  text-align: left;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-  margin-top: var(--ui-space-1, 0.25rem);
-}
-
-.gauge-chart__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  white-space: nowrap;
-}
-
-.gauge-chart__legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--ui-radius-full, 9999px);
-  display: inline-block;
-}
-
-.gauge-chart__legend-dot--danger {
-  background: var(--ui-danger, #ef4444);
-}
-
-.gauge-chart__legend-dot--warn {
-  background: #f97316;
-}
-
-.gauge-chart__legend-dot--caution {
-  background: var(--ui-warning, #f59e0b);
-}
-
-.gauge-chart__legend-dot--good {
-  background: var(--ui-success, #16a34a);
 }
 
 .dashboard__alert {

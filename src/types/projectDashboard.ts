@@ -21,6 +21,7 @@ export type DashboardNavItem = {
   icon: DashboardNavKey;
   disabled?: boolean;
   tooltip?: string;
+  requiredPermission?: string; // 表示に必要な権限キー
 };
 
 import type { ReactionSummary } from "@/services/projectChat";

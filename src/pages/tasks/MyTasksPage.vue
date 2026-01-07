@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import AppEmptyState from "@/components/ui/AppEmptyState.vue";
-import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -336,7 +335,12 @@ onMounted(() => {
       brand-subtitle="マイタスク"
       @close="closeSidebar"
     />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="demo__overlay"
+      aria-hidden="true"
+      @click="closeSidebar"
+    />
 
     <div class="demo__main">
       <header class="demo__topbar">
@@ -454,23 +458,25 @@ onMounted(() => {
 
             <div class="tasks-tabs__content" role="tabpanel">
               <!-- 状態メッセージ -->
-              <PageSkeleton v-if="loading" variant="default" />
+              <section v-if="loading" class="tasks-empty">
+                読み込み中...
+              </section>
               <AppEmptyState
                 v-else-if="errorMessage"
-                icon="error"
                 :title="errorMessage"
+                icon="error"
               />
               <AppEmptyState
                 v-else-if="activeTab === 'active' && !activeTasks.length"
-                icon="empty"
                 title="進行中のタスクはありません"
                 description="新しいタスクを作成するか、プロジェクトからタスクを確認してください。"
+                icon="empty"
               />
               <AppEmptyState
                 v-else-if="activeTab === 'completed' && !completedTasks.length"
-                icon="empty"
                 title="完了したタスクはまだありません"
                 description="タスクを完了すると、ここに表示されます。"
+                icon="empty"
               />
 
               <template v-else>
@@ -996,6 +1002,12 @@ onMounted(() => {
 .due-soon {
   color: var(--ui-warning, #f59e0b);
   font-weight: var(--ui-font-semibold, 600);
+}
+
+.tasks-empty {
+  text-align: center;
+  padding: var(--ui-space-8, 2rem) 0;
+  color: var(--ui-text-muted, #64748b);
 }
 
 @media (max-width: 1200px) {

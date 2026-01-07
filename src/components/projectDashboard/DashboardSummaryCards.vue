@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 export interface SummaryCard {
   id: string;
   label: string;
   value: number | string;
   caption: string;
-  tone?: "neutral" | "alert";
-  icon?: "chart" | "check" | "activity" | "alert";
+  tone?: "neutral" | "alert" | "success";
+  icon?: "chart" | "check" | "activity" | "alert" | "star";
+}
+
+export interface WeeklyScore {
+  completedTasks: number;
+  totalTasks: number;
+  progressDelta: number; // 先週比
+  streak: number; // 連続達成日数
 }
 
 const props = withDefaults(
@@ -18,14 +25,29 @@ const props = withDefaults(
     cards?: SummaryCard[];
     rotate?: boolean;
     showHeader?: boolean;
+    customizable?: boolean;
+    weeklyScore?: WeeklyScore | null;
   }>(),
   {
     title: "Webサイトリニューアル",
     description: "今週の状況をひと目で確認できます。",
     rotate: true,
     showHeader: true,
+    customizable: false,
+    weeklyScore: null,
   },
 );
+
+const emit = defineEmits<{
+  (e: "update:visibleCards", cardIds: string[]): void;
+  (e: "toggle-customize"): void;
+}>();
+
+const CARD_VISIBILITY_KEY = "fliro_summary_card_visibility";
+
+// カスタマイズモード
+const isCustomizing = ref(false);
+const visibleCardIds = ref<string[]>([]);
 
 const defaultCards: SummaryCard[] = [
   { id: "progress", label: "進捗率", value: 68, caption: "計画タスクの達成率" },
@@ -43,9 +65,39 @@ const defaultProgressValue = Number(
   defaultCards.find((card) => card.id === "progress")?.value ?? 0,
 );
 
-const cardList = computed<SummaryCard[]>(() =>
-  props.cards && props.cards.length ? props.cards : defaultCards,
-);
+// 週次スコアカードを生成
+const weeklyScoreCard = computed<SummaryCard | null>(() => {
+  if (!props.weeklyScore) return null;
+  const { completedTasks, progressDelta, streak } = props.weeklyScore;
+  const deltaPrefix = progressDelta >= 0 ? "+" : "";
+  return {
+    id: "weekly-score",
+    label: "週次スコア",
+    value: completedTasks,
+    caption: `${deltaPrefix}${progressDelta}% 先週比 • ${streak}日連続`,
+    tone: progressDelta >= 0 ? "success" : "neutral",
+    icon: "star",
+  };
+});
+
+// カードリストの生成（週次スコアカードを含む）
+const allCards = computed<SummaryCard[]>(() => {
+  const base = props.cards && props.cards.length ? props.cards : defaultCards;
+  if (weeklyScoreCard.value) {
+    return [weeklyScoreCard.value, ...base];
+  }
+  return base;
+});
+
+const cardList = computed<SummaryCard[]>(() => {
+  if (!props.customizable || visibleCardIds.value.length === 0) {
+    return allCards.value;
+  }
+  return allCards.value.filter((card) =>
+    visibleCardIds.value.includes(card.id),
+  );
+});
+
 const isDemo = computed(() => !props.cards || props.cards.length === 0);
 const activeCardIndex = ref(0);
 const progressValue = ref<number>(
@@ -55,7 +107,62 @@ let highlightTimer: number | undefined;
 let progressTimer: number | undefined;
 let progressDirection = 1;
 
+// カスタマイズ機能
+function loadVisibility() {
+  try {
+    const stored = localStorage.getItem(CARD_VISIBILITY_KEY);
+    if (stored) {
+      visibleCardIds.value = JSON.parse(stored);
+    } else {
+      visibleCardIds.value = allCards.value.map((c) => c.id);
+    }
+  } catch {
+    visibleCardIds.value = allCards.value.map((c) => c.id);
+  }
+}
+
+function saveVisibility() {
+  try {
+    localStorage.setItem(
+      CARD_VISIBILITY_KEY,
+      JSON.stringify(visibleCardIds.value),
+    );
+    emit("update:visibleCards", visibleCardIds.value);
+  } catch {
+    // ignore
+  }
+}
+
+function toggleCardVisibility(cardId: string) {
+  const index = visibleCardIds.value.indexOf(cardId);
+  if (index === -1) {
+    visibleCardIds.value.push(cardId);
+  } else if (visibleCardIds.value.length > 1) {
+    visibleCardIds.value.splice(index, 1);
+  }
+  saveVisibility();
+}
+
+function toggleCustomize() {
+  isCustomizing.value = !isCustomizing.value;
+  emit("toggle-customize");
+}
+
+watch(
+  () => allCards.value,
+  () => {
+    // カードが追加された場合、デフォルトで表示
+    const existingIds = new Set(visibleCardIds.value);
+    allCards.value.forEach((card) => {
+      if (!existingIds.has(card.id)) {
+        visibleCardIds.value.push(card.id);
+      }
+    });
+  },
+);
+
 onMounted(() => {
+  loadVisibility();
   if (props.rotate && isDemo.value) {
     highlightTimer = window.setInterval(() => {
       activeCardIndex.value =
@@ -92,10 +199,42 @@ onBeforeUnmount(() => {
         <h2>{{ props.title }}</h2>
         <p>{{ props.description }}</p>
       </div>
-      <small v-if="props.note" class="summary__note">
-        {{ props.note }}
-      </small>
+      <div class="summary__header-actions">
+        <button
+          v-if="props.customizable"
+          type="button"
+          class="summary__customize-btn"
+          @click="toggleCustomize"
+        >
+          {{ isCustomizing ? "完了" : "カスタマイズ" }}
+        </button>
+        <small v-if="props.note" class="summary__note">
+          {{ props.note }}
+        </small>
+      </div>
     </header>
+
+    <!-- カスタマイズモード -->
+    <div v-if="isCustomizing && props.customizable" class="summary__customize">
+      <p class="summary__customize-label">表示するカードを選択</p>
+      <div class="summary__customize-options">
+        <label
+          v-for="card in allCards"
+          :key="card.id"
+          class="summary__customize-option"
+        >
+          <input
+            type="checkbox"
+            :checked="visibleCardIds.includes(card.id)"
+            :disabled="
+              visibleCardIds.length === 1 && visibleCardIds.includes(card.id)
+            "
+            @change="toggleCardVisibility(card.id)"
+          />
+          {{ card.label }}
+        </label>
+      </div>
+    </div>
 
     <div class="summary__grid">
       <article
@@ -104,6 +243,7 @@ onBeforeUnmount(() => {
         class="summary-card"
         :class="{
           'is-alert': card.tone === 'alert',
+          'is-success': card.tone === 'success',
           'is-active': index === activeCardIndex,
         }"
       >
@@ -170,6 +310,22 @@ onBeforeUnmount(() => {
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <svg
+                v-else-if="card.icon === 'star'"
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                ></polygon>
               </svg>
             </div>
             <div>
@@ -238,6 +394,71 @@ onBeforeUnmount(() => {
   background: rgba(184, 227, 233, 0.35);
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
+}
+
+.summary__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.summary__customize-btn {
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.summary__customize-btn:hover {
+  background: rgba(79, 124, 130, 0.08);
+  border-color: var(--primary);
+}
+
+.summary__customize {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.summary__customize-label {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.summary__customize-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.summary__customize-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: border-color 150ms ease;
+}
+
+.summary__customize-option:hover {
+  border-color: var(--primary);
+}
+
+.summary__customize-option input {
+  width: 16px;
+  height: 16px;
 }
 
 .summary__grid {
@@ -320,6 +541,19 @@ onBeforeUnmount(() => {
 
 .summary-card.is-alert .summary-card__value {
   color: #0b2e33;
+}
+
+.summary-card.is-success {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: linear-gradient(135deg, #fff 0%, rgba(34, 197, 94, 0.05) 100%);
+}
+
+.summary-card.is-success .summary-card__value {
+  color: #166534;
+}
+
+.summary-card.is-success .summary-card__icon {
+  color: #22c55e;
 }
 
 .summary-card.is-active {
