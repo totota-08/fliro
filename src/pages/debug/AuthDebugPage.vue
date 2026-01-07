@@ -3,8 +3,11 @@ import UserAvatar from "@/components/common/UserAvatar.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { removeAccount, updateAccountAvatar } from "@/services/accountActions";
 import { signOutUser, useAuthStore } from "@/store/auth";
+import { getLogger } from "@logtape/logtape";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+
+const logger = getLogger("app.pages.debug.AuthDebug");
 
 const router = useRouter();
 const { user, profile } = useAuthStore();
@@ -36,7 +39,7 @@ const handleAvatarChange = async (event: Event) => {
     await updateAccountAvatar(file);
     avatarMessage.value = "アイコンを更新しました。";
   } catch (error) {
-    console.error(error);
+    logger.error`Avatar upload failed: ${error}`;
     avatarMessage.value = `アイコンのアップロードに失敗しました。${error}`;
   } finally {
     avatarUploading.value = false;
@@ -58,7 +61,7 @@ const handleDeleteAccount = async () => {
     await removeAccount();
     await router.push({ name: ROUTE_NAMES.login });
   } catch (error) {
-    console.error(error);
+    logger.error`Account deletion failed: ${error}`;
     deleteError.value = `アカウントを削除できませんでした。再ログイン後に再度お試しください。${error}`;
   } finally {
     deleteLoading.value = false;

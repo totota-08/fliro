@@ -6,6 +6,9 @@ import { fetchProject } from "@/firebase/projectService";
 import { ROUTE_NAMES } from "@/constants/routes";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.pages.debug.ProjectDebug");
 
 const route = useRoute();
 const projectId = String(route.params.projectId || "");
@@ -26,7 +29,7 @@ onMounted(async () => {
       errorMsg.value = "プロジェクトが見つかりません。";
     }
   } catch (e) {
-    console.error(e);
+    logger.error`Failed to fetch project: ${e}`;
     errorMsg.value = "プロジェクトの取得に失敗しました。";
   } finally {
     loading.value = false;
