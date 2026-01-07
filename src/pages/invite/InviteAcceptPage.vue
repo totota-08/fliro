@@ -304,7 +304,6 @@ async function loadInviteDetails() {
       tokenLength: token.length,
       authed: Boolean(user.value),
     })}`;
-    console.error("Failed to load invite", error);
     if (!user.value && isPermissionDenied(error)) {
       authRequired.value = true;
       errorMsg.value = "招待を受けるにはアカウントを作成してください。";
