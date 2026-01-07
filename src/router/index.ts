@@ -4,6 +4,9 @@ import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { getCurrentUser } from "@/lib/getCurrentUser";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.router");
 import HomePage from "@/pages/HomePage.vue";
 import MyPage from "@/pages/account/MyPage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
@@ -232,7 +235,7 @@ router.beforeEach(async (to) => {
   try {
     user = await getCurrentUser();
   } catch (error) {
-    console.error("Auth check failed", error);
+    logger.error`Auth check failed: ${error}`;
     return { name: ROUTE_NAMES.login };
   }
 
@@ -289,7 +292,7 @@ router.beforeEach(async (to) => {
           // MANAGE系の権限チェックはここで追加可能
         }
       } catch (error) {
-        console.error("Permission check failed", error);
+        logger.error`Permission check failed: ${error}`;
         return {
           name: ROUTE_NAMES.forbidden,
           query: {
