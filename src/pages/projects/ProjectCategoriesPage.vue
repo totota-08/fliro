@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ProjectPermission } from "@/constants/permissions";
@@ -145,11 +146,12 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </li>
-          <li
-            v-if="!categories.length"
-            class="category-item category-item--empty"
-          >
-            カテゴリがまだありません。
+          <li v-if="!categories.length" class="category-item--empty">
+            <AppEmptyState
+              title="カテゴリがまだありません"
+              description="新しいカテゴリを追加して、タスクを整理しましょう。"
+              icon="folder"
+            />
           </li>
         </ul>
       </section>
