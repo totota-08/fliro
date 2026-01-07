@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/**
+ * ProjectAppShell - プロジェクトコンテキスト用のアプリシェル
+ *
+ * 左サイドバー + メイン領域 + モバイルオーバーレイ
+ * UIトークンを使用した統一されたレイアウト
+ */
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import { useSidebarState } from "@/composables/useSidebarState";
 import type {
@@ -64,9 +70,9 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
           <button
             type="button"
             class="project-app-shell__menu-button"
+            aria-label="サイドバーを切り替え"
             @click="toggleSidebar"
           >
-            <span class="sr-only">サイドバーを切り替え</span>
             <svg
               aria-hidden="true"
               class="project-app-shell__menu-icon"
@@ -110,17 +116,18 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
 
 <style scoped>
 .project-app-shell {
-  --sidebar-width: 260px;
+  --shell-sidebar-width: var(--ui-sidebar-width, 260px);
+
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--shell-sidebar-width) minmax(0, 1fr);
   width: 100%;
   height: 100vh;
   gap: 0;
-  background: var(--surface-muted);
+  background: var(--ui-surface-muted, #f1f5f9);
 }
 
 .project-app-shell--sidebar-collapsed {
-  --sidebar-width: 0px;
+  --shell-sidebar-width: 0px;
 }
 
 @supports (height: 100dvh) {
@@ -136,8 +143,8 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
 .project-app-shell__main {
   display: flex;
   flex-direction: column;
-  background: var(--surface-elevated, #f5fcff);
-  border-left: 1px solid rgba(11, 46, 51, 0.08);
+  background: var(--ui-bg, #f5fcff);
+  border-left: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   height: 100vh;
   overflow-y: auto;
 }
@@ -151,14 +158,14 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
 .project-app-shell__topbar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--ui-z-sticky, 20);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  min-height: 4rem;
-  padding: 0 1.75rem;
-  border-bottom: 1px solid rgba(11, 46, 51, 0.08);
+  gap: var(--ui-space-6, 1.5rem);
+  min-height: var(--ui-topbar-height, 64px);
+  padding: 0 var(--ui-space-6, 1.5rem);
+  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   background: rgba(245, 252, 255, 0.95);
   backdrop-filter: blur(6px);
 }
@@ -166,7 +173,7 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
 .project-app-shell__topbar-left {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: var(--ui-space-5, 1.25rem);
 }
 
 .project-app-shell__menu-button {
@@ -175,22 +182,23 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(11, 46, 51, 0.12);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   background: transparent;
-  color: var(--primary-strong);
+  color: var(--ui-brand-900, #0b2e33);
   cursor: pointer;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: var(--ui-transition-all);
 }
 
 .project-app-shell__menu-button:hover {
-  background: rgba(184, 227, 233, 0.2);
-  border-color: rgba(11, 46, 51, 0.18);
-  box-shadow: 0 8px 18px rgba(11, 46, 51, 0.12);
+  background: var(--ui-brand-100, #e5f6f8);
+  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
+  box-shadow: var(--ui-shadow-md);
+}
+
+.project-app-shell__menu-button:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
 }
 
 .project-app-shell__menu-icon {
@@ -200,18 +208,19 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
 
 .project-app-shell__actions {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
 }
 
 .project-app-shell__body {
   flex: 1;
   min-height: 0;
+  padding: var(--ui-space-6, 1.5rem);
 }
 
 .project-app-shell__body--split {
   display: grid;
-  gap: 1.75rem;
+  gap: var(--ui-space-6, 1.5rem);
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
   align-items: start;
 }
@@ -222,36 +231,28 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
 
 .project-app-shell__body-panel {
   min-width: 0;
+  position: sticky;
+  top: calc(var(--ui-topbar-height, 64px) + var(--ui-space-6, 1.5rem));
 }
 
+/* Header Title Styles */
 :deep(.project-app-shell__breadcrumb) {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 :deep(.project-app-shell__heading) {
-  margin: 0.35rem 0 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-strong);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-xl, 1.25rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
+/* Responsive */
 @media (max-width: 1200px) {
   .project-app-shell {
-    --sidebar-width: 0px;
+    --shell-sidebar-width: 0px;
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -259,9 +260,9 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(11, 46, 51, 0.45);
+    background: var(--ui-surface-overlay, rgba(0, 0, 0, 0.35));
     backdrop-filter: blur(2px);
-    z-index: 30;
+    z-index: var(--ui-z-sidebar, 30);
   }
 
   .project-app-shell__menu-button {
@@ -269,11 +270,25 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
   }
 
   .project-app-shell__topbar {
-    gap: 1rem;
+    gap: var(--ui-space-4, 1rem);
+  }
+
+  .project-app-shell__body {
+    padding: var(--ui-space-4, 1rem);
   }
 
   .project-app-shell__body--split {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-app-shell__body-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .project-app-shell__body {
+    padding: var(--ui-space-3, 0.75rem);
   }
 }
 </style>
