@@ -5,7 +5,7 @@ import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
 import { ProjectPermission } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectAccess } from "@/composables/useProjectAccess";
@@ -60,7 +60,9 @@ const form = ref({
   allowGuestView: false,
 });
 
-const navItems = computed(() => buildProjectNavItems(projectId.value));
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(projectId.value, can),
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
