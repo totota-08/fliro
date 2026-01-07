@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { TaskDoc, TaskStatus } from "@/services/taskService";
+import TaskStatusBadge from "@/components/ui/TaskStatusBadge.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
+import type { TaskDoc } from "@/services/taskService";
 import { ref } from "vue";
 
 const props = defineProps<{
@@ -13,16 +14,6 @@ const emit = defineEmits<{
 }>();
 
 const isDescriptionExpanded = ref(false);
-
-function formatStatus(status: TaskStatus) {
-  const map: Record<TaskStatus, string> = {
-    todo: "未着手",
-    "in-progress": "進行中",
-    review: "レビュー",
-    done: "完了",
-  };
-  return map[status] || status;
-}
 
 function formatDueDate(task: TaskDoc) {
   if (!task.dueDate?.seconds) return "未設定";
@@ -67,9 +58,7 @@ function formatDueDate(task: TaskDoc) {
           <section class="task-drawer__section">
             <p class="label">ステータス</p>
             <div class="readonly-value">
-              <span :class="['status-badge', task.status]">
-                {{ formatStatus(task.status) }}
-              </span>
+              <TaskStatusBadge :status="task.status" />
               <span class="muted" style="margin-left: 8px"
                 >{{ task.progress }}%</span
               >
@@ -257,35 +246,6 @@ function formatDueDate(task: TaskDoc) {
   font-size: var(--ui-text-base, 1rem);
   display: flex;
   align-items: center;
-}
-
-.status-badge {
-  display: inline-flex;
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text, #0b2e33);
-}
-
-.status-badge.todo {
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.status-badge.in-progress {
-  background: var(--ui-brand-100, #e5f6f8);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.status-badge.review {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-badge.done {
-  background: #dcfce7;
-  color: #166534;
 }
 
 .muted {
