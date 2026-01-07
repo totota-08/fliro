@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import TaskForm from "@/components/tasks/TaskForm.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { db } from "@/lib/firebase";
 import { fetchProject } from "@/firebase/projectService";
+import {
+  listenProjectMembers,
+  type ProjectMember,
+} from "@/services/projectMembers";
 import {
   listenTaskDiscussion,
   sendTaskDiscussionMessage,
@@ -13,28 +17,22 @@ import {
   updateTask,
   type TaskDoc,
   type TaskStatus,
+  type CreateTaskPayload,
 } from "@/services/taskService";
 import {
   listenTaskCategories,
   type TaskCategory,
 } from "@/services/taskCategoryService";
-import type { ProjectMember } from "@/services/projectMembers";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
-import { collection, onSnapshot } from "firebase/firestore";
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectTaskDetailPage");
 const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
-
-type MemberEntry = ProjectMember & {
-  id: string;
-  name: string;
-};
 
 const projectId = ref(String(route.params.projectId));
 const taskId = ref(String(route.params.taskId));
@@ -45,33 +43,26 @@ const input = ref("");
 const sending = ref(false);
 const messageLimit = ref(20);
 const categories = ref<TaskCategory[]>([]);
-const members = ref<MemberEntry[]>([]);
-
-// 編集モーダル
+const members = ref<ProjectMember[]>([]);
 const isEditModalOpen = ref(false);
-const isUpdating = ref(false);
-const editForm = reactive({
-  title: "",
-  description: "",
-  status: "todo" as TaskStatus,
-  dueDate: "",
-  assigneeId: "",
-  categoryId: "",
-  progress: 0,
-});
-
-const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
-const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
-  { value: "todo", label: "未着手" },
-  { value: "in-progress", label: "進行中" },
-  { value: "review", label: "レビュー" },
-  { value: "done", label: "完了" },
-];
+const isSubmitting = ref(false);
 
 let stopTask: (() => void) | null = null;
 let stopDiscussion: (() => void) | null = null;
 let stopCategories: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
+
+// Computed for TaskForm
+const formCategories = computed(() =>
+  categories.value.map((c) => ({ id: c.id, name: c.name })),
+);
+
+const formMembers = computed(() =>
+  members.value.map((m) => ({
+    id: m.userId,
+    name: m.displayName || m.nickname || m.fullName || m.userId,
+  })),
+);
 
 // Derived State
 const decisions = computed(() =>
@@ -172,23 +163,7 @@ function showMoreMessages() {
   messageLimit.value += 20;
 }
 
-function isDecideCommand(text: string | undefined) {
-  if (!text) return false;
-  return text.trim().startsWith("/decide");
-}
-
-// 編集モーダル
 function openEditModal() {
-  if (!task.value) return;
-  editForm.title = task.value.title;
-  editForm.description = task.value.description || "";
-  editForm.status = task.value.status;
-  editForm.dueDate = task.value.dueDate
-    ? new Date(task.value.dueDate.seconds * 1000).toISOString().split("T")[0]
-    : "";
-  editForm.assigneeId = task.value.assigneeId || "";
-  editForm.categoryId = task.value.categoryId || "";
-  editForm.progress = task.value.progress ?? 0;
   isEditModalOpen.value = true;
 }
 
@@ -196,50 +171,27 @@ function closeEditModal() {
   isEditModalOpen.value = false;
 }
 
-function getMemberNameById(id?: string | null) {
-  if (!id) return null;
-  const member = members.value.find((m) => m.id === id);
-  return member?.name || null;
+async function handleEditSubmit(payload: CreateTaskPayload) {
+  if (!user.value || !task.value) return;
+
+  isSubmitting.value = true;
+  try {
+    await updateTask(projectId.value, taskId.value, payload, {
+      userId: user.value.uid,
+      actorName: profile.value?.nickname || profile.value?.fullName || "User",
+      origin: "ui",
+    });
+    closeEditModal();
+  } catch (e) {
+    logger.error`Failed to update task: ${e}`;
+  } finally {
+    isSubmitting.value = false;
+  }
 }
 
-async function submitEditForm() {
-  if (!task.value || !user.value || !editForm.title.trim()) return;
-  if (isUpdating.value) return;
-
-  isUpdating.value = true;
-  try {
-    const assigneeId = editForm.assigneeId || null;
-    const assigneeName = assigneeId ? getMemberNameById(assigneeId) : null;
-
-    await updateTask(
-      projectId.value,
-      taskId.value,
-      {
-        title: editForm.title.trim(),
-        description: editForm.description.trim(),
-        status: editForm.status,
-        dueDate: editForm.dueDate ? new Date(editForm.dueDate) : null,
-        assigneeId,
-        assigneeName,
-        categoryId: editForm.categoryId || null,
-        progress: editForm.progress,
-      },
-      {
-        userId: user.value.uid,
-        actorName:
-          profile.value?.nickname || profile.value?.fullName || user.value.uid,
-        origin: "ui",
-      },
-    );
-    closeEditModal();
-  } catch (error) {
-    logger.error`Failed to update task: ${error}`;
-    alert(
-      error instanceof Error ? error.message : "タスクの更新に失敗しました",
-    );
-  } finally {
-    isUpdating.value = false;
-  }
+function isDecideCommand(text: string | undefined) {
+  if (!text) return false;
+  return text.trim().startsWith("/decide");
 }
 
 // Lifecycle
@@ -262,28 +214,9 @@ onMounted(async () => {
     categories.value = list;
   });
 
-  // メンバー監視
-  stopMembers = onSnapshot(
-    collection(db, "projects", projectId.value, "members"),
-    (snapshot) => {
-      members.value = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        const memberId = data.userId || docSnap.id;
-        return {
-          id: memberId,
-          name: data.nickname || data.fullName || memberId,
-          userId: memberId,
-          role: (data.role as ProjectMember["role"]) || "member",
-          projectRole:
-            (data.projectRole as ProjectMember["projectRole"]) || "member",
-          nickname: data.nickname,
-          fullName: data.fullName,
-          displayName: data.nickname || data.fullName || memberId,
-          email: data.email,
-        };
-      });
-    },
-  );
+  stopMembers = listenProjectMembers(projectId.value, (list) => {
+    members.value = list;
+  });
 });
 
 onBeforeUnmount(() => {
@@ -306,6 +239,9 @@ onBeforeUnmount(() => {
             <span class="status-badge" :class="task.status">{{
               formatStatus(task.status)
             }}</span>
+            <button class="edit-button" type="button" @click="openEditModal">
+              編集
+            </button>
           </div>
           <div class="meta-row meta-row-mobile">
             <div class="meta-item">
@@ -473,17 +409,7 @@ onBeforeUnmount(() => {
           <aside class="sidebar">
             <div class="sidebar-inner">
               <section class="section summary-card">
-                <div class="summary-header">
-                  <h2 class="section-title">サマリー</h2>
-                  <button
-                    v-if="task"
-                    type="button"
-                    class="edit-button"
-                    @click="openEditModal"
-                  >
-                    編集
-                  </button>
-                </div>
+                <h2 class="section-title">サマリー</h2>
                 <div v-if="task" class="summary-grid">
                   <div class="summary-item">
                     <span class="label">ステータス</span>
@@ -504,10 +430,6 @@ onBeforeUnmount(() => {
                     <span class="summary-value">{{
                       formatDate(task.dueDate) || "期限なし"
                     }}</span>
-                  </div>
-                  <div class="summary-item">
-                    <span class="label">進捗</span>
-                    <span class="summary-value">{{ task.progress || 0 }}%</span>
                   </div>
                 </div>
                 <p v-else class="empty-text">タスク詳細を読み込み中...</p>
@@ -546,142 +468,21 @@ onBeforeUnmount(() => {
       </main>
     </div>
 
-    <!-- 編集モーダル -->
+    <!-- Edit Modal -->
     <Teleport to="body">
       <div
         v-if="isEditModalOpen"
-        class="edit-modal-overlay"
+        class="modal-overlay"
         @click.self="closeEditModal"
       >
-        <div
-          class="edit-modal"
-          role="dialog"
-          aria-labelledby="edit-modal-title"
-        >
-          <header class="edit-modal__header">
-            <h3 id="edit-modal-title">タスクを編集</h3>
-            <button
-              type="button"
-              class="edit-modal__close"
-              aria-label="閉じる"
-              @click="closeEditModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <form class="edit-modal__body" @submit.prevent="submitEditForm">
-            <div class="edit-form__field">
-              <label class="edit-form__label">
-                タイトル <span class="required">*</span>
-              </label>
-              <input
-                v-model="editForm.title"
-                type="text"
-                class="edit-form__input"
-                required
-              />
-            </div>
-
-            <div class="edit-form__field">
-              <label class="edit-form__label">説明</label>
-              <textarea
-                v-model="editForm.description"
-                class="edit-form__textarea"
-                rows="3"
-              />
-            </div>
-
-            <div class="edit-form__row">
-              <div class="edit-form__field">
-                <label class="edit-form__label">ステータス</label>
-                <select v-model="editForm.status" class="edit-form__select">
-                  <option
-                    v-for="option in STATUS_OPTIONS"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
-              </div>
-
-              <div class="edit-form__field">
-                <label class="edit-form__label">期限</label>
-                <input
-                  v-model="editForm.dueDate"
-                  type="date"
-                  class="edit-form__input"
-                />
-              </div>
-            </div>
-
-            <div class="edit-form__row">
-              <div class="edit-form__field">
-                <label class="edit-form__label">担当者</label>
-                <select v-model="editForm.assigneeId" class="edit-form__select">
-                  <option value="">未割当</option>
-                  <option
-                    v-for="member in members"
-                    :key="member.id"
-                    :value="member.id"
-                  >
-                    {{ member.name }}
-                  </option>
-                </select>
-              </div>
-
-              <div class="edit-form__field">
-                <label class="edit-form__label">カテゴリ</label>
-                <select v-model="editForm.categoryId" class="edit-form__select">
-                  <option value="">カテゴリなし</option>
-                  <option
-                    v-for="category in categories"
-                    :key="category.id"
-                    :value="category.id"
-                  >
-                    {{ category.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <div class="edit-form__field">
-              <label class="edit-form__label">進捗率</label>
-              <div class="progress-picker">
-                <button
-                  v-for="option in PROGRESS_OPTIONS"
-                  :key="`progress-${option}`"
-                  type="button"
-                  :class="[
-                    'progress-pill',
-                    { 'is-active': editForm.progress === option },
-                  ]"
-                  @click="editForm.progress = option"
-                >
-                  {{ option }}%
-                </button>
-              </div>
-            </div>
-
-            <footer class="edit-modal__footer">
-              <button
-                type="button"
-                class="edit-modal__btn edit-modal__btn--ghost"
-                @click="closeEditModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="edit-modal__btn edit-modal__btn--primary"
-                :disabled="!editForm.title.trim() || isUpdating"
-              >
-                {{ isUpdating ? "保存中..." : "保存" }}
-              </button>
-            </footer>
-          </form>
-        </div>
+        <TaskForm
+          :task="task"
+          :categories="formCategories"
+          :members="formMembers"
+          :submitting="isSubmitting"
+          @submit="handleEditSubmit"
+          @cancel="closeEditModal"
+        />
       </div>
     </Teleport>
   </div>
@@ -1251,214 +1052,53 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 1px #e2e8f0;
 }
 
-/* Summary Header */
-.summary-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.summary-header .section-title {
-  margin: 0;
-}
-
+/* Edit Button */
 .edit-button {
-  padding: 6px 14px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #4f7c82;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: var(--ui-radius-full, 9999px);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-brand-500, #4f7c82);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--ui-transition-colors, all 0.15s ease);
 }
 
 .edit-button:hover {
-  background: #f0fdfa;
-  border-color: #0d9488;
-  color: #0d9488;
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-color: var(--ui-brand-500, #4f7c82);
 }
 
-/* Edit Modal */
-.edit-modal-overlay {
+.edit-button:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.2));
+}
+
+/* Modal Overlay */
+.modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 1rem;
-  z-index: 100;
-}
-
-.edit-modal {
-  background: #fff;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
-}
-
-.edit-modal__header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
+  z-index: 1000;
+  padding: var(--ui-space-4, 1rem);
 }
 
-.edit-modal__header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.edit-modal__close {
-  background: transparent;
-  border: none;
-  font-size: 24px;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.edit-modal__close:hover {
-  color: #64748b;
-}
-
-.edit-modal__body {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.edit-form__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.edit-form__row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-@media (max-width: 480px) {
-  .edit-form__row {
-    grid-template-columns: 1fr;
+@media (prefers-reduced-motion: no-preference) {
+  .modal-overlay {
+    animation: fadeIn 0.15s ease-out;
   }
 }
 
-.edit-form__label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.required {
-  color: #ef4444;
-}
-
-.edit-form__input,
-.edit-form__textarea,
-.edit-form__select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  background: #fff;
-  transition: border-color 0.15s ease;
-}
-
-.edit-form__input:focus,
-.edit-form__textarea:focus,
-.edit-form__select:focus {
-  outline: none;
-  border-color: #0d9488;
-}
-
-.edit-form__textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-.progress-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.progress-pill {
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
-  padding: 6px 14px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-  transition: all 0.15s ease;
-}
-
-.progress-pill:hover {
-  border-color: #0d9488;
-  color: #0d9488;
-}
-
-.progress-pill.is-active {
-  background: #0d9488;
-  color: #fff;
-  border-color: #0d9488;
-}
-
-.edit-modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.edit-modal__btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.edit-modal__btn--ghost {
-  background: transparent;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-}
-
-.edit-modal__btn--ghost:hover {
-  background: #f8fafc;
-}
-
-.edit-modal__btn--primary {
-  background: #0d9488;
-  border: none;
-  color: #fff;
-}
-
-.edit-modal__btn--primary:hover:not(:disabled) {
-  background: #0f766e;
-}
-
-.edit-modal__btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 </style>
