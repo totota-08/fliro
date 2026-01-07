@@ -26,7 +26,12 @@ onMounted(() => {
 <template>
   <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
     <DashboardSidebar :open="isSidebarOpen" @close="closeSidebar" />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+    <div
+      v-if="isSidebarOpen"
+      class="demo__overlay"
+      aria-hidden="true"
+      @click="closeSidebar"
+    />
 
     <div class="demo__main">
       <header class="demo__topbar">
