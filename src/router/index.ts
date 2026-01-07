@@ -1,6 +1,9 @@
 import ForbiddenPage from "@/components/errorPage/403.vue";
 import NotFoundPage from "@/components/errorPage/404.vue";
-import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
+import {
+  ROLE_DEFAULT_PERMISSIONS,
+  ROUTE_REQUIRED_PERMISSIONS,
+} from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { getCurrentUser } from "@/lib/getCurrentUser";
@@ -287,9 +290,20 @@ router.beforeEach(async (to) => {
 
         // owner/adminは全権限を持つ
         if (!access.isOwner && !access.isAdmin) {
-          // TODO: 細かい権限チェックは将来的に実装
-          // 現時点ではmember/viewerも基本的なVIEW系は許可
-          // MANAGE系の権限チェックはここで追加可能
+          // ロールベースの権限チェック
+          const rolePermissions = ROLE_DEFAULT_PERMISSIONS[access.role] || [];
+          const hasPermission = rolePermissions.includes(requiredPermission);
+
+          if (!hasPermission) {
+            logger.warn`Permission denied: ${access.role} does not have ${requiredPermission}`;
+            return {
+              name: ROUTE_NAMES.forbidden,
+              query: {
+                projectId,
+                reason: "このページにアクセスする権限がありません。",
+              },
+            };
+          }
         }
       } catch (error) {
         logger.error`Permission check failed: ${error}`;
