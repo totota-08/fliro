@@ -23,7 +23,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@firebase/rules-unit-testing": "^5.0.0",
-    "@types/node": "^24.6.0",
+    "@types/node": "^25.0.3",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
     "@vitejs/plugin-vue": "^6.0.1",
