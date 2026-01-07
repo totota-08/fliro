@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -460,21 +461,23 @@ onMounted(() => {
               <section v-if="loading" class="tasks-empty">
                 読み込み中...
               </section>
-              <section v-else-if="errorMessage" class="tasks-empty">
-                {{ errorMessage }}
-              </section>
-              <section
+              <AppEmptyState
+                v-else-if="errorMessage"
+                :title="errorMessage"
+                icon="error"
+              />
+              <AppEmptyState
                 v-else-if="activeTab === 'active' && !activeTasks.length"
-                class="tasks-empty"
-              >
-                進行中のタスクはありません。
-              </section>
-              <section
+                title="進行中のタスクはありません"
+                description="新しいタスクを作成するか、プロジェクトからタスクを確認してください。"
+                icon="empty"
+              />
+              <AppEmptyState
                 v-else-if="activeTab === 'completed' && !completedTasks.length"
-                class="tasks-empty"
-              >
-                完了したタスクはまだありません。
-              </section>
+                title="完了したタスクはまだありません"
+                description="タスクを完了すると、ここに表示されます。"
+                icon="empty"
+              />
 
               <template v-else>
                 <!-- 進行中タブ -->

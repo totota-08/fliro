@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import { appName } from "@/constants/appMeta";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
@@ -10,7 +11,7 @@ import type {
   DashboardProjectItem,
 } from "@/types/projectDashboard";
 import { collection, getDocs } from "firebase/firestore";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useRoute } from "vue-router";
 
 const props = withDefaults(
@@ -32,7 +33,12 @@ const { user, profile } = useAuthStore();
 const route = useRoute();
 const projectList = ref<DashboardProjectItem[]>([]);
 
-const navItems = computed(() => buildProjectNavItems(props.projectId));
+// 権限フィルタリング付きナビゲーション
+const projectIdRef = toRef(props, "projectId");
+const { can } = useProjectAccess(projectIdRef);
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(props.projectId, can),
+);
 
 const sidebarProjects = computed(() => projectList.value);
 

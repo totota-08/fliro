@@ -5,7 +5,8 @@ import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import { appName } from "@/constants/appMeta";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
@@ -61,7 +62,11 @@ let stopMembers: (() => void) | null = null;
 let stopInvites: (() => void) | null = null;
 let actionTimer: ReturnType<typeof setTimeout> | null = null;
 
-const navItems = computed(() => buildProjectNavItems(projectId.value));
+// 権限フィルタリング付きナビゲーション
+const { can } = useProjectAccess(projectId);
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(projectId.value, can),
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
