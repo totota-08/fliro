@@ -23,6 +23,7 @@ export const ROUTE_NAMES = {
   myTasks: "my-tasks",
   secretAccess: "secret-access",
   secretChat: "secret-chat",
+  forbidden: "forbidden",
   notFound: "not-found",
   demoDashboard: "demo.dashboard",
 } as const;
