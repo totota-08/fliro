@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import AppBadge from "@/components/ui/AppBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
@@ -244,7 +245,7 @@ onBeforeUnmount(() => {
         title="今週のタスク状況"
         subtitle="期限が近いタスクをチェックして、優先順位を整えましょう。"
       >
-        <div v-if="loading" class="loading-state">読み込み中...</div>
+        <PageSkeleton v-if="loading" variant="default" />
         <AppEmptyState
           v-else-if="!taskList.length"
           icon="empty"
@@ -401,12 +402,6 @@ onBeforeUnmount(() => {
 }
 
 /* Tasks */
-.loading-state {
-  text-align: center;
-  padding: var(--ui-space-8, 2rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
 .task-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
