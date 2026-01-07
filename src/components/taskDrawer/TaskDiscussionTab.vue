@@ -145,20 +145,20 @@ onBeforeUnmount(() => {
 
 .empty-state {
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   padding: 20px;
   font-size: 14px;
 }
 
 .msg {
-  border: 1px solid rgba(11, 46, 51, 0.1);
+  border: 1px solid var(--border-light);
   border-radius: 16px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface);
 }
 
 .msg.decision {
-  background: rgba(22, 163, 74, 0.08); /* Green tint for decision */
+  background: var(--color-success-bg);
   border-color: rgba(22, 163, 74, 0.2);
 }
 
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: #64748b; /* --muted */
+  color: var(--text-muted);
   font-weight: 750;
   font-size: 12px;
   margin-bottom: 6px;
@@ -174,20 +174,20 @@ onBeforeUnmount(() => {
 
 .sender {
   font-weight: 800;
-  color: #0f172a; /* --text */
+  color: var(--text-strong);
 }
 
 .text {
   line-height: 1.55;
   white-space: pre-wrap;
-  color: #334155;
+  color: var(--text);
   font-size: 14px;
 }
 
 .composer {
   display: flex;
   gap: 10px;
-  border-top: 1px solid rgba(11, 46, 51, 0.12); /* --line */
+  border-top: 1px solid var(--border);
   padding-top: 12px;
   align-items: flex-start;
   margin-top: auto;
@@ -202,22 +202,22 @@ onBeforeUnmount(() => {
 
 input {
   width: 100%;
-  border: 1px solid rgba(11, 46, 51, 0.12);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 12px 12px;
   outline: none;
   font-size: 14px;
-  background: white;
+  background: var(--surface);
   transition: border-color 0.2s;
 }
 
 input:focus {
-  border-color: #0b2e33; /* --brand */
+  border-color: var(--brand);
 }
 
 .hint {
   margin: 0;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -228,10 +228,10 @@ input:focus {
   border-radius: 14px;
   padding: 12px 14px;
   font-weight: 900;
-  background: #0b2e33; /* --brand */
-  color: #fff;
+  background: var(--brand);
+  color: var(--text-inverse);
   transition: opacity 0.2s;
-  height: 44px; /* Align with input height approx */
+  height: 44px;
 }
 
 .send-btn:disabled {

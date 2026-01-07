@@ -389,7 +389,7 @@ const gaugeSegmentStyles = computed(() => {
 }
 
 .status-bars__fill--todo {
-  background: rgba(11, 46, 51, 0.28);
+  background: var(--ui-border-strong);
 }
 
 .status-bars__fill--progress {
@@ -476,7 +476,7 @@ const gaugeSegmentStyles = computed(() => {
 }
 
 .gauge-chart__legend-dot--warn {
-  background: #f97316;
+  background: var(--ui-warn, #f97316);
 }
 
 .gauge-chart__legend-dot--caution {
