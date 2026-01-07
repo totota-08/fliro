@@ -16,7 +16,7 @@ const logger = getLogger("app.services.projectMembers");
 
 export interface ProjectMember {
   userId: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: "owner" | "admin" | "manager" | "pm" | "member" | "viewer" | "observer";
   projectRole: "owner" | "member";
   roles?: string[];
   nickname?: string;
