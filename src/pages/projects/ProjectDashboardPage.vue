@@ -133,9 +133,6 @@ const filteredTasks = computed(() => {
       (task) => (task.categoryId || "none") === filters.category,
     );
   }
-  if (showMyTasksOnly.value && user.value) {
-    list = list.filter((task) => task.assigneeId === user.value?.uid);
-  }
   if (taskView.value === "mine" && user.value) {
     list = list.filter((task) => task.assigneeId === user.value?.uid);
   }
