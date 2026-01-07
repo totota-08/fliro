@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import AppBadge from "@/components/ui/AppBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import SectionCard from "@/components/ui/SectionCard.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
+import AppShell from "@/layouts/AppShell.vue";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs, query } from "firebase/firestore";
@@ -19,46 +23,42 @@ interface TaskDoc {
   projectName: string;
 }
 
+interface ProjectItem {
+  id: string;
+  name: string;
+  role?: string;
+  lastAccessedAt?: Date;
+}
+
 const { user, profile } = useAuthStore();
 const loading = ref(true);
 const taskList = ref<TaskDoc[]>([]);
 const projectCount = ref(0);
-const projects = ref<{ id: string; name: string; role?: string }[]>([]);
+const projects = ref<ProjectItem[]>([]);
 const keyBuffer = ref("");
 const SECRET = appName.toLowerCase();
 const router = useRouter();
-
-function getRoleLabel(role?: string): string {
-  switch (role) {
-    case "owner":
-      return "オーナー";
-    case "admin":
-      return "管理者";
-    case "viewer":
-      return "閲覧者";
-    default:
-      return "メンバー";
-  }
-}
 
 async function fetchTasks() {
   if (!user.value) return;
   loading.value = true;
   try {
     const items: TaskDoc[] = [];
-    const projectItems: { id: string; name: string; role?: string }[] = [];
+    const projectItems: ProjectItem[] = [];
     const projectsSnap = await getDocs(
       collection(db, "userProjects", user.value.uid, "projects"),
     );
     projectCount.value = projectsSnap.size;
     for (const docSnap of projectsSnap.docs) {
       const projectId = docSnap.id;
-      const projectName =
-        (docSnap.data().projectName as string) || "プロジェクト";
+      const data = docSnap.data();
+      const projectName = (data.projectName as string) || "プロジェクト";
+      const lastAccessedAt = data.lastAccessedAt?.toDate?.() || null;
       projectItems.push({
         id: projectId,
         name: projectName,
-        role: docSnap.data().role as string,
+        role: data.role as string,
+        lastAccessedAt,
       });
       const tasksSnap = await getDocs(
         query(collection(db, "projects", projectId, "tasks")),
@@ -103,6 +103,29 @@ const completedThisWeek = computed(
     ).length,
 );
 
+function getRoleBadgeVariant(
+  role?: string,
+): "owner" | "admin" | "member" | "viewer" {
+  if (!role) return "member";
+  const normalized = role.toLowerCase();
+  if (normalized === "owner") return "owner";
+  if (normalized === "admin") return "admin";
+  if (normalized === "viewer") return "viewer";
+  return "member";
+}
+
+function formatRelativeDate(date?: Date): string {
+  if (!date) return "";
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return "今日";
+  if (days === 1) return "昨日";
+  if (days < 7) return `${days}日前`;
+  if (days < 30) return `${Math.floor(days / 7)}週間前`;
+  return date.toLocaleDateString("ja-JP");
+}
+
 function handleKeydown(event: KeyboardEvent) {
   keyBuffer.value = (keyBuffer.value + event.key.toLowerCase()).slice(
     -SECRET.length,
@@ -123,246 +146,307 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mypage-shell">
-    <section class="profile-card">
-      <div>
-        <p class="eyebrow">My Page</p>
-        <h1>
-          {{ profile?.nickname || profile?.fullName || `${appName} ユーザー` }}
-        </h1>
-        <p>{{ profile?.email }}</p>
-        <div class="profile-actions">
-          <AppButton :to="{ name: ROUTE_NAMES.authDebug }" variant="outline"
-            >アカウント設定</AppButton
-          >
-          <AppButton :to="{ name: ROUTE_NAMES.projectCreate }"
-            >新しいプロジェクト</AppButton
-          >
-        </div>
-      </div>
-      <dl>
-        <div>
-          <dt>参加プロジェクト</dt>
-          <dd>{{ projectCount }}</dd>
-        </div>
-        <div>
-          <dt>タスク総数</dt>
-          <dd>{{ totalTasks }}</dd>
-        </div>
-        <div>
-          <dt>完了タスク（週）</dt>
-          <dd>{{ completedThisWeek }}</dd>
-        </div>
-      </dl>
-    </section>
-
-    <section class="projects-panel">
-      <header>
-        <div>
-          <h2>参加中のプロジェクト</h2>
-          <p>クリックしてプロジェクトのダッシュボードにアクセスできます。</p>
-        </div>
-      </header>
-      <div v-if="!projects.length" class="empty">
-        まだプロジェクトに参加していません。
-      </div>
-      <ul v-else class="project-list">
-        <li v-for="project in projects" :key="project.id">
-          <div>
-            <p class="project-name">{{ project.name }}</p>
-            <p class="project-role">{{ getRoleLabel(project.role) }}</p>
+  <AppShell>
+    <div class="mypage">
+      <!-- Profile Section -->
+      <SectionCard elevated>
+        <div class="profile">
+          <div class="profile__info">
+            <p class="profile__eyebrow">My Page</p>
+            <h1 class="profile__name">
+              {{
+                profile?.nickname || profile?.fullName || `${appName} ユーザー`
+              }}
+            </h1>
+            <p class="profile__email">{{ profile?.email }}</p>
+            <div class="profile__actions">
+              <AppButton
+                :to="{ name: ROUTE_NAMES.authDebug }"
+                variant="outline"
+              >
+                アカウント設定
+              </AppButton>
+              <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
+                新しいプロジェクト
+              </AppButton>
+            </div>
           </div>
-          <AppButton
-            variant="outline"
-            :to="{
-              name: ROUTE_NAMES.projectDashboard,
-              params: { projectId: project.id },
-            }"
-          >
-            開く
-          </AppButton>
-        </li>
-      </ul>
-    </section>
-
-    <section class="tasks-panel">
-      <header>
-        <div>
-          <h2>今週のタスク状況</h2>
-          <p>期限が近いタスクをチェックして、優先順位を整えましょう。</p>
+          <dl class="profile__stats">
+            <div class="profile__stat">
+              <dt>参加プロジェクト</dt>
+              <dd>{{ projectCount }}</dd>
+            </div>
+            <div class="profile__stat">
+              <dt>タスク総数</dt>
+              <dd>{{ totalTasks }}</dd>
+            </div>
+            <div class="profile__stat">
+              <dt>完了タスク（週）</dt>
+              <dd>{{ completedThisWeek }}</dd>
+            </div>
+          </dl>
         </div>
-      </header>
-      <div v-if="loading" class="empty">読み込み中...</div>
-      <div v-else-if="!taskList.length" class="empty">
-        まだタスクがありません。新しいプロジェクトでタスクを追加してみましょう。
-      </div>
-      <div v-else class="task-grid">
-        <article
-          v-for="task in upcomingTasks"
-          :key="task.title + task.projectId"
-          class="task-card"
+      </SectionCard>
+
+      <!-- Projects Section -->
+      <SectionCard
+        title="参加中のプロジェクト"
+        subtitle="プロジェクトを選択して開く"
+      >
+        <AppEmptyState
+          v-if="!projects.length"
+          icon="folder"
+          title="プロジェクトがありません"
+          description="新しいプロジェクトを作成するか、招待リンクから参加してください。"
         >
-          <p class="task-title">{{ task.title }}</p>
-          <p class="task-project">{{ task.projectName }}</p>
-          <p class="task-due" v-if="task.dueDate">
-            期限:
-            {{ new Date(task.dueDate.seconds * 1000).toLocaleDateString() }}
-          </p>
-          <p class="task-due" v-else>期限: 未設定</p>
-        </article>
-      </div>
-    </section>
-  </div>
+          <template #action>
+            <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
+              プロジェクトを作成
+            </AppButton>
+          </template>
+        </AppEmptyState>
+        <ul v-else class="project-list">
+          <li
+            v-for="project in projects"
+            :key="project.id"
+            class="project-item"
+          >
+            <div class="project-item__info">
+              <div class="project-item__header">
+                <p class="project-item__name">{{ project.name }}</p>
+                <AppBadge
+                  :variant="getRoleBadgeVariant(project.role)"
+                  size="sm"
+                >
+                  {{ project.role || "member" }}
+                </AppBadge>
+              </div>
+              <p v-if="project.lastAccessedAt" class="project-item__activity">
+                最終アクセス: {{ formatRelativeDate(project.lastAccessedAt) }}
+              </p>
+            </div>
+            <AppButton
+              variant="outline"
+              size="sm"
+              :to="{
+                name: ROUTE_NAMES.projectDashboard,
+                params: { projectId: project.id },
+              }"
+            >
+              開く
+            </AppButton>
+          </li>
+        </ul>
+      </SectionCard>
+
+      <!-- Tasks Section -->
+      <SectionCard
+        title="今週のタスク状況"
+        subtitle="期限が近いタスクをチェックして、優先順位を整えましょう。"
+      >
+        <div v-if="loading" class="loading-state">読み込み中...</div>
+        <AppEmptyState
+          v-else-if="!taskList.length"
+          icon="empty"
+          title="タスクがありません"
+          description="プロジェクトでタスクを追加してみましょう。"
+        />
+        <AppEmptyState
+          v-else-if="!upcomingTasks.length"
+          icon="search"
+          title="今週の予定タスクはありません"
+          description="期限のあるタスクがあると、ここに表示されます。"
+        />
+        <div v-else class="task-grid">
+          <article
+            v-for="task in upcomingTasks"
+            :key="task.title + task.projectId"
+            class="task-card"
+          >
+            <p class="task-card__title">{{ task.title }}</p>
+            <p class="task-card__project">{{ task.projectName }}</p>
+            <p class="task-card__due">
+              期限:
+              {{ new Date(task.dueDate!.seconds * 1000).toLocaleDateString() }}
+            </p>
+          </article>
+        </div>
+      </SectionCard>
+    </div>
+  </AppShell>
 </template>
 
 <style scoped>
-.mypage-shell {
-  min-height: 100vh;
-  padding: 3rem clamp(1rem, 5vw, 4rem);
-  background: #f5f7f9;
+.mypage {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: var(--ui-space-6, 1.5rem);
 }
 
-.profile-card {
-  background: #fff;
-  border-radius: 1.75rem;
-  border: 2px solid #b8e3e9;
-  padding: 2rem;
+/* Profile */
+.profile {
   display: grid;
-  gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--ui-space-6, 1.5rem);
+  grid-template-columns: 1fr auto;
+  align-items: start;
 }
 
-.eyebrow {
+.profile__eyebrow {
+  margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.25em;
-  color: #4f7c82;
-  margin: 0;
+  letter-spacing: 0.15em;
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-brand-600, #4f7c82);
 }
 
-.profile-card h1 {
-  margin: 0.35rem 0;
-  color: #0b2e33;
+.profile__name {
+  margin: var(--ui-space-2, 0.5rem) 0 0;
+  font-size: var(--ui-text-2xl, 1.5rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
 }
 
-.profile-card p {
-  margin: 0;
-  color: #4f7c82;
+.profile__email {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
-.profile-actions {
+.profile__actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  gap: var(--ui-space-3, 0.75rem);
+  margin-top: var(--ui-space-4, 1rem);
+  flex-wrap: wrap;
 }
 
-dl {
-  margin: 0;
+.profile__stats {
   display: flex;
-  gap: 1.5rem;
-}
-
-dt {
-  color: #4f7c82;
-  font-size: 0.85rem;
-}
-
-dd {
+  gap: var(--ui-space-6, 1.5rem);
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
 }
 
-.projects-panel {
-  background: #fff;
-  border-radius: 1.5rem;
-  border: 1px solid #e1ecef;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.profile__stat {
+  text-align: center;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-lg, 1rem);
+  min-width: 90px;
 }
 
+.profile__stat dt {
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.profile__stat dd {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-2xl, 1.5rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-brand-700, #1a4a51);
+}
+
+/* Projects */
 .project-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
-.project-list li {
+.project-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid #e1ecef;
-  border-radius: 1rem;
-  padding: 1rem;
+  gap: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  background: var(--ui-surface, #ffffff);
+  transition: var(--ui-transition-all);
 }
 
-.project-name {
-  margin: 0;
-  font-weight: 600;
-  color: #0b2e33;
+.project-item:hover {
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-sm);
 }
 
-.project-role {
-  margin: 0.35rem 0 0;
-  color: #4f7c82;
-  font-size: 0.9rem;
-}
-
-.tasks-panel {
-  background: #fff;
-  border-radius: 1.5rem;
-  border: 1px solid #e1ecef;
-  padding: 2rem;
+.project-item__info {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--ui-space-1, 0.25rem);
+  min-width: 0;
 }
 
-.tasks-panel header h2 {
+.project-item__header {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3, 0.75rem);
+}
+
+.project-item__name {
   margin: 0;
-  color: #0b2e33;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
 }
 
-.tasks-panel header p {
-  margin: 0.35rem 0 0;
-  color: #4f7c82;
+.project-item__activity {
+  margin: 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
-.empty {
+/* Tasks */
+.loading-state {
   text-align: center;
-  color: #4f7c82;
+  padding: var(--ui-space-8, 2rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .task-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--ui-space-4, 1rem);
 }
 
 .task-card {
-  border: 1px solid #e1ecef;
-  border-radius: 1rem;
-  padding: 1rem;
-  background: #f9fbfb;
+  padding: var(--ui-space-4, 1rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface, #ffffff);
+  transition: var(--ui-transition-all);
 }
 
-.task-title {
+.task-card:hover {
+  border-color: var(--ui-brand-300, #b8e3e9);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.task-card__title {
   margin: 0;
-  font-weight: 600;
-  color: #0b2e33;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
 }
 
-.task-project,
-.task-due {
-  margin: 0.35rem 0 0;
-  color: #4f7c82;
-  font-size: 0.9rem;
+.task-card__project,
+.task-card__due {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .profile {
+    grid-template-columns: 1fr;
+  }
+
+  .profile__stats {
+    justify-content: flex-start;
+  }
 }
 </style>

@@ -1,105 +1,250 @@
-import { buildPermissionsFromRoles } from "@/constants/roles";
-import type { ProjectMember } from "@/services/projectMembers";
-import { computed, type ComputedRef, type Ref } from "vue";
-
-export interface ProjectAccessResult {
-  isOwner: ComputedRef<boolean>;
-  isAdmin: ComputedRef<boolean>;
-  isMember: ComputedRef<boolean>;
-  isGuest: ComputedRef<boolean>;
-  can: (
-    permissionKey: keyof ReturnType<typeof buildPermissionsFromRoles>,
-  ) => boolean;
-  role: ComputedRef<ProjectMember["role"] | null>;
-}
+import {
+  type ProjectPermissionKey,
+  ROLE_DEFAULT_PERMISSIONS,
+} from "@/constants/permissions";
+import { db } from "@/lib/firebase";
+import { useAuthStore } from "@/store/auth";
+import type { ProjectDoc } from "@/types/project";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
 
 /**
- * プロジェクトアクセス権限を判定するComposable
+ * プロジェクトへのアクセス権限を判定するComposable
  *
- * @param currentUserId - 現在のユーザーID
- * @param members - プロジェクトメンバーのリスト
- * @returns 権限判定の結果オブジェクト
- *
- * @example
- * const { isOwner, isAdmin, can } = useProjectAccess(user.value?.uid, members);
- * if (can('canManageSettings')) {
- *   // 設定を管理できる
- * }
+ * @param projectId - プロジェクトID (ref)
+ * @returns 権限判定用のcomputed
  */
-export function useProjectAccess(
-  currentUserId: Ref<string | undefined | null>,
-  members: Ref<ProjectMember[]>,
-): ProjectAccessResult {
-  const currentMember = computed(() => {
-    if (!currentUserId.value) return null;
-    return members.value.find((m) => m.userId === currentUserId.value) || null;
+export function useProjectAccess(projectId: Ref<string>) {
+  const { user } = useAuthStore();
+
+  const memberData = ref<{
+    role: string;
+    roles: string[];
+    projectRole: string;
+    permissions: Record<string, boolean>;
+  } | null>(null);
+
+  const project = ref<ProjectDoc | null>(null);
+  const loading = ref(true);
+
+  let stopMemberListener: (() => void) | null = null;
+  let stopProjectListener: (() => void) | null = null;
+
+  function startListeners() {
+    stopListeners();
+    loading.value = true;
+
+    if (!user.value || !projectId.value) {
+      memberData.value = null;
+      project.value = null;
+      loading.value = false;
+      return;
+    }
+
+    // プロジェクト情報の購読
+    stopProjectListener = onSnapshot(
+      doc(db, "projects", projectId.value),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          project.value = snapshot.data() as ProjectDoc;
+        } else {
+          project.value = null;
+        }
+      },
+    );
+
+    // メンバー情報の購読
+    stopMemberListener = onSnapshot(
+      doc(db, "projects", projectId.value, "members", user.value.uid),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          memberData.value = {
+            role: data.role || "member",
+            roles: data.roles || [data.role || "member"],
+            projectRole: data.projectRole || data.role || "member",
+            permissions: data.permissions || {},
+          };
+        } else {
+          memberData.value = null;
+        }
+        loading.value = false;
+      },
+    );
+  }
+
+  function stopListeners() {
+    stopMemberListener?.();
+    stopProjectListener?.();
+    stopMemberListener = null;
+    stopProjectListener = null;
+  }
+
+  watch(
+    [projectId, () => user.value?.uid],
+    () => {
+      startListeners();
+    },
+    { immediate: true },
+  );
+
+  onBeforeUnmount(() => {
+    stopListeners();
   });
 
-  const role = computed(() => {
-    return currentMember.value?.role || null;
-  });
+  // --- 権限判定 computed ---
 
+  /** プロジェクトのオーナーかどうか */
   const isOwner = computed(() => {
-    if (!currentMember.value) return false;
-    // projectRole が owner または role が owner の場合
-    return (
-      currentMember.value.projectRole === "owner" ||
-      currentMember.value.role === "owner"
-    );
+    if (!user.value) return false;
+    // プロジェクトのownerUserIdと一致するか
+    if (project.value?.ownerUserId === user.value.uid) return true;
+    // memberDataのroleがownerか
+    const role = memberData.value?.projectRole || memberData.value?.role || "";
+    return role.toLowerCase() === "owner";
   });
 
+  /** 管理者（owner または admin）かどうか */
   const isAdmin = computed(() => {
-    if (!currentMember.value) return false;
-    // owner は admin 権限も持つ
-    return (
-      isOwner.value ||
-      currentMember.value.role === "admin" ||
-      currentMember.value.projectRole === "owner"
-    );
+    if (isOwner.value) return true;
+    const role = memberData.value?.projectRole || memberData.value?.role || "";
+    return role.toLowerCase() === "admin";
   });
 
+  /** メンバー（owner, admin, member）かどうか */
   const isMember = computed(() => {
-    if (!currentMember.value) return false;
-    // owner/admin も member に含まれる
-    return (
-      isOwner.value || isAdmin.value || currentMember.value.role === "member"
-    );
+    if (isAdmin.value) return true;
+    const role = memberData.value?.projectRole || memberData.value?.role || "";
+    return role.toLowerCase() === "member";
   });
 
+  /** ゲスト（viewer）かどうか */
   const isGuest = computed(() => {
-    if (!currentMember.value) return false;
-    return (
-      currentMember.value.role === "viewer" && !isOwner.value && !isAdmin.value
-    );
+    if (!memberData.value) return true;
+    const role = memberData.value?.projectRole || memberData.value?.role || "";
+    return role.toLowerCase() === "viewer";
+  });
+
+  /** プロジェクトにアクセス可能かどうか（メンバーに含まれている） */
+  const hasAccess = computed(() => memberData.value !== null);
+
+  /**
+   * 現在のロールを取得
+   */
+  const currentRole = computed(() => {
+    const role = memberData.value?.projectRole || memberData.value?.role || "";
+    return role.toLowerCase();
   });
 
   /**
-   * 特定の権限を持っているか判定
+   * 特定の権限を持っているかを判定
+   * @param permissionKey - permissions オブジェクトのキー (ProjectPermissionKey or null)
+   *                        nullの場合はログインのみで許可
    */
-  const can = (
-    permissionKey: keyof ReturnType<typeof buildPermissionsFromRoles>,
-  ): boolean => {
-    if (!currentMember.value) return false;
+  function can(permissionKey: ProjectPermissionKey | string | null): boolean {
+    // nullの場合はログインしていればOK
+    if (permissionKey === null) return !!user.value;
 
-    // permissions オブジェクトが存在する場合はそれを使用
-    if (currentMember.value.permissions) {
-      return currentMember.value.permissions[permissionKey] || false;
+    // プロジェクトメンバーでなければfalse
+    if (!hasAccess.value) return false;
+
+    // owner は全権限を持つ
+    if (isOwner.value) return true;
+
+    // admin も基本的に全権限を持つ
+    if (isAdmin.value) return true;
+
+    // 明示的なpermissionsがあればそれを参照
+    if (memberData.value?.permissions?.[permissionKey]) return true;
+
+    // ロールベースのデフォルト権限を確認
+    const role = currentRole.value;
+    const rolePermissions = ROLE_DEFAULT_PERMISSIONS[role];
+    if (rolePermissions?.includes(permissionKey as ProjectPermissionKey)) {
+      return true;
     }
 
-    // permissions がない場合は roles から計算
-    const roles = currentMember.value.roles || [
-      currentMember.value.role || "member",
-    ];
-    const permissions = buildPermissionsFromRoles(roles);
-    return permissions[permissionKey] || false;
-  };
+    return false;
+  }
+
+  /**
+   * 特定の権限を持っているかをcomputedで返す
+   */
+  function canRef(permissionKey: string) {
+    return computed(() => can(permissionKey));
+  }
 
   return {
+    loading,
+    memberData,
+    project,
+    currentRole,
     isOwner,
     isAdmin,
     isMember,
     isGuest,
+    hasAccess,
     can,
-    role,
+    canRef,
   };
+}
+
+/**
+ * 権限を一度だけ取得する（非リアクティブ）
+ */
+export async function fetchProjectAccess(
+  projectId: string,
+  userId: string,
+): Promise<{
+  isOwner: boolean;
+  isAdmin: boolean;
+  isMember: boolean;
+  isGuest: boolean;
+  hasAccess: boolean;
+  role: string;
+}> {
+  try {
+    const [projectSnap, memberSnap] = await Promise.all([
+      getDoc(doc(db, "projects", projectId)),
+      getDoc(doc(db, "projects", projectId, "members", userId)),
+    ]);
+
+    const project = projectSnap.exists() ? projectSnap.data() : null;
+    const member = memberSnap.exists() ? memberSnap.data() : null;
+
+    if (!member) {
+      return {
+        isOwner: false,
+        isAdmin: false,
+        isMember: false,
+        isGuest: true,
+        hasAccess: false,
+        role: "",
+      };
+    }
+
+    const role = (member.projectRole || member.role || "member").toLowerCase();
+    const isOwner = project?.ownerUserId === userId || role === "owner";
+    const isAdmin = isOwner || role === "admin";
+    const isMember = isAdmin || role === "member";
+    const isGuest = role === "viewer";
+
+    return {
+      isOwner,
+      isAdmin,
+      isMember,
+      isGuest,
+      hasAccess: true,
+      role,
+    };
+  } catch {
+    return {
+      isOwner: false,
+      isAdmin: false,
+      isMember: false,
+      isGuest: true,
+      hasAccess: false,
+      role: "",
+    };
+  }
 }

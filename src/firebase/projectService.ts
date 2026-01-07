@@ -1,5 +1,6 @@
 import { db } from "@/lib/firebase";
 import { addProjectMember } from "@/services/projectMembers";
+import { ensureDefaultRoles } from "@/services/rolesService";
 import type { CreateProjectPayload, ProjectDoc } from "@/types/project";
 import {
   addDoc,
@@ -54,6 +55,9 @@ export async function createProject(
     invitedBy: currentUserId,
     projectName: projectBase.name,
   });
+
+  // デフォルトロールを作成
+  await ensureDefaultRoles(projRef.id);
 
   return projRef.id;
 }

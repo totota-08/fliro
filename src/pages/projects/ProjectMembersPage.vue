@@ -5,7 +5,8 @@ import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
 import { appName } from "@/constants/appMeta";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
@@ -69,7 +70,11 @@ const removeMemberHandler = async () => {
 let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 
-const navItems = computed(() => buildProjectNavItems(projectId.value));
+// 権限フィルタリング付きナビゲーション
+const { can } = useProjectAccess(projectId);
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(projectId.value, can),
+);
 
 const sidebarProjects = computed(() =>
   projectList.value.map((entry, index) => ({
@@ -838,7 +843,7 @@ onBeforeUnmount(() => {
 .demo__content {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: var(--ui-space-8, 2rem);
   height: calc(100vh - 64px);
   min-height: 0;
   box-sizing: border-box;
@@ -853,7 +858,7 @@ onBeforeUnmount(() => {
 .team-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
   flex: 1;
   min-height: 0;
 }
@@ -861,14 +866,14 @@ onBeforeUnmount(() => {
 .team-page__header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   align-items: center;
 }
 
 .team-page__header-actions {
   display: inline-flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .team-page__header h2 {
@@ -876,21 +881,31 @@ onBeforeUnmount(() => {
 }
 
 .team-page__header p {
-  margin: 0.25rem 0 0;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
 }
 
 .team-page__invite {
   border: none;
-  border-radius: 0.9rem;
-  padding: 0.65rem 1rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   display: inline-flex;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
   align-items: center;
-  background: #0b2e33;
-  color: #fff;
-  font-weight: 600;
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-surface, #ffffff);
+  font-weight: var(--ui-font-semibold, 600);
   cursor: pointer;
+  transition: var(--ui-transition-all);
+}
+
+.team-page__invite:hover {
+  background: var(--ui-brand-800, #1a4a52);
+}
+
+.team-page__invite:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
 }
 
 .team-page__invite svg {
@@ -901,45 +916,45 @@ onBeforeUnmount(() => {
 .team-page__invite-link {
   border: none;
   background: transparent;
-  color: var(--text);
-  font-weight: 600;
+  color: var(--ui-text, #0b2e33);
+  font-weight: var(--ui-font-semibold, 600);
   padding: 0;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: var(--ui-transition-colors);
 }
 
 .team-page__invite-link:hover {
-  color: var(--primary);
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .team-page__stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .team-page__stats article {
-  border-radius: 1rem;
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  padding: 1rem;
-  background: #fff;
+  border-radius: var(--ui-radius-lg, 1rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-surface, #ffffff);
 }
 
 .team-page__stats p {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .team-page__stats strong {
-  font-size: 2rem;
-  color: #0b2e33;
+  font-size: var(--ui-text-3xl, 1.875rem);
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .team-page__members {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -948,7 +963,7 @@ onBeforeUnmount(() => {
 .team-page__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
   flex: 1;
   min-height: 0;
 }
@@ -956,49 +971,49 @@ onBeforeUnmount(() => {
 .team-page__aside {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   position: sticky;
   top: 96px;
   align-self: start;
 }
 
 .team-page__aside-card {
-  border: 1px solid var(--border-light);
-  border-radius: 1.25rem;
-  padding: 1.25rem;
-  background: var(--surface-card);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-5, 1.25rem);
+  background: var(--ui-surface, #ffffff);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .team-page__aside-card h3 {
   margin: 0;
-  font-size: 1rem;
-  color: var(--text-strong);
+  font-size: var(--ui-text-base, 1rem);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .team-page__summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .team-page__summary-item {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
 .team-page__summary-grid p {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .team-page__summary-grid strong {
-  font-size: 1.3rem;
-  color: var(--text-strong);
+  font-size: var(--ui-text-xl, 1.25rem);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .team-page__summary-item--status {
@@ -1009,32 +1024,35 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-light);
-  background: var(--surface-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-full, 9999px);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-muted, #f1f5f9);
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
 }
 
 .team-page__summary-link {
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   background: transparent;
-  color: var(--text);
-  border-radius: 0.85rem;
-  padding: 0.6rem 1rem;
-  font-weight: 600;
+  color: var(--ui-text, #0b2e33);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
   cursor: pointer;
   text-align: center;
-  transition:
-    border-color 0.2s ease,
-    color 0.2s ease;
+  transition: var(--ui-transition-all);
 }
 
 .team-page__summary-link:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
+}
+
+.team-page__summary-link:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
 }
 
 .team-page__summary-link:disabled {
@@ -1048,19 +1066,19 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .team-page__role-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .team-page__role-count {
-  font-weight: 600;
-  color: var(--text);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
 }
 
 .team-page__recent-list {
@@ -1069,13 +1087,13 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .team-page__recent-row {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .team-page__recent-info {
@@ -1084,16 +1102,16 @@ onBeforeUnmount(() => {
 
 .team-page__recent-name {
   margin: 0;
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .team-page__recent-meta {
-  margin: 0.15rem 0 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
   display: flex;
-  gap: 0.35rem;
+  gap: var(--ui-space-1, 0.25rem);
   align-items: center;
 }
 
@@ -1102,35 +1120,37 @@ onBeforeUnmount(() => {
 }
 
 .team-page__recent-empty {
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .team-page__actions {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .team-page__action-button {
-  border: 1px solid var(--border-light);
-  background: var(--surface-card);
-  color: var(--text);
-  border-radius: 0.85rem;
-  padding: 0.65rem 1rem;
-  font-weight: 600;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
   cursor: pointer;
   text-align: center;
-  transition:
-    border-color 0.2s ease,
-    color 0.2s ease,
-    background 0.2s ease;
+  transition: var(--ui-transition-all);
 }
 
 .team-page__action-button:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
+}
+
+.team-page__action-button:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
 }
 
 .team-page__action-button--ghost {
@@ -1145,7 +1165,7 @@ onBeforeUnmount(() => {
 .team-page__members-header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   align-items: center;
 }
 
@@ -1154,9 +1174,9 @@ onBeforeUnmount(() => {
 }
 
 .team-page__members-count {
-  margin: 0.35rem 0 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .team-page__search {
@@ -1166,17 +1186,19 @@ onBeforeUnmount(() => {
 
 .team-page__search input {
   width: 100%;
-  border-radius: 0.85rem;
-  border: 1px solid var(--border-light);
-  padding: 0.65rem 1rem;
-  font-size: 0.95rem;
-  background: var(--surface-card);
-  color: var(--text);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  transition: var(--ui-transition-all);
 }
 
 .team-page__search input:focus {
-  outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
-  outline-offset: 2px;
+  outline: none;
+  border-color: var(--ui-border-focus, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
 }
 
 .team-page__members-list {
@@ -1191,130 +1213,127 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .team-member {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.25rem;
-  padding: 1rem;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-4, 1rem);
   display: grid;
   grid-template-columns: minmax(240px, 2fr) 160px 1fr;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   align-items: center;
-  background: #fff;
+  background: var(--ui-surface, #ffffff);
 }
 
 .team-member--clickable {
   cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
+  transition: var(--ui-transition-all);
 }
 
 .team-member--clickable:hover {
-  border-color: var(--border);
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--text) 12%, transparent);
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-lg);
   transform: translateY(-1px);
 }
 
 .team-member--selected {
   position: relative;
-  border-color: var(--primary);
-  background: var(--surface-elevated);
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--primary) 18%, transparent);
+  border-color: var(--ui-brand-600, #4f7c82);
+  background: var(--ui-surface-elevated, #f8fafc);
+  box-shadow: var(--ui-shadow-md);
 }
 
 .team-member--selected::before {
   content: "";
   position: absolute;
-  left: 0.35rem;
-  top: 0.65rem;
-  bottom: 0.65rem;
+  left: var(--ui-space-1, 0.25rem);
+  top: var(--ui-space-3, 0.75rem);
+  bottom: var(--ui-space-3, 0.75rem);
   width: 3px;
-  border-radius: 999px;
-  background: var(--primary);
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-brand-600, #4f7c82);
 }
 
 .team-member--empty {
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .team-member__persona {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
 }
 
 .avatar {
   width: 48px;
   height: 48px;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-full, 9999px);
   background: rgba(79, 124, 130, 0.15);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: var(--ui-font-bold, 700);
 }
 
 .avatar--sm {
   width: 36px;
   height: 36px;
-  font-size: 0.75rem;
+  font-size: var(--ui-text-xs, 0.75rem);
 }
 
 .team-member__name {
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .team-member__email {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .team-member__details {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
   flex-wrap: wrap;
 }
 
 .badge {
-  border-radius: 999px;
-  padding: 0.2rem 0.75rem;
-  font-weight: 600;
-  font-size: 0.85rem;
+  border-radius: var(--ui-radius-full, 9999px);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-sm, 0.875rem);
   text-transform: capitalize;
 }
 
 .badge.role-owner {
   background: rgba(11, 46, 51, 0.1);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .badge.role-admin {
   background: rgba(79, 124, 130, 0.2);
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
 
 .badge.role-member,
 .badge.role-viewer {
-  background: rgba(11, 46, 51, 0.05);
-  color: #496167;
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .status-indicator {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 .status-indicator.status-online {
-  color: #1d9160;
+  color: var(--ui-success, #16a34a);
 }
 
 .status-indicator.status-away {
@@ -1322,7 +1341,7 @@ onBeforeUnmount(() => {
 }
 
 .status-indicator.status-offline {
-  color: #9da8b6;
+  color: var(--ui-text-muted, #64748b);
 }
 
 .sr-only {
@@ -1338,13 +1357,13 @@ onBeforeUnmount(() => {
 }
 
 .invite-panel {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.25rem;
-  padding: 1.5rem;
-  background: #fff;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-6, 1.5rem);
+  background: var(--ui-surface, #ffffff);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
 .invite-modal__overlay {
@@ -1354,54 +1373,60 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 6rem 1rem 1rem;
-  z-index: 9999;
+  padding: 6rem var(--ui-space-4, 1rem) var(--ui-space-4, 1rem);
+  z-index: var(--ui-z-modal, 50);
   overflow: auto;
 }
 
 .invite-modal__panel {
   width: min(640px, 100%);
   position: relative;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--ui-shadow-xl);
 }
 
 .invite-modal__close {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  border: 1px solid var(--border-light);
+  top: var(--ui-space-3, 0.75rem);
+  right: var(--ui-space-3, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   background: transparent;
-  border-radius: 0.75rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
   width: 2.25rem;
   height: 2.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text);
+  color: var(--ui-text, #0b2e33);
+  transition: var(--ui-transition-all);
 }
 
 .invite-modal__close:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
+}
+
+.invite-modal__close:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
 }
 
 .invite-panel__hint {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .invite-panel__actions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .invite-panel__error {
-  color: #d64545;
+  color: var(--ui-danger, #ef4444);
   margin: 0;
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
 }
 
 @media (max-width: 960px) {
@@ -1431,7 +1456,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .invite-modal__overlay {
-    padding: 5rem 1rem 1rem;
+    padding: 5rem var(--ui-space-4, 1rem) var(--ui-space-4, 1rem);
   }
 }
 </style>
