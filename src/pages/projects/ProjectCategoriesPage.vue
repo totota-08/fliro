@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import { buildFilteredProjectNavItems } from "@/constants/projectNav";
 import { ProjectPermission } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectAccess } from "@/composables/useProjectAccess";
@@ -27,7 +27,9 @@ const { can } = useProjectAccess(projectId);
 
 const canEdit = computed(() => can(ProjectPermission.MANAGE_CATEGORIES));
 
-const navItems = computed(() => buildProjectNavItems(projectId.value));
+const navItems = computed(() =>
+  buildFilteredProjectNavItems(projectId.value, can),
+);
 
 const profileInfo = computed(() => ({
   name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
