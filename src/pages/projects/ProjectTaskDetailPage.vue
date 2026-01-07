@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import TaskForm from "@/components/tasks/TaskForm.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProject } from "@/firebase/projectService";
+import {
+  listenProjectMembers,
+  type ProjectMember,
+} from "@/services/projectMembers";
 import {
   listenTaskDiscussion,
   sendTaskDiscussionMessage,
@@ -9,8 +14,10 @@ import {
 } from "@/services/taskDiscussionService";
 import {
   listenTask,
+  updateTask,
   type TaskDoc,
   type TaskStatus,
+  type CreateTaskPayload,
 } from "@/services/taskService";
 import {
   listenTaskCategories,
@@ -36,10 +43,26 @@ const input = ref("");
 const sending = ref(false);
 const messageLimit = ref(20);
 const categories = ref<TaskCategory[]>([]);
+const members = ref<ProjectMember[]>([]);
+const isEditModalOpen = ref(false);
+const isSubmitting = ref(false);
 
 let stopTask: (() => void) | null = null;
 let stopDiscussion: (() => void) | null = null;
 let stopCategories: (() => void) | null = null;
+let stopMembers: (() => void) | null = null;
+
+// Computed for TaskForm
+const formCategories = computed(() =>
+  categories.value.map((c) => ({ id: c.id, name: c.name })),
+);
+
+const formMembers = computed(() =>
+  members.value.map((m) => ({
+    id: m.userId,
+    name: m.displayName || m.nickname || m.fullName || m.userId,
+  })),
+);
 
 // Derived State
 const decisions = computed(() =>
@@ -140,6 +163,32 @@ function showMoreMessages() {
   messageLimit.value += 20;
 }
 
+function openEditModal() {
+  isEditModalOpen.value = true;
+}
+
+function closeEditModal() {
+  isEditModalOpen.value = false;
+}
+
+async function handleEditSubmit(payload: CreateTaskPayload) {
+  if (!user.value || !task.value) return;
+
+  isSubmitting.value = true;
+  try {
+    await updateTask(projectId.value, taskId.value, payload, {
+      userId: user.value.uid,
+      actorName: profile.value?.nickname || profile.value?.fullName || "User",
+      origin: "ui",
+    });
+    closeEditModal();
+  } catch (e) {
+    logger.error`Failed to update task: ${e}`;
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
 function isDecideCommand(text: string | undefined) {
   if (!text) return false;
   return text.trim().startsWith("/decide");
@@ -164,12 +213,17 @@ onMounted(async () => {
   stopCategories = listenTaskCategories(projectId.value, (list) => {
     categories.value = list;
   });
+
+  stopMembers = listenProjectMembers(projectId.value, (list) => {
+    members.value = list;
+  });
 });
 
 onBeforeUnmount(() => {
   stopTask?.();
   stopDiscussion?.();
   stopCategories?.();
+  stopMembers?.();
 });
 </script>
 
@@ -185,6 +239,9 @@ onBeforeUnmount(() => {
             <span class="status-badge" :class="task.status">{{
               formatStatus(task.status)
             }}</span>
+            <button class="edit-button" type="button" @click="openEditModal">
+              編集
+            </button>
           </div>
           <div class="meta-row meta-row-mobile">
             <div class="meta-item">
@@ -410,6 +467,24 @@ onBeforeUnmount(() => {
         </div>
       </main>
     </div>
+
+    <!-- Edit Modal -->
+    <Teleport to="body">
+      <div
+        v-if="isEditModalOpen"
+        class="modal-overlay"
+        @click.self="closeEditModal"
+      >
+        <TaskForm
+          :task="task"
+          :categories="formCategories"
+          :members="formMembers"
+          :submitting="isSubmitting"
+          @submit="handleEditSubmit"
+          @cancel="closeEditModal"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -975,5 +1050,55 @@ onBeforeUnmount(() => {
 .empty-activity .activity-dot {
   background: #e2e8f0;
   box-shadow: 0 0 0 1px #e2e8f0;
+}
+
+/* Edit Button */
+.edit-button {
+  padding: 6px 16px;
+  border-radius: var(--ui-radius-full, 9999px);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-brand-500, #4f7c82);
+  cursor: pointer;
+  transition: var(--ui-transition-colors, all 0.15s ease);
+}
+
+.edit-button:hover {
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-color: var(--ui-brand-500, #4f7c82);
+}
+
+.edit-button:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.2));
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: var(--ui-space-4, 1rem);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal-overlay {
+    animation: fadeIn 0.15s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 </style>

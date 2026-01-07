@@ -288,8 +288,13 @@ const pricingPlans = [
 <style scoped>
 .landing {
   min-height: 100vh;
-  background: linear-gradient(135deg, #b8e3e9, #fff 45%, #93b1b5);
-  color: #0b2e33;
+  background: linear-gradient(
+    135deg,
+    var(--ui-brand-300),
+    var(--ui-surface) 45%,
+    var(--ui-brand-400)
+  );
+  color: var(--ui-brand-900);
   display: flex;
   flex-direction: column;
 }
@@ -299,18 +304,18 @@ const pricingPlans = [
   top: 0;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(147, 177, 181, 0.4);
-  z-index: 10;
+  border-bottom: 1px solid var(--ui-border);
+  z-index: var(--ui-z-sticky);
 }
 
 .landing__nav {
   max-width: 1140px;
   margin: 0 auto;
-  padding: 1rem 1.5rem;
+  padding: var(--ui-space-4) var(--ui-space-6);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--ui-space-4);
 }
 
 .landing__brand {
@@ -322,8 +327,8 @@ const pricingPlans = [
 .landing__logo {
   width: 40px;
   height: 40px;
-  border-radius: 0.75rem;
-  background: #4f7c82;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-brand-600);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -333,74 +338,74 @@ const pricingPlans = [
   width: 24px;
   height: 24px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--ui-text-inverse);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .landing__title {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: var(--ui-text-xl);
+  font-weight: var(--ui-font-bold);
 }
 
 .landing__links {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--ui-space-4);
   flex-wrap: wrap;
 }
 
 .landing__links a {
   text-decoration: none;
-  color: #4f7c82;
-  font-weight: 600;
+  color: var(--ui-brand-600);
+  font-weight: var(--ui-font-semibold);
 }
 
 .landing__links a:hover {
-  color: #0b2e33;
+  color: var(--ui-brand-900);
 }
 
 .hero {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 3rem;
+  gap: var(--ui-space-12);
   align-items: center;
-  padding: 4rem 1.5rem 2rem;
+  padding: var(--ui-space-16) var(--ui-space-6) var(--ui-space-8);
   max-width: 1140px;
   margin: 0 auto;
 }
 
 .hero__content h1 {
   font-size: clamp(2.5rem, 5vw, 3.75rem);
-  margin: 0.75rem 0 1rem;
+  margin: var(--ui-space-3) 0 var(--ui-space-4);
 }
 
 .hero__content p {
-  color: #4f7c82;
-  font-size: 1.1rem;
-  line-height: 1.75;
+  color: var(--ui-brand-600);
+  font-size: var(--ui-text-lg);
+  line-height: var(--ui-leading-relaxed);
 }
 
 .hero__eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-weight: 600;
-  color: #4f7c82;
-  font-size: 0.85rem;
+  font-weight: var(--ui-font-semibold);
+  color: var(--ui-brand-600);
+  font-size: var(--ui-text-sm);
 }
 
 .hero__actions {
   display: flex;
-  gap: 1rem;
+  gap: var(--ui-space-4);
   flex-wrap: wrap;
-  margin-top: 2rem;
+  margin-top: var(--ui-space-8);
 }
 
 .hero__note {
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  color: #93b1b5;
+  margin-top: var(--ui-space-4);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-brand-400);
 }
 
 .hero__visual {
@@ -410,132 +415,134 @@ const pricingPlans = [
 
 .hero-card {
   width: min(460px, 100%);
-  border-radius: 1.5rem;
-  background: #fff;
-  border: 1px solid rgba(147, 177, 181, 0.35);
-  box-shadow: 0 40px 70px rgba(11, 46, 51, 0.18);
+  border-radius: var(--ui-radius-2xl);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow-2xl);
 }
 
 .hero-card header {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(147, 177, 181, 0.2);
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border-light);
 }
 
 .hero-card header span {
   width: 0.75rem;
   height: 0.75rem;
-  border-radius: 999px;
-  background: rgba(147, 177, 181, 0.6);
+  border-radius: var(--ui-radius-full);
+  background: var(--ui-brand-400);
 }
 
 .hero-card__body {
-  padding: 1.25rem 1.5rem;
+  padding: var(--ui-space-5) var(--ui-space-6);
   display: grid;
-  gap: 1rem;
+  gap: var(--ui-space-4);
 }
 
 .hero-card__body div {
-  padding: 1rem;
-  border-radius: 1rem;
+  padding: var(--ui-space-4);
+  border-radius: var(--ui-radius-lg);
   background: rgba(184, 227, 233, 0.35);
 }
 
 .hero-card__body p {
-  margin: 0 0 0.35rem;
-  font-weight: 600;
+  margin: 0 0 var(--ui-space-1);
+  font-weight: var(--ui-font-semibold);
 }
 
 .hero-card__body ul {
   margin: 0;
-  padding-left: 1rem;
-  color: #4f7c82;
+  padding-left: var(--ui-space-4);
+  color: var(--ui-brand-600);
 }
 
 .section-heading {
   text-align: center;
   max-width: 720px;
-  margin: 0 auto 2.5rem;
+  margin: 0 auto var(--ui-space-10);
 }
 
 .section-heading p {
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #4f7c82;
-  font-weight: 600;
+  color: var(--ui-brand-600);
+  font-weight: var(--ui-font-semibold);
   margin: 0;
 }
 
 .section-heading h2 {
-  margin: 0.5rem 0 0;
+  margin: var(--ui-space-2) 0 0;
   font-size: clamp(2rem, 4vw, 3rem);
 }
 
 .features,
 .pricing,
 .cta {
-  padding: 4rem 1.5rem;
-  background: #fff;
+  padding: var(--ui-space-16) var(--ui-space-6);
+  background: var(--ui-surface);
 }
 
 .features__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
+  gap: var(--ui-space-6);
   max-width: 1140px;
   margin: 0 auto;
 }
 
 .feature-card {
-  border: 1px solid #b8e3e9;
-  border-radius: 1.5rem;
-  padding: 1.75rem;
-  background: #f8fcfd;
-  transition:
-    box-shadow 150ms ease,
-    transform 150ms ease;
+  border: 1px solid var(--ui-brand-300);
+  border-radius: var(--ui-radius-2xl);
+  padding: var(--ui-space-6);
+  background: var(--ui-brand-50);
+  transition: var(--ui-transition-all);
 }
 
 .feature-card:hover {
-  box-shadow: 0 25px 40px rgba(11, 46, 51, 0.15);
+  box-shadow: var(--ui-shadow-xl);
   transform: translateY(-4px);
 }
 
 .feature-card__icon {
   width: 3rem;
   height: 3rem;
-  border-radius: 0.75rem;
-  background: #b8e3e9;
-  margin-bottom: 1rem;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-brand-300);
+  margin-bottom: var(--ui-space-4);
 }
 
 .pricing {
-  background: linear-gradient(135deg, rgba(184, 227, 233, 0.25), #fff);
+  background: linear-gradient(
+    135deg,
+    rgba(184, 227, 233, 0.25),
+    var(--ui-surface)
+  );
 }
 
 .pricing__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
+  gap: var(--ui-space-6);
   max-width: 1140px;
   margin: 0 auto;
 }
 
 .pricing-card {
-  background: #fff;
-  border: 2px solid #b8e3e9;
-  border-radius: 1.5rem;
-  padding: 2rem;
+  background: var(--ui-surface);
+  border: 2px solid var(--ui-brand-300);
+  border-radius: var(--ui-radius-2xl);
+  padding: var(--ui-space-8);
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--ui-space-6);
 }
 
 .pricing-card--highlight {
-  border-color: #4f7c82;
-  box-shadow: 0 30px 60px rgba(11, 46, 51, 0.25);
+  border-color: var(--ui-brand-600);
+  box-shadow: var(--ui-shadow-2xl);
 }
 
 .pricing-card__ribbon {
@@ -543,22 +550,22 @@ const pricingPlans = [
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: #4f7c82;
-  color: #fff;
-  padding: 0.3rem 1.2rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse);
+  padding: var(--ui-space-1) var(--ui-space-5);
+  border-radius: var(--ui-radius-full);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-semibold);
 }
 
 .pricing-card__price span {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: var(--ui-text-3xl);
+  font-weight: var(--ui-font-bold);
 }
 
 .pricing-card__price small {
-  color: #93b1b5;
-  margin-left: 0.3rem;
+  color: var(--ui-brand-400);
+  margin-left: var(--ui-space-1);
 }
 
 .pricing-card ul {
@@ -567,12 +574,12 @@ const pricingPlans = [
   list-style: none;
   display: grid;
   gap: 0.65rem;
-  color: #4f7c82;
+  color: var(--ui-brand-600);
 }
 
 .cta {
-  background: #4f7c82;
-  color: #fff;
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse);
 }
 
 .cta__inner {
@@ -581,42 +588,42 @@ const pricingPlans = [
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4);
 }
 
 .cta__inner p {
-  color: #b8e3e9;
+  color: var(--ui-brand-300);
   margin: 0;
-  line-height: 1.7;
+  line-height: var(--ui-leading-relaxed);
 }
 
 .landing__footer {
-  background: #0b2e33;
-  color: #fff;
-  padding: 3rem 1.5rem;
+  background: var(--ui-brand-900);
+  color: var(--ui-text-inverse);
+  padding: var(--ui-space-12) var(--ui-space-6);
 }
 
 .landing__footer-grid {
   max-width: 1140px;
-  margin: 0 auto 2rem;
+  margin: 0 auto var(--ui-space-8);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 2rem;
+  gap: var(--ui-space-8);
 }
 
 .landing__footer-grid ul {
   list-style: none;
   margin: 0;
   padding: 0;
-  color: #93b1b5;
+  color: var(--ui-brand-400);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--ui-space-2);
 }
 
 .landing__footer-grid li:first-child {
-  font-weight: 700;
-  color: #fff;
+  font-weight: var(--ui-font-bold);
+  color: var(--ui-text-inverse);
 }
 
 .landing__footer-grid a {
@@ -625,14 +632,14 @@ const pricingPlans = [
 }
 
 .landing__footer-grid a:hover {
-  color: #fff;
+  color: var(--ui-text-inverse);
 }
 
 .landing__copyright {
   text-align: center;
-  color: #93b1b5;
+  color: var(--ui-brand-400);
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--ui-text-sm);
 }
 
 @media (max-width: 768px) {

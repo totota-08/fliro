@@ -1,6 +1,15 @@
+import ForbiddenPage from "@/components/errorPage/403.vue";
 import NotFoundPage from "@/components/errorPage/404.vue";
+import {
+  ROLE_DEFAULT_PERMISSIONS,
+  ROUTE_REQUIRED_PERMISSIONS,
+} from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { getCurrentUser } from "@/lib/getCurrentUser";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.router");
 import HomePage from "@/pages/HomePage.vue";
 import MyPage from "@/pages/account/MyPage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
@@ -193,6 +202,12 @@ export const router = createRouter({
       component: TeamPage,
     },
     {
+      path: "/forbidden",
+      name: ROUTE_NAMES.forbidden,
+      component: ForbiddenPage,
+      meta: { layout: "full" },
+    },
+    {
       path: "/:pathMatch(.*)*",
       name: ROUTE_NAMES.notFound,
       component: NotFoundPage,
@@ -223,7 +238,7 @@ router.beforeEach(async (to) => {
   try {
     user = await getCurrentUser();
   } catch (error) {
-    console.error("Auth check failed", error);
+    logger.error`Auth check failed: ${error}`;
     return { name: ROUTE_NAMES.login };
   }
 
@@ -246,6 +261,61 @@ router.beforeEach(async (to) => {
     }
 
     return { name: ROUTE_NAMES.myPage };
+  }
+
+  // プロジェクト権限チェック
+  const projectId = to.params.projectId as string | undefined;
+  const routeName = to.name as
+    | (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES]
+    | undefined;
+
+  if (projectId && routeName && user) {
+    const requiredPermission = ROUTE_REQUIRED_PERMISSIONS[routeName];
+
+    // undefined = 権限チェック不要, null = 認証のみ必要
+    if (requiredPermission !== undefined && requiredPermission !== null) {
+      try {
+        const access = await fetchProjectAccess(projectId, user.uid);
+
+        // プロジェクトにアクセス権がない場合
+        if (!access.hasAccess) {
+          return {
+            name: ROUTE_NAMES.forbidden,
+            query: {
+              projectId,
+              reason: "このプロジェクトのメンバーではありません。",
+            },
+          };
+        }
+
+        // owner/adminは全権限を持つ
+        if (!access.isOwner && !access.isAdmin) {
+          // ロールベースの権限チェック
+          const rolePermissions = ROLE_DEFAULT_PERMISSIONS[access.role] || [];
+          const hasPermission = rolePermissions.includes(requiredPermission);
+
+          if (!hasPermission) {
+            logger.warn`Permission denied: ${access.role} does not have ${requiredPermission}`;
+            return {
+              name: ROUTE_NAMES.forbidden,
+              query: {
+                projectId,
+                reason: "このページにアクセスする権限がありません。",
+              },
+            };
+          }
+        }
+      } catch (error) {
+        logger.error`Permission check failed: ${error}`;
+        return {
+          name: ROUTE_NAMES.forbidden,
+          query: {
+            projectId,
+            reason: "権限の確認中にエラーが発生しました。",
+          },
+        };
+      }
+    }
   }
 
   return true;
