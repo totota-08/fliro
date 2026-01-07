@@ -2,6 +2,7 @@
 import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProject } from "@/firebase/projectService";
 import { db } from "@/lib/firebase";
@@ -556,9 +557,12 @@ watch(channels, (list) => {
           </header>
 
           <div class="msg-list" ref="chatContainer">
-            <div v-if="currentChannelMessages.length === 0" class="empty-state">
-              <p>メッセージはまだありません。</p>
-            </div>
+            <AppEmptyState
+              v-if="currentChannelMessages.length === 0"
+              title="メッセージはまだありません"
+              description="最初のメッセージを送信して会話を始めましょう。"
+              icon="empty"
+            />
             <div
               v-for="msg in currentChannelMessages"
               :key="msg.id"
