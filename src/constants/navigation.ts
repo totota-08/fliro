@@ -72,6 +72,14 @@ export const PROJECT_SIDEBAR_NAV_CONFIG: SidebarNavItemConfig[] = [
     requiredPermission: ProjectPermission.VIEW_SETTINGS,
     requiresProjectId: true,
   },
+  {
+    key: "scores",
+    label: "週次スコア",
+    icon: "scores",
+    routeName: ROUTE_NAMES.projectScores,
+    requiredPermission: ProjectPermission.VIEW_SCORES,
+    requiresProjectId: true,
+  },
 ];
 
 /**
