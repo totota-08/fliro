@@ -61,12 +61,6 @@ type MemberEntry = ProjectMember & {
   lastAccessedAt?: { seconds: number; nanoseconds: number };
 };
 
-type DashboardNotification = {
-  id: string;
-  message: string;
-  dismissible: boolean;
-};
-
 const project = ref<ProjectDoc | null>(null);
 const members = ref<MemberEntry[]>([]);
 const { getDisplayName } = useUserDisplay(members);
@@ -77,8 +71,6 @@ const taskView = ref<"all" | "mine">("all");
 const selectedTask = ref<TaskDoc | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
 const chatLoading = ref(true);
-const notifications = ref<DashboardNotification[]>([]);
-const dismissedNotificationIds = ref<Set<string>>(new Set());
 const filters = reactive({
   search: "",
   status: "all",
@@ -241,57 +233,6 @@ function normalizeProgress(value: number | null | undefined) {
 //     statusClass: memberStatusClass(member),
 //   })),
 // )
-
-function evaluateNotifications() {
-  const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000;
-  const userAssignments = tasks.value.filter(
-    (task) => task.assigneeId === user.value?.uid,
-  );
-  const dueSoon = tasks.value.filter(
-    (task) =>
-      task.dueDate?.seconds &&
-      task.dueDate.seconds * 1000 - now <= oneDay &&
-      task.dueDate.seconds * 1000 > now,
-  );
-  const overdueCount = tasks.value.filter((task) => isTaskOverdue(task)).length;
-
-  const alerts: DashboardNotification[] = [];
-  if (
-    userAssignments.length &&
-    !dismissedNotificationIds.value.has("assigned")
-  ) {
-    alerts.push({
-      id: "assigned",
-      message: `あなたに割り当てられたタスクが ${userAssignments.length} 件あります`,
-      dismissible: true,
-    });
-  }
-  if (dueSoon.length && !dismissedNotificationIds.value.has("due-soon")) {
-    alerts.push({
-      id: "due-soon",
-      message: `期限が迫っているタスク: ${dueSoon.length} 件`,
-      dismissible: true,
-    });
-  }
-  if (overdueCount) {
-    alerts.push({
-      id: "overdue",
-      message: `期限切れのタスクが ${overdueCount} 件あります`,
-      dismissible: false,
-    });
-  }
-  notifications.value = alerts;
-}
-
-function dismissNotification(id: string) {
-  const note = notifications.value.find((entry) => entry.id === id);
-  if (!note || !note.dismissible) return;
-  const next = new Set(dismissedNotificationIds.value);
-  next.add(id);
-  dismissedNotificationIds.value = next;
-  notifications.value = notifications.value.filter((entry) => entry.id !== id);
-}
 
 watch(
   taskView,
@@ -555,24 +496,6 @@ onBeforeUnmount(() => {
     </template>
 
     <div class="dashboard__content">
-      <section v-if="notifications.length" class="dashboard__alerts">
-        <div
-          v-for="note in notifications"
-          :key="note.id"
-          class="dashboard__alert"
-        >
-          <p>{{ note.message }}</p>
-          <button
-            v-if="note.dismissible"
-            type="button"
-            class="dashboard__alert-close"
-            aria-label="通知を閉じる"
-            @click.stop="dismissNotification(note.id)"
-          >
-            &times;
-          </button>
-        </div>
-      </section>
       <NotificationBar :notifications="notificationsBar" />
 
       <DashboardSummaryCards
@@ -628,48 +551,5 @@ onBeforeUnmount(() => {
   font-weight: var(--ui-font-bold);
   font-size: var(--ui-text-sm);
   color: var(--ui-brand-900);
-}
-
-/* Dashboard Alerts */
-.dashboard__alerts {
-  background: var(--ui-warning-light);
-  border-left: 4px solid var(--ui-warning);
-  border-radius: var(--ui-radius-lg);
-  padding: var(--ui-space-2) var(--ui-space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-}
-
-.dashboard__alert {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-2) var(--ui-space-1) var(--ui-space-2)
-    var(--ui-space-2);
-}
-
-.dashboard__alert p {
-  margin: 0;
-  color: var(--ui-warning-text);
-  font-weight: var(--ui-font-semibold);
-}
-
-.dashboard__alert-close {
-  border: none;
-  background: transparent;
-  color: var(--ui-warning-text);
-  font-size: var(--ui-text-base);
-  font-weight: var(--ui-font-bold);
-  cursor: pointer;
-  padding: var(--ui-space-1);
-  line-height: 1;
-  border-radius: var(--ui-radius-sm);
-  transition: var(--ui-transition-colors);
-}
-
-.dashboard__alert-close:hover {
-  background: var(--ui-notify-warning-label);
 }
 </style>
