@@ -71,14 +71,23 @@ async function addProjectMember(
   memberId,
   role = "member",
   invitedBy = "owner1",
-  permissions = {}
+  permissions = {},
 ) {
+  // メンバーロールにはデフォルトでタスク管理権限を付与
+  const canManageTasksDefault = [
+    "member",
+    "admin",
+    "owner",
+    "manager",
+    "pm",
+  ].includes(role);
   await setDoc(doc(db, "projects", projectId, "members", memberId), {
     userId: memberId,
     role,
     permissions: {
       canManageSettings: false,
       canInviteMembers: false,
+      canManageTasks: canManageTasksDefault,
       ...permissions,
     },
     joinedAt: serverTimestamp(),
@@ -127,7 +136,7 @@ describe("Firestore rules / プロファイル (profiles)", () => {
       setDoc(doc(userDb, "profiles", "user1"), {
         nickname: "Test User",
         email: "test@example.com",
-      })
+      }),
     );
   });
 
@@ -137,7 +146,7 @@ describe("Firestore rules / プロファイル (profiles)", () => {
       setDoc(doc(userDb, "profiles", "user2"), {
         nickname: "Other User",
         email: "other@example.com",
-      })
+      }),
     );
   });
 
@@ -152,7 +161,7 @@ describe("Firestore rules / プロファイル (profiles)", () => {
     await assertSucceeds(
       updateDoc(doc(userDb, "profiles", "user1"), {
         nickname: "Updated User",
-      })
+      }),
     );
   });
 
@@ -182,7 +191,7 @@ describe("Firestore rules / プロファイル (profiles)", () => {
       setDoc(doc(guestDb, "profiles", "guest"), {
         nickname: "Guest",
         email: "guest@example.com",
-      })
+      }),
     );
   });
 });
@@ -260,7 +269,7 @@ describe("Firestore rules / プロジェクト (projects)", () => {
       updateDoc(doc(ownerDb, "projects", "project1"), {
         name: "Updated Project",
         ownerUserId: "owner1", // Must keep same owner
-      })
+      }),
     );
   });
 
@@ -270,7 +279,7 @@ describe("Firestore rules / プロジェクト (projects)", () => {
     await assertFails(
       updateDoc(doc(ownerDb, "projects", "project1"), {
         ownerUserId: "new-owner",
-      })
+      }),
     );
   });
 
@@ -314,7 +323,7 @@ describe("Firestore rules / メンバー (members)", () => {
     const ownerDb = testEnv.authenticatedContext("owner1").firestore();
     await createTestProject(ownerDb, "project1", "owner1");
     await assertSucceeds(
-      addProjectMember(ownerDb, "project1", "member1", "member", "owner1")
+      addProjectMember(ownerDb, "project1", "member1", "member", "owner1"),
     );
   });
 
@@ -327,7 +336,7 @@ describe("Firestore rules / メンバー (members)", () => {
 
     const adminDb = testEnv.authenticatedContext("admin1").firestore();
     await assertSucceeds(
-      addProjectMember(adminDb, "project1", "member1", "member", "admin1")
+      addProjectMember(adminDb, "project1", "member1", "member", "admin1"),
     );
   });
 
@@ -338,7 +347,7 @@ describe("Firestore rules / メンバー (members)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertFails(
-      addProjectMember(memberDb, "project1", "member2", "member", "member1")
+      addProjectMember(memberDb, "project1", "member2", "member", "member1"),
     );
   });
 
@@ -349,7 +358,7 @@ describe("Firestore rules / メンバー (members)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      getDoc(doc(memberDb, "projects", "project1", "members", "member1"))
+      getDoc(doc(memberDb, "projects", "project1", "members", "member1")),
     );
   });
 
@@ -360,7 +369,7 @@ describe("Firestore rules / メンバー (members)", () => {
 
     const otherDb = testEnv.authenticatedContext("other1").firestore();
     await assertFails(
-      getDoc(doc(otherDb, "projects", "project1", "members", "member1"))
+      getDoc(doc(otherDb, "projects", "project1", "members", "member1")),
     );
   });
 
@@ -370,7 +379,7 @@ describe("Firestore rules / メンバー (members)", () => {
     await addProjectMember(ownerDb, "project1", "member1", "member", "owner1");
 
     await assertSucceeds(
-      deleteDoc(doc(ownerDb, "projects", "project1", "members", "member1"))
+      deleteDoc(doc(ownerDb, "projects", "project1", "members", "member1")),
     );
   });
 
@@ -381,7 +390,7 @@ describe("Firestore rules / メンバー (members)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      deleteDoc(doc(memberDb, "projects", "project1", "members", "member1"))
+      deleteDoc(doc(memberDb, "projects", "project1", "members", "member1")),
     );
   });
 });
@@ -419,7 +428,7 @@ describe("Firestore rules / タスク (tasks)", () => {
         createdBy: "member1",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -435,7 +444,7 @@ describe("Firestore rules / タスク (tasks)", () => {
         createdBy: "other1",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -447,7 +456,7 @@ describe("Firestore rules / タスク (tasks)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      getDoc(doc(memberDb, "projects", "project1", "tasks", "task1"))
+      getDoc(doc(memberDb, "projects", "project1", "tasks", "task1")),
     );
   });
 
@@ -461,7 +470,7 @@ describe("Firestore rules / タスク (tasks)", () => {
     await assertSucceeds(
       updateDoc(doc(memberDb, "projects", "project1", "tasks", "task1"), {
         status: "in-progress",
-      })
+      }),
     );
   });
 
@@ -473,7 +482,7 @@ describe("Firestore rules / タスク (tasks)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      deleteDoc(doc(memberDb, "projects", "project1", "tasks", "task1"))
+      deleteDoc(doc(memberDb, "projects", "project1", "tasks", "task1")),
     );
   });
 
@@ -486,7 +495,21 @@ describe("Firestore rules / タスク (tasks)", () => {
     await assertFails(
       updateDoc(doc(otherDb, "projects", "project1", "tasks", "task1"), {
         status: "done",
-      })
+      }),
+    );
+  });
+
+  it("viewerロールのメンバーはタスクを更新できない", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner1").firestore();
+    await createTestProject(ownerDb, "project1", "owner1");
+    await createTestTask(ownerDb, "project1", "task1", "owner1");
+    await addProjectMember(ownerDb, "project1", "viewer1", "viewer", "owner1");
+
+    const viewerDb = testEnv.authenticatedContext("viewer1").firestore();
+    await assertFails(
+      updateDoc(doc(viewerDb, "projects", "project1", "tasks", "task1"), {
+        status: "done",
+      }),
     );
   });
 });
@@ -526,7 +549,7 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           "project1",
           "tasks",
           "task1",
-          "messages"
+          "messages",
         ),
         {
           text: "Hello",
@@ -534,8 +557,8 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           senderName: "Member 1",
           createdAt: serverTimestamp(),
           type: "normal",
-        }
-      )
+        },
+      ),
     );
   });
 
@@ -551,7 +574,7 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
         senderName: "Owner",
         createdAt: serverTimestamp(),
         type: "normal",
-      }
+      },
     );
     await addProjectMember(ownerDb, "project1", "member1", "member", "owner1");
 
@@ -565,9 +588,9 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           "tasks",
           "task1",
           "messages",
-          msgRef.id
-        )
-      )
+          msgRef.id,
+        ),
+      ),
     );
   });
 
@@ -585,7 +608,7 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           "project1",
           "tasks",
           "task1",
-          "messages"
+          "messages",
         ),
         {
           text: "Hello",
@@ -593,8 +616,8 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           senderName: "Other",
           createdAt: serverTimestamp(),
           type: "normal",
-        }
-      )
+        },
+      ),
     );
   });
 
@@ -613,7 +636,7 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           "project1",
           "tasks",
           "task1",
-          "messages"
+          "messages",
         ),
         {
           text: "Hello",
@@ -621,8 +644,8 @@ describe("Firestore rules / タスクメッセージ (task messages)", () => {
           senderName: "Other",
           createdAt: serverTimestamp(),
           type: "normal",
-        }
-      )
+        },
+      ),
     );
   });
 });
@@ -663,7 +686,7 @@ describe("Firestore rules / スレッド (threads)", () => {
         description: null,
         isPublic: true,
         allowedUserIds: null,
-      })
+      }),
     );
   });
 
@@ -680,7 +703,7 @@ describe("Firestore rules / スレッド (threads)", () => {
         userId: "member1",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -701,7 +724,7 @@ describe("Firestore rules / スレッド (threads)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      getDoc(doc(memberDb, "projects", "project1", "threads", "thread1"))
+      getDoc(doc(memberDb, "projects", "project1", "threads", "thread1")),
     );
   });
 
@@ -726,7 +749,7 @@ describe("Firestore rules / スレッド (threads)", () => {
       updateDoc(doc(memberDb, "projects", "project1", "threads", "thread1"), {
         name: "Updated Thread",
         updatedAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -748,7 +771,7 @@ describe("Firestore rules / スレッド (threads)", () => {
     });
 
     await assertSucceeds(
-      deleteDoc(doc(memberDb, "projects", "project1", "threads", "thread1"))
+      deleteDoc(doc(memberDb, "projects", "project1", "threads", "thread1")),
     );
   });
 
@@ -769,7 +792,7 @@ describe("Firestore rules / スレッド (threads)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertFails(
-      deleteDoc(doc(memberDb, "projects", "project1", "threads", "thread1"))
+      deleteDoc(doc(memberDb, "projects", "project1", "threads", "thread1")),
     );
   });
 });
@@ -801,7 +824,7 @@ describe("Firestore rules / カテゴリ (categories)", () => {
       setDoc(doc(ownerDb, "projects", "project1", "categories", "cat1"), {
         name: "Bug",
         color: "#ff0000",
-      })
+      }),
     );
   });
 
@@ -817,7 +840,7 @@ describe("Firestore rules / カテゴリ (categories)", () => {
       setDoc(doc(adminDb, "projects", "project1", "categories", "cat1"), {
         name: "Feature",
         color: "#00ff00",
-      })
+      }),
     );
   });
 
@@ -831,7 +854,7 @@ describe("Firestore rules / カテゴリ (categories)", () => {
       setDoc(doc(memberDb, "projects", "project1", "categories", "cat1"), {
         name: "Bug",
         color: "#ff0000",
-      })
+      }),
     );
   });
 
@@ -846,7 +869,7 @@ describe("Firestore rules / カテゴリ (categories)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      getDoc(doc(memberDb, "projects", "project1", "categories", "cat1"))
+      getDoc(doc(memberDb, "projects", "project1", "categories", "cat1")),
     );
   });
 
@@ -859,7 +882,7 @@ describe("Firestore rules / カテゴリ (categories)", () => {
     });
 
     await assertSucceeds(
-      deleteDoc(doc(ownerDb, "projects", "project1", "categories", "cat1"))
+      deleteDoc(doc(ownerDb, "projects", "project1", "categories", "cat1")),
     );
   });
 });
@@ -894,7 +917,7 @@ describe("Firestore rules / ロール (roles)", () => {
         permissions: ["canViewTasks"],
         position: 1,
         isDefault: false,
-      })
+      }),
     );
   });
 
@@ -913,7 +936,7 @@ describe("Firestore rules / ロール (roles)", () => {
         permissions: ["canViewTasks"],
         position: 2,
         isDefault: false,
-      })
+      }),
     );
   });
 
@@ -930,7 +953,7 @@ describe("Firestore rules / ロール (roles)", () => {
         permissions: [],
         position: 3,
         isDefault: false,
-      })
+      }),
     );
   });
 
@@ -948,7 +971,7 @@ describe("Firestore rules / ロール (roles)", () => {
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      getDoc(doc(memberDb, "projects", "project1", "roles", "admin"))
+      getDoc(doc(memberDb, "projects", "project1", "roles", "admin")),
     );
   });
 });
@@ -980,7 +1003,7 @@ describe("Firestore rules / ユーザープロジェクト (userProjects)", () =
         projectName: "My Project",
         role: "owner",
         lastAccessedAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -991,7 +1014,7 @@ describe("Firestore rules / ユーザープロジェクト (userProjects)", () =
         projectName: "My Project",
         role: "member",
         lastAccessedAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -1003,7 +1026,7 @@ describe("Firestore rules / ユーザープロジェクト (userProjects)", () =
       lastAccessedAt: serverTimestamp(),
     });
     await assertSucceeds(
-      getDoc(doc(userDb, "userProjects", "user1", "projects", "project1"))
+      getDoc(doc(userDb, "userProjects", "user1", "projects", "project1")),
     );
   });
 
@@ -1015,12 +1038,12 @@ describe("Firestore rules / ユーザープロジェクト (userProjects)", () =
         projectName: "My Project",
         role: "owner",
         lastAccessedAt: serverTimestamp(),
-      }
+      },
     );
 
     const user2Db = testEnv.authenticatedContext("user2").firestore();
     await assertFails(
-      getDoc(doc(user2Db, "userProjects", "user1", "projects", "project1"))
+      getDoc(doc(user2Db, "userProjects", "user1", "projects", "project1")),
     );
   });
 
@@ -1035,7 +1058,7 @@ describe("Firestore rules / ユーザープロジェクト (userProjects)", () =
         projectName: "Test Project",
         role: "member",
         lastAccessedAt: serverTimestamp(),
-      }
+      },
     );
 
     // Owner can update member's userProject
@@ -1046,8 +1069,8 @@ describe("Firestore rules / ユーザープロジェクト (userProjects)", () =
           projectName: "Updated Project Name",
           role: "admin",
           lastAccessedAt: serverTimestamp(),
-        }
-      )
+        },
+      ),
     );
   });
 });
@@ -1087,7 +1110,7 @@ describe("Firestore rules / イベント (events)", () => {
         actorName: "Member 1",
         payload: { taskId: "task1", taskTitle: "Test Task" },
         createdAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -1104,13 +1127,13 @@ describe("Firestore rules / イベント (events)", () => {
         actorName: "Owner",
         payload: {},
         createdAt: serverTimestamp(),
-      }
+      },
     );
     await addProjectMember(ownerDb, "project1", "member1", "member", "owner1");
 
     const memberDb = testEnv.authenticatedContext("member1").firestore();
     await assertSucceeds(
-      getDoc(doc(memberDb, "projects", "project1", "events", eventRef.id))
+      getDoc(doc(memberDb, "projects", "project1", "events", eventRef.id)),
     );
   });
 
@@ -1128,7 +1151,7 @@ describe("Firestore rules / イベント (events)", () => {
         actorName: "Other",
         payload: {},
         createdAt: serverTimestamp(),
-      })
+      }),
     );
   });
 
@@ -1145,12 +1168,12 @@ describe("Firestore rules / イベント (events)", () => {
         actorName: "Owner",
         payload: {},
         createdAt: serverTimestamp(),
-      }
+      },
     );
 
     const otherDb = testEnv.authenticatedContext("other1").firestore();
     await assertSucceeds(
-      getDoc(doc(otherDb, "projects", "project1", "events", eventRef.id))
+      getDoc(doc(otherDb, "projects", "project1", "events", eventRef.id)),
     );
   });
 });
@@ -1184,7 +1207,7 @@ describe("Firestore rules / 保留中の招待 (pendingInvites)", () => {
         projectId: "project1",
         createdAt: serverTimestamp(),
         status: "pending",
-      })
+      }),
     );
   });
 
@@ -1221,7 +1244,7 @@ describe("Firestore rules / 保留中の招待 (pendingInvites)", () => {
         createdAt: serverTimestamp(),
         status: "completed",
         userId: "user1",
-      })
+      }),
     );
   });
 });

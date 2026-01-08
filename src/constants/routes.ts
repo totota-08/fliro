@@ -18,6 +18,7 @@ export const ROUTE_NAMES = {
   projectActivity: "project-activity",
   projectNotifications: "project-notifications",
   projectTaskDetail: "project-task-detail",
+  projectScores: "project-scores",
   inviteAccept: "invite-accept",
   myPage: "my-page",
   myTasks: "my-tasks",
