@@ -247,6 +247,37 @@ export async function deleteProjectInvite(inviteId: string) {
   await deleteDoc(ref);
 }
 
+/**
+ * Listen for pending invites for a specific user email.
+ * Returns invites where acceptedEmail matches and status is 'pending'.
+ */
+export function listenUserInvites(
+  email: string,
+  callback: (invites: ProjectInvite[]) => void,
+) {
+  const ref = collection(db, "projectInvites");
+  const q = query(
+    ref,
+    where("acceptedEmail", "==", email),
+    where("status", "==", "pending"),
+    orderBy("createdAt", "desc"),
+    limit(50),
+  );
+  return onSnapshot(q, (snapshot) => {
+    const list = snapshot.docs.map(mapInvite).filter((invite) => {
+      // Filter out revoked invites
+      if (invite.revokedAt) return false;
+      // Filter out expired invites
+      const expiresAt = resolveTimestamp(invite.expiresAt);
+      if (typeof expiresAt === "number" && Date.now() > expiresAt) {
+        return false;
+      }
+      return true;
+    });
+    callback(list);
+  });
+}
+
 export async function redeemInvite(
   token: string,
   userId: string,
