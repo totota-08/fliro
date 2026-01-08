@@ -73,12 +73,21 @@ async function addProjectMember(
   invitedBy = "owner1",
   permissions = {},
 ) {
+  // メンバーロールにはデフォルトでタスク管理権限を付与
+  const canManageTasksDefault = [
+    "member",
+    "admin",
+    "owner",
+    "manager",
+    "pm",
+  ].includes(role);
   await setDoc(doc(db, "projects", projectId, "members", memberId), {
     userId: memberId,
     role,
     permissions: {
       canManageSettings: false,
       canInviteMembers: false,
+      canManageTasks: canManageTasksDefault,
       ...permissions,
     },
     joinedAt: serverTimestamp(),
@@ -485,6 +494,20 @@ describe("Firestore rules / タスク (tasks)", () => {
     const otherDb = testEnv.authenticatedContext("other1").firestore();
     await assertFails(
       updateDoc(doc(otherDb, "projects", "project1", "tasks", "task1"), {
+        status: "done",
+      }),
+    );
+  });
+
+  it("viewerロールのメンバーはタスクを更新できない", async () => {
+    const ownerDb = testEnv.authenticatedContext("owner1").firestore();
+    await createTestProject(ownerDb, "project1", "owner1");
+    await createTestTask(ownerDb, "project1", "task1", "owner1");
+    await addProjectMember(ownerDb, "project1", "viewer1", "viewer", "owner1");
+
+    const viewerDb = testEnv.authenticatedContext("viewer1").firestore();
+    await assertFails(
+      updateDoc(doc(viewerDb, "projects", "project1", "tasks", "task1"), {
         status: "done",
       }),
     );
