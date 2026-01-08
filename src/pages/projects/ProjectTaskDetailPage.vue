@@ -2,6 +2,8 @@
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import TaskForm from "@/components/tasks/TaskForm.vue";
 import TaskStatusBadge from "@/components/ui/TaskStatusBadge.vue";
+import { useProjectAccess } from "@/composables/useProjectAccess";
+import { ProjectPermission } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProject } from "@/firebase/projectService";
 import {
@@ -37,6 +39,11 @@ const { user, profile } = useAuthStore();
 const projectId = ref(String(route.params.projectId));
 const taskId = ref(String(route.params.taskId));
 const project = ref<ProjectDoc | null>(null);
+
+// 権限チェック
+const { can } = useProjectAccess(projectId);
+const canEditTask = computed(() => can(ProjectPermission.MANAGE_TASKS));
+
 const task = ref<TaskDoc | null>(null);
 const messages = ref<TaskDiscussionMessage[]>([]);
 const input = ref("");
@@ -227,7 +234,12 @@ onBeforeUnmount(() => {
           <div class="title-row">
             <h1 class="task-title">{{ task.title }}</h1>
             <TaskStatusBadge :status="task.status" />
-            <button class="edit-button" type="button" @click="openEditModal">
+            <button
+              v-if="canEditTask"
+              class="edit-button"
+              type="button"
+              @click="openEditModal"
+            >
               編集
             </button>
           </div>

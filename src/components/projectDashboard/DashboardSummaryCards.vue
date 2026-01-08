@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import type { DashboardCardConfig } from "@/services/dashboardSettingsService";
 
 export interface SummaryCard {
   id: string;
@@ -27,6 +28,7 @@ const props = withDefaults(
     showHeader?: boolean;
     customizable?: boolean;
     weeklyScore?: WeeklyScore | null;
+    cardConfig?: DashboardCardConfig[];
   }>(),
   {
     title: "Webサイトリニューアル",
@@ -41,6 +43,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "update:visibleCards", cardIds: string[]): void;
   (e: "toggle-customize"): void;
+  (e: "update:cardConfig", config: DashboardCardConfig[]): void;
 }>();
 
 const CARD_VISIBILITY_KEY = "fliro_summary_card_visibility";
@@ -90,12 +93,37 @@ const allCards = computed<SummaryCard[]>(() => {
 });
 
 const cardList = computed<SummaryCard[]>(() => {
+  // If cardConfig is provided from props, use it for ordering and visibility
+  if (props.cardConfig && props.cardConfig.length > 0) {
+    const visibleConfigs = props.cardConfig
+      .filter((c) => c.visible)
+      .sort((a, b) => a.position - b.position);
+
+    return visibleConfigs
+      .map((config) => allCards.value.find((card) => card.id === config.id))
+      .filter((card): card is SummaryCard => card !== undefined);
+  }
+
+  // Fallback to local visibility
   if (!props.customizable || visibleCardIds.value.length === 0) {
     return allCards.value;
   }
   return allCards.value.filter((card) =>
     visibleCardIds.value.includes(card.id),
   );
+});
+
+// Sort cards for customization panel (by position)
+const sortedConfigCards = computed(() => {
+  if (!props.cardConfig || props.cardConfig.length === 0) {
+    return allCards.value.map((card, index) => ({
+      id: card.id,
+      type: card.id,
+      position: index,
+      visible: true,
+    }));
+  }
+  return [...props.cardConfig].sort((a, b) => a.position - b.position);
 });
 
 const isDemo = computed(() => !props.cards || props.cards.length === 0);
@@ -146,6 +174,75 @@ function toggleCardVisibility(cardId: string) {
 function toggleCustomize() {
   isCustomizing.value = !isCustomizing.value;
   emit("toggle-customize");
+}
+
+function getCardLabel(id: string): string {
+  const card = allCards.value.find((c) => c.id === id);
+  return card?.label || id;
+}
+
+function moveCardUp(cardId: string) {
+  if (!props.cardConfig) return;
+
+  const sorted = [...props.cardConfig].sort((a, b) => a.position - b.position);
+  const index = sorted.findIndex((c) => c.id === cardId);
+  if (index <= 0) return;
+
+  // Swap positions
+  const currentCard = sorted[index];
+  const prevCard = sorted[index - 1];
+  if (!currentCard || !prevCard) return;
+
+  const currentPos = currentCard.position;
+  const prevPos = prevCard.position;
+
+  const updated = props.cardConfig.map((c) => {
+    if (c.id === cardId) return { ...c, position: prevPos };
+    if (c.id === prevCard.id) return { ...c, position: currentPos };
+    return c;
+  });
+
+  emit("update:cardConfig", updated);
+}
+
+function moveCardDown(cardId: string) {
+  if (!props.cardConfig) return;
+
+  const sorted = [...props.cardConfig].sort((a, b) => a.position - b.position);
+  const index = sorted.findIndex((c) => c.id === cardId);
+  if (index === -1 || index >= sorted.length - 1) return;
+
+  // Swap positions
+  const currentCard = sorted[index];
+  const nextCard = sorted[index + 1];
+  if (!currentCard || !nextCard) return;
+
+  const currentPos = currentCard.position;
+  const nextPos = nextCard.position;
+
+  const updated = props.cardConfig.map((c) => {
+    if (c.id === cardId) return { ...c, position: nextPos };
+    if (c.id === nextCard.id) return { ...c, position: currentPos };
+    return c;
+  });
+
+  emit("update:cardConfig", updated);
+}
+
+function toggleCardVisible(cardId: string) {
+  if (!props.cardConfig) return;
+
+  // Prevent hiding all cards
+  const visibleCount = props.cardConfig.filter((c) => c.visible).length;
+  const currentCard = props.cardConfig.find((c) => c.id === cardId);
+  if (visibleCount <= 1 && currentCard?.visible) return;
+
+  const updated = props.cardConfig.map((c) => {
+    if (c.id === cardId) return { ...c, visible: !c.visible };
+    return c;
+  });
+
+  emit("update:cardConfig", updated);
 }
 
 watch(
@@ -214,8 +311,79 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <!-- カスタマイズモード -->
-    <div v-if="isCustomizing && props.customizable" class="summary__customize">
+    <!-- カスタマイズモード（cardConfig使用時） -->
+    <div
+      v-if="isCustomizing && props.customizable && props.cardConfig"
+      class="summary__customize"
+    >
+      <p class="summary__customize-label">カードの表示・並び順を設定</p>
+      <div class="summary__customize-list">
+        <div
+          v-for="(config, index) in sortedConfigCards"
+          :key="config.id"
+          class="summary__customize-item"
+        >
+          <label class="summary__customize-checkbox">
+            <input
+              type="checkbox"
+              :checked="config.visible"
+              :disabled="
+                sortedConfigCards.filter((c) => c.visible).length === 1 &&
+                config.visible
+              "
+              @change="toggleCardVisible(config.id)"
+            />
+            <span>{{ getCardLabel(config.id) }}</span>
+          </label>
+          <div class="summary__customize-actions">
+            <button
+              type="button"
+              class="summary__order-btn"
+              :disabled="index === 0"
+              aria-label="上へ移動"
+              @click="moveCardUp(config.id)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="summary__order-btn"
+              :disabled="index === sortedConfigCards.length - 1"
+              aria-label="下へ移動"
+              @click="moveCardDown(config.id)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- カスタマイズモード（レガシー：cardConfig未使用時） -->
+    <div
+      v-else-if="isCustomizing && props.customizable"
+      class="summary__customize"
+    >
       <p class="summary__customize-label">表示するカードを選択</p>
       <div class="summary__customize-options">
         <label
@@ -459,6 +627,74 @@ onBeforeUnmount(() => {
 .summary__customize-option input {
   width: 16px;
   height: 16px;
+}
+
+.summary__customize-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary__customize-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  transition: border-color 150ms ease;
+}
+
+.summary__customize-item:hover {
+  border-color: var(--primary);
+}
+
+.summary__customize-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.summary__customize-checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
+.summary__customize-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.summary__order-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-light);
+  border-radius: 0.5rem;
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.summary__order-btn:hover:not(:disabled) {
+  background: rgba(79, 124, 130, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.summary__order-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .summary__grid {

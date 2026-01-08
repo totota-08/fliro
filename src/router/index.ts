@@ -157,6 +157,12 @@ export const router = createRouter({
       meta: { requiresAuth: true, section: "tasks" },
     },
     {
+      path: "/projects/:projectId/scores",
+      name: ROUTE_NAMES.projectScores,
+      component: () => import("@/pages/projects/ProjectScoresPage.vue"),
+      meta: { requiresAuth: true, section: "scores" },
+    },
+    {
       path: "/tasks",
       name: ROUTE_NAMES.myTasks,
       component: MyTasksPage,
