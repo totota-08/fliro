@@ -206,31 +206,41 @@ function handleNavigate(taskId: string) {
         @dblclick="handleNavigate(task.id)"
       >
         <div class="task-row__content">
-          <p class="task-row__title">{{ task.title }}</p>
-          <span class="task-row__category">{{
-            getCategoryName(task.categoryId)
-          }}</span>
-          <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
-          <span class="task-row__status" :class="taskStatusClass(task)">
-            {{ taskStatusLabel(task.status) }}
-          </span>
-          <div class="task-row__progress">
-            <div class="task-row__progress-bar">
-              <div
-                class="task-row__progress-fill"
-                :style="{ width: `${taskProgress(task)}%` }"
-              />
-            </div>
-            <span class="task-row__progress-value"
-              >{{ taskProgress(task) }}%</span
-            >
+          <div class="task-row__main">
+            <p class="task-row__title">{{ task.title }}</p>
+            <span class="task-row__category">{{
+              getCategoryName(task.categoryId)
+            }}</span>
           </div>
-          <span
-            class="task-row__due"
-            :class="{ 'task-row__due--overdue': isTaskOverdue(task) }"
-          >
-            {{ formatDueDate(task) }}
-          </span>
+          <div class="task-row__meta">
+            <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
+            <span class="task-row__status" :class="taskStatusClass(task)">
+              {{ taskStatusLabel(task.status) }}
+            </span>
+          </div>
+          <div class="task-row__metric task-row__metric--progress">
+            <span class="task-row__metric-label">進捗</span>
+            <div class="task-row__progress">
+              <div class="task-row__progress-bar">
+                <div
+                  class="task-row__progress-fill"
+                  :style="{ width: `${taskProgress(task)}%` }"
+                />
+              </div>
+              <span class="task-row__progress-value"
+                >{{ taskProgress(task) }}%</span
+              >
+            </div>
+          </div>
+          <div class="task-row__metric task-row__metric--due">
+            <span class="task-row__metric-label">期限</span>
+            <span
+              class="task-row__due"
+              :class="{ 'task-row__due--overdue': isTaskOverdue(task) }"
+            >
+              {{ formatDueDate(task) }}
+            </span>
+          </div>
         </div>
       </li>
     </ul>
@@ -362,7 +372,9 @@ function handleNavigate(taskId: string) {
 
 .task-row__content {
   display: grid;
-  grid-template-columns: 1fr auto auto auto auto auto;
+  grid-template-columns:
+    minmax(0, 1.4fr) minmax(140px, 0.8fr) minmax(150px, 0.8fr)
+    minmax(110px, 0.5fr);
   align-items: center;
   gap: var(--ui-space-3, 0.75rem);
 }
@@ -384,6 +396,36 @@ function handleNavigate(taskId: string) {
   .task-row__due {
     justify-self: start;
   }
+}
+
+.task-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
+  min-width: 0;
+}
+
+.task-row__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.task-row__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.task-row__metric-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--ui-text-muted, #94a3b8);
+  text-transform: uppercase;
 }
 
 .task-row__title {
