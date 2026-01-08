@@ -1,4 +1,3 @@
-
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import fs from "node:fs";
 
@@ -18,7 +17,7 @@ export async function setupTestEnv() {
 }
 
 export async function getTestEnv() {
-    return testEnv;
+  return testEnv;
 }
 
 export async function teardownTestEnv() {

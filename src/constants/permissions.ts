@@ -45,6 +45,8 @@ export const ProjectPermission = {
   VIEW_NOTIFICATIONS: "viewNotifications",
   /** 通知設定変更 */
   MANAGE_NOTIFICATIONS: "manageNotifications",
+  /** 週次スコア閲覧（Admin専用） */
+  VIEW_SCORES: "viewScores",
 } as const;
 
 export type ProjectPermissionKey =
@@ -56,7 +58,7 @@ export type ProjectPermissionKey =
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, ProjectPermissionKey[]> =
   {
     owner: Object.values(ProjectPermission),
-    admin: Object.values(ProjectPermission),
+    admin: Object.values(ProjectPermission), // admin も全権限（VIEW_SCORES含む）
     member: [
       ProjectPermission.VIEW_DASHBOARD,
       ProjectPermission.VIEW_TASKS,
@@ -105,6 +107,7 @@ export const ROUTE_REQUIRED_PERMISSIONS: Partial<
   [ROUTE_NAMES.projectActivity]: ProjectPermission.VIEW_ACTIVITY,
   [ROUTE_NAMES.projectNotifications]: ProjectPermission.VIEW_NOTIFICATIONS,
   [ROUTE_NAMES.projectTaskDetail]: ProjectPermission.VIEW_TASKS,
+  [ROUTE_NAMES.projectScores]: ProjectPermission.VIEW_SCORES,
 
   // 認証のみ必要（プロジェクト権限不要）
   [ROUTE_NAMES.myPage]: null,
