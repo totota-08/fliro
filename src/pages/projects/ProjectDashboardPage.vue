@@ -35,6 +35,11 @@ import {
   type TaskDoc,
   type TaskStatus,
 } from "@/services/taskService";
+import {
+  getDashboardSettings,
+  saveDashboardSettings,
+  type DashboardCardConfig,
+} from "@/services/dashboardSettingsService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -80,6 +85,9 @@ const filters = reactive({
 });
 const showMyTasksOnly = ref(false);
 const isTaskModalOpen = ref(false);
+
+// Dashboard card customization
+const cardConfig = ref<DashboardCardConfig[]>([]);
 
 // ProjectAppShell用のデータを取得
 const { navItems, sidebarProjects, profileInfo } =
@@ -202,6 +210,39 @@ function isTaskOverdue(task: TaskDoc) {
   if (!task.dueDate?.seconds) return false;
   const due = task.dueDate.seconds * 1000;
   return due < Date.now() && task.status !== "done";
+}
+
+// Load dashboard card configuration
+async function loadCardConfig() {
+  if (!user.value) return;
+  try {
+    const settings = await getDashboardSettings(
+      user.value.uid,
+      projectId.value,
+    );
+    cardConfig.value = settings.cards;
+  } catch (error) {
+    logger.error`Failed to load dashboard settings: ${error}`;
+    // Use default config on error
+    cardConfig.value = [
+      { id: "overdue", type: "overdue", position: 0, visible: true },
+      { id: "due-soon", type: "due-soon", position: 1, visible: true },
+      { id: "active", type: "active", position: 2, visible: true },
+      { id: "done", type: "done", position: 3, visible: true },
+    ];
+  }
+}
+
+// Handle card config update from DashboardSummaryCards
+async function handleCardConfigUpdate(newConfig: DashboardCardConfig[]) {
+  cardConfig.value = newConfig;
+  if (!user.value) return;
+
+  try {
+    await saveDashboardSettings(user.value.uid, projectId.value, newConfig);
+  } catch (error) {
+    logger.error`Failed to save dashboard settings: ${error}`;
+  }
 }
 
 function normalizeProgress(value: number | null | undefined) {
@@ -328,6 +369,7 @@ function resetWatchers() {
   watchTasks();
   watchCategories();
   watchChat();
+  loadCardConfig();
 }
 
 function closeTaskModal() {
@@ -502,7 +544,10 @@ onBeforeUnmount(() => {
         :description="''"
         :cards="summaryCards"
         :rotate="false"
-        :show-header="false"
+        :show-header="true"
+        :customizable="true"
+        :card-config="cardConfig"
+        @update:card-config="handleCardConfigUpdate"
       />
 
       <DashboardInsights :tasks="tasks" v-model:collapsed="insightsCollapsed" />
