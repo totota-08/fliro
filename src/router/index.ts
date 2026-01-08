@@ -1,9 +1,6 @@
 import ErrorPage from "@/components/errorPage/ErrorPage.vue";
 import NotFoundPage from "@/components/errorPage/404.vue";
-import {
-  ROLE_DEFAULT_PERMISSIONS,
-  ROUTE_REQUIRED_PERMISSIONS,
-} from "@/constants/permissions";
+import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { getCurrentUser } from "@/lib/getCurrentUser";
@@ -328,23 +325,20 @@ router.beforeEach(async (to) => {
         };
       }
 
-      // owner/adminは全権限を持つ
-      if (!access.isOwner && !access.isAdmin) {
-        // ロールベースの権限チェック
-        const rolePermissions = ROLE_DEFAULT_PERMISSIONS[access.role] || [];
-        const hasPermission = rolePermissions.includes(requiredPermission);
+      // owner/adminは全権限を持つ（fetchProjectAccessで既に判定済み）
+      // ロールベースの権限チェック（Firestoreから取得した権限を使用）
+      const hasPermission = access.permissions.includes(requiredPermission);
 
-        if (!hasPermission) {
-          logger.warn`Permission denied: ${access.role} does not have ${requiredPermission}`;
-          return {
-            name: ROUTE_NAMES.error,
-            query: {
-              projectId,
-              errorType: "forbidden",
-              reason: "このページにアクセスする権限がありません。",
-            },
-          };
-        }
+      if (!hasPermission) {
+        logger.warn`Permission denied: ${access.role} does not have ${requiredPermission}`;
+        return {
+          name: ROUTE_NAMES.error,
+          query: {
+            projectId,
+            errorType: "forbidden",
+            reason: "このページにアクセスする権限がありません。",
+          },
+        };
       }
     }
   }

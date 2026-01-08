@@ -204,6 +204,8 @@ export interface ProjectAccessResult {
   isGuest: boolean;
   hasAccess: boolean;
   role: string;
+  /** ロールに紐づく権限配列（Firestoreから取得） */
+  permissions: ProjectPermissionKey[];
   error?: ProjectAccessError;
 }
 
@@ -233,6 +235,7 @@ export async function fetchProjectAccess(
         isGuest: true,
         hasAccess: false,
         role: "",
+        permissions: [],
         error: "not_found",
       };
     }
@@ -250,6 +253,7 @@ export async function fetchProjectAccess(
           isGuest: false,
           hasAccess: true,
           role: "owner",
+          permissions: ROLE_DEFAULT_PERMISSIONS.owner || [],
         };
       }
 
@@ -260,6 +264,7 @@ export async function fetchProjectAccess(
         isGuest: true,
         hasAccess: false,
         role: "",
+        permissions: [],
         error: "permission",
       };
     }
@@ -270,6 +275,37 @@ export async function fetchProjectAccess(
     const isMember = isAdmin || role === "member";
     const isGuest = role === "viewer";
 
+    // owner/adminは全権限を持つ
+    if (isOwner || isAdmin) {
+      return {
+        isOwner,
+        isAdmin,
+        isMember,
+        isGuest,
+        hasAccess: true,
+        role,
+        permissions: ROLE_DEFAULT_PERMISSIONS.owner || [],
+      };
+    }
+
+    // Firestoreからロールの権限を取得
+    let permissions: ProjectPermissionKey[] = [];
+    try {
+      const roleSnap = await getDoc(
+        doc(db, "projects", projectId, "roles", role),
+      );
+      if (roleSnap.exists()) {
+        const roleData = roleSnap.data();
+        permissions = (roleData.permissions || []) as ProjectPermissionKey[];
+      } else {
+        // ロールドキュメントがない場合はデフォルト権限を使用
+        permissions = ROLE_DEFAULT_PERMISSIONS[role] || [];
+      }
+    } catch {
+      // ロール取得に失敗した場合はデフォルト権限を使用
+      permissions = ROLE_DEFAULT_PERMISSIONS[role] || [];
+    }
+
     return {
       isOwner,
       isAdmin,
@@ -277,6 +313,7 @@ export async function fetchProjectAccess(
       isGuest,
       hasAccess: true,
       role,
+      permissions,
     };
   } catch (error) {
     // ネットワークエラーやFirebaseエラーの場合
@@ -287,6 +324,7 @@ export async function fetchProjectAccess(
       isGuest: true,
       hasAccess: false,
       role: "",
+      permissions: [],
       error: "network",
     };
   }
