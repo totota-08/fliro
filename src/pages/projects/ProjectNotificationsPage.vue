@@ -50,6 +50,46 @@ let stopMembers: (() => void) | null = null;
 const { navItems, sidebarProjects, profileInfo } =
   useProjectShellData(projectId);
 
+// 通知設定（computedより先に定義）
+type NotificationSettings = {
+  mention: boolean;
+  deadline: boolean;
+  assignment: boolean;
+};
+
+const NOTIFICATION_SETTINGS_KEY = "fliro_notification_settings";
+
+const notificationSettings = ref<NotificationSettings>({
+  mention: true,
+  deadline: true,
+  assignment: true,
+});
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+    if (raw) {
+      notificationSettings.value = {
+        ...notificationSettings.value,
+        ...(JSON.parse(raw) as NotificationSettings),
+      };
+    }
+  } catch (error) {
+    logger.warn`Failed to load notification settings: ${error}`;
+  }
+}
+
+function persistSettings() {
+  try {
+    localStorage.setItem(
+      NOTIFICATION_SETTINGS_KEY,
+      JSON.stringify(notificationSettings.value),
+    );
+  } catch (error) {
+    logger.warn`Failed to save notification settings: ${error}`;
+  }
+}
+
 const notifications = computed<NotificationItem[]>(() => {
   const me = user.value?.uid;
   const displayName = profile.value?.nickname || profile.value?.fullName || "";
@@ -187,45 +227,6 @@ function requestPushPermission() {
   Notification.requestPermission().then((permission) => {
     permissionState.value = permission;
   });
-}
-
-type NotificationSettings = {
-  mention: boolean;
-  deadline: boolean;
-  assignment: boolean;
-};
-
-const NOTIFICATION_SETTINGS_KEY = "fliro_notification_settings";
-
-const notificationSettings = ref<NotificationSettings>({
-  mention: true,
-  deadline: true,
-  assignment: true,
-});
-
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
-    if (raw) {
-      notificationSettings.value = {
-        ...notificationSettings.value,
-        ...(JSON.parse(raw) as NotificationSettings),
-      };
-    }
-  } catch (error) {
-    logger.warn`Failed to load notification settings: ${error}`;
-  }
-}
-
-function persistSettings() {
-  try {
-    localStorage.setItem(
-      NOTIFICATION_SETTINGS_KEY,
-      JSON.stringify(notificationSettings.value),
-    );
-  } catch (error) {
-    logger.warn`Failed to save notification settings: ${error}`;
-  }
 }
 
 function openNotification(item: NotificationItem) {

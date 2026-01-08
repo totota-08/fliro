@@ -190,19 +190,31 @@ export function useProjectAccess(projectId: Ref<string>) {
 }
 
 /**
- * 権限を一度だけ取得する（非リアクティブ）
+ * プロジェクトアクセス権取得時のエラー種別
  */
-export async function fetchProjectAccess(
-  projectId: string,
-  userId: string,
-): Promise<{
+export type ProjectAccessError = "network" | "not_found" | "permission";
+
+/**
+ * プロジェクトアクセス権取得の結果
+ */
+export interface ProjectAccessResult {
   isOwner: boolean;
   isAdmin: boolean;
   isMember: boolean;
   isGuest: boolean;
   hasAccess: boolean;
   role: string;
-}> {
+  error?: ProjectAccessError;
+}
+
+/**
+ * 権限を一度だけ取得する（非リアクティブ）
+ * オーナーはメンバードキュメントが存在しなくてもアクセス可能
+ */
+export async function fetchProjectAccess(
+  projectId: string,
+  userId: string,
+): Promise<ProjectAccessResult> {
   try {
     const [projectSnap, memberSnap] = await Promise.all([
       getDoc(doc(db, "projects", projectId)),
@@ -212,7 +224,8 @@ export async function fetchProjectAccess(
     const project = projectSnap.exists() ? projectSnap.data() : null;
     const member = memberSnap.exists() ? memberSnap.data() : null;
 
-    if (!member) {
+    // プロジェクトが存在しない場合
+    if (!project) {
       return {
         isOwner: false,
         isAdmin: false,
@@ -220,11 +233,39 @@ export async function fetchProjectAccess(
         isGuest: true,
         hasAccess: false,
         role: "",
+        error: "not_found",
+      };
+    }
+
+    // オーナー判定を優先（メンバードキュメントがなくてもオーナーならアクセス可能）
+    const isOwnerByProject = project.ownerUserId === userId;
+
+    if (!member) {
+      // メンバードキュメントがなくても、オーナーならアクセス可能
+      if (isOwnerByProject) {
+        return {
+          isOwner: true,
+          isAdmin: true,
+          isMember: true,
+          isGuest: false,
+          hasAccess: true,
+          role: "owner",
+        };
+      }
+
+      return {
+        isOwner: false,
+        isAdmin: false,
+        isMember: false,
+        isGuest: true,
+        hasAccess: false,
+        role: "",
+        error: "permission",
       };
     }
 
     const role = (member.projectRole || member.role || "member").toLowerCase();
-    const isOwner = project?.ownerUserId === userId || role === "owner";
+    const isOwner = isOwnerByProject || role === "owner";
     const isAdmin = isOwner || role === "admin";
     const isMember = isAdmin || role === "member";
     const isGuest = role === "viewer";
@@ -237,7 +278,8 @@ export async function fetchProjectAccess(
       hasAccess: true,
       role,
     };
-  } catch {
+  } catch (error) {
+    // ネットワークエラーやFirebaseエラーの場合
     return {
       isOwner: false,
       isAdmin: false,
@@ -245,6 +287,7 @@ export async function fetchProjectAccess(
       isGuest: true,
       hasAccess: false,
       role: "",
+      error: "network",
     };
   }
 }

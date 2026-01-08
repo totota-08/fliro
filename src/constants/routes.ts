@@ -25,5 +25,6 @@ export const ROUTE_NAMES = {
   secretChat: "secret-chat",
   forbidden: "forbidden",
   notFound: "not-found",
+  error: "error",
   demoDashboard: "demo.dashboard",
 } as const;
