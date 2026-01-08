@@ -294,7 +294,6 @@ function watchProject() {
 function watchTasks() {
   stopTasks = listenTasks(projectId.value, (list) => {
     tasks.value = list;
-    evaluateNotifications();
   });
 }
 
