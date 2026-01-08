@@ -10,7 +10,7 @@
     "lint": "eslint . --ext .js,.ts --fix",
     "format": "prettier --write .",
     "typecheck": "vue-tsc --noEmit",
-    "test:rules": "firebase emulators:exec --project test-project --only firestore \"node --test tests/*.test.mjs\"",
+    "test:rules": "firebase emulators:exec --project test-project --only firestore \"node --test --test-concurrency=1 tests/*.test.mjs\"",
     "prepare": "husky"
   },
   "dependencies": {

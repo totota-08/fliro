@@ -693,6 +693,9 @@ describe("Firestore rules / スレッド (threads)", () => {
       userId: "owner1",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      description: null,
+      isPublic: null,
+      allowedUserIds: null,
     });
     await addProjectMember(ownerDb, "project1", "member1", "member", "owner1");
 
@@ -714,14 +717,14 @@ describe("Firestore rules / スレッド (threads)", () => {
       userId: "member1",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      description: null,
+      isPublic: null,
+      allowedUserIds: null,
     });
 
     await assertSucceeds(
       updateDoc(doc(memberDb, "projects", "project1", "threads", "thread1"), {
         name: "Updated Thread",
-        createdBy: "member1",
-        userId: "member1",
-        createdAt: serverTimestamp(), // Keep same
         updatedAt: serverTimestamp(),
       })
     );
@@ -739,6 +742,9 @@ describe("Firestore rules / スレッド (threads)", () => {
       userId: "member1",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      description: null,
+      isPublic: null,
+      allowedUserIds: null,
     });
 
     await assertSucceeds(
@@ -755,6 +761,9 @@ describe("Firestore rules / スレッド (threads)", () => {
       userId: "owner1",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      description: null,
+      isPublic: null,
+      allowedUserIds: null,
     });
     await addProjectMember(ownerDb, "project1", "member1", "member", "owner1");
 

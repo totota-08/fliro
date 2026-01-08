@@ -10,23 +10,26 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import fs from "node:fs";
 
 let testEnv;
 
-async function createInvite(db, token = "invite123") {
+async function createInvite(db, token = "invite123", createdAt = null) {
+  const timestamp = createdAt || Timestamp.now();
   await setDoc(doc(db, "projectInvites", token), {
     projectId: "project1",
     projectName: "Test Project",
     createdBy: "owner1",
     status: "pending",
-    createdAt: serverTimestamp(),
+    createdAt: timestamp,
     usedCount: 0,
     maxUses: 10,
     expiresAt: null,
     passwordHash: null,
   });
+  return timestamp;
 }
 
 describe("Firestore rules / 招待機能", () => {
@@ -93,13 +96,15 @@ describe("Firestore rules / 招待機能", () => {
 
   it("認証済みユーザーは自身の招待受諾として更新できる", async () => {
     const ownerDb = testEnv.authenticatedContext("owner1").firestore();
-    await createInvite(ownerDb, "invite-accept");
+    const createdAt = await createInvite(ownerDb, "invite-accept");
 
     const userDb = testEnv.authenticatedContext("user2").firestore();
     await assertSucceeds(
       updateDoc(doc(userDb, "projectInvites", "invite-accept"), {
         projectId: "project1",
+        projectName: "Test Project",
         createdBy: "owner1",
+        createdAt: createdAt,
         status: "accepted",
         acceptedBy: "user2",
         acceptedAt: serverTimestamp(),
