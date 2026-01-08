@@ -3,7 +3,6 @@
  * DashboardInsights コンポーネント
  *
  * プロジェクトの進捗、ステータス別タスク数、ヘルススコアを表示するチャート群。
- * 折りたたみ可能。
  */
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
 import { computed } from "vue";
@@ -11,17 +10,9 @@ import { computed } from "vue";
 interface Props {
   /** タスク一覧 */
   tasks: TaskDoc[];
-  /** 折りたたみ状態 */
-  collapsed?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  collapsed: false,
-});
-
-const emit = defineEmits<{
-  "update:collapsed": [value: boolean];
-}>();
+const props = defineProps<Props>();
 
 // 全体の進捗率
 const overallProgress = computed(() => {
@@ -116,46 +107,15 @@ function isTaskOverdue(task: TaskDoc) {
   const due = task.dueDate.seconds * 1000;
   return due < Date.now() && task.status !== "done";
 }
-
-function toggleCollapse() {
-  emit("update:collapsed", !props.collapsed);
-}
 </script>
 
 <template>
-  <section class="dashboard-insights" :class="{ 'is-collapsed': collapsed }">
+  <section class="dashboard-insights">
     <header class="dashboard-insights__header">
       <h3 class="dashboard-insights__title">インサイト</h3>
-      <button
-        type="button"
-        class="dashboard-insights__toggle"
-        :aria-expanded="!collapsed"
-        aria-controls="insights-content"
-        @click="toggleCollapse"
-      >
-        <svg
-          class="dashboard-insights__toggle-icon"
-          :class="{ 'is-collapsed': collapsed }"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-        <span class="sr-only">{{ collapsed ? "展開" : "折りたたむ" }}</span>
-      </button>
     </header>
 
-    <div
-      v-show="!collapsed"
-      id="insights-content"
-      class="dashboard-insights__content"
-    >
+    <div class="dashboard-insights__content">
       <div class="dashboard-insights__charts">
         <!-- 全体の進捗 -->
         <div class="chart-card chart-card--progress">
@@ -338,54 +298,11 @@ function toggleCollapse() {
   margin-bottom: var(--gap-lg, 1rem);
 }
 
-.dashboard-insights.is-collapsed .dashboard-insights__header {
-  margin-bottom: 0;
-}
-
 .dashboard-insights__title {
   margin: 0;
   font-size: var(--font-size-lg, 1.15rem);
   font-weight: var(--font-weight-bold, 700);
   color: var(--brand, #0b2e33);
-}
-
-.dashboard-insights__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border-color, rgba(11, 46, 51, 0.12));
-  border-radius: var(--radius-sm, 0.5rem);
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.dashboard-insights__toggle:hover {
-  background: var(--surface-hover, rgba(11, 46, 51, 0.04));
-}
-
-.dashboard-insights__toggle-icon {
-  transition: transform 0.2s ease;
-  color: var(--text-muted, #4f7c82);
-}
-
-.dashboard-insights__toggle-icon.is-collapsed {
-  transform: rotate(-90deg);
-}
-
-.dashboard-insights__content {
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .dashboard-insights__charts {

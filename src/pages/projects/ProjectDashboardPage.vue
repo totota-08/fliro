@@ -88,7 +88,6 @@ const filters = reactive({
 const showMyTasksOnly = ref(false);
 const isSidebarOpen = ref(true);
 const isTaskModalOpen = ref(false);
-const insightsCollapsed = ref(true); // デフォルトで折りたたむ（Now First設計）
 
 let stopTasks: (() => void) | null = null;
 let stopProject: (() => void) | null = null;
@@ -193,8 +192,8 @@ const summaryCards = computed<SummaryCard[]>(() => {
   cards.push({
     id: "done",
     label: "完了",
-    value: `${done}/${total}`,
-    caption: "タスク完了数",
+    value: String(done),
+    caption: "完了タスク数",
     tone: done === total && total > 0 ? "success" : "neutral",
     icon: "check",
   });
@@ -607,6 +606,9 @@ onBeforeUnmount(() => {
         </section>
         <NotificationBar :notifications="notificationsBar" />
 
+        <!-- インサイト: 常時表示 -->
+        <DashboardInsights :tasks="tasks" />
+
         <!-- サマリーカード: Now First設計でアクション指向 -->
         <DashboardSummaryCards
           :title="project?.name || 'ダッシュボード'"
@@ -614,12 +616,6 @@ onBeforeUnmount(() => {
           :cards="summaryCards"
           :rotate="false"
           :show-header="false"
-        />
-
-        <!-- インサイト: デフォルトで折りたたみ（詳細は展開して確認） -->
-        <DashboardInsights
-          :tasks="tasks"
-          v-model:collapsed="insightsCollapsed"
         />
 
         <div class="demo__grid">
