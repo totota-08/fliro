@@ -225,6 +225,19 @@ const handleNavigate = () => {
                   stroke-width="1.3"
                 />
               </svg>
+              <svg
+                v-else-if="item.icon === 'scores'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  d="M18 20V10M12 20V4M6 20v-6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.8"
+                />
+              </svg>
             </span>
             {{ item.label }}
           </RouterLink>
