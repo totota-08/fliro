@@ -2,12 +2,9 @@
 import InviteCreateDrawer from "@/components/invites/InviteCreateDrawer.vue";
 import ButtonLoading from "@/components/loading/ButtonLoading.vue";
 import PageSkeleton from "@/components/loading/PageSkeleton.vue";
-import { appName } from "@/constants/appMeta";
 import { buildPermissionsFromRoles } from "@/constants/roles";
-import { ROUTE_NAMES } from "@/constants/routes";
-import { buildFilteredProjectNavItems } from "@/constants/projectNav";
-import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
@@ -23,13 +20,7 @@ import {
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const logger = getLogger("app.pages.projects.ProjectInvites");
@@ -44,7 +35,6 @@ type MemberSummary = {
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const project = ref<ProjectDoc | null>(null);
-const projectList = ref<{ id: string; name: string }[]>([]);
 const members = ref<MemberSummary[]>([]);
 const statusFilter = ref<InviteFilter>("all");
 const inviteQuery = ref("");
@@ -62,28 +52,9 @@ let stopMembers: (() => void) | null = null;
 let stopInvites: (() => void) | null = null;
 let actionTimer: ReturnType<typeof setTimeout> | null = null;
 
-// 権限フィルタリング付きナビゲーション
-const { can } = useProjectAccess(projectId);
-const navItems = computed(() =>
-  buildFilteredProjectNavItems(projectId.value, can),
-);
-
-const sidebarProjects = computed(() =>
-  projectList.value.map((entry, index) => ({
-    key: entry.id,
-    label: entry.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
+// ProjectAppShell用のデータ
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
 
 const memberNameMap = computed(() => {
   const map = new Map<string, string>();
@@ -265,18 +236,6 @@ async function revokeInvite(invite: ProjectInvite) {
   }
 }
 
-function loadProjectList() {
-  if (!user.value) return;
-  getDocs(collection(db, "userProjects", user.value.uid, "projects")).then(
-    (snap) => {
-      projectList.value = snap.docs.map((docSnap) => ({
-        id: docSnap.id,
-        name: (docSnap.data().projectName as string) || "Project",
-      }));
-    },
-  );
-}
-
 function watchProject() {
   stopProject?.();
   stopMembers?.();
@@ -419,7 +378,6 @@ function handleInviteCreated(_link: string) {
 }
 
 onMounted(() => {
-  loadProjectList();
   watchProject();
   watchInvites();
 });
@@ -457,7 +415,7 @@ onBeforeUnmount(() => {
 
     <PageSkeleton v-if="isInitialLoading" variant="invites" />
     <template v-else>
-      <div class="demo__content demo__content--condensed">
+      <div class="invites-content">
         <section class="invites-page">
           <header class="invites-page__header">
             <div>
@@ -620,24 +578,19 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import "@/pages/demo/styles/demo-shell.css";
-
-.demo__main {
-  overflow: hidden;
-}
-
-.demo__content {
+.invites-content {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-8, 2rem);
-  height: calc(100vh - var(--ui-topbar-height, 64px));
+  gap: var(--ui-space-8);
+  padding: var(--ui-space-6);
+  height: calc(100vh - var(--ui-topbar-height));
   min-height: 0;
   box-sizing: border-box;
 }
 
 @supports (height: 100dvh) {
-  .demo__content {
-    height: calc(100dvh - var(--ui-topbar-height, 64px));
+  .invites-content {
+    height: calc(100dvh - var(--ui-topbar-height));
   }
 }
 

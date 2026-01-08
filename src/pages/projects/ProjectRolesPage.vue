@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { appName } from "@/constants/appMeta";
-import { ROUTE_NAMES } from "@/constants/routes";
-import { buildFilteredProjectNavItems } from "@/constants/projectNav";
 import { ProjectPermission } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectAccess } from "@/composables/useProjectAccess";
+import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import {
   listenProjectMembers,
@@ -26,32 +24,11 @@ let stopMembers: (() => void) | null = null;
 
 // useProjectAccess で権限管理を統一
 const { can } = useProjectAccess(projectId);
-
 const canEdit = computed(() => can(ProjectPermission.MANAGE_ROLES));
 
-const navItems = computed(() =>
-  buildFilteredProjectNavItems(projectId.value, can),
-);
-
-const sidebarProjects = computed(() =>
-  members.value.map((member, index) => ({
-    key: member.userId,
-    label: member.displayName || member.userId,
-    to: {
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: projectId.value },
-    },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
+// ProjectAppShell用のデータ
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
 
 const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
 
@@ -186,8 +163,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import "@/pages/demo/styles/demo-shell.css";
-
 .roles-content {
   padding: 0 var(--ui-space-6, 1.5rem) var(--ui-space-8, 2rem);
   display: flex;

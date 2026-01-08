@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
-import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildFilteredProjectNavItems } from "@/constants/projectNav";
-import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
-import { db } from "@/lib/firebase";
 import { listenProjectChat, type ChatMessage } from "@/services/projectChat";
 import {
   listenProjectMembers,
@@ -16,7 +13,6 @@ import { listenTimeline, type TimelinePost } from "@/services/timelineService";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
-import { collection, getDocs } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
@@ -35,7 +31,6 @@ const logger = getLogger("app.pages.projects.Notifications");
 const router = useRouter();
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
-const projectList = ref<{ id: string; name: string }[]>([]);
 const tasks = ref<TaskDoc[]>([]);
 const timeline = ref<TimelinePost[]>([]);
 const chatMessages = ref<ChatMessage[]>([]);
@@ -51,31 +46,9 @@ let stopTimeline: (() => void) | null = null;
 let stopChat: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 
-// 権限フィルタリング付きナビゲーション
-const { can } = useProjectAccess(projectId);
-const navItems = computed(() =>
-  buildFilteredProjectNavItems(projectId.value, can),
-);
-
-const sidebarProjects = computed(() =>
-  projectList.value.map((project, index) => ({
-    key: project.id,
-    label: project.name,
-    to: {
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: project.id },
-    },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
+// ProjectAppShell用のデータ
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
 
 const notifications = computed<NotificationItem[]>(() => {
   const me = user.value?.uid;
@@ -281,20 +254,8 @@ function resetWatchers() {
   );
 }
 
-async function loadProjectList() {
-  if (!user.value) return;
-  const snap = await getDocs(
-    collection(db, "userProjects", user.value.uid, "projects"),
-  );
-  projectList.value = snap.docs.map((docSnap) => ({
-    id: docSnap.id,
-    name: (docSnap.data().projectName as string) || "Project",
-  }));
-}
-
 onMounted(() => {
   loadSettings();
-  loadProjectList();
   resetWatchers();
 });
 
@@ -466,8 +427,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import "@/pages/demo/styles/demo-shell.css";
-
 .notify-content {
   padding: 0 var(--ui-space-6, 1.5rem) var(--ui-space-8, 2rem);
   display: flex;

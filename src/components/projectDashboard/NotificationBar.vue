@@ -29,51 +29,51 @@ const typeLabel: Record<NotificationType, string> = {
 <style scoped>
 .notification-bar {
   display: grid;
-  gap: 0.4rem;
-  margin-bottom: 0.8rem;
+  gap: var(--ui-space-1);
+  margin-bottom: var(--ui-space-3);
 }
 
 .notification {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 0.75rem;
-  font-size: 0.95rem;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-base);
 }
 
 .notification__label {
-  font-weight: 700;
-  font-size: 0.85rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.65rem;
-  background: rgba(0, 0, 0, 0.08);
+  font-weight: var(--ui-font-bold);
+  font-size: var(--ui-text-sm);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-border-light);
 }
 
 .notification--info {
-  background: rgba(79, 124, 130, 0.08);
-  color: #0b2e33;
+  background: var(--ui-notify-info-bg);
+  color: var(--ui-brand-900);
 }
 
 .notification--info .notification__label {
-  background: rgba(79, 124, 130, 0.18);
+  background: var(--ui-notify-info-label);
 }
 
 .notification--warning {
-  background: rgba(255, 202, 99, 0.16);
-  color: #7c4a00;
+  background: var(--ui-notify-warning-bg);
+  color: var(--ui-warning-text);
 }
 
 .notification--warning .notification__label {
-  background: rgba(255, 202, 99, 0.35);
+  background: var(--ui-notify-warning-label);
 }
 
 .notification--critical {
-  background: rgba(220, 38, 38, 0.15);
-  color: #991b1b;
+  background: var(--ui-notify-critical-bg);
+  color: var(--ui-danger-text);
 }
 
 .notification--critical .notification__label {
-  background: rgba(220, 38, 38, 0.25);
+  background: var(--ui-notify-critical-label);
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import WeeklyEventSparkline from "@/components/projectActivity/WeeklyEventSparkline.vue";
+import { useProjectShellData } from "@/composables/useProjectShellData";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import {
   fetchProjectEventsPage,
   listenProjectEvents,
@@ -28,43 +29,45 @@ type IconDef = { path: string; bg: string; color: string };
 const iconMap = {
   task: {
     path: iconPath("task"),
-    bg: "var(--surface-muted, #eef2f7)",
-    color: "#0b2e33",
+    bg: "var(--ui-surface-muted)",
+    color: "var(--ui-brand-900)",
   },
   check: {
     path: iconPath("check"),
-    bg: "var(--surface-muted, #eef7f1)",
-    color: "#0f5132",
+    bg: "var(--ui-success-light)",
+    color: "var(--ui-success-text)",
   },
   clock: {
     path: iconPath("clock"),
-    bg: "var(--surface-muted, #f5f2ff)",
-    color: "#3f2e8c",
+    bg: "var(--ui-info-light)",
+    color: "var(--ui-info)",
   },
   user: {
     path: iconPath("user"),
-    bg: "var(--surface-muted, #eef2f7)",
-    color: "#0b2e33",
+    bg: "var(--ui-surface-muted)",
+    color: "var(--ui-brand-900)",
   },
   bot: {
     path: iconPath("bot"),
-    bg: "var(--surface-muted, #f2f4f8)",
-    color: "#1f2937",
+    bg: "var(--ui-surface-muted)",
+    color: "var(--ui-text-strong)",
   },
   alert: {
     path: iconPath("alert"),
-    bg: "var(--surface-muted, #fff3f3)",
-    color: "#b91c1c",
+    bg: "var(--ui-danger-light)",
+    color: "var(--ui-danger-text)",
   },
   note: {
     path: iconPath("note"),
-    bg: "var(--surface-muted, #eef2f7)",
-    color: "#0b2e33",
+    bg: "var(--ui-surface-muted)",
+    color: "var(--ui-brand-900)",
   },
 } satisfies Record<string, IconDef>;
 
 const route = useRoute();
 const projectId = ref(String(route.params.projectId || ""));
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
 const filterType = ref<ProjectEventCategory | "all">("all");
 const loading = ref(true);
 const loadingMore = ref(false);
@@ -315,168 +318,144 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="activity-shell">
-    <ProjectSidebar
-      :open="true"
-      :project-id="projectId"
-      brand-subtitle="ログ"
-    />
-    <main class="activity-shell__main">
-      <header class="log-header">
-        <div class="log-header__titles">
-          <p class="log-header__breadcrumb">プロジェクト &gt; ログ</p>
-          <div class="log-header__row">
-            <h1 class="log-header__title">活動ログ</h1>
-            <span class="log-header__count"
-              >{{ decoratedEvents.length }}件</span
-            >
-          </div>
-        </div>
-      </header>
-
-      <div class="log-layout">
-        <div class="log-content">
-          <section class="log-toolbar">
-            <label class="log-filter">
-              <span class="log-filter__label">種類</span>
-              <select v-model="filterType" class="log-filter__select">
-                <option value="all">すべて</option>
-                <option value="task">タスク</option>
-                <option value="decision">決定</option>
-                <option value="member">メンバー</option>
-                <option value="bot">Bot</option>
-              </select>
-            </label>
-          </section>
-
-          <section class="log-list">
-            <div v-if="loading" class="log-state">読み込み中です…</div>
-            <div v-else-if="!decoratedEvents.length" class="log-state">
-              該当するイベントがありません。
-            </div>
-            <ul
-              v-else
-              class="log-rows"
-              :class="{ 'is-scrollable': isLogExpanded }"
-            >
-              <li
-                v-for="item in displayedEvents"
-                :key="item.event.id"
-                class="log-row"
-              >
-                <div class="log-icon" :style="iconStyles(item.event)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path
-                      :d="iconPathForEvent(item.event)"
-                      stroke-width="1.6"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div class="log-main">
-                  <p class="log-title">{{ item.title }}</p>
-                  <p class="log-desc">{{ item.description }}</p>
-                  <p class="log-meta">
-                    <span>{{ item.event.actorName }}</span>
-                    <span class="dot">•</span>
-                    <span>{{ item.event.origin }}</span>
-                  </p>
-                </div>
-                <span class="log-time">{{
-                  formatTimestamp(item.event.createdAt)
-                }}</span>
-              </li>
-            </ul>
-
-            <div v-if="showLoadMoreButton" class="log-load-more">
-              <button
-                type="button"
-                class="log-load-more__btn log-more-btn"
-                :disabled="loadingMore"
-                @click="handleLoadMoreAction"
-              >
-                {{ loadMoreLabel }}
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <aside class="log-aside">
-          <div class="log-aside__card">
-            <div class="log-aside__header">
-              <h3>今週のイベント</h3>
-              <span class="log-aside__sub">直近7日・件</span>
-            </div>
-            <p class="log-aside__subtitle">
-              直近7日の日別イベント数
-              <span class="log-aside__total"
-                >合計 {{ weeklyTotals.week }}件</span
-              >
-            </p>
-            <WeeklyEventSparkline
-              :series="weeklySeries"
-              :today-key="todayKey"
-            />
-            <div class="log-aside__summary">
-              <div class="log-aside__stat">
-                <p class="log-aside__label">今日</p>
-                <p class="log-aside__value">{{ weeklyTotals.today }}</p>
-                <span class="log-aside__unit">件</span>
-              </div>
-              <div class="log-aside__stat">
-                <p class="log-aside__label">今週</p>
-                <p class="log-aside__value">{{ weeklyTotals.week }}</p>
-                <span class="log-aside__unit">件</span>
-              </div>
-            </div>
-          </div>
-          <div class="log-aside__card">
-            <div class="log-aside__header">
-              <h3>種別別（今週）</h3>
-            </div>
-            <ul class="log-aside__list">
-              <li>
-                <span>タスク</span>
-                <strong>{{ weeklyTotals.categoryTotals.task }}</strong>
-              </li>
-              <li>
-                <span>アサイン/その他</span>
-                <strong>{{ weeklyTotals.categoryTotals.assignment }}</strong>
-              </li>
-              <li>
-                <span>メンバー</span>
-                <strong>{{ weeklyTotals.categoryTotals.member }}</strong>
-              </li>
-            </ul>
-          </div>
-        </aside>
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+    brand-subtitle="ログ"
+  >
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; ログ</p>
+      <div class="log-header__row">
+        <h1 class="project-app-shell__heading">活動ログ</h1>
+        <span class="log-header__count">{{ decoratedEvents.length }}件</span>
       </div>
-    </main>
-  </div>
+    </template>
+
+    <div class="log-layout">
+      <div class="log-content">
+        <section class="log-toolbar">
+          <label class="log-filter">
+            <span class="log-filter__label">種類</span>
+            <select v-model="filterType" class="log-filter__select">
+              <option value="all">すべて</option>
+              <option value="task">タスク</option>
+              <option value="decision">決定</option>
+              <option value="member">メンバー</option>
+              <option value="bot">Bot</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="log-list">
+          <div v-if="loading" class="log-state">読み込み中です…</div>
+          <div v-else-if="!decoratedEvents.length" class="log-state">
+            該当するイベントがありません。
+          </div>
+          <ul
+            v-else
+            class="log-rows"
+            :class="{ 'is-scrollable': isLogExpanded }"
+          >
+            <li
+              v-for="item in displayedEvents"
+              :key="item.event.id"
+              class="log-row"
+            >
+              <div class="log-icon" :style="iconStyles(item.event)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path
+                    :d="iconPathForEvent(item.event)"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div class="log-main">
+                <p class="log-title">{{ item.title }}</p>
+                <p class="log-desc">{{ item.description }}</p>
+                <p class="log-meta">
+                  <span>{{ item.event.actorName }}</span>
+                  <span class="dot">•</span>
+                  <span>{{ item.event.origin }}</span>
+                </p>
+              </div>
+              <span class="log-time">{{
+                formatTimestamp(item.event.createdAt)
+              }}</span>
+            </li>
+          </ul>
+
+          <div v-if="showLoadMoreButton" class="log-load-more">
+            <button
+              type="button"
+              class="log-load-more__btn log-more-btn"
+              :disabled="loadingMore"
+              @click="handleLoadMoreAction"
+            >
+              {{ loadMoreLabel }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <aside class="log-aside">
+        <div class="log-aside__card">
+          <div class="log-aside__header">
+            <h3>今週のイベント</h3>
+            <span class="log-aside__sub">直近7日・件</span>
+          </div>
+          <p class="log-aside__subtitle">
+            直近7日の日別イベント数
+            <span class="log-aside__total">合計 {{ weeklyTotals.week }}件</span>
+          </p>
+          <WeeklyEventSparkline :series="weeklySeries" :today-key="todayKey" />
+          <div class="log-aside__summary">
+            <div class="log-aside__stat">
+              <p class="log-aside__label">今日</p>
+              <p class="log-aside__value">{{ weeklyTotals.today }}</p>
+              <span class="log-aside__unit">件</span>
+            </div>
+            <div class="log-aside__stat">
+              <p class="log-aside__label">今週</p>
+              <p class="log-aside__value">{{ weeklyTotals.week }}</p>
+              <span class="log-aside__unit">件</span>
+            </div>
+          </div>
+        </div>
+        <div class="log-aside__card">
+          <div class="log-aside__header">
+            <h3>種別別（今週）</h3>
+          </div>
+          <ul class="log-aside__list">
+            <li>
+              <span>タスク</span>
+              <strong>{{ weeklyTotals.categoryTotals.task }}</strong>
+            </li>
+            <li>
+              <span>アサイン/その他</span>
+              <strong>{{ weeklyTotals.categoryTotals.assignment }}</strong>
+            </li>
+            <li>
+              <span>メンバー</span>
+              <strong>{{ weeklyTotals.categoryTotals.member }}</strong>
+            </li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>
-@import "@/pages/demo/styles/demo-shell.css";
-
-.activity-shell {
-  display: flex;
-  min-height: 100vh;
-  background: var(--ui-bg, #f5fcff);
-}
-
-@supports (min-height: 100dvh) {
-  .activity-shell {
-    min-height: 100dvh;
-  }
-}
-
-.activity-shell__main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: var(--ui-space-5, 1.25rem) var(--ui-space-6, 1.5rem)
-    var(--ui-space-8, 2rem);
+.log-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--ui-space-5);
+  align-items: start;
+  padding: var(--ui-space-6);
 }
 
 .log-content {
@@ -487,27 +466,10 @@ onBeforeUnmount(() => {
   gap: var(--ui-space-3, 0.75rem);
 }
 
-.log-header {
-  margin-bottom: var(--ui-space-3, 0.75rem);
-}
-
-.log-header__breadcrumb {
-  margin: 0;
-  color: var(--ui-text-muted, #64748b);
-  font-size: var(--ui-text-sm, 0.875rem);
-}
-
 .log-header__row {
   display: flex;
   align-items: center;
   gap: var(--ui-space-3, 0.75rem);
-}
-
-.log-header__title {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-2xl, 1.5rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text-strong, #0f172a);
 }
 
 .log-header__count {
@@ -517,13 +479,6 @@ onBeforeUnmount(() => {
   color: var(--ui-brand-900, #0b2e33);
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
-}
-
-.log-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: var(--ui-space-5, 1.25rem);
-  align-items: start;
 }
 
 .log-toolbar {
@@ -798,10 +753,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .activity-shell__main {
-    padding: var(--ui-space-4, 1rem);
-  }
-
   .log-layout {
     grid-template-columns: 1fr;
   }
