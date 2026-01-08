@@ -5,14 +5,15 @@ import DashboardSummaryCards, {
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
 import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
-import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import TaskCreateModal, {
   type TaskFormData,
 } from "@/components/tasks/TaskCreateModal.vue";
 import TaskPreviewDrawer from "@/components/tasks/TaskPreviewDrawer.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
+import { useProjectShellData } from "@/composables/useProjectShellData";
 import { useUserDisplay } from "@/composables/useUserDisplay";
 import { appName, appVersion } from "@/constants/appMeta";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import {
@@ -86,8 +87,12 @@ const filters = reactive({
   category: "all",
 });
 const showMyTasksOnly = ref(false);
-const isSidebarOpen = ref(true);
 const isTaskModalOpen = ref(false);
+
+// ProjectAppShell用のデータを取得
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
+const insightsCollapsed = ref(true); // デフォルトで折りたたむ（Now First設計）
 
 let stopTasks: (() => void) | null = null;
 let stopProject: (() => void) | null = null;
@@ -508,18 +513,7 @@ function navigateToTaskDetail(taskId: string) {
 //   return trimmed.slice(0, 2).toUpperCase()
 // }
 
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   resetWatchers();
 });
 
@@ -542,1300 +536,140 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
-    <ProjectSidebar
-      :open="isSidebarOpen"
-      :project-id="projectId"
-      brand-subtitle="プロジェクト"
-      @close="closeSidebar"
-    />
-    <div v-if="isSidebarOpen" class="demo__overlay" @click="closeSidebar" />
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+  >
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">
+        {{ appName }} &gt; ダッシュボード
+      </p>
+      <h1 class="project-app-shell__heading">
+        {{ project?.name || "プロジェクト" }}
+      </h1>
+    </template>
+    <template #headerActions>
+      <span class="dashboard__version" v-if="appVersion">{{ appVersion }}</span>
+    </template>
 
-    <div class="demo__main">
-      <header class="demo__topbar">
-        <div class="demo__topbar-left">
+    <div class="dashboard__content">
+      <section v-if="notifications.length" class="dashboard__alerts">
+        <div
+          v-for="note in notifications"
+          :key="note.id"
+          class="dashboard__alert"
+        >
+          <p>{{ note.message }}</p>
           <button
+            v-if="note.dismissible"
             type="button"
-            class="demo__menu-button"
-            @click="toggleSidebar"
+            class="dashboard__alert-close"
+            aria-label="通知を閉じる"
+            @click.stop="dismissNotification(note.id)"
           >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              aria-hidden="true"
-              class="demo__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
+            &times;
           </button>
-          <div>
-            <p class="demo__breadcrumb">{{ appName }} &gt; ダッシュボード</p>
-            <h1 class="demo__heading">{{ project?.name || "プロジェクト" }}</h1>
-          </div>
         </div>
-        <div class="demo__toolbar">
-          <span class="demo__version" v-if="appVersion">{{ appVersion }}</span>
-        </div>
-      </header>
+      </section>
+      <NotificationBar :notifications="notificationsBar" />
 
-      <div class="demo__content">
-        <section v-if="notifications.length" class="dashboard__alerts">
-          <div
-            v-for="note in notifications"
-            :key="note.id"
-            class="dashboard__alert"
-          >
-            <p>⚡ {{ note.message }}</p>
-            <button
-              v-if="note.dismissible"
-              type="button"
-              class="dashboard__alert-close"
-              aria-label="通知を閉じる"
-              @click.stop="dismissNotification(note.id)"
-            >
-              ×
-            </button>
-          </div>
-        </section>
-        <NotificationBar :notifications="notificationsBar" />
+      <DashboardSummaryCards
+        :title="project?.name || 'ダッシュボード'"
+        :description="''"
+        :cards="summaryCards"
+        :rotate="false"
+        :show-header="false"
+      />
 
-        <!-- インサイト: 常時表示 -->
-        <DashboardInsights :tasks="tasks" />
+      <DashboardInsights :tasks="tasks" v-model:collapsed="insightsCollapsed" />
 
-        <!-- サマリーカード: Now First設計でアクション指向 -->
-        <DashboardSummaryCards
-          :title="project?.name || 'ダッシュボード'"
-          :description="''"
-          :cards="summaryCards"
-          :rotate="false"
-          :show-header="false"
-        />
-
-        <div class="demo__grid">
-          <section class="demo__primary">
-            <DashboardTaskList
-              v-model="filters"
-              :tasks="filteredTasks"
-              :members="members"
-              :categories="categories"
-              @select="selectTaskById"
-              @navigate="navigateToTaskDetail"
-            />
-          </section>
-
-          <!-- Temporarily commented out
-          <aside class="demo__secondary">
-            <div class="secondary-tabs">
-              <button
-                type="button"
-                :class="['secondary-tab', { 'is-active': secondaryTab === 'chat' }]"
-                @click="secondaryTab = 'chat'"
-              >
-                チャット
-              </button>
-              <button
-                type="button"
-                :class="['secondary-tab', { 'is-active': secondaryTab === 'members' }]"
-                @click="secondaryTab = 'members'"
-              >
-                メンバー
-              </button>
-            </div>
-
-            <div v-if="secondaryTab === 'chat'">
-              <div class="chat-preview__header">
-                <h3>チームチャット</h3>
-                <p>最新メッセージはダッシュボードから直接確認できます。</p>
-              </div>
-              <TeamChatPreview
-                :messages="chatPreviewMessages"
-                :online-count="members.length"
-                :show-composer="true"
-                :loading="chatLoading"
-                :current-user-id="user?.uid"
-                :current-user-name="profile?.nickname || profile?.fullName"
-                :tasks="tasks"
-                @send="sendChatMessage"
-                @react="reactToChatMessage"
-                @update="handleUpdateMessage"
-                @delete="handleDeleteMessage"
-                @convert-task="handleConvertToTask"
-                @link-task="handleLinkTask"
-              />
-            </div>
-
-            <div v-else class="member-preview">
-              <div class="member-preview__header">
-                <div>
-                  <h3>チームメンバー</h3>
-                  <p>{{ members.length }}名のメンバーを素早く確認できます。</p>
-                </div>
-                <AppButton
-                  class="member-preview__cta"
-                  variant="outline"
-                  :to="{ name: ROUTE_NAMES.projectMembers, params: { projectId } }"
-                >
-                  メンバー管理へ
-                </AppButton>
-              </div>
-
-              <div class="member-preview__stats">
-                <div>
-                  <p>総メンバー</p>
-                  <strong>{{ members.length }}</strong>
-                </div>
-                <div>
-                  <p>オンライン</p>
-                  <strong>{{ onlineMemberCount }}</strong>
-                </div>
-              </div>
-
-              <ul class="member-preview__list">
-                <li v-for="member in memberPreviewList" :key="member.id">
-                  <div class="member-chip">
-                    <div class="member-chip__avatar" aria-hidden="true">{{ getMemberInitials(member.name) }}</div>
-                    <div>
-                      <p class="member-chip__name">{{ member.name }}</p>
-                      <p class="member-chip__meta">{{ member.role || 'member' }}・{{ member.statusLabel }}</p>
-                    </div>
-                  </div>
-                  <span class="member-chip__status" :class="`status-${member.statusClass}`">{{ member.statusLabel }}</span>
-                </li>
-              </ul>
-            </div>
-          </aside>
-          -->
-        </div>
-      </div>
+      <DashboardTaskList
+        v-model="filters"
+        :tasks="filteredTasks"
+        :members="members"
+        :categories="categories"
+        @select="selectTaskById"
+        @navigate="navigateToTaskDetail"
+      />
     </div>
+  </ProjectAppShell>
 
-    <TaskCreateModal
-      :open="isTaskModalOpen"
-      :categories="categories"
-      :members="members"
-      @close="closeTaskModal"
-      @submit="handleTaskSubmit"
-    />
+  <TaskCreateModal
+    :open="isTaskModalOpen"
+    :categories="categories"
+    :members="members"
+    @close="closeTaskModal"
+    @submit="handleTaskSubmit"
+  />
 
-    <TaskPreviewDrawer
-      :task="selectedTask"
-      :project-id="projectId"
-      @close="selectedTask = null"
-    />
-  </div>
+  <TaskPreviewDrawer
+    :task="selectedTask"
+    :project-id="projectId"
+    @close="selectedTask = null"
+  />
 </template>
 
 <style scoped>
-@import "@/pages/demo/styles/demo-shell.css";
-
-.demo__version {
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  background: var(--ui-surface-muted, #f1f5f9);
-  font-weight: var(--ui-font-bold, 700);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.demo__content {
+/* Dashboard Content Layout */
+.dashboard__content {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-6, 1.5rem);
+  gap: var(--ui-space-6);
 }
 
-.demo__grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--ui-space-7, 1.75rem);
+/* Dashboard Version Badge */
+.dashboard__version {
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
+  font-weight: var(--ui-font-bold);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-brand-900);
 }
 
-.muted {
-  color: var(--ui-text-muted, #64748b);
-}
-
-.top-actions {
-  display: flex;
-  gap: var(--ui-space-3, 0.75rem);
-  align-items: center;
-}
-
-.top-actions__new {
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: none;
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  font-weight: var(--ui-font-semibold, 600);
-  box-shadow: var(--ui-shadow-md);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.top-actions__new:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.top-actions__new:focus {
-  outline: none;
-  box-shadow: var(--ui-ring-focus);
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
+/* Dashboard Alerts */
 .dashboard__alerts {
-  background: var(--ui-warning-light, #fef3c7);
-  border-left: 4px solid var(--ui-warning, #f59e0b);
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  background: var(--ui-warning-light);
+  border-left: 4px solid var(--ui-warning);
+  border-radius: var(--ui-radius-lg);
+  padding: var(--ui-space-2) var(--ui-space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
+  gap: var(--ui-space-1);
 }
 
 .dashboard__alert {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--ui-space-3, 0.75rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-1, 0.25rem)
-    var(--ui-space-2, 0.5rem) var(--ui-space-2, 0.5rem);
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-1) var(--ui-space-2)
+    var(--ui-space-2);
 }
 
 .dashboard__alert p {
   margin: 0;
-  color: #92400e;
-  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-warning-text);
+  font-weight: var(--ui-font-semibold);
 }
 
 .dashboard__alert-close {
   border: none;
   background: transparent;
-  color: #b45309;
-  font-size: var(--ui-text-base, 1rem);
-  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-warning-text);
+  font-size: var(--ui-text-base);
+  font-weight: var(--ui-font-bold);
   cursor: pointer;
-  padding: var(--ui-space-1, 0.25rem);
+  padding: var(--ui-space-1);
   line-height: 1;
-  border-radius: var(--ui-radius-sm, 0.5rem);
+  border-radius: var(--ui-radius-sm);
   transition: var(--ui-transition-colors);
 }
 
 .dashboard__alert-close:hover {
-  background: rgba(244, 172, 67, 0.25);
-  color: #92400e;
-}
-
-.demo__primary {
-  display: grid;
-  gap: var(--ui-space-8, 2rem);
-}
-
-.demo__secondary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-5, 1.25rem);
-}
-
-.secondary-tabs {
-  display: flex;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.secondary-tab {
-  flex: 1;
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  background: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-brand-600, #4f7c82);
-  transition: var(--ui-transition-all);
-}
-
-.secondary-tab.is-active {
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  border-color: var(--ui-brand-900, #0b2e33);
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.member-preview {
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  padding: var(--ui-space-5, 1.25rem);
-  background: #fffdf8;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-4, 1rem);
-}
-
-.member-preview__header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--ui-space-4, 1rem);
-  align-items: center;
-}
-
-.member-preview__header h3 {
-  margin: 0;
-}
-
-.member-preview__header p {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  color: var(--ui-text-muted, #64748b);
-  font-size: var(--ui-text-sm, 0.875rem);
-}
-
-.member-preview__cta {
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-}
-
-.member-preview__stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.member-preview__stats div {
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  background: rgba(184, 227, 233, 0.3);
-}
-
-.member-preview__stats p {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.member-preview__stats strong {
-  font-size: var(--ui-text-2xl, 1.5rem);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.member-preview__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.member-chip {
-  display: flex;
-  gap: var(--ui-space-3, 0.75rem);
-  align-items: center;
-}
-
-.member-chip__avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--ui-radius-full, 9999px);
-  background: rgba(79, 124, 130, 0.15);
-  color: var(--ui-brand-900, #0b2e33);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--ui-font-bold, 700);
-}
-
-.member-chip__name {
-  margin: 0;
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.member-chip__meta {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.member-chip__status {
-  margin-left: auto;
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.member-chip__status.status-online {
-  color: var(--ui-success, #16a34a);
-}
-
-.member-chip__status.status-away {
-  color: #b07816;
-}
-
-.member-chip__status.status-offline {
-  color: var(--ui-text-muted, #64748b);
-}
-
-.task-list {
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  background: var(--ui-surface, #ffffff);
-  padding: var(--ui-space-5, 1.25rem);
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.task-list__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--ui-space-4, 1rem);
-  padding-bottom: var(--ui-space-4, 1rem);
-  border-bottom: 2px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  gap: var(--ui-space-6, 1.5rem);
-  flex-wrap: wrap;
-}
-
-.task-list__header-left {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-}
-
-.task-list__header-left h3 {
-  margin: 0;
-  font-size: var(--ui-text-xl, 1.25rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.task-list__header-left p {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-medium, 500);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.task-list__filters {
-  display: flex;
-  gap: var(--ui-space-2, 0.5rem);
-  align-items: center;
-  flex-wrap: nowrap;
-}
-
-.task-filter-select {
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  background: rgba(255, 255, 255, 0.8);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-medium, 500);
-  color: var(--ui-brand-900, #0b2e33);
-  transition: var(--ui-transition-all);
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%230b2e33' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right var(--ui-space-3, 0.75rem) center;
-  background-size: 10px;
-  padding-right: 2.2rem;
-  min-width: 110px;
-}
-
-.task-filter-select:hover {
-  border-color: var(--ui-border-focus, #4f7c82);
-  background-color: var(--ui-surface, #ffffff);
-}
-
-.task-filter-select:focus {
-  outline: none;
-  border-color: var(--ui-border-focus, #4f7c82);
-  background-color: var(--ui-surface, #ffffff);
-  box-shadow: var(--ui-ring-focus);
-}
-
-.filter-reset-btn {
-  padding: var(--ui-space-2, 0.5rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ui-brand-600, #4f7c82);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.filter-reset-btn svg {
-  display: block;
-}
-
-.filter-reset-btn:hover {
-  border-color: var(--ui-brand-600, #4f7c82);
-  background: rgba(79, 124, 130, 0.08);
-  color: var(--ui-brand-900, #0b2e33);
-  transform: rotate(-15deg);
-}
-
-.filter-reset-btn:active {
-  transform: scale(0.95) rotate(-15deg);
-}
-
-.task-list__items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-}
-
-.task-row {
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.task-row:hover {
-  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
-  background-color: rgba(184, 227, 233, 0.1);
-}
-
-.task-row__content {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 0.9fr 1.5fr 1fr;
-  gap: var(--ui-space-4, 1rem);
-  align-items: center;
-}
-
-@media (max-width: 768px) {
-  .task-row__content {
-    grid-template-columns: 1fr;
-    gap: var(--ui-space-2, 0.5rem);
-  }
-
-  .task-row__title {
-    font-size: var(--ui-text-lg, 1.125rem);
-  }
-
-  .task-row__status {
-    justify-content: flex-start;
-  }
-
-  .task-row__progress {
-    margin-top: var(--ui-space-1, 0.25rem);
-  }
-
-  .task-row__due {
-    text-align: left;
-    font-size: var(--ui-text-sm, 0.875rem);
-  }
-}
-
-.task-row__title {
-  margin: 0;
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text-strong, #0f172a);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.task-row__assignee {
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.task-row__category {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  padding: 4px 8px;
-  border-radius: var(--ui-radius-full, 9999px);
-  background: rgba(11, 46, 51, 0.06);
-  color: var(--ui-text-strong, #0f172a);
-  font-size: var(--ui-text-sm, 0.875rem);
-  white-space: nowrap;
-}
-
-.task-row__status {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  min-width: auto;
-  padding: 0;
-  border-radius: 0;
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-bold, 700);
-  letter-spacing: 0.01em;
-  border: none;
-  background: transparent;
-  transition: var(--ui-transition-colors);
-}
-
-.task-row__status--todo {
-  color: var(--ui-text-muted, #64748b);
-}
-
-.task-row__status--in-progress {
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.task-row__status--review {
-  color: #8a5a00;
-}
-
-.task-row__status--done {
-  color: #166534;
-}
-
-.task-row__status.is-overdue {
-  color: #991b1b;
-}
-
-.task-row__progress {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.task-row__progress-bar {
-  flex: 1;
-  height: var(--ui-space-2, 0.5rem);
-  background: rgba(11, 46, 51, 0.1);
-  border-radius: var(--ui-radius-full, 9999px);
-  overflow: hidden;
-}
-
-.task-row__progress-fill {
-  height: 100%;
-  background: var(--ui-brand-600, #4f7c82);
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-.task-row__progress-value {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text-strong, #0f172a);
-  min-width: 3rem;
-  text-align: right;
-}
-
-.task-row__due {
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-  text-align: right;
-}
-
-.task-row__due--overdue {
-  color: var(--ui-danger, #ef4444);
-  font-weight: var(--ui-font-bold, 700);
-}
-
-.task-row.is-overdue {
-  border-color: rgba(239, 68, 68, 0.25);
-  background-color: var(--ui-danger-light, #fef2f2);
-}
-
-.task-row.is-overdue:hover {
-  border-color: rgba(239, 68, 68, 0.4);
-  background-color: rgba(239, 68, 68, 0.08);
-}
-
-.status-pill {
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.status-pill--todo {
-  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.status-pill--progress {
-  background: rgba(79, 124, 130, 0.2);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.status-pill--review {
-  background: rgba(255, 202, 99, 0.25);
-  color: #915a00;
-}
-
-.status-pill--done {
-  background: var(--ui-success-light, #dcfce7);
-  color: #166534;
-}
-
-.ai-panel {
-  margin-top: var(--ui-space-6, 1.5rem);
-  padding: var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-lg, 1rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-  background: var(--ui-surface, #ffffff);
-}
-
-.chat-preview__header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--ui-space-1, 0.25rem);
-  margin-bottom: var(--ui-space-3, 0.75rem);
-}
-
-.chat-preview__header p {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.ai-panel textarea,
-.ai-panel input {
-  width: 100%;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  padding: var(--ui-space-3, 0.75rem);
-}
-
-.ai-panel textarea:focus,
-.ai-panel input:focus {
-  outline: none;
-  border-color: var(--ui-border-focus, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
-}
-
-.ai-panel button {
-  align-self: flex-start;
-  border: none;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.ai-panel button:hover {
-  background: var(--ui-brand-800, #1a4a52);
-}
-
-.ai-response {
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem);
-  min-height: 80px;
-}
-
-.task-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-4, 1rem);
-  z-index: var(--ui-z-modal, 50);
-}
-
-.task-modal__card {
-  width: min(520px, 100%);
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  padding: var(--ui-space-6, 1.5rem);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-4, 1rem);
-  box-shadow: var(--ui-shadow-xl);
-}
-
-.task-modal__card header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.task-modal__card button {
-  border: none;
-  background: transparent;
-  font-size: var(--ui-text-xl, 1.25rem);
-  cursor: pointer;
-}
-
-.task-modal__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.task-modal__form input,
-.task-modal__form textarea,
-.task-modal__form select {
-  width: 100%;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  padding: var(--ui-space-3, 0.75rem);
-}
-
-.task-modal__form input:focus,
-.task-modal__form textarea:focus,
-.task-modal__form select:focus {
-  outline: none;
-  border-color: var(--ui-border-focus, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
-}
-
-.task-modal__form footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.task-modal__form footer button {
-  border: none;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-5, 1.25rem);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.task-modal__form footer .ghost {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.task-modal__form footer button:last-child {
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-}
-
-.task-modal__range-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.task-modal__range-header .hint {
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.progress-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-space-2, 0.5rem);
-  margin-top: var(--ui-space-2, 0.5rem);
-}
-
-.progress-pill {
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  border-radius: var(--ui-radius-full, 9999px);
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  background: transparent;
-  cursor: pointer;
-  font-size: var(--ui-text-xs, 0.75rem);
-  transition: var(--ui-transition-all);
-}
-
-.progress-pill.is-active {
-  background: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-surface, #ffffff);
-  border-color: var(--ui-brand-600, #4f7c82);
-}
-
-.task-modal__thread-toggle {
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-4, 1rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.thread-toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--ui-space-3, 0.75rem);
-  cursor: pointer;
-}
-
-.thread-toggle input {
-  margin-top: var(--ui-space-1, 0.25rem);
-}
-
-.thread-toggle__title {
-  margin: 0;
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.thread-toggle__description {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.task-drawer-enter-active,
-.task-drawer-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.task-drawer-enter-from,
-.task-drawer-leave-to {
-  opacity: 0;
-}
-
-.task-drawer-enter-from .task-drawer__panel,
-.task-drawer-leave-to .task-drawer__panel {
-  transform: translateX(20%);
-  opacity: 0;
-}
-
-.task-drawer {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: flex-end;
-  z-index: var(--ui-z-modal, 50);
-}
-
-.task-drawer__overlay {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.task-drawer__panel {
-  width: clamp(280px, 85vw, 420px);
-  background: var(--ui-surface, #ffffff);
-  box-shadow: var(--ui-shadow-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-6, 1.5rem);
-  transform: translateX(0);
-  transition: var(--ui-transition-all);
-}
-
-.task-drawer__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.task-drawer__eyebrow {
-  margin: 0;
-  font-size: var(--ui-text-xs, 0.75rem);
-  letter-spacing: 0.08em;
-  color: var(--ui-text-muted, #64748b);
-  text-transform: uppercase;
-}
-
-.task-drawer__header h3 {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-}
-
-.task-drawer__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-}
-
-.task-drawer__section .label {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.task-drawer__section textarea,
-.task-drawer__section input,
-.task-drawer__section select {
-  width: 100%;
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem);
-}
-
-.task-drawer__section textarea:focus,
-.task-drawer__section input:focus,
-.task-drawer__section select:focus {
-  outline: none;
-  border-color: var(--ui-border-focus, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
-}
-
-.thread-section .thread-create-btn {
-  border: 1px dashed var(--ui-brand-600, #4f7c82);
-  background: rgba(79, 124, 130, 0.08);
-  color: var(--ui-brand-900, #0b2e33);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.thread-section .thread-create-btn:hover {
-  background: rgba(79, 124, 130, 0.15);
-}
-
-.thread-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.thread-form input {
-  border-radius: var(--ui-radius-md, 0.75rem);
-}
-
-.thread-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.thread-actions button {
-  border: none;
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.thread-actions .ghost {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text, #0b2e33);
-}
-
-.thread-actions button:last-child {
-  background: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-surface, #ffffff);
-}
-
-.thread-status {
-  background: var(--ui-success-light, #dcfce7);
-  border: 1px solid #bbf7d0;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-}
-
-.thread-status .thread-name {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.task-drawer__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.task-drawer__footer button {
-  border: none;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.task-drawer__footer .ghost {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.task-drawer__footer .danger {
-  background: var(--ui-danger, #ef4444);
-}
-
-/* Task Drawer Tabs */
-.drawer-tabs {
-  display: flex;
-  gap: var(--ui-space-2, 0.5rem);
-  padding-bottom: var(--ui-space-3, 0.75rem);
-  border-bottom: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  margin-bottom: var(--ui-space-4, 1rem);
-}
-
-.drawer-tab {
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-brand-900, #0b2e33);
-  font-weight: var(--ui-font-bold, 700);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-  font-size: var(--ui-text-sm, 0.875rem);
-}
-
-.drawer-tab.active {
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  border-color: var(--ui-brand-900, #0b2e33);
-}
-
-.drawer-tab:hover:not(.active) {
-  background: rgba(11, 46, 51, 0.08);
-}
-
-.drawer-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-5, 1.25rem);
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.drawer-content.no-padding {
-  padding: 0;
-  gap: 0;
-}
-
-.drawer-close {
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  width: 36px;
-  height: 36px;
-  cursor: pointer;
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-900, #0b2e33);
-  display: grid;
-  place-items: center;
-  font-size: var(--ui-text-xl, 1.25rem);
-  transition: var(--ui-transition-all);
-}
-
-.drawer-close:hover {
-  border-color: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-brand-600, #4f7c82);
-}
-
-.empty-placeholder {
-  padding: var(--ui-space-5, 1.25rem);
-  border: 1px dashed var(--ui-border, rgba(11, 46, 51, 0.12));
-  border-radius: var(--ui-radius-lg, 1rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text-muted, #64748b);
-  text-align: center;
-  font-weight: var(--ui-font-bold, 700);
-}
-
-.task-drawer__title-link {
-  text-decoration: none;
-  color: inherit;
-  display: flex;
-  align-items: baseline;
-  gap: var(--ui-space-1, 0.25rem);
-  transition: var(--ui-transition-colors);
-}
-
-.task-drawer__title-link:hover {
-  color: var(--ui-brand-600, #4f7c82);
-  text-decoration: underline;
-}
-
-.task-drawer__helper {
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-  margin: var(--ui-space-1, 0.25rem) 0 0 0;
-}
-
-.task-drawer__panel {
-  background: var(--ui-surface-elevated, #f8fafc) !important;
-  border-left: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.readonly-value {
-  padding: var(--ui-space-2, 0.5rem) 0;
-  color: var(--ui-text, #0b2e33);
-  font-size: var(--ui-text-base, 1rem);
-  display: flex;
-  align-items: center;
-}
-
-.description-preview {
-  white-space: pre-wrap;
-  color: var(--ui-text, #0b2e33);
-  font-size: var(--ui-text-sm, 0.875rem);
-  line-height: var(--ui-leading-relaxed, 1.625);
-  max-height: 100px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.6);
-  padding: var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  transition: max-height 0.3s ease;
-}
-
-.description-preview.is-expanded {
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.description-toggle {
-  background: none;
-  border: none;
-  color: var(--ui-brand-600, #4f7c82);
-  font-size: var(--ui-text-xs, 0.75rem);
-  cursor: pointer;
-  padding: var(--ui-space-1, 0.25rem) 0;
-  margin-top: var(--ui-space-1, 0.25rem);
-  font-weight: var(--ui-font-semibold, 600);
-  transition: var(--ui-transition-colors);
-}
-
-.description-toggle:hover {
-  text-decoration: underline;
-}
-
-.task-drawer__sticky-footer {
-  margin-top: auto;
-  padding: var(--ui-space-4, 1rem) var(--ui-space-6, 1.5rem);
-  background: var(--ui-surface-elevated, #f8fafc);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  display: flex;
-  justify-content: center;
-  position: sticky;
-  bottom: 0;
-}
-
-.cta-button {
-  display: flex;
-  width: 100%;
-  justify-content: center;
-  align-items: center;
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  border: 1px solid var(--ui-brand-600, #4f7c82);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  color: var(--ui-brand-600, #4f7c82);
-  font-weight: var(--ui-font-semibold, 600);
-  text-decoration: none;
-  font-size: var(--ui-text-sm, 0.875rem);
-  background: var(--ui-surface, #ffffff);
-  transition: var(--ui-transition-all);
-}
-
-.cta-button:hover {
-  background: rgba(79, 124, 130, 0.08);
+  background: var(--ui-notify-warning-label);
 }
 </style>

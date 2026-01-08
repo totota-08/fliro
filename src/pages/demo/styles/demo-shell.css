@@ -1,11 +1,11 @@
 .demo {
-  --sidebar-width: 260px;
+  --sidebar-width: var(--ui-sidebar-width);
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   width: 100%;
   height: 100vh;
   gap: 0;
-  background: var(--surface-muted);
+  background: var(--ui-surface-muted);
 }
 
 .demo--sidebar-collapsed {
@@ -25,8 +25,8 @@
 .demo__main {
   display: flex;
   flex-direction: column;
-  background: var(--surface-elevated, #f5fcff);
-  border-left: 1px solid rgba(11, 46, 51, 0.08);
+  background: var(--ui-bg);
+  border-left: 1px solid var(--ui-border-light);
   height: 100vh;
   overflow-y: auto;
 }
@@ -40,14 +40,14 @@
 .demo__topbar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--ui-z-dropdown);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  min-height: 4rem;
-  padding: 0 1.75rem;
-  border-bottom: 1px solid rgba(11, 46, 51, 0.08);
+  gap: var(--ui-space-6);
+  min-height: var(--ui-topbar-height);
+  padding: 0 var(--ui-space-6);
+  border-bottom: 1px solid var(--ui-border-light);
   background: rgba(245, 252, 255, 0.95);
   backdrop-filter: blur(6px);
 }
@@ -55,7 +55,7 @@
 .demo__topbar-left {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: var(--ui-space-5);
 }
 
 .demo__menu-button {
@@ -64,22 +64,18 @@
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(11, 46, 51, 0.12);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border);
   background: transparent;
-  color: var(--primary-strong);
+  color: var(--ui-brand-900);
   cursor: pointer;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: var(--ui-transition-colors);
 }
 
 .demo__menu-button:hover {
-  background: rgba(184, 227, 233, 0.2);
-  border-color: rgba(11, 46, 51, 0.18);
-  box-shadow: 0 8px 18px rgba(11, 46, 51, 0.12);
+  background: var(--ui-brand-100);
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-md);
 }
 
 .demo__menu-icon {
@@ -89,20 +85,20 @@
 
 .demo__breadcrumb {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
 }
 
 .demo__heading {
   margin: 0.35rem 0 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-strong);
+  font-size: var(--ui-text-xl);
+  font-weight: var(--ui-font-bold);
+  color: var(--ui-text-strong);
 }
 
 .demo__toolbar {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3);
   align-items: center;
 }
 
@@ -110,86 +106,82 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.8rem;
-  border: 1px solid rgba(11, 46, 51, 0.15);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border);
   background: transparent;
-  padding: 0.55rem 1.15rem;
+  padding: var(--ui-space-2) var(--ui-space-4);
   cursor: pointer;
-  font-weight: 600;
-  color: var(--primary-strong);
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  font-weight: var(--ui-font-semibold);
+  color: var(--ui-brand-900);
+  transition: var(--ui-transition-colors);
 }
 
 .demo__toolbar button:hover {
-  background: rgba(184, 227, 233, 0.18);
-  border-color: rgba(11, 46, 51, 0.22);
-  box-shadow: 0 12px 22px rgba(11, 46, 51, 0.12);
+  background: var(--ui-brand-100);
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-md);
 }
 
 .demo__toolbar .is-primary {
-  background: var(--primary);
-  color: var(--surface-elevated, #f5fcff);
-  border-color: rgba(79, 124, 130, 0.4);
-  box-shadow: 0 12px 24px rgba(79, 124, 130, 0.25);
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse);
+  border-color: var(--ui-brand-600);
+  box-shadow: var(--ui-shadow-btn-primary);
 }
 
 .demo__toolbar .is-primary:hover {
-  background: var(--primary-strong);
-  border-color: rgba(11, 46, 51, 0.35);
-  box-shadow: 0 16px 28px rgba(11, 46, 51, 0.22);
+  background: var(--ui-brand-900);
+  border-color: var(--ui-brand-900);
+  box-shadow: var(--ui-shadow-btn-hover);
 }
 
 .demo__content {
-  padding: 2rem;
+  padding: var(--ui-space-8);
   display: grid;
-  gap: 2rem;
+  gap: var(--ui-space-8);
 }
 
 .demo__grid {
   display: grid;
-  gap: 1.75rem;
+  gap: var(--ui-space-6);
   grid-template-columns: minmax(0, 2fr) minmax(280px, 0.9fr);
   align-items: start;
 }
 
 .demo__primary {
   display: grid;
-  gap: 2rem;
+  gap: var(--ui-space-8);
 }
 
 .demo__secondary {
   display: grid;
-  gap: 1.5rem;
+  gap: var(--ui-space-6);
   position: sticky;
   top: 5rem;
 }
 
 .demo__tips {
-  border-radius: 1.25rem;
-  background: var(--surface-elevated);
-  border: 1px solid var(--border-light);
-  padding: 1.5rem;
-  box-shadow: 0 16px 28px rgba(11, 46, 51, 0.1);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface-elevated);
+  border: 1px solid var(--ui-border-light);
+  padding: var(--ui-space-6);
+  box-shadow: var(--ui-shadow-lg);
 }
 
 .demo__tips h3 {
-  margin: 0 0 1rem;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text-strong);
+  margin: 0 0 var(--ui-space-4);
+  font-size: var(--ui-text-base);
+  font-weight: var(--ui-font-semibold);
+  color: var(--ui-text-strong);
 }
 
 .demo__tips ul {
   margin: 0;
   padding-left: 1.1rem;
   display: grid;
-  gap: 0.75rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  gap: var(--ui-space-3);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
 }
 
 .sr-only {
@@ -214,9 +206,9 @@
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(11, 46, 51, 0.45);
+    background: var(--ui-surface-overlay);
     backdrop-filter: blur(2px);
-    z-index: 30;
+    z-index: var(--ui-z-sidebar);
   }
 
   .demo__menu-button {
@@ -224,11 +216,11 @@
   }
 
   .demo__topbar {
-    gap: 1rem;
+    gap: var(--ui-space-4);
   }
 
   .demo__content {
-    padding: 1.75rem;
+    padding: var(--ui-space-6);
   }
 
   .demo__secondary {
@@ -244,14 +236,14 @@
 
 @media (max-width: 768px) {
   .demo__content {
-    padding: 1.5rem;
+    padding: var(--ui-space-6);
   }
 
   .demo__toolbar {
-    gap: 0.5rem;
+    gap: var(--ui-space-2);
   }
 
   .demo__toolbar button {
-    padding: 0.45rem 0.9rem;
+    padding: var(--ui-space-2) var(--ui-space-3);
   }
 }

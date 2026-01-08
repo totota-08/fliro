@@ -28,14 +28,25 @@
   /* Semantic Colors */
   --ui-success: #16a34a;
   --ui-success-light: #dcfce7;
+  --ui-success-text: #166534;
   --ui-warning: #f59e0b;
   --ui-warning-light: #fef3c7;
+  --ui-warning-text: #7c4a00;
   --ui-warn: #f97316; /* Orange - 要対応レベル */
   --ui-warn-light: #ffedd5;
   --ui-danger: #d64545;
   --ui-danger-light: #fee2e2;
+  --ui-danger-text: #991b1b;
   --ui-info: #0284c7;
   --ui-info-light: #e0f2fe;
+
+  /* Notification overlays */
+  --ui-notify-info-bg: rgba(79, 124, 130, 0.08);
+  --ui-notify-info-label: rgba(79, 124, 130, 0.18);
+  --ui-notify-warning-bg: rgba(255, 202, 99, 0.16);
+  --ui-notify-warning-label: rgba(255, 202, 99, 0.35);
+  --ui-notify-critical-bg: rgba(220, 38, 38, 0.15);
+  --ui-notify-critical-label: rgba(220, 38, 38, 0.25);
 
   /* Text Colors */
   --ui-text: #0b2e33;
@@ -173,6 +184,34 @@
   --ui-sidebar-width: 260px;
   --ui-topbar-height: 64px;
   --ui-content-max-width: 1200px;
+
+  /* ========================================
+   * 9. Sidebar Colors (Dark background用)
+   * ======================================== */
+
+  /* Sidebar text colors (on dark background) */
+  --ui-sidebar-text: rgba(245, 252, 255, 0.85);
+  --ui-sidebar-text-strong: #f5fcff;
+  --ui-sidebar-text-muted: rgba(245, 252, 255, 0.7);
+  --ui-sidebar-text-dim: rgba(245, 252, 255, 0.6);
+
+  /* Sidebar interactive states */
+  --ui-sidebar-hover: rgba(184, 227, 233, 0.12);
+  --ui-sidebar-hover-strong: rgba(184, 227, 233, 0.18);
+  --ui-sidebar-active: rgba(184, 227, 233, 0.95);
+  --ui-sidebar-icon-bg: rgba(245, 252, 255, 0.12);
+  --ui-sidebar-icon-active-bg: rgba(79, 124, 130, 0.16);
+
+  /* Sidebar borders */
+  --ui-sidebar-border: rgba(245, 252, 255, 0.2);
+  --ui-sidebar-border-light: rgba(245, 252, 255, 0.25);
+  --ui-sidebar-border-hover: rgba(245, 252, 255, 0.35);
+  --ui-sidebar-border-strong: rgba(245, 252, 255, 0.4);
+
+  /* Sidebar shadows */
+  --ui-sidebar-shadow: 0 28px 48px rgba(11, 46, 51, 0.32);
+  --ui-sidebar-active-shadow: 0 12px 24px rgba(11, 46, 51, 0.18);
+  --ui-sidebar-focus-ring: 0 0 0 2px rgba(184, 227, 233, 0.5);
 }
 
 /* ========================================
