@@ -16,26 +16,34 @@ service cloud.firestore {
       allow read, delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    function isProjectMember(projectId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
-    }
-
     function isProjectOwner(projectId) {
       return isSignedIn()
         && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUserId == request.auth.uid;
     }
 
-    function canManageSettings(projectId) {
+    // オーナーもメンバーとして扱う（メンバードキュメントがなくてもアクセス可能）
+    function isProjectMember(projectId) {
       return isSignedIn()
-        && get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
-             .data.permissions.canManageSettings == true;
+        && (exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+            || isProjectOwner(projectId));
     }
 
+    // オーナーは常に設定管理権限を持つ
+    function canManageSettings(projectId) {
+      return isSignedIn()
+        && (isProjectOwner(projectId)
+            || (exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                && get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                     .data.permissions.canManageSettings == true));
+    }
+
+    // オーナーは常にメンバー招待権限を持つ
     function canInviteMembers(projectId) {
       return isSignedIn()
-        && get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
-             .data.permissions.canInviteMembers == true;
+        && (isProjectOwner(projectId)
+            || (exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                && get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                     .data.permissions.canInviteMembers == true));
     }
 
     function isCreatingOwnProject() {
