@@ -73,12 +73,15 @@ async function addProjectMember(
   invitedBy = "owner1",
   permissions = {}
 ) {
+  // メンバーロールにはデフォルトでタスク管理権限を付与
+  const canManageTasksDefault = ["member", "admin", "owner", "manager", "pm"].includes(role);
   await setDoc(doc(db, "projects", projectId, "members", memberId), {
     userId: memberId,
     role,
     permissions: {
       canManageSettings: false,
       canInviteMembers: false,
+      canManageTasks: canManageTasksDefault,
       ...permissions,
     },
     joinedAt: serverTimestamp(),

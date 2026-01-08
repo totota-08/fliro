@@ -46,6 +46,17 @@ service cloud.firestore {
                      .data.permissions.canInviteMembers == true));
     }
 
+    // オーナー・管理者は常にタスク管理権限を持つ、または明示的にcanManageTasks権限を持つメンバー
+    function canManageTasks(projectId) {
+      return isSignedIn()
+        && (isProjectOwner(projectId)
+            || (exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                && (get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                     .data.role in ['owner', 'admin']
+                    || get(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid))
+                     .data.permissions.canManageTasks == true)));
+    }
+
     function isCreatingOwnProject() {
       return isSignedIn()
         && request.resource.data.ownerUserId == request.auth.uid;
@@ -150,7 +161,8 @@ service cloud.firestore {
                       && request.resource.data.updatedAt is timestamp;
         allow read: if isProjectMember(projectId)
                     || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
-        allow update, delete: if isProjectMember(projectId);
+        allow update: if canManageTasks(projectId);
+        allow delete: if isProjectMember(projectId);
 
         match /messages/{messageId} {
           allow read: if isProjectMember(projectId)
