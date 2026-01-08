@@ -1,8 +1,8 @@
+import { type ProjectPermissionKey } from "@/constants/permissions";
 import {
-  type ProjectPermissionKey,
   PROJECT_SIDEBAR_NAV_CONFIG,
   buildProjectNavItemsFromConfig,
-} from "@/constants/permissions";
+} from "@/constants/navigation";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 
 /**
