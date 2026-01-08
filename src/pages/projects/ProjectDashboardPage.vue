@@ -561,21 +561,23 @@ onBeforeUnmount(() => {
         @navigate="navigateToTaskDetail"
       />
     </div>
+
+    <Teleport to="body">
+      <TaskCreateModal
+        :open="isTaskModalOpen"
+        :categories="categories"
+        :members="members"
+        @close="closeTaskModal"
+        @submit="handleTaskSubmit"
+      />
+
+      <TaskPreviewDrawer
+        :task="selectedTask"
+        :project-id="projectId"
+        @close="selectedTask = null"
+      />
+    </Teleport>
   </ProjectAppShell>
-
-  <TaskCreateModal
-    :open="isTaskModalOpen"
-    :categories="categories"
-    :members="members"
-    @close="closeTaskModal"
-    @submit="handleTaskSubmit"
-  />
-
-  <TaskPreviewDrawer
-    :task="selectedTask"
-    :project-id="projectId"
-    @close="selectedTask = null"
-  />
 </template>
 
 <style scoped>
