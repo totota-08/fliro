@@ -40,6 +40,11 @@ const navItems = computed(() =>
   buildFilteredProjectNavItems(props.projectId, can),
 );
 
+const dashboardTo = computed(() => ({
+  name: ROUTE_NAMES.projectDashboard,
+  params: { projectId: props.projectId },
+}));
+
 const sidebarProjects = computed(() => projectList.value);
 
 const profileInfo = computed<DashboardProfileInfo>(() => ({
@@ -87,6 +92,7 @@ watch(
     :projects="sidebarProjects"
     :profile="profileInfo"
     :brand-subtitle="brandSubtitle"
+    :dashboard-to="dashboardTo"
     @close="handleClose"
   />
 </template>

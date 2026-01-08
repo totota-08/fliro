@@ -18,6 +18,7 @@ const props = withDefaults(
     projects?: DashboardProjectItem[];
     profile?: DashboardProfileInfo;
     brandSubtitle?: string;
+    dashboardTo?: string | object;
   }>(),
   {
     navItems: () =>
@@ -107,10 +108,16 @@ const handleNavigate = () => {
 <template>
   <aside :class="rootClasses">
     <div class="sidebar__header">
-      <div class="sidebar__brand">
+      <component
+        :is="props.dashboardTo ? RouterLink : 'div'"
+        :to="props.dashboardTo"
+        class="sidebar__brand"
+        :class="{ 'sidebar__brand--clickable': props.dashboardTo }"
+        @click="props.dashboardTo ? handleNavigate() : undefined"
+      >
         <div class="sidebar__logo">{{ appName }}</div>
         <p class="sidebar__subtitle">{{ props.brandSubtitle }}</p>
-      </div>
+      </component>
       <button type="button" class="sidebar__toggle" @click="handleClose">
         <span aria-hidden="true">X</span>
         <span class="sr-only">サイドバーを閉じる</span>

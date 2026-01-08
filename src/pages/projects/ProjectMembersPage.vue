@@ -358,6 +358,13 @@ function goToInvites() {
   });
 }
 
+function goToRoles() {
+  void router.push({
+    name: ROUTE_NAMES.projectRoles,
+    params: { projectId: projectId.value },
+  });
+}
+
 function goToTimeline() {
   void router.push({
     name: ROUTE_NAMES.projectActivity,
@@ -559,6 +566,14 @@ onBeforeUnmount(() => {
               @click="goToInvites"
             >
               招待リンク管理 →
+            </button>
+            <button
+              v-if="currentPermissions.canEditRoles"
+              type="button"
+              class="team-page__invite-link"
+              @click="goToRoles"
+            >
+              ロール管理 →
             </button>
           </div>
         </header>
