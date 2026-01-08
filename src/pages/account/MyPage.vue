@@ -8,10 +8,15 @@ import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import AppShell from "@/layouts/AppShell.vue";
+import {
+  listenUserInvites,
+  redeemInvite,
+  type ProjectInvite,
+} from "@/services/projectInvites";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs, query } from "firebase/firestore";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.account.MyPage");
@@ -39,6 +44,12 @@ const projects = ref<ProjectItem[]>([]);
 const keyBuffer = ref("");
 const SECRET = appName.toLowerCase();
 const router = useRouter();
+
+// Invite-related state
+const invites = ref<ProjectInvite[]>([]);
+const inviteLoading = ref(false);
+const joiningInviteId = ref<string | null>(null);
+let unsubscribeInvites: (() => void) | null = null;
 
 async function fetchTasks() {
   if (!user.value) return;
@@ -136,13 +147,77 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+// Filter out invites for projects the user has already joined
+const pendingInvites = computed(() => {
+  const joinedProjectIds = new Set(projects.value.map((p) => p.id));
+  return invites.value.filter(
+    (invite) => !joinedProjectIds.has(invite.projectId),
+  );
+});
+
+function setupInviteListener() {
+  if (unsubscribeInvites) {
+    unsubscribeInvites();
+    unsubscribeInvites = null;
+  }
+
+  const email = profile.value?.email;
+  if (!email) {
+    invites.value = [];
+    return;
+  }
+
+  inviteLoading.value = true;
+  unsubscribeInvites = listenUserInvites(email, (list) => {
+    invites.value = list;
+    inviteLoading.value = false;
+  });
+}
+
+async function handleJoinProject(invite: ProjectInvite) {
+  if (!user.value || joiningInviteId.value) return;
+
+  joiningInviteId.value = invite.id;
+  try {
+    const projectId = await redeemInvite(
+      invite.token,
+      user.value.uid,
+      user.value.email || profile.value?.email || "",
+    );
+    // Refresh tasks to update the projects list
+    await fetchTasks();
+    // Navigate to the project dashboard
+    router.push({
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId },
+    });
+  } catch (error) {
+    logger.error`Failed to join project: ${error}`;
+  } finally {
+    joiningInviteId.value = null;
+  }
+}
+
 onMounted(async () => {
   await fetchTasks();
+  setupInviteListener();
   window.addEventListener("keydown", handleKeydown);
 });
 
+// Watch for profile changes to update invite listener
+watch(
+  () => profile.value?.email,
+  () => {
+    setupInviteListener();
+  },
+);
+
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleKeydown);
+  if (unsubscribeInvites) {
+    unsubscribeInvites();
+    unsubscribeInvites = null;
+  }
 });
 </script>
 
@@ -235,6 +310,39 @@ onBeforeUnmount(() => {
               }"
             >
               開く
+            </AppButton>
+          </li>
+        </ul>
+      </SectionCard>
+
+      <!-- Invited Projects Section -->
+      <SectionCard
+        v-if="pendingInvites.length > 0"
+        title="招待されたプロジェクト"
+        subtitle="以下のプロジェクトに招待されています"
+      >
+        <ul class="project-list">
+          <li
+            v-for="invite in pendingInvites"
+            :key="invite.id"
+            class="project-item project-item--invite"
+          >
+            <div class="project-item__info">
+              <div class="project-item__header">
+                <p class="project-item__name">
+                  {{ invite.projectName || "プロジェクト" }}
+                </p>
+                <AppBadge variant="info" size="sm">招待</AppBadge>
+              </div>
+            </div>
+            <AppButton
+              variant="primary"
+              size="sm"
+              :loading="joiningInviteId === invite.id"
+              :disabled="joiningInviteId !== null"
+              @click="handleJoinProject(invite)"
+            >
+              参加する
             </AppButton>
           </li>
         </ul>
@@ -374,6 +482,15 @@ onBeforeUnmount(() => {
 .project-item:hover {
   border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
   box-shadow: var(--ui-shadow-sm);
+}
+
+.project-item--invite {
+  border-color: var(--ui-brand-200, #b8e3e9);
+  background: var(--ui-brand-50, #f0fafb);
+}
+
+.project-item--invite:hover {
+  border-color: var(--ui-brand-400, #7ec3cc);
 }
 
 .project-item__info {
