@@ -3,6 +3,9 @@ import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppBadge from "@/components/ui/AppBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav.vue";
+import SwipeableTaskCard from "@/components/mobile/SwipeableTaskCard.vue";
+import PullToRefresh from "@/components/mobile/PullToRefresh.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -12,7 +15,7 @@ import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs } from "firebase/firestore";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.tasks.MyTasks");
@@ -26,6 +29,40 @@ const errorMessage = ref("");
 const activeTab = ref<"active" | "completed">("active");
 const tasks = ref<TaskDoc[]>([]);
 const projects = ref<{ id: string; name: string }[]>([]);
+
+// モバイル検出
+const isMobile = ref(false);
+const checkMobile = () => {
+  isMobile.value = window.matchMedia("(max-width: 768px)").matches;
+};
+
+// モバイルナビゲーション項目
+const mobileNavItems = computed(() => [
+  {
+    name: "home",
+    label: "ホーム",
+    icon: "home",
+    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projects.value[0]?.id || "" } },
+  },
+  {
+    name: "tasks",
+    label: "タスク",
+    icon: "tasks",
+    to: { name: ROUTE_NAMES.myTasks },
+  },
+  {
+    name: "team",
+    label: "チーム",
+    icon: "users",
+    to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projects.value[0]?.id || "" } },
+  },
+  {
+    name: "settings",
+    label: "設定",
+    icon: "settings",
+    to: { name: ROUTE_NAMES.myPage },
+  },
+]);
 
 /**
  * Sidebar 用ナビゲーション
@@ -306,6 +343,13 @@ async function removeTask(task: DecoratedTask) {
 }
 
 /**
+ * プルトゥーリフレッシュハンドラ（モバイル用）
+ */
+async function handleRefresh() {
+  await loadTasks();
+}
+
+/**
  * サイドバー制御
  */
 const closeSidebar = () => {
@@ -323,7 +367,13 @@ onMounted(() => {
   if (window.matchMedia("(max-width: 1200px)").matches) {
     isSidebarOpen.value = false;
   }
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
   loadTasks();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", checkMobile);
 });
 </script>
 
@@ -458,7 +508,13 @@ onMounted(() => {
               </button>
             </div>
 
-            <div class="tasks-tabs__content" role="tabpanel">
+            <!-- モバイル: PullToRefreshでラップ -->
+            <PullToRefresh
+              v-if="isMobile"
+              class="tasks-tabs__content"
+              role="tabpanel"
+              @refresh="handleRefresh"
+            >
               <!-- 状態メッセージ -->
               <section v-if="loading" class="tasks-empty">
                 読み込み中...
@@ -478,7 +534,7 @@ onMounted(() => {
                   <AppButton
                     v-if="projects.length > 0"
                     variant="primary"
-                    :to="{ name: ROUTE_NAMES.PROJECT_DASHBOARD, params: { projectId: projects[0].id } }"
+                    :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId: projects[0].id } }"
                   >
                     プロジェクトを開く
                   </AppButton>
@@ -492,7 +548,68 @@ onMounted(() => {
               />
 
               <template v-else>
-                <!-- 進行中タブ -->
+                <!-- 進行中タブ（モバイル: SwipeableTaskCard） -->
+                <template v-if="activeTab === 'active'">
+                  <SwipeableTaskCard
+                    v-for="task in activeTasks"
+                    :key="task.id"
+                    :task="task"
+                    @complete="toggleComplete(task)"
+                    @delete="removeTask(task)"
+                    @click="goToTask(task)"
+                  />
+                </template>
+
+                <!-- 完了タブ（モバイル: SwipeableTaskCard） -->
+                <template v-else>
+                  <SwipeableTaskCard
+                    v-for="task in completedTasks"
+                    :key="task.id"
+                    :task="task"
+                    @complete="toggleComplete(task)"
+                    @delete="removeTask(task)"
+                    @click="goToTask(task)"
+                  />
+                </template>
+              </template>
+            </PullToRefresh>
+
+            <!-- デスクトップ: 通常表示 -->
+            <div v-else class="tasks-tabs__content" role="tabpanel">
+              <!-- 状態メッセージ -->
+              <section v-if="loading" class="tasks-empty">
+                読み込み中...
+              </section>
+              <AppEmptyState
+                v-else-if="errorMessage"
+                :title="errorMessage"
+                icon="error"
+              />
+              <AppEmptyState
+                v-else-if="activeTab === 'active' && !activeTasks.length"
+                title="進行中のタスクはありません"
+                description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
+                icon="empty"
+              >
+                <template #action>
+                  <AppButton
+                    v-if="projects.length > 0"
+                    variant="primary"
+                    :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId: projects[0].id } }"
+                  >
+                    プロジェクトを開く
+                  </AppButton>
+                </template>
+              </AppEmptyState>
+              <AppEmptyState
+                v-else-if="activeTab === 'completed' && !completedTasks.length"
+                title="完了したタスクはまだありません"
+                description="タスクを完了すると、ここに表示されます。"
+                icon="empty"
+              />
+
+              <template v-else>
+                <!-- 進行中タブ（デスクトップ: 従来のカード） -->
                 <template v-if="activeTab === 'active'">
                   <article
                     v-for="task in activeTasks"
@@ -649,6 +766,9 @@ onMounted(() => {
         </section>
       </div>
     </div>
+
+    <!-- モバイルボトムナビゲーション -->
+    <MobileBottomNav v-if="isMobile" :items="mobileNavItems" />
   </div>
 </template>
 
@@ -1144,6 +1264,16 @@ onMounted(() => {
     max-width: 100%;
     overflow-x: hidden;
     box-sizing: border-box;
+  }
+
+  /* モバイルボトムナビゲーション用のスペース確保 */
+  .demo__content--condensed {
+    padding-bottom: calc(var(--ui-space-6, 1.5rem) + 72px);
+  }
+
+  /* サイドバーを非表示 */
+  .demo__main {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 </style>
