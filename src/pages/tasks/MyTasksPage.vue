@@ -471,9 +471,19 @@ onMounted(() => {
               <AppEmptyState
                 v-else-if="activeTab === 'active' && !activeTasks.length"
                 title="進行中のタスクはありません"
-                description="新しいタスクを作成するか、プロジェクトからタスクを確認してください。"
+                description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
                 icon="empty"
-              />
+              >
+                <template #action>
+                  <AppButton
+                    v-if="projects.length > 0"
+                    variant="primary"
+                    :to="{ name: ROUTE_NAMES.PROJECT_DASHBOARD, params: { projectId: projects[0].id } }"
+                  >
+                    プロジェクトを開く
+                  </AppButton>
+                </template>
+              </AppEmptyState>
               <AppEmptyState
                 v-else-if="activeTab === 'completed' && !completedTasks.length"
                 title="完了したタスクはまだありません"
@@ -516,53 +526,31 @@ onMounted(() => {
                     </div>
 
                     <h3>{{ task.title }}</h3>
-                    <p>{{ task.description || "説明なし" }}</p>
 
-                    <div class="task-card__meta">
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                          <path
-                            d="M7 10h10"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                          />
-                          <path
-                            d="M11 14h2"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                        <span>{{ task.dueDateLabel }}</span>
-                      </div>
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M12 6v6l3.5 3.5"
-                            stroke-width="1.7"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                          <circle cx="12" cy="12" r="8" stroke-width="1.5" />
-                        </svg>
-                        <span :class="task.dueClass">{{
-                          task.dueMessage
-                        }}</span>
-                      </div>
+                    <!-- 説明は最初の50文字のみ表示 -->
+                    <p v-if="task.description" class="task-card__description">
+                      {{ task.description.length > 50 ? task.description.slice(0, 50) + '...' : task.description }}
+                    </p>
+
+                    <!-- 期限情報を目立たせる -->
+                    <div class="task-card__due-info">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        class="task-card__due-icon"
+                      >
+                        <path
+                          d="M12 6v6l3.5 3.5"
+                          stroke-width="1.7"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                        <circle cx="12" cy="12" r="8" stroke-width="1.5" />
+                      </svg>
+                      <span :class="['task-card__due-text', task.dueClass]">
+                        {{ task.dueMessage }}
+                      </span>
                     </div>
 
                     <div class="task-card__actions">
@@ -613,43 +601,28 @@ onMounted(() => {
                       </AppBadge>
                     </div>
                     <h3>{{ task.title }}</h3>
-                    <p>{{ task.description || "説明なし" }}</p>
-                    <div class="task-card__meta">
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                          <path
-                            d="M7 10h10"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                          />
-                        </svg>
-                        <span>{{ task.dueDateLabel }}</span>
-                      </div>
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M20 6 9 17l-5-5"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                        <span>完了済み</span>
-                      </div>
+
+                    <!-- 説明は最初の50文字のみ表示 -->
+                    <p v-if="task.description" class="task-card__description">
+                      {{ task.description.length > 50 ? task.description.slice(0, 50) + '...' : task.description }}
+                    </p>
+
+                    <!-- 完了済みの表示 -->
+                    <div class="task-card__due-info task-card__due-info--completed">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        class="task-card__due-icon"
+                      >
+                        <path
+                          d="M20 6 9 17l-5-5"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                      <span class="task-card__due-text">完了済み</span>
                     </div>
 
                     <div class="task-card__actions">
@@ -1032,23 +1005,54 @@ onMounted(() => {
   font-size: var(--ui-text-sm, 0.875rem);
 }
 
-.task-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-xs, 0.75rem);
+/* 説明文のスタイル */
+.task-card__description {
+  margin: var(--ui-space-2, 0.5rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  line-height: var(--ui-leading-normal, 1.5);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
-.task-card__meta-item {
+/* 期限情報を目立たせる */
+.task-card__due-info {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  color: var(--ui-text-muted, #64748b);
+  gap: var(--ui-space-2, 0.5rem);
+  margin-top: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
-.task-card__meta-item svg {
-  width: 1rem;
-  height: 1rem;
+.task-card__due-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.task-card__due-text {
+  color: var(--ui-text, #0b2e33);
+}
+
+/* 期限切れの場合は赤く目立たせる */
+.task-card__due-text.due-over {
+  color: var(--ui-danger, #d64545);
+}
+
+/* 期限が近い場合は警告色 */
+.task-card__due-text.due-soon {
+  color: var(--ui-warning, #f59e0b);
+}
+
+/* 完了済みの場合は緑色 */
+.task-card__due-info--completed {
+  background: var(--ui-success-light, #dcfce7);
+}
+
+.task-card__due-info--completed .task-card__due-text {
+  color: var(--ui-success, #16a34a);
 }
 
 .task-card__actions {
@@ -1113,8 +1117,33 @@ onMounted(() => {
     justify-content: space-between;
   }
 
+  /* タッチターゲット最適化（最小44px × 44px） */
   .task-card {
     padding: var(--ui-space-5, 1.25rem);
+    min-height: 44px;
+  }
+
+  .task-card__actions {
+    /* ボタンを縦並びにしてタップしやすく */
+    flex-direction: column;
+    width: 100%;
+    gap: var(--ui-space-3, 0.75rem);
+  }
+
+  /* 期限情報を大きく見やすく */
+  .task-card__due-info {
+    padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+    font-size: var(--ui-text-base, 1rem);
+  }
+
+  /* 横スクロール完全排除 */
+  .demo__content,
+  .demo__main,
+  .tasks-list {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 }
 </style>

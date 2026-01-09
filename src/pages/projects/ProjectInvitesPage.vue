@@ -2,6 +2,9 @@
 import InviteCreateDrawer from "@/components/invites/InviteCreateDrawer.vue";
 import ButtonLoading from "@/components/loading/ButtonLoading.vue";
 import PageSkeleton from "@/components/loading/PageSkeleton.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppAlert from "@/components/ui/AppAlert.vue";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
@@ -46,6 +49,10 @@ const actionMessage = ref("");
 const actionError = ref("");
 const revokeTarget = ref<string | null>(null);
 const isInitialLoading = ref(true);
+
+// オンボーディングヒント
+const ONBOARDING_KEY = "onboarding-invites-dismissed";
+const showOnboardingHint = ref(!localStorage.getItem(ONBOARDING_KEY));
 
 let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
@@ -377,6 +384,11 @@ function handleInviteCreated(_link: string) {
   setActionMessage("招待リンクを作成しました。");
 }
 
+function dismissOnboardingHint() {
+  showOnboardingHint.value = false;
+  localStorage.setItem(ONBOARDING_KEY, "true");
+}
+
 onMounted(() => {
   watchProject();
   watchInvites();
@@ -452,6 +464,20 @@ onBeforeUnmount(() => {
           </header>
 
           <section class="invites-page__list">
+            <!-- オンボーディングヒント -->
+            <AppAlert
+              v-if="showOnboardingHint && canCreateInvite"
+              variant="info"
+              dismissible
+              title="💡 ヒント: 招待リンクの使い方"
+              @dismiss="dismissOnboardingHint"
+            >
+              <p>
+                招待リンクを作成したら、メールやチャットで共有できます。
+                パスワードを設定すると、セキュリティが向上します。
+              </p>
+            </AppAlert>
+
             <div class="invites-page__toolbar">
               <div class="invites-page__filters">
                 <label class="small-label" for="invite-status">
@@ -490,7 +516,26 @@ onBeforeUnmount(() => {
               {{ actionError }}
             </p>
 
-            <div class="invites-page__table">
+            <!-- 空状態 -->
+            <AppEmptyState
+              v-if="!loading && !filteredInvites.length"
+              title="招待リンクがまだありません"
+              description="招待リンクを作成して、チームメンバーを招待しましょう。"
+              icon="empty"
+            >
+              <template #action>
+                <AppButton
+                  v-if="canCreateInvite"
+                  variant="primary"
+                  @click="openCreateDrawer"
+                >
+                  招待リンクを作成
+                </AppButton>
+              </template>
+            </AppEmptyState>
+
+            <!-- テーブル表示 -->
+            <div v-else class="invites-page__table">
               <table>
                 <thead>
                   <tr>
@@ -506,9 +551,6 @@ onBeforeUnmount(() => {
                 <tbody>
                   <tr v-if="loading">
                     <td colspan="7" class="empty">読み込み中...</td>
-                  </tr>
-                  <tr v-else-if="!filteredInvites.length">
-                    <td colspan="7" class="empty">招待リンクがありません。</td>
                   </tr>
                   <tr v-for="invite in filteredInvites" :key="invite.id">
                     <td>
