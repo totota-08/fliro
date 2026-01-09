@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import AppBadge from "@/components/ui/AppBadge.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -129,32 +131,32 @@ type DecoratedTask = TaskDoc & {
 };
 
 /**
- * ステータス → バッジクラス
+ * ステータス → AppBadge variant
  */
-const getStatusBadgeClass = (status: DisplayStatus) => {
+const getStatusBadgeVariant = (status: DisplayStatus): "success" | "primary" | "info" | "default" => {
   switch (status) {
     case "完了":
-      return "badge status-done";
+      return "success";
     case "進行中":
-      return "badge status-progress";
+      return "primary";
     case "レビュー待ち":
-      return "badge status-review";
+      return "info";
     default:
-      return "badge status-todo";
+      return "default";
   }
 };
 
 /**
- * 優先度 → バッジクラス
+ * 優先度 → AppBadge variant
  */
-const getPriorityBadgeClass = (priority: DisplayPriority) => {
+const getPriorityBadgeVariant = (priority: DisplayPriority): "danger" | "warning" | "default" => {
   switch (priority) {
     case "高":
-      return "badge priority-high";
+      return "danger";
     case "中":
-      return "badge priority-medium";
+      return "warning";
     default:
-      return "badge priority-low";
+      return "default";
   }
 };
 
@@ -504,14 +506,12 @@ onMounted(() => {
                         <span>{{ task.projectName }}</span>
                       </div>
                       <div class="task-card__badges">
-                        <span :class="getStatusBadgeClass(task.displayStatus)">
+                        <AppBadge :variant="getStatusBadgeVariant(task.displayStatus)" size="sm">
                           {{ task.displayStatus }}
-                        </span>
-                        <span
-                          :class="getPriorityBadgeClass(task.displayPriority)"
-                        >
+                        </AppBadge>
+                        <AppBadge :variant="getPriorityBadgeVariant(task.displayPriority)" size="sm">
                           {{ task.displayPriority }}
-                        </span>
+                        </AppBadge>
                       </div>
                     </div>
 
@@ -566,20 +566,24 @@ onMounted(() => {
                     </div>
 
                     <div class="task-card__actions">
-                      <button type="button" @click.stop="toggleComplete(task)">
+                      <AppButton
+                        size="sm"
+                        variant="primary"
+                        @click.stop="toggleComplete(task)"
+                      >
                         {{
                           (task as any).status === "done"
                             ? "未完了に戻す"
                             : "完了にする"
                         }}
-                      </button>
-                      <button
-                        type="button"
-                        class="is-danger"
+                      </AppButton>
+                      <AppButton
+                        size="sm"
+                        variant="danger"
                         @click.stop="removeTask(task)"
                       >
                         削除
-                      </button>
+                      </AppButton>
                     </div>
                   </article>
                 </template>
@@ -604,9 +608,9 @@ onMounted(() => {
                         />
                         <span>{{ task.projectName }}</span>
                       </div>
-                      <span :class="getStatusBadgeClass(task.displayStatus)">
+                      <AppBadge :variant="getStatusBadgeVariant(task.displayStatus)" size="sm">
                         {{ task.displayStatus }}
-                      </span>
+                      </AppBadge>
                     </div>
                     <h3>{{ task.title }}</h3>
                     <p>{{ task.description || "説明なし" }}</p>
@@ -649,16 +653,20 @@ onMounted(() => {
                     </div>
 
                     <div class="task-card__actions">
-                      <button type="button" @click.stop="toggleComplete(task)">
+                      <AppButton
+                        size="sm"
+                        variant="secondary"
+                        @click.stop="toggleComplete(task)"
+                      >
                         未完了に戻す
-                      </button>
-                      <button
-                        type="button"
-                        class="is-danger"
+                      </AppButton>
+                      <AppButton
+                        size="sm"
+                        variant="danger"
                         @click.stop="removeTask(task)"
                       >
                         削除
-                      </button>
+                      </AppButton>
                     </div>
                   </article>
                 </template>
@@ -1049,81 +1057,9 @@ onMounted(() => {
   gap: var(--ui-space-2, 0.5rem);
 }
 
-.task-card__actions button {
-  border: none;
-  border-radius: var(--ui-radius-full, 9999px);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-xs, 0.75rem);
-  cursor: pointer;
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-text-inverse, #ffffff);
-  font-weight: var(--ui-font-medium, 500);
-  transition: var(--ui-transition-colors);
-}
+/* ボタンスタイルは AppButton コンポーネントで管理 */
 
-.task-card__actions button:hover {
-  background: var(--ui-brand-700, #1a4a51);
-}
-
-.task-card__actions button.is-danger {
-  background: var(--ui-danger, #d64545);
-}
-
-.task-card__actions button.is-danger:hover {
-  background: #c03939;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.status-done {
-  background: var(--ui-success-light, #dcfce7);
-  color: var(--ui-success, #16a34a);
-  border: 1px solid rgba(22, 163, 74, 0.25);
-}
-
-.status-progress {
-  background: var(--ui-brand-100, #e5f6f8);
-  color: var(--ui-brand-700, #1a4a51);
-  border: 1px solid rgba(79, 124, 130, 0.25);
-}
-
-.status-review {
-  background: var(--ui-info-light, #e0f2fe);
-  color: var(--ui-info, #0284c7);
-  border: 1px solid rgba(2, 132, 199, 0.25);
-}
-
-.status-todo {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-}
-
-.priority-high {
-  background: var(--ui-danger-light, #fee2e2);
-  color: var(--ui-danger, #d64545);
-  border: 1px solid rgba(214, 69, 69, 0.25);
-}
-
-.priority-medium {
-  background: var(--ui-warning-light, #fef3c7);
-  color: var(--ui-warning, #f59e0b);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-}
-
-.priority-low {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-}
+/* バッジスタイルは AppBadge コンポーネントで管理 */
 
 .task-dot {
   width: 0.5rem;
