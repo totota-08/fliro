@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LoadingScreen from "@/components/ui/LoadingScreen.vue";
+import RouterProgressBar from "@/components/ui/RouterProgressBar.vue";
 import { onMounted, ref } from "vue";
 import { RouterView } from "vue-router";
 
@@ -14,9 +15,10 @@ onMounted(async () => {
 
 <template>
   <LoadingScreen :loading="isLoading" />
+  <RouterProgressBar />
   <RouterView v-slot="{ Component }">
-    <transition name="page-fade" mode="out-in">
-      <component :is="Component" />
+    <transition name="page-fade">
+      <component :is="Component" :key="$route.fullPath" />
     </transition>
   </RouterView>
 </template>
