@@ -34,7 +34,9 @@ let currentY = 0;
 // スクロール位置が0かチェック
 function isAtTop(): boolean {
   if (!containerRef.value) return false;
-  const scrollable = containerRef.value.querySelector(".pull-to-refresh__content");
+  const scrollable = containerRef.value.querySelector(
+    ".pull-to-refresh__content",
+  );
   if (!scrollable) return false;
   return scrollable.scrollTop === 0;
 }
@@ -44,7 +46,10 @@ function handleTouchStart(e: TouchEvent) {
   if (props.disabled || isRefreshing.value) return;
   if (!isAtTop()) return;
 
-  startY = e.touches[0].clientY;
+  const touch = e.touches[0];
+  if (!touch) return;
+
+  startY = touch.clientY;
   currentY = startY;
   isPulling.value = true;
 }
@@ -58,7 +63,10 @@ function handleTouchMove(e: TouchEvent) {
     return;
   }
 
-  currentY = e.touches[0].clientY;
+  const touch = e.touches[0];
+  if (!touch) return;
+
+  currentY = touch.clientY;
   const distance = currentY - startY;
 
   if (distance > 0) {
@@ -86,7 +94,7 @@ async function handleTouchEnd() {
     emit("refresh");
 
     // 最小表示時間（UXのため）
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     isRefreshing.value = false;
     pullDistance.value = 0;
@@ -107,8 +115,12 @@ defineExpose({ completeRefresh });
 // イベントリスナー設定
 onMounted(() => {
   if (containerRef.value) {
-    containerRef.value.addEventListener("touchstart", handleTouchStart, { passive: true });
-    containerRef.value.addEventListener("touchmove", handleTouchMove, { passive: false });
+    containerRef.value.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
+    containerRef.value.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
     containerRef.value.addEventListener("touchend", handleTouchEnd);
   }
 });
@@ -139,11 +151,7 @@ onBeforeUnmount(() => {
           'is-refreshing': isRefreshing,
         }"
       >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-        >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path
             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             fill="currentColor"

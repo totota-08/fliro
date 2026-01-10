@@ -3,9 +3,12 @@ import UserAvatar from "@/components/common/UserAvatar.vue";
 import TaskForm from "@/components/tasks/TaskForm.vue";
 import TaskStatusBadge from "@/components/ui/TaskStatusBadge.vue";
 import { useProjectAccess } from "@/composables/useProjectAccess";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectShellData } from "@/composables/useProjectShellData";
 import { ProjectPermission } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProject } from "@/firebase/projectService";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import {
   listenProjectMembers,
   type ProjectMember,
@@ -28,7 +31,7 @@ import {
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectTaskDetailPage");
@@ -36,13 +39,46 @@ const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
 
-const projectId = ref(String(route.params.projectId));
+const { projectId } = useProjectIdRoute();
 const taskId = ref(String(route.params.taskId));
 const project = ref<ProjectDoc | null>(null);
+
+// ProjectAppShell用のデータ
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
 
 // 権限チェック
 const { can } = useProjectAccess(projectId);
 const canEditTask = computed(() => can(ProjectPermission.MANAGE_TASKS));
+
+// 戻り先の計算
+const backRouteInfo = computed(() => {
+  const from = route.query.from;
+  switch (from) {
+    case "threads":
+      return {
+        label: "← スレッドに戻る",
+        to: {
+          name: ROUTE_NAMES.projectThreads,
+          params: { projectId: projectId.value },
+        },
+      };
+    case "mytasks":
+      return {
+        label: "← マイタスクへ戻る",
+        to: { name: ROUTE_NAMES.myTasks },
+      };
+    case "dashboard":
+    default:
+      return {
+        label: "← ダッシュボードへ戻る",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: projectId.value },
+        },
+      };
+  }
+});
 
 const task = ref<TaskDoc | null>(null);
 const messages = ref<TaskDiscussionMessage[]>([]);
@@ -115,14 +151,7 @@ const categoryLabel = computed(() => {
 
 // Methods
 function goBack() {
-  if (route.query.from === "dashboard") {
-    router.push({
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: projectId.value },
-    });
-  } else {
-    router.back();
-  }
+  router.push(backRouteInfo.value.to);
 }
 
 function formatDate(dateWrapper: any) {
@@ -216,6 +245,37 @@ onMounted(async () => {
   });
 });
 
+// taskIdのウォッチ - リスナーの再購読
+watch(
+  () => route.params.taskId,
+  (newTaskId) => {
+    if (newTaskId && String(newTaskId) !== taskId.value) {
+      taskId.value = String(newTaskId);
+
+      // 既存のタスク関連リスナーを停止
+      stopTask?.();
+      stopDiscussion?.();
+
+      // 新しいタスクのリスナーを開始
+      stopTask = listenTask(projectId.value, taskId.value, (doc) => {
+        task.value = doc;
+      });
+
+      stopDiscussion = listenTaskDiscussion(
+        projectId.value,
+        taskId.value,
+        (msgs) => {
+          messages.value = msgs;
+        },
+      );
+
+      // メッセージ表示をリセット
+      messageLimit.value = 20;
+      input.value = "";
+    }
+  },
+);
+
 onBeforeUnmount(() => {
   stopTask?.();
   stopDiscussion?.();
@@ -225,39 +285,52 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="task-page">
-    <div class="task-container">
-      <!-- Header -->
-      <header class="task-header">
-        <button @click="goBack" class="back-link">← ダッシュボード</button>
-        <div class="header-content" v-if="task">
-          <div class="title-row">
-            <h1 class="task-title">{{ task.title }}</h1>
-            <TaskStatusBadge :status="task.status" />
-            <button
-              v-if="canEditTask"
-              class="edit-button"
-              type="button"
-              @click="openEditModal"
-            >
-              編集
-            </button>
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+  >
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; タスク詳細</p>
+      <h1 class="project-app-shell__heading">
+        {{ project?.name || "プロジェクト" }}
+      </h1>
+    </template>
+    <template #headerActions>
+      <button @click="goBack" class="back-link">
+        {{ backRouteInfo.label }}
+      </button>
+    </template>
+
+    <div class="task-detail-content">
+      <header class="task-header" v-if="task">
+        <div class="title-row">
+          <h2 class="task-title">{{ task.title }}</h2>
+          <TaskStatusBadge :status="task.status" />
+          <button
+            v-if="canEditTask"
+            class="edit-button"
+            type="button"
+            @click="openEditModal"
+          >
+            編集
+          </button>
+        </div>
+        <div class="meta-row meta-row-mobile">
+          <div class="meta-item">
+            <span class="label">担当</span>
+            <span class="value">{{ task.assigneeName || "未割り当て" }}</span>
           </div>
-          <div class="meta-row meta-row-mobile">
-            <div class="meta-item">
-              <span class="label">担当</span>
-              <span class="value">{{ task.assigneeName || "未割り当て" }}</span>
-            </div>
-            <div class="meta-item">
-              <span class="label">期限</span>
-              <span class="value">{{
-                formatDate(task.dueDate) || "期限なし"
-              }}</span>
-            </div>
-            <div class="meta-item">
-              <span class="label">カテゴリ</span>
-              <span class="value">{{ categoryLabel }}</span>
-            </div>
+          <div class="meta-item">
+            <span class="label">期限</span>
+            <span class="value">{{
+              formatDate(task.dueDate) || "期限なし"
+            }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="label">カテゴリ</span>
+            <span class="value">{{ categoryLabel }}</span>
           </div>
         </div>
       </header>
@@ -483,41 +556,23 @@ onBeforeUnmount(() => {
         />
       </div>
     </Teleport>
-  </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>
-/* Page Layout */
-.task-page {
-  min-height: 100vh;
-  background: linear-gradient(120deg, var(--ui-bg), var(--ui-brand-100));
-  color: var(--ui-text);
-  font-family: var(--ui-font-sans);
-  display: flex;
-  justify-content: center;
-  padding: var(--ui-space-10) var(--ui-space-5);
-}
-
-.task-container {
-  width: 100%;
-  max-width: 1152px;
-  background: var(--ui-surface);
-  border-radius: var(--ui-radius-2xl);
-  box-shadow: var(--ui-shadow-xl);
-  overflow: hidden;
+/* Content Layout */
+.task-detail-content {
   display: flex;
   flex-direction: column;
+  gap: var(--ui-space-6);
 }
 
 /* Header */
 .task-header {
-  padding: var(--ui-space-8) var(--ui-space-10);
-  border-bottom: 1px solid var(--ui-border-light);
+  padding: var(--ui-space-5);
+  border: 1px solid var(--ui-border-light);
+  border-radius: var(--ui-radius-xl);
   background: var(--ui-surface);
-}
-
-.header-content {
-  margin-top: var(--ui-space-4);
 }
 
 .back-link {
@@ -546,11 +601,11 @@ onBeforeUnmount(() => {
 }
 
 .task-title {
-  font-size: var(--ui-text-3xl);
+  font-size: var(--ui-text-xl);
   font-weight: var(--ui-font-bold);
   color: var(--ui-text-strong);
   margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
   line-height: var(--ui-leading-tight);
 }
 
@@ -594,7 +649,7 @@ onBeforeUnmount(() => {
 
 /* Content Body */
 .task-content {
-  padding: var(--ui-space-10);
+  padding: 0;
 }
 
 .task-grid {

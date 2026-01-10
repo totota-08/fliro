@@ -59,15 +59,21 @@ const swipeLabel = computed(() => {
 
 // タッチイベントハンドラ
 function handleTouchStart(e: TouchEvent) {
-  startX.value = e.touches[0].clientX;
-  currentX.value = e.touches[0].clientX;
+  const touch = e.touches[0];
+  if (!touch) return;
+
+  startX.value = touch.clientX;
+  currentX.value = touch.clientX;
   isSwiping.value = true;
 }
 
 function handleTouchMove(e: TouchEvent) {
   if (!isSwiping.value) return;
 
-  currentX.value = e.touches[0].clientX;
+  const touch = e.touches[0];
+  if (!touch) return;
+
+  currentX.value = touch.clientX;
   let distance = currentX.value - startX.value;
 
   // 最大スワイプ距離を制限
@@ -148,10 +154,7 @@ function handleClick() {
           </span>
         </div>
 
-        <p
-          v-if="task.description"
-          class="task-card__description"
-        >
+        <p v-if="task.description" class="task-card__description">
           {{
             task.description.length > 50
               ? task.description.slice(0, 50) + "..."
@@ -177,9 +180,7 @@ function handleClick() {
         </div>
 
         <!-- スワイプヒント（最初の数回だけ表示） -->
-        <div class="task-card__swipe-hint">
-          ← スワイプで操作 →
-        </div>
+        <div class="task-card__swipe-hint">← スワイプで操作 →</div>
       </div>
     </div>
   </div>

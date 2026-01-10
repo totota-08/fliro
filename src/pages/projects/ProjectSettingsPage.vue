@@ -44,6 +44,12 @@ const deleteConfirmInput = ref("");
 const { can } = useProjectAccess(projectId);
 
 const canManage = computed(() => can(ProjectPermission.MANAGE_SETTINGS));
+const canManageCategories = computed(() =>
+  can(ProjectPermission.MANAGE_CATEGORIES),
+);
+const canManageNotifications = computed(() =>
+  can(ProjectPermission.MANAGE_NOTIFICATIONS),
+);
 
 const aiEnabled = ref(false);
 const aiKey = ref("");
@@ -603,6 +609,7 @@ watch(projectId, async (newId, oldId) => {
               <h3>関連設定</h3>
               <div class="related-links">
                 <button
+                  v-if="canManageCategories"
                   type="button"
                   class="related-link"
                   @click="goToCategories"
@@ -630,6 +637,7 @@ watch(projectId, async (newId, oldId) => {
                   <span class="related-link__arrow">→</span>
                 </button>
                 <button
+                  v-if="canManageNotifications"
                   type="button"
                   class="related-link"
                   @click="goToNotifications"

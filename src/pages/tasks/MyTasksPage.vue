@@ -3,6 +3,7 @@ import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppBadge from "@/components/ui/AppBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppTasksSkeleton from "@/components/ui/AppTasksSkeleton.vue";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav.vue";
 import SwipeableTaskCard from "@/components/mobile/SwipeableTaskCard.vue";
 import PullToRefresh from "@/components/mobile/PullToRefresh.vue";
@@ -42,7 +43,10 @@ const mobileNavItems = computed(() => [
     name: "home",
     label: "ホーム",
     icon: "home",
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: projects.value[0]?.id || "" } },
+    to: {
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: projects.value[0]?.id || "" },
+    },
   },
   {
     name: "tasks",
@@ -54,7 +58,10 @@ const mobileNavItems = computed(() => [
     name: "team",
     label: "チーム",
     icon: "users",
-    to: { name: ROUTE_NAMES.projectMembers, params: { projectId: projects.value[0]?.id || "" } },
+    to: {
+      name: ROUTE_NAMES.projectMembers,
+      params: { projectId: projects.value[0]?.id || "" },
+    },
   },
   {
     name: "settings",
@@ -170,7 +177,9 @@ type DecoratedTask = TaskDoc & {
 /**
  * ステータス → AppBadge variant
  */
-const getStatusBadgeVariant = (status: DisplayStatus): "success" | "primary" | "info" | "default" => {
+const getStatusBadgeVariant = (
+  status: DisplayStatus,
+): "success" | "primary" | "info" | "default" => {
   switch (status) {
     case "完了":
       return "success";
@@ -186,7 +195,9 @@ const getStatusBadgeVariant = (status: DisplayStatus): "success" | "primary" | "
 /**
  * 優先度 → AppBadge variant
  */
-const getPriorityBadgeVariant = (priority: DisplayPriority): "danger" | "warning" | "default" => {
+const getPriorityBadgeVariant = (
+  priority: DisplayPriority,
+): "danger" | "warning" | "default" => {
   switch (priority) {
     case "高":
       return "danger";
@@ -317,6 +328,7 @@ function goToTask(task: DecoratedTask) {
   router.push({
     name: ROUTE_NAMES.projectTaskDetail,
     params: { projectId: task.projectId, taskId: task.id },
+    query: { from: "mytasks" },
   });
 }
 
@@ -516,9 +528,7 @@ onBeforeUnmount(() => {
               @refresh="handleRefresh"
             >
               <!-- 状態メッセージ -->
-              <section v-if="loading" class="tasks-empty">
-                読み込み中...
-              </section>
+              <AppTasksSkeleton v-if="loading" :count="5" />
               <AppEmptyState
                 v-else-if="errorMessage"
                 :title="errorMessage"
@@ -532,9 +542,12 @@ onBeforeUnmount(() => {
               >
                 <template #action>
                   <AppButton
-                    v-if="projects.length > 0"
+                    v-if="projects.length > 0 && projects[0]"
                     variant="primary"
-                    :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId: projects[0].id } }"
+                    :to="{
+                      name: ROUTE_NAMES.projectDashboard,
+                      params: { projectId: projects[0].id },
+                    }"
                   >
                     プロジェクトを開く
                   </AppButton>
@@ -593,9 +606,12 @@ onBeforeUnmount(() => {
               >
                 <template #action>
                   <AppButton
-                    v-if="projects.length > 0"
+                    v-if="projects.length > 0 && projects[0]"
                     variant="primary"
-                    :to="{ name: ROUTE_NAMES.projectDashboard, params: { projectId: projects[0].id } }"
+                    :to="{
+                      name: ROUTE_NAMES.projectDashboard,
+                      params: { projectId: projects[0].id },
+                    }"
                   >
                     プロジェクトを開く
                   </AppButton>
@@ -633,10 +649,18 @@ onBeforeUnmount(() => {
                         <span>{{ task.projectName }}</span>
                       </div>
                       <div class="task-card__badges">
-                        <AppBadge :variant="getStatusBadgeVariant(task.displayStatus)" size="sm">
+                        <AppBadge
+                          :variant="getStatusBadgeVariant(task.displayStatus)"
+                          size="sm"
+                        >
                           {{ task.displayStatus }}
                         </AppBadge>
-                        <AppBadge :variant="getPriorityBadgeVariant(task.displayPriority)" size="sm">
+                        <AppBadge
+                          :variant="
+                            getPriorityBadgeVariant(task.displayPriority)
+                          "
+                          size="sm"
+                        >
                           {{ task.displayPriority }}
                         </AppBadge>
                       </div>
@@ -646,7 +670,11 @@ onBeforeUnmount(() => {
 
                     <!-- 説明は最初の50文字のみ表示 -->
                     <p v-if="task.description" class="task-card__description">
-                      {{ task.description.length > 50 ? task.description.slice(0, 50) + '...' : task.description }}
+                      {{
+                        task.description.length > 50
+                          ? task.description.slice(0, 50) + "..."
+                          : task.description
+                      }}
                     </p>
 
                     <!-- 期限情報を目立たせる -->
@@ -713,7 +741,10 @@ onBeforeUnmount(() => {
                         />
                         <span>{{ task.projectName }}</span>
                       </div>
-                      <AppBadge :variant="getStatusBadgeVariant(task.displayStatus)" size="sm">
+                      <AppBadge
+                        :variant="getStatusBadgeVariant(task.displayStatus)"
+                        size="sm"
+                      >
                         {{ task.displayStatus }}
                       </AppBadge>
                     </div>
@@ -721,11 +752,17 @@ onBeforeUnmount(() => {
 
                     <!-- 説明は最初の50文字のみ表示 -->
                     <p v-if="task.description" class="task-card__description">
-                      {{ task.description.length > 50 ? task.description.slice(0, 50) + '...' : task.description }}
+                      {{
+                        task.description.length > 50
+                          ? task.description.slice(0, 50) + "..."
+                          : task.description
+                      }}
                     </p>
 
                     <!-- 完了済みの表示 -->
-                    <div class="task-card__due-info task-card__due-info--completed">
+                    <div
+                      class="task-card__due-info task-card__due-info--completed"
+                    >
                       <svg
                         viewBox="0 0 24 24"
                         fill="none"
