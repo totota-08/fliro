@@ -47,6 +47,8 @@ export const ProjectPermission = {
   MANAGE_NOTIFICATIONS: "manageNotifications",
   /** 週次スコア閲覧（Admin専用） */
   VIEW_SCORES: "viewScores",
+  /** 自分に割り当てられたタスクの進捗率のみ変更 */
+  UPDATE_OWN_PROGRESS: "updateOwnProgress",
 } as const;
 
 export type ProjectPermissionKey =
@@ -62,7 +64,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, ProjectPermissionKey[]> =
     member: [
       ProjectPermission.VIEW_DASHBOARD,
       ProjectPermission.VIEW_TASKS,
-      ProjectPermission.MANAGE_TASKS,
+      ProjectPermission.UPDATE_OWN_PROGRESS, // 自分担当タスクの進捗のみ変更可
       ProjectPermission.VIEW_THREADS,
       ProjectPermission.POST_THREADS,
       ProjectPermission.VIEW_ACTIVITY,

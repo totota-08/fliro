@@ -62,6 +62,14 @@ service cloud.firestore {
                      .data.permissions.canManageTasks == true)));
     }
 
+    // メンバーが自分に割り当てられたタスクの進捗のみ更新可能かどうか
+    function canUpdateOwnTaskProgress(projectId) {
+      return isSignedIn()
+        && isProjectMember(projectId)
+        && resource.data.assigneeId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['progress', 'status', 'updatedAt']);
+    }
+
     function isCreatingOwnProject() {
       return isSignedIn()
         && request.resource.data.ownerUserId == request.auth.uid;
@@ -166,7 +174,8 @@ service cloud.firestore {
                       && request.resource.data.updatedAt is timestamp;
         allow read: if isProjectMember(projectId)
                     || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
-        allow update: if canManageTasks(projectId);
+        // Owner/Adminはフル編集可能、Memberは自分担当タスクの進捗のみ更新可能
+        allow update: if canManageTasks(projectId) || canUpdateOwnTaskProgress(projectId);
         allow delete: if isProjectMember(projectId);
 
         match /messages/{messageId} {
