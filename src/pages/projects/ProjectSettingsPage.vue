@@ -18,6 +18,11 @@ import {
 } from "@/firebase/projectService";
 import { updateProjectSettings } from "@/services/projectSettings";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
+import {
+  getDashboardSettings,
+  saveDashboardSettings,
+  type DashboardCardConfig,
+} from "@/services/dashboardSettingsService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -58,6 +63,19 @@ const aiResponse = ref("");
 const aiLoading = ref(false);
 const tasks = ref<TaskDoc[]>([]);
 let stopTasks: (() => void) | null = null;
+
+// Dashboard card configuration
+const cardConfig = ref<DashboardCardConfig[]>([]);
+const cardConfigSaving = ref(false);
+
+// カードラベルのマッピング
+const CARD_LABELS: Record<string, string> = {
+  overdue: "期限切れ",
+  "due-soon": "直近の期限",
+  active: "進行中",
+  done: "完了",
+  "weekly-score": "週次スコア",
+};
 
 const form = ref({
   name: "",
@@ -125,6 +143,90 @@ function goToNotifications() {
     name: ROUTE_NAMES.projectNotifications,
     params: { projectId: projectId.value },
   });
+}
+
+// ダッシュボードカード設定の読み込み
+async function loadCardConfig() {
+  if (!user.value) return;
+  try {
+    const settings = await getDashboardSettings(
+      user.value.uid,
+      projectId.value,
+    );
+    cardConfig.value = settings.cards;
+  } catch (error) {
+    logger.error`Failed to load card config: ${error}`;
+    // デフォルト設定を使用
+    cardConfig.value = [
+      { id: "overdue", type: "overdue", position: 0, visible: true },
+      { id: "due-soon", type: "due-soon", position: 1, visible: true },
+      { id: "active", type: "active", position: 2, visible: true },
+      { id: "done", type: "done", position: 3, visible: true },
+    ];
+  }
+}
+
+// カードの並び順でソート
+const sortedCardConfig = computed(() =>
+  [...cardConfig.value].sort((a, b) => a.position - b.position),
+);
+
+// カードの表示/非表示を切り替え
+function toggleCardVisible(cardId: string) {
+  const card = cardConfig.value.find((c) => c.id === cardId);
+  if (card) {
+    card.visible = !card.visible;
+  }
+}
+
+// カードを上に移動
+function moveCardUp(cardId: string) {
+  const sorted = [...cardConfig.value].sort((a, b) => a.position - b.position);
+  const index = sorted.findIndex((c) => c.id === cardId);
+  if (index <= 0) return;
+  const current = sorted[index];
+  const prev = sorted[index - 1];
+  if (!current || !prev) return;
+  const temp = current.position;
+  current.position = prev.position;
+  prev.position = temp;
+  cardConfig.value = sorted;
+}
+
+// カードを下に移動
+function moveCardDown(cardId: string) {
+  const sorted = [...cardConfig.value].sort((a, b) => a.position - b.position);
+  const index = sorted.findIndex((c) => c.id === cardId);
+  if (index < 0 || index >= sorted.length - 1) return;
+  const current = sorted[index];
+  const next = sorted[index + 1];
+  if (!current || !next) return;
+  const temp = current.position;
+  current.position = next.position;
+  next.position = temp;
+  cardConfig.value = sorted;
+}
+
+// カード設定を保存
+async function saveCardConfig() {
+  if (!user.value) return;
+  cardConfigSaving.value = true;
+  try {
+    await saveDashboardSettings(
+      user.value.uid,
+      projectId.value,
+      cardConfig.value,
+    );
+  } catch (error) {
+    logger.error`Failed to save card config: ${error}`;
+  } finally {
+    cardConfigSaving.value = false;
+  }
+}
+
+// カードのラベルを取得
+function getCardLabel(cardId: string): string {
+  return CARD_LABELS[cardId] || cardId;
 }
 
 async function loadProjectList() {
@@ -291,6 +393,7 @@ async function handleDelete() {
 onMounted(async () => {
   await loadProjectList();
   await loadProject();
+  await loadCardConfig();
   watchTasks();
 });
 
@@ -302,6 +405,7 @@ watch(projectId, async (newId, oldId) => {
   if (!newId || newId === oldId) return;
   stopTasks?.();
   await loadProject();
+  await loadCardConfig();
   watchTasks();
 });
 </script>
@@ -445,6 +549,108 @@ watch(projectId, async (newId, oldId) => {
                   </transition>
                 </div>
               </form>
+            </section>
+
+            <!-- ダッシュボードカード設定セクション -->
+            <section class="card">
+              <header class="card-header">
+                <div class="card-header__icon">
+                  <svg
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h2>ダッシュボードカード設定</h2>
+                  <p>サマリーカードの表示・並び順を管理します</p>
+                </div>
+              </header>
+
+              <div class="form-stack">
+                <div class="card-config-list">
+                  <div
+                    v-for="(config, index) in sortedCardConfig"
+                    :key="config.id"
+                    class="card-config-item"
+                  >
+                    <label class="card-config-checkbox">
+                      <input
+                        type="checkbox"
+                        :checked="config.visible"
+                        @change="toggleCardVisible(config.id)"
+                      />
+                      <span class="card-config-label">{{
+                        getCardLabel(config.id)
+                      }}</span>
+                    </label>
+                    <div class="card-config-actions">
+                      <button
+                        type="button"
+                        class="card-config-btn"
+                        :disabled="index === 0"
+                        @click="moveCardUp(config.id)"
+                        aria-label="上に移動"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M5 15l7-7 7 7"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="card-config-btn"
+                        :disabled="index === sortedCardConfig.length - 1"
+                        @click="moveCardDown(config.id)"
+                        aria-label="下に移動"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <AppButton
+                    type="button"
+                    :loading="cardConfigSaving"
+                    variant="primary"
+                    @click="saveCardConfig"
+                  >
+                    設定を保存
+                  </AppButton>
+                </div>
+              </div>
             </section>
 
             <section class="card" :class="{ 'is-disabled': !canEdit }">
@@ -1070,6 +1276,73 @@ watch(projectId, async (newId, oldId) => {
   padding: var(--ui-space-8, 2rem);
   text-align: center;
   color: var(--ui-danger, #d64545);
+}
+
+/* Card Config (Dashboard Card Settings) */
+.card-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.card-config-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-surface-muted, #f8fafa);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+}
+
+.card-config-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3, 0.75rem);
+  cursor: pointer;
+}
+
+.card-config-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ui-brand-600, #4f7c82);
+  cursor: pointer;
+}
+
+.card-config-label {
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #0b2e33);
+}
+
+.card-config-actions {
+  display: flex;
+  gap: var(--ui-space-1, 0.25rem);
+}
+
+.card-config-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.15));
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text-muted, #64748b);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.card-config-btn:hover:not(:disabled) {
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-600, #4f7c82);
+  background: var(--ui-brand-100, #e5f6f8);
+}
+
+.card-config-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {

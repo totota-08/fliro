@@ -171,11 +171,6 @@ function toggleCardVisibility(cardId: string) {
   saveVisibility();
 }
 
-function toggleCustomize() {
-  isCustomizing.value = !isCustomizing.value;
-  emit("toggle-customize");
-}
-
 function getCardLabel(id: string): string {
   const card = allCards.value.find((c) => c.id === id);
   return card?.label || id;
@@ -291,26 +286,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="summary">
-    <header v-if="props.showHeader" class="summary__header">
-      <div>
-        <h2>{{ props.title }}</h2>
-        <p>{{ props.description }}</p>
-      </div>
-      <div class="summary__header-actions">
-        <button
-          v-if="props.customizable"
-          type="button"
-          class="summary__customize-btn"
-          @click="toggleCustomize"
-        >
-          {{ isCustomizing ? "完了" : "カスタマイズ" }}
-        </button>
-        <small v-if="props.note" class="summary__note">
-          {{ props.note }}
-        </small>
-      </div>
-    </header>
-
     <!-- カスタマイズモード（cardConfig使用時） -->
     <div
       v-if="isCustomizing && props.customizable && props.cardConfig"
@@ -530,62 +505,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-}
-
-.summary__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
-  justify-content: space-between;
-  padding: 1.75rem 2rem;
-  border-radius: 1.5rem;
-  background: var(--surface-elevated);
-  border: 1px solid var(--border-light);
-  box-shadow: 0 12px 28px rgba(11, 46, 51, 0.1);
-}
-
-.summary__header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.summary__header p {
-  margin: 0.35rem 0 0;
-  color: var(--text-muted);
-}
-
-.summary__note {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  background: rgba(184, 227, 233, 0.35);
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.75rem;
-}
-
-.summary__header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.summary__customize-btn {
-  border: 1px solid var(--border-light);
-  border-radius: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: var(--surface-elevated);
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease;
-}
-
-.summary__customize-btn:hover {
-  background: rgba(79, 124, 130, 0.08);
-  border-color: var(--primary);
 }
 
 .summary__customize {
@@ -816,12 +735,5 @@ onBeforeUnmount(() => {
   inset: 0;
   background: linear-gradient(90deg, #4f7c82, rgba(11, 46, 51, 0.9));
   transition: width 400ms ease;
-}
-
-@media (max-width: 768px) {
-  .summary__header {
-    flex-direction: column;
-    gap: 1rem;
-  }
 }
 </style>
