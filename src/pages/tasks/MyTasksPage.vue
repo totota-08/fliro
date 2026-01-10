@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import AppBadge from "@/components/ui/AppBadge.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import AppTasksSkeleton from "@/components/ui/AppTasksSkeleton.vue";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav.vue";
+import SwipeableTaskCard from "@/components/mobile/SwipeableTaskCard.vue";
+import PullToRefresh from "@/components/mobile/PullToRefresh.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -11,7 +16,7 @@ import { useAuthStore } from "@/store/auth";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs } from "firebase/firestore";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.tasks.MyTasks");
@@ -25,6 +30,46 @@ const errorMessage = ref("");
 const activeTab = ref<"active" | "completed">("active");
 const tasks = ref<TaskDoc[]>([]);
 const projects = ref<{ id: string; name: string }[]>([]);
+
+// モバイル検出
+const isMobile = ref(false);
+const checkMobile = () => {
+  isMobile.value = window.matchMedia("(max-width: 768px)").matches;
+};
+
+// モバイルナビゲーション項目
+const mobileNavItems = computed(() => [
+  {
+    name: "home",
+    label: "ホーム",
+    icon: "home",
+    to: {
+      name: ROUTE_NAMES.projectDashboard,
+      params: { projectId: projects.value[0]?.id || "" },
+    },
+  },
+  {
+    name: "tasks",
+    label: "タスク",
+    icon: "tasks",
+    to: { name: ROUTE_NAMES.myTasks },
+  },
+  {
+    name: "team",
+    label: "チーム",
+    icon: "users",
+    to: {
+      name: ROUTE_NAMES.projectMembers,
+      params: { projectId: projects.value[0]?.id || "" },
+    },
+  },
+  {
+    name: "settings",
+    label: "設定",
+    icon: "settings",
+    to: { name: ROUTE_NAMES.myPage },
+  },
+]);
 
 /**
  * Sidebar 用ナビゲーション
@@ -130,32 +175,36 @@ type DecoratedTask = TaskDoc & {
 };
 
 /**
- * ステータス → バッジクラス
+ * ステータス → AppBadge variant
  */
-const getStatusBadgeClass = (status: DisplayStatus) => {
+const getStatusBadgeVariant = (
+  status: DisplayStatus,
+): "success" | "primary" | "info" | "default" => {
   switch (status) {
     case "完了":
-      return "badge status-done";
+      return "success";
     case "進行中":
-      return "badge status-progress";
+      return "primary";
     case "レビュー待ち":
-      return "badge status-review";
+      return "info";
     default:
-      return "badge status-todo";
+      return "default";
   }
 };
 
 /**
- * 優先度 → バッジクラス
+ * 優先度 → AppBadge variant
  */
-const getPriorityBadgeClass = (priority: DisplayPriority) => {
+const getPriorityBadgeVariant = (
+  priority: DisplayPriority,
+): "danger" | "warning" | "default" => {
   switch (priority) {
     case "高":
-      return "badge priority-high";
+      return "danger";
     case "中":
-      return "badge priority-medium";
+      return "warning";
     default:
-      return "badge priority-low";
+      return "default";
   }
 };
 
@@ -306,6 +355,13 @@ async function removeTask(task: DecoratedTask) {
 }
 
 /**
+ * プルトゥーリフレッシュハンドラ（モバイル用）
+ */
+async function handleRefresh() {
+  await loadTasks();
+}
+
+/**
  * サイドバー制御
  */
 const closeSidebar = () => {
@@ -323,7 +379,13 @@ onMounted(() => {
   if (window.matchMedia("(max-width: 1200px)").matches) {
     isSidebarOpen.value = false;
   }
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
   loadTasks();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", checkMobile);
 });
 </script>
 
@@ -458,7 +520,13 @@ onMounted(() => {
               </button>
             </div>
 
-            <div class="tasks-tabs__content" role="tabpanel">
+            <!-- モバイル: PullToRefreshでラップ -->
+            <PullToRefresh
+              v-if="isMobile"
+              class="tasks-tabs__content"
+              role="tabpanel"
+              @refresh="handleRefresh"
+            >
               <!-- 状態メッセージ -->
               <AppTasksSkeleton v-if="loading" :count="5" />
               <AppEmptyState
@@ -469,9 +537,22 @@ onMounted(() => {
               <AppEmptyState
                 v-else-if="activeTab === 'active' && !activeTasks.length"
                 title="進行中のタスクはありません"
-                description="新しいタスクを作成するか、プロジェクトからタスクを確認してください。"
+                description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
                 icon="empty"
-              />
+              >
+                <template #action>
+                  <AppButton
+                    v-if="projects.length > 0 && projects[0]"
+                    variant="primary"
+                    :to="{
+                      name: ROUTE_NAMES.projectDashboard,
+                      params: { projectId: projects[0].id },
+                    }"
+                  >
+                    プロジェクトを開く
+                  </AppButton>
+                </template>
+              </AppEmptyState>
               <AppEmptyState
                 v-else-if="activeTab === 'completed' && !completedTasks.length"
                 title="完了したタスクはまだありません"
@@ -480,7 +561,71 @@ onMounted(() => {
               />
 
               <template v-else>
-                <!-- 進行中タブ -->
+                <!-- 進行中タブ（モバイル: SwipeableTaskCard） -->
+                <template v-if="activeTab === 'active'">
+                  <SwipeableTaskCard
+                    v-for="task in activeTasks"
+                    :key="task.id"
+                    :task="task"
+                    @complete="toggleComplete(task)"
+                    @delete="removeTask(task)"
+                    @click="goToTask(task)"
+                  />
+                </template>
+
+                <!-- 完了タブ（モバイル: SwipeableTaskCard） -->
+                <template v-else>
+                  <SwipeableTaskCard
+                    v-for="task in completedTasks"
+                    :key="task.id"
+                    :task="task"
+                    @complete="toggleComplete(task)"
+                    @delete="removeTask(task)"
+                    @click="goToTask(task)"
+                  />
+                </template>
+              </template>
+            </PullToRefresh>
+
+            <!-- デスクトップ: 通常表示 -->
+            <div v-else class="tasks-tabs__content" role="tabpanel">
+              <!-- 状態メッセージ -->
+              <section v-if="loading" class="tasks-empty">
+                読み込み中...
+              </section>
+              <AppEmptyState
+                v-else-if="errorMessage"
+                :title="errorMessage"
+                icon="error"
+              />
+              <AppEmptyState
+                v-else-if="activeTab === 'active' && !activeTasks.length"
+                title="進行中のタスクはありません"
+                description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
+                icon="empty"
+              >
+                <template #action>
+                  <AppButton
+                    v-if="projects.length > 0 && projects[0]"
+                    variant="primary"
+                    :to="{
+                      name: ROUTE_NAMES.projectDashboard,
+                      params: { projectId: projects[0].id },
+                    }"
+                  >
+                    プロジェクトを開く
+                  </AppButton>
+                </template>
+              </AppEmptyState>
+              <AppEmptyState
+                v-else-if="activeTab === 'completed' && !completedTasks.length"
+                title="完了したタスクはまだありません"
+                description="タスクを完了すると、ここに表示されます。"
+                icon="empty"
+              />
+
+              <template v-else>
+                <!-- 進行中タブ（デスクトップ: 従来のカード） -->
                 <template v-if="activeTab === 'active'">
                   <article
                     v-for="task in activeTasks"
@@ -504,82 +649,74 @@ onMounted(() => {
                         <span>{{ task.projectName }}</span>
                       </div>
                       <div class="task-card__badges">
-                        <span :class="getStatusBadgeClass(task.displayStatus)">
+                        <AppBadge
+                          :variant="getStatusBadgeVariant(task.displayStatus)"
+                          size="sm"
+                        >
                           {{ task.displayStatus }}
-                        </span>
-                        <span
-                          :class="getPriorityBadgeClass(task.displayPriority)"
+                        </AppBadge>
+                        <AppBadge
+                          :variant="
+                            getPriorityBadgeVariant(task.displayPriority)
+                          "
+                          size="sm"
                         >
                           {{ task.displayPriority }}
-                        </span>
+                        </AppBadge>
                       </div>
                     </div>
 
                     <h3>{{ task.title }}</h3>
-                    <p>{{ task.description || "説明なし" }}</p>
 
-                    <div class="task-card__meta">
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                          <path
-                            d="M7 10h10"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                          />
-                          <path
-                            d="M11 14h2"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                        <span>{{ task.dueDateLabel }}</span>
-                      </div>
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M12 6v6l3.5 3.5"
-                            stroke-width="1.7"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                          <circle cx="12" cy="12" r="8" stroke-width="1.5" />
-                        </svg>
-                        <span :class="task.dueClass">{{
-                          task.dueMessage
-                        }}</span>
-                      </div>
+                    <!-- 説明は最初の50文字のみ表示 -->
+                    <p v-if="task.description" class="task-card__description">
+                      {{
+                        task.description.length > 50
+                          ? task.description.slice(0, 50) + "..."
+                          : task.description
+                      }}
+                    </p>
+
+                    <!-- 期限情報を目立たせる -->
+                    <div class="task-card__due-info">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        class="task-card__due-icon"
+                      >
+                        <path
+                          d="M12 6v6l3.5 3.5"
+                          stroke-width="1.7"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                        <circle cx="12" cy="12" r="8" stroke-width="1.5" />
+                      </svg>
+                      <span :class="['task-card__due-text', task.dueClass]">
+                        {{ task.dueMessage }}
+                      </span>
                     </div>
 
                     <div class="task-card__actions">
-                      <button type="button" @click.stop="toggleComplete(task)">
+                      <AppButton
+                        size="sm"
+                        variant="primary"
+                        @click.stop="toggleComplete(task)"
+                      >
                         {{
                           (task as any).status === "done"
                             ? "未完了に戻す"
                             : "完了にする"
                         }}
-                      </button>
-                      <button
-                        type="button"
-                        class="is-danger"
+                      </AppButton>
+                      <AppButton
+                        size="sm"
+                        variant="danger"
                         @click.stop="removeTask(task)"
                       >
                         削除
-                      </button>
+                      </AppButton>
                     </div>
                   </article>
                 </template>
@@ -604,61 +741,59 @@ onMounted(() => {
                         />
                         <span>{{ task.projectName }}</span>
                       </div>
-                      <span :class="getStatusBadgeClass(task.displayStatus)">
+                      <AppBadge
+                        :variant="getStatusBadgeVariant(task.displayStatus)"
+                        size="sm"
+                      >
                         {{ task.displayStatus }}
-                      </span>
+                      </AppBadge>
                     </div>
                     <h3>{{ task.title }}</h3>
-                    <p>{{ task.description || "説明なし" }}</p>
-                    <div class="task-card__meta">
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                          <path
-                            d="M7 10h10"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                          />
-                        </svg>
-                        <span>{{ task.dueDateLabel }}</span>
-                      </div>
-                      <div class="task-card__meta-item">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                        >
-                          <path
-                            d="M20 6 9 17l-5-5"
-                            stroke-width="1.6"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                        <span>完了済み</span>
-                      </div>
+
+                    <!-- 説明は最初の50文字のみ表示 -->
+                    <p v-if="task.description" class="task-card__description">
+                      {{
+                        task.description.length > 50
+                          ? task.description.slice(0, 50) + "..."
+                          : task.description
+                      }}
+                    </p>
+
+                    <!-- 完了済みの表示 -->
+                    <div
+                      class="task-card__due-info task-card__due-info--completed"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        class="task-card__due-icon"
+                      >
+                        <path
+                          d="M20 6 9 17l-5-5"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                      <span class="task-card__due-text">完了済み</span>
                     </div>
 
                     <div class="task-card__actions">
-                      <button type="button" @click.stop="toggleComplete(task)">
+                      <AppButton
+                        size="sm"
+                        variant="secondary"
+                        @click.stop="toggleComplete(task)"
+                      >
                         未完了に戻す
-                      </button>
-                      <button
-                        type="button"
-                        class="is-danger"
+                      </AppButton>
+                      <AppButton
+                        size="sm"
+                        variant="danger"
                         @click.stop="removeTask(task)"
                       >
                         削除
-                      </button>
+                      </AppButton>
                     </div>
                   </article>
                 </template>
@@ -668,6 +803,9 @@ onMounted(() => {
         </section>
       </div>
     </div>
+
+    <!-- モバイルボトムナビゲーション -->
+    <MobileBottomNav v-if="isMobile" :items="mobileNavItems" />
   </div>
 </template>
 
@@ -1024,23 +1162,54 @@ onMounted(() => {
   font-size: var(--ui-text-sm, 0.875rem);
 }
 
-.task-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-xs, 0.75rem);
+/* 説明文のスタイル */
+.task-card__description {
+  margin: var(--ui-space-2, 0.5rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  line-height: var(--ui-leading-normal, 1.5);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
-.task-card__meta-item {
+/* 期限情報を目立たせる */
+.task-card__due-info {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  color: var(--ui-text-muted, #64748b);
+  gap: var(--ui-space-2, 0.5rem);
+  margin-top: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
 }
 
-.task-card__meta-item svg {
-  width: 1rem;
-  height: 1rem;
+.task-card__due-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.task-card__due-text {
+  color: var(--ui-text, #0b2e33);
+}
+
+/* 期限切れの場合は赤く目立たせる */
+.task-card__due-text.due-over {
+  color: var(--ui-danger, #d64545);
+}
+
+/* 期限が近い場合は警告色 */
+.task-card__due-text.due-soon {
+  color: var(--ui-warning, #f59e0b);
+}
+
+/* 完了済みの場合は緑色 */
+.task-card__due-info--completed {
+  background: var(--ui-success-light, #dcfce7);
+}
+
+.task-card__due-info--completed .task-card__due-text {
+  color: var(--ui-success, #16a34a);
 }
 
 .task-card__actions {
@@ -1049,81 +1218,9 @@ onMounted(() => {
   gap: var(--ui-space-2, 0.5rem);
 }
 
-.task-card__actions button {
-  border: none;
-  border-radius: var(--ui-radius-full, 9999px);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-xs, 0.75rem);
-  cursor: pointer;
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-text-inverse, #ffffff);
-  font-weight: var(--ui-font-medium, 500);
-  transition: var(--ui-transition-colors);
-}
+/* ボタンスタイルは AppButton コンポーネントで管理 */
 
-.task-card__actions button:hover {
-  background: var(--ui-brand-700, #1a4a51);
-}
-
-.task-card__actions button.is-danger {
-  background: var(--ui-danger, #d64545);
-}
-
-.task-card__actions button.is-danger:hover {
-  background: #c03939;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.status-done {
-  background: var(--ui-success-light, #dcfce7);
-  color: var(--ui-success, #16a34a);
-  border: 1px solid rgba(22, 163, 74, 0.25);
-}
-
-.status-progress {
-  background: var(--ui-brand-100, #e5f6f8);
-  color: var(--ui-brand-700, #1a4a51);
-  border: 1px solid rgba(79, 124, 130, 0.25);
-}
-
-.status-review {
-  background: var(--ui-info-light, #e0f2fe);
-  color: var(--ui-info, #0284c7);
-  border: 1px solid rgba(2, 132, 199, 0.25);
-}
-
-.status-todo {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-}
-
-.priority-high {
-  background: var(--ui-danger-light, #fee2e2);
-  color: var(--ui-danger, #d64545);
-  border: 1px solid rgba(214, 69, 69, 0.25);
-}
-
-.priority-medium {
-  background: var(--ui-warning-light, #fef3c7);
-  color: var(--ui-warning, #f59e0b);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-}
-
-.priority-low {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-}
+/* バッジスタイルは AppBadge コンポーネントで管理 */
 
 .task-dot {
   width: 0.5rem;
@@ -1177,8 +1274,43 @@ onMounted(() => {
     justify-content: space-between;
   }
 
+  /* タッチターゲット最適化（最小44px × 44px） */
   .task-card {
     padding: var(--ui-space-5, 1.25rem);
+    min-height: 44px;
+  }
+
+  .task-card__actions {
+    /* ボタンを縦並びにしてタップしやすく */
+    flex-direction: column;
+    width: 100%;
+    gap: var(--ui-space-3, 0.75rem);
+  }
+
+  /* 期限情報を大きく見やすく */
+  .task-card__due-info {
+    padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+    font-size: var(--ui-text-base, 1rem);
+  }
+
+  /* 横スクロール完全排除 */
+  .demo__content,
+  .demo__main,
+  .tasks-list {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  /* モバイルボトムナビゲーション用のスペース確保 */
+  .demo__content--condensed {
+    padding-bottom: calc(var(--ui-space-6, 1.5rem) + 72px);
+  }
+
+  /* サイドバーを非表示 */
+  .demo__main {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 </style>

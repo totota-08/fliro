@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import AppButton from "@/components/ui/AppButton.vue";
 import type { TaskCategory } from "@/services/taskCategoryService";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 interface MemberOption {
   id: string;
@@ -33,6 +34,27 @@ const filters = computed({
   get: () => props.modelValue,
   set: (value: TaskFilters) => emit("update:modelValue", value),
 });
+
+// 「さらに表示」機能
+const INITIAL_DISPLAY_COUNT = 10;
+const LOAD_MORE_COUNT = 10;
+const visibleTasksCount = ref(INITIAL_DISPLAY_COUNT);
+
+const visibleTasks = computed(() => {
+  return props.tasks.slice(0, visibleTasksCount.value);
+});
+
+const hasMoreTasks = computed(() => {
+  return props.tasks.length > visibleTasksCount.value;
+});
+
+const remainingTasksCount = computed(() => {
+  return props.tasks.length - visibleTasksCount.value;
+});
+
+function loadMoreTasks() {
+  visibleTasksCount.value += LOAD_MORE_COUNT;
+}
 
 function updateFilter<K extends keyof TaskFilters>(
   key: K,
@@ -198,7 +220,7 @@ function handleNavigate(taskId: string) {
     </div>
     <ul class="task-list__items">
       <li
-        v-for="task in tasks"
+        v-for="task in visibleTasks"
         :key="task.id"
         class="task-row"
         :class="{ 'is-overdue': isTaskOverdue(task) }"
@@ -244,6 +266,13 @@ function handleNavigate(taskId: string) {
         </div>
       </li>
     </ul>
+
+    <!-- さらに表示ボタン -->
+    <div v-if="hasMoreTasks" class="task-list__load-more">
+      <AppButton variant="ghost" @click="loadMoreTasks">
+        さらに表示 ({{ remainingTasksCount }}件)
+      </AppButton>
+    </div>
   </div>
 </template>
 
@@ -544,5 +573,13 @@ function handleNavigate(taskId: string) {
 .task-row.is-overdue:hover {
   border-color: rgba(239, 68, 68, 0.4);
   background-color: rgba(239, 68, 68, 0.08);
+}
+
+.task-list__load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--ui-space-4, 1rem);
+  padding-top: var(--ui-space-4, 1rem);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 </style>

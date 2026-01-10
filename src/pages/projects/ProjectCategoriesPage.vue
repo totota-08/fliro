@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import PageHeader from "@/components/ui/PageHeader.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
+import AppModal from "@/components/ui/AppModal.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
@@ -369,154 +371,123 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 編集モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isEditModalOpen"
-        class="modal-overlay"
-        @click.self="closeEditModal"
-      >
-        <div class="modal" role="dialog" aria-labelledby="edit-modal-title">
-          <header class="modal__header">
-            <h3 id="edit-modal-title">カテゴリを編集</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeEditModal"
-            >
-              &times;
-            </button>
-          </header>
+    <AppModal
+      :open="isEditModalOpen"
+      size="md"
+      @close="closeEditModal"
+    >
+      <template #header>
+        <h3>カテゴリを編集</h3>
+      </template>
 
-          <form class="modal__body" @submit.prevent="updateCategory">
-            <div class="form-field">
-              <label class="form-label">
-                カテゴリ名 <span class="required">*</span>
-              </label>
-              <input
-                v-model="editForm.name"
-                type="text"
-                class="form-input"
-                maxlength="30"
-                required
-              />
-            </div>
-
-            <div class="form-field">
-              <label class="form-label">カラー</label>
-              <div class="color-picker">
-                <div class="color-picker__presets">
-                  <button
-                    v-for="preset in presetColors"
-                    :key="preset.value"
-                    type="button"
-                    class="color-preset"
-                    :class="{ 'is-selected': editForm.color === preset.value }"
-                    :style="{ backgroundColor: preset.value }"
-                    :title="preset.label"
-                    @click="selectPresetColor(preset.value, 'edit')"
-                  />
-                </div>
-                <div class="color-picker__custom">
-                  <label class="color-custom-label">
-                    その他:
-                    <input
-                      type="color"
-                      class="color-custom-input"
-                      :value="editForm.color || '#0b2e33'"
-                      @input="handleCustomColorChange($event, 'edit')"
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-field">
-              <label class="form-label">説明</label>
-              <textarea
-                v-model="editForm.description"
-                class="form-textarea"
-                rows="2"
-              />
-            </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeEditModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!editForm.name.trim() || isUpdating"
-              >
-                {{ isUpdating ? "保存中..." : "保存" }}
-              </button>
-            </footer>
-          </form>
+      <form @submit.prevent="updateCategory">
+        <div class="form-field">
+          <label class="form-label">
+            カテゴリ名 <span class="required">*</span>
+          </label>
+          <input
+            v-model="editForm.name"
+            type="text"
+            class="form-input"
+            maxlength="30"
+            required
+          />
         </div>
-      </div>
-    </Teleport>
 
-    <!-- 削除確認モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isDeleteModalOpen"
-        class="modal-overlay"
-        @click.self="closeDeleteModal"
-      >
-        <div
-          class="modal modal--sm"
-          role="alertdialog"
-          aria-labelledby="delete-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="delete-modal-title">カテゴリを削除</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeDeleteModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <div class="modal__body">
-            <p>
-              「<strong>{{ deletingCategory?.name }}</strong
-              >」を削除しますか？
-            </p>
-            <p class="modal__warning">この操作は取り消せません。</p>
-
-            <div v-if="deleteError" class="error-alert">
-              <p>{{ deleteError }}</p>
+        <div class="form-field">
+          <label class="form-label">カラー</label>
+          <div class="color-picker">
+            <div class="color-picker__presets">
+              <button
+                v-for="preset in presetColors"
+                :key="preset.value"
+                type="button"
+                class="color-preset"
+                :class="{ 'is-selected': editForm.color === preset.value }"
+                :style="{ backgroundColor: preset.value }"
+                :title="preset.label"
+                @click="selectPresetColor(preset.value, 'edit')"
+              />
+            </div>
+            <div class="color-picker__custom">
+              <label class="color-custom-label">
+                その他:
+                <input
+                  type="color"
+                  class="color-custom-input"
+                  :value="editForm.color || '#0b2e33'"
+                  @input="handleCustomColorChange($event, 'edit')"
+                />
+              </label>
             </div>
           </div>
+        </div>
 
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closeDeleteModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="isDeleting"
-              @click="confirmDelete"
-            >
-              {{ isDeleting ? "削除中..." : "削除する" }}
-            </button>
-          </footer>
+        <div class="form-field">
+          <label class="form-label">説明</label>
+          <textarea
+            v-model="editForm.description"
+            class="form-textarea"
+            rows="2"
+          />
+        </div>
+      </form>
+
+      <template #footer>
+        <AppButton
+          variant="ghost"
+          @click="closeEditModal"
+        >
+          キャンセル
+        </AppButton>
+        <AppButton
+          type="submit"
+          variant="primary"
+          :disabled="!editForm.name.trim() || isUpdating"
+          @click="updateCategory"
+        >
+          {{ isUpdating ? "保存中..." : "保存" }}
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <!-- 削除確認モーダル -->
+    <AppModal
+      :open="isDeleteModalOpen"
+      size="sm"
+      @close="closeDeleteModal"
+    >
+      <template #header>
+        <h3>カテゴリを削除</h3>
+      </template>
+
+      <div>
+        <p>
+          「<strong>{{ deletingCategory?.name }}</strong>」を削除しますか？
+        </p>
+        <p class="modal__warning">この操作は取り消せません。</p>
+
+        <div v-if="deleteError" class="error-alert">
+          <p>{{ deleteError }}</p>
         </div>
       </div>
-    </Teleport>
+
+      <template #footer>
+        <AppButton
+          variant="ghost"
+          @click="closeDeleteModal"
+        >
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="danger"
+          :disabled="isDeleting"
+          @click="confirmDelete"
+        >
+          {{ isDeleting ? "削除中..." : "削除する" }}
+        </AppButton>
+      </template>
+    </AppModal>
   </ProjectAppShell>
 </template>
 
@@ -805,77 +776,12 @@ onBeforeUnmount(() => {
   background: var(--color-danger-bg, #fef2f2);
 }
 
-/* モーダル */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--gap-lg);
-  z-index: 100;
-}
-
-.modal {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-}
-
-.modal--sm {
-  max-width: 400px;
-}
-
-.modal__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--gap-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal__header h3 {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--brand);
-}
-
-.modal__close {
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal__close:hover {
-  color: var(--text-strong);
-}
-
-.modal__body {
-  padding: var(--gap-lg);
-}
+/* モーダルスタイルは AppModal コンポーネントで管理 */
 
 .modal__warning {
   margin-top: var(--gap-sm);
   font-size: var(--font-size-sm);
   color: var(--text-muted);
-}
-
-.modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--gap-sm);
-  padding: var(--gap-lg);
-  border-top: 1px solid var(--border-color);
 }
 
 /* エラーアラート */
