@@ -396,17 +396,38 @@ onMounted(() => {
               <h2>マイタスク</h2>
               <p>あなたに割り当てられたタスクの一覧です</p>
             </div>
-            <button type="button" class="tasks-page__filter">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path
-                  d="M4 6h16M6 12h12M10 18h4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+            <div class="tasks-page__actions">
+              <button
+                type="button"
+                class="tasks-page__action-btn tasks-page__action-btn--primary"
+                @click="router.push({ name: ROUTE_NAMES.taskProgress })"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
                   stroke-width="1.8"
-                />
-              </svg>
-              フィルター
-            </button>
+                >
+                  <path
+                    d="M12 20v-6m0 0V4m0 10h6m-6 0H6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                進捗を更新
+              </button>
+              <button type="button" class="tasks-page__filter">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path
+                    d="M4 6h16M6 12h12M10 18h4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.8"
+                  />
+                </svg>
+                フィルター
+              </button>
+            </div>
           </header>
 
           <section class="tasks-stats">
@@ -855,6 +876,50 @@ onMounted(() => {
   font-size: var(--ui-text-sm, 0.875rem);
 }
 
+.tasks-page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.tasks-page__action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-5, 1.25rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-brand-900, #0b2e33);
+  cursor: pointer;
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-sm, 0.875rem);
+  transition: var(--ui-transition-all);
+}
+
+.tasks-page__action-btn:hover {
+  background: var(--ui-brand-100, #e5f6f8);
+  border-color: var(--ui-brand-600, #4f7c82);
+  box-shadow: var(--ui-shadow-md);
+}
+
+.tasks-page__action-btn--primary {
+  background: var(--ui-brand-600, #4f7c82);
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-surface, #ffffff);
+}
+
+.tasks-page__action-btn--primary:hover {
+  background: var(--ui-brand-700, #3d6166);
+  border-color: var(--ui-brand-700, #3d6166);
+}
+
+.tasks-page__action-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 .tasks-page__filter {
   display: inline-flex;
   align-items: center;
@@ -866,6 +931,7 @@ onMounted(() => {
   color: var(--ui-brand-900, #0b2e33);
   cursor: pointer;
   font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-sm, 0.875rem);
   transition: var(--ui-transition-all);
 }
 

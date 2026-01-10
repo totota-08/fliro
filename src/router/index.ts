@@ -33,6 +33,7 @@ import ProjectSettingsPage from "@/pages/projects/ProjectSettingsPage.vue";
 import SecretAccessPage from "@/pages/secret/SecretAccessPage.vue";
 import SecretChatPage from "@/pages/secret/SecretChatPage.vue";
 import MyTasksPage from "@/pages/tasks/MyTasksPage.vue";
+import TaskProgressPage from "@/pages/tasks/TaskProgressPage.vue";
 import { useAuthStore, waitForAuthReady } from "@/store/auth";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -163,6 +164,12 @@ export const router = createRouter({
       path: "/tasks",
       name: ROUTE_NAMES.myTasks,
       component: MyTasksPage,
+      meta: { requiresAuth: true, section: "tasks" },
+    },
+    {
+      path: "/tasks/progress",
+      name: ROUTE_NAMES.taskProgress,
+      component: TaskProgressPage,
       meta: { requiresAuth: true, section: "tasks" },
     },
     {
