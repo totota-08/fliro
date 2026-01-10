@@ -151,8 +151,11 @@ export const router = createRouter({
     {
       path: "/projects/:projectId/tasks/:taskId",
       name: ROUTE_NAMES.projectTaskDetail,
-      component: () => import("@/pages/projects/ProjectTaskDetailPage.vue"),
-      meta: { requiresAuth: true, section: "tasks" },
+      redirect: (to) => ({
+        name: ROUTE_NAMES.projectDashboard,
+        params: { projectId: to.params.projectId },
+        query: { taskId: to.params.taskId },
+      }),
     },
     {
       path: "/projects/:projectId/scores",
