@@ -6,7 +6,7 @@
  * 3タブ構成: 概要 / スレッド / ログ
  * 軽編集可能（ステータス/担当/期限/進捗）
  */
-import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { computed, ref, watch, onBeforeUnmount, toRef } from "vue";
 import AppDrawer from "@/components/ui/AppDrawer.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
@@ -16,6 +16,7 @@ import type { TaskDoc, TaskStatus } from "@/services/taskService";
 import { updateTask } from "@/services/taskService";
 import type { TaskCategory } from "@/services/taskCategoryService";
 import type { ProjectMember } from "@/services/projectMembers";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import {
   listenTaskDiscussion,
   sendTaskDiscussionMessage,
@@ -42,6 +43,7 @@ const props = defineProps<{
   taskId: string | null;
   tasks: TaskDoc[];
   categoriesById?: Map<string, TaskCategory>;
+  categories?: TaskCategory[];
   membersById?: Map<string, ProjectMember>;
   members?: ProjectMember[];
 }>();
@@ -57,12 +59,27 @@ const activityLogs = ref<ProjectEvent[]>([]);
 const messageInput = ref("");
 const isEditing = ref(false);
 
+// 権限チェック
+const projectIdRef = toRef(props, "projectId");
+const { isOwner, isAdmin } = useProjectAccess(projectIdRef);
+
+// タスク編集権限（Owner/Adminのみ）
+const canEditTask = computed(() => isOwner.value || isAdmin.value);
+
+// 進捗編集権限（自分が担当者なら進捗のみ変更可能）
+const canEditProgress = computed(() => {
+  if (canEditTask.value) return true;
+  if (!task.value || !user.value) return false;
+  return task.value.assigneeId === user.value.uid;
+});
+
 // Edit form state
 const editForm = ref({
   status: "" as TaskStatus,
   assigneeId: "" as string | null,
   dueDate: "",
   progress: 0,
+  categoryId: "" as string | null,
 });
 
 let unsubscribeThread: (() => void) | null = null;
@@ -85,6 +102,15 @@ const membersList = computed(() => {
   if (props.membersById) return Array.from(props.membersById.values());
   return [];
 });
+
+const categoriesList = computed(() => {
+  if (props.categories) return props.categories;
+  if (props.categoriesById) return Array.from(props.categoriesById.values());
+  return [];
+});
+
+// 進捗オプション
+const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
 
 // タスクに関連するログのみフィルタリング
 const taskRelatedLogs = computed(() => {
@@ -140,6 +166,7 @@ watch(isEditing, (editing) => {
       assigneeId: task.value.assigneeId || null,
       dueDate: formatDueDateISO(task.value.dueDate),
       progress: task.value.progress ?? 0,
+      categoryId: task.value.categoryId || null,
     };
   }
 });
@@ -163,6 +190,7 @@ async function handleSaveEdit() {
       assigneeName: string | null;
       dueDate: Date | null;
       progress: number;
+      categoryId: string | null;
     }> = {};
 
     // ステータスの変更
@@ -195,6 +223,11 @@ async function handleSaveEdit() {
       updates.progress = normalizedProgress;
     }
 
+    // カテゴリの変更
+    if (editForm.value.categoryId !== (task.value.categoryId || null)) {
+      updates.categoryId = editForm.value.categoryId;
+    }
+
     if (Object.keys(updates).length > 0) {
       await updateTask(props.projectId, task.value.id, updates, {
         userId: user.value?.uid ?? null,
@@ -212,6 +245,36 @@ async function handleSaveEdit() {
 
 function handleCancelEdit() {
   isEditing.value = false;
+}
+
+// 進捗率の即時保存
+async function handleProgressChange(newProgress: number) {
+  if (!task.value || !props.projectId) return;
+  if (task.value.progress === newProgress) return;
+
+  try {
+    const updates: Partial<{ progress: number; status: TaskStatus }> = {
+      progress: newProgress,
+    };
+
+    // 100%になったら自動的に完了ステータスに
+    if (newProgress === 100 && task.value.status !== "done") {
+      updates.status = "done";
+    }
+    // 完了状態から戻す場合は進行中に
+    else if (newProgress < 100 && task.value.status === "done") {
+      updates.status = "in-progress";
+    }
+
+    await updateTask(props.projectId, task.value.id, updates, {
+      userId: user.value?.uid ?? null,
+      actorName:
+        profile.value?.nickname || profile.value?.fullName || "Unknown",
+      origin: "ui",
+    });
+  } catch (error) {
+    logger.error`Failed to update progress: ${error}`;
+  }
 }
 
 async function handleSendMessage() {
@@ -330,9 +393,28 @@ function formatEventDetail(event: ProjectEvent): string {
             <p class="task-drawer__label">ステータス</p>
             <div class="task-drawer__value">
               <TaskStatusBadge :status="task.status" />
-              <span class="task-drawer__progress"
-                >{{ task.progress ?? 0 }}%</span
+            </div>
+          </section>
+
+          <!-- 進捗率（権限があれば即座に変更可能） -->
+          <section class="task-drawer__section">
+            <p class="task-drawer__label">進捗率</p>
+            <div v-if="canEditProgress" class="task-drawer__progress-selector">
+              <button
+                v-for="option in PROGRESS_OPTIONS"
+                :key="option"
+                type="button"
+                :class="[
+                  'task-drawer__progress-btn',
+                  { 'is-active': (task.progress ?? 0) === option },
+                ]"
+                @click="handleProgressChange(option)"
               >
+                {{ option }}%
+              </button>
+            </div>
+            <div v-else class="task-drawer__value">
+              {{ task.progress ?? 0 }}%
             </div>
           </section>
 
@@ -366,7 +448,7 @@ function formatEventDetail(event: ProjectEvent): string {
             </div>
           </section>
 
-          <div class="task-drawer__actions">
+          <div v-if="canEditTask" class="task-drawer__actions">
             <AppButton variant="secondary" size="sm" @click="isEditing = true">
               編集
             </AppButton>
@@ -425,20 +507,40 @@ function formatEventDetail(event: ProjectEvent): string {
           </section>
 
           <section class="task-drawer__section">
-            <label class="task-drawer__label" for="edit-progress">進捗</label>
-            <div class="task-drawer__progress-input">
-              <input
-                id="edit-progress"
-                v-model.number="editForm.progress"
-                type="range"
-                min="0"
-                max="100"
-                step="25"
-                class="task-drawer__range"
-              />
-              <span class="task-drawer__progress-value"
-                >{{ editForm.progress }}%</span
+            <label class="task-drawer__label" for="edit-category"
+              >カテゴリ</label
+            >
+            <select
+              id="edit-category"
+              v-model="editForm.categoryId"
+              class="task-drawer__input"
+            >
+              <option :value="null">カテゴリなし</option>
+              <option
+                v-for="category in categoriesList"
+                :key="category.id"
+                :value="category.id"
               >
+                {{ category.name }}
+              </option>
+            </select>
+          </section>
+
+          <section class="task-drawer__section">
+            <label class="task-drawer__label">進捗</label>
+            <div class="task-drawer__progress-selector">
+              <button
+                v-for="option in PROGRESS_OPTIONS"
+                :key="option"
+                type="button"
+                :class="[
+                  'task-drawer__progress-btn',
+                  { 'is-active': editForm.progress === option },
+                ]"
+                @click="editForm.progress = option"
+              >
+                {{ option }}%
+              </button>
             </div>
           </section>
 
@@ -585,6 +687,9 @@ function formatEventDetail(event: ProjectEvent): string {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* タブ */
@@ -594,6 +699,7 @@ function formatEventDetail(event: ProjectEvent): string {
   padding: var(--ui-space-1);
   background: var(--ui-surface-muted);
   border-radius: var(--ui-radius-md);
+  flex-shrink: 0;
 }
 
 .task-drawer__tab {
@@ -643,11 +749,9 @@ function formatEventDetail(event: ProjectEvent): string {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4);
-}
-
-.task-drawer__panel--thread {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 /* セクション */
@@ -732,24 +836,34 @@ function formatEventDetail(event: ProjectEvent): string {
   box-shadow: var(--ui-ring-focus);
 }
 
-.task-drawer__progress-input {
+/* 進捗率選択ボタン */
+.task-drawer__progress-selector {
   display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
+  gap: var(--ui-space-1);
 }
 
-.task-drawer__range {
+.task-drawer__progress-btn {
   flex: 1;
-  height: 6px;
-  accent-color: var(--ui-brand-600);
-}
-
-.task-drawer__progress-value {
-  min-width: 3rem;
+  padding: var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
   font-size: var(--ui-text-sm);
   font-weight: var(--ui-font-semibold);
-  color: var(--ui-text);
-  text-align: right;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.task-drawer__progress-btn:hover {
+  border-color: var(--ui-brand-600);
+  color: var(--ui-brand-600);
+}
+
+.task-drawer__progress-btn.is-active {
+  background: var(--ui-brand-600);
+  border-color: var(--ui-brand-600);
+  color: var(--ui-text-inverse, #fff);
 }
 
 /* アクション */
@@ -761,14 +875,38 @@ function formatEventDetail(event: ProjectEvent): string {
 }
 
 /* スレッド */
+.task-drawer__panel--thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .task-drawer__thread-messages {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-3);
-  min-height: 200px;
-  max-height: 400px;
+  min-height: 0;
+  padding-bottom: var(--ui-space-3);
+  /* スクロールバーのスタイリング */
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-border) transparent;
+}
+
+.task-drawer__thread-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-drawer__thread-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-drawer__thread-messages::-webkit-scrollbar-thumb {
+  background-color: var(--ui-border);
+  border-radius: 3px;
 }
 
 .task-drawer__message {
@@ -827,10 +965,13 @@ function formatEventDetail(event: ProjectEvent): string {
 }
 
 .task-drawer__composer {
+  flex-shrink: 0;
   display: flex;
   gap: var(--ui-space-2);
-  padding-top: var(--ui-space-3);
+  padding: var(--ui-space-3) 0;
   border-top: 1px solid var(--ui-border-light);
+  background: var(--ui-surface);
+  margin-top: auto;
 }
 
 .task-drawer__composer-input {
