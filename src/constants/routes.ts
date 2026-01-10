@@ -22,6 +22,7 @@ export const ROUTE_NAMES = {
   inviteAccept: "invite-accept",
   myPage: "my-page",
   myTasks: "my-tasks",
+  taskProgress: "task-progress",
   secretAccess: "secret-access",
   secretChat: "secret-chat",
   forbidden: "forbidden",
