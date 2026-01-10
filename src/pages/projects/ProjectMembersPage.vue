@@ -2,8 +2,10 @@
 import InviteLinksMiniCard from "@/components/invites/InviteLinksMiniCard.vue";
 import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
+import { ProjectPermission } from "@/constants/permissions";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
@@ -64,6 +66,17 @@ let stopMembers: (() => void) | null = null;
 // ProjectAppShell用のデータ
 const { navItems, sidebarProjects, profileInfo } =
   useProjectShellData(projectId);
+
+// useProjectAccess で権限管理を統一
+const { can } = useProjectAccess(projectId);
+
+// MANAGE_INVITES / MANAGE_ROLES 権限判定（ボタン表示制御用）
+const canManageInvitesViaAccess = computed(() =>
+  can(ProjectPermission.MANAGE_INVITES),
+);
+const canManageRolesViaAccess = computed(() =>
+  can(ProjectPermission.MANAGE_ROLES),
+);
 
 const memberStats = computed(() => {
   const total = members.value.length;
@@ -520,7 +533,7 @@ onBeforeUnmount(() => {
               メンバーを招待
             </button>
             <button
-              v-if="canManageInvites"
+              v-if="canManageInvitesViaAccess"
               type="button"
               class="team-page__invite-link"
               @click="goToInvites"
@@ -528,7 +541,7 @@ onBeforeUnmount(() => {
               招待リンク管理 →
             </button>
             <button
-              v-if="currentPermissions.canEditRoles"
+              v-if="canManageRolesViaAccess"
               type="button"
               class="team-page__invite-link"
               @click="goToRoles"

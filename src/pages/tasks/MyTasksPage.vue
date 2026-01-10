@@ -278,6 +278,7 @@ function goToTask(task: DecoratedTask) {
   router.push({
     name: ROUTE_NAMES.projectTaskDetail,
     params: { projectId: task.projectId, taskId: task.id },
+    query: { from: "mytasks" },
   });
 }
 

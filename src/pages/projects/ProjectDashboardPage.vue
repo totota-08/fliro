@@ -424,6 +424,7 @@ function navigateToTaskDetail(taskId: string) {
   router.push({
     name: ROUTE_NAMES.projectTaskDetail,
     params: { projectId: projectId.value, taskId },
+    query: { from: "dashboard" },
   });
 }
 

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
-import ProjectSidebar from "@/components/projectDashboard/ProjectSidebar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
+import { useProjectShellData } from "@/composables/useProjectShellData";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProject } from "@/firebase/projectService";
+import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   listenProjectChat,
@@ -37,7 +39,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectChat");
 
@@ -58,10 +60,13 @@ const defaultChannel: ChatChannel = {
   type: "general",
 };
 
-const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
-const projectId = ref(String(route.params.projectId || ""));
+const { projectId } = useProjectIdRoute();
+
+// ProjectAppShell用のデータ
+const { navItems, sidebarProjects, profileInfo } =
+  useProjectShellData(projectId);
 const messages = ref<ChatMessage[]>([]);
 const input = ref("");
 const project = ref<ProjectDoc | null>(null);
@@ -310,6 +315,7 @@ function openTask(taskId: string) {
   router.push({
     name: ROUTE_NAMES.projectTaskDetail,
     params: { projectId: projectId.value, taskId },
+    query: { from: "threads" },
   });
 }
 
@@ -416,15 +422,9 @@ onMounted(() => {
   }
 });
 
-watch(
-  () => route.params.projectId,
-  (newId) => {
-    const nextId = newId ? String(newId) : "";
-    if (nextId === projectId.value) return;
-    projectId.value = nextId;
-    void refreshProjectContext();
-  },
-);
+watch(projectId, () => {
+  void refreshProjectContext();
+});
 
 onBeforeUnmount(() => {
   stopWatchers();
@@ -443,21 +443,59 @@ watch(channels, (list) => {
 </script>
 
 <template>
-  <div class="chat-page">
-    <ProjectSidebar
-      :open="true"
-      :project-id="projectId"
-      brand-subtitle="プロジェクト"
-    />
+  <ProjectAppShell
+    :project-id="projectId"
+    :nav-items="navItems"
+    :sidebar-projects="sidebarProjects"
+    :profile-info="profileInfo"
+  >
+    <template #headerTitle>
+      <p class="project-app-shell__breadcrumb">プロジェクト &gt; スレッド</p>
+      <h1 class="project-app-shell__heading">
+        {{ project?.name || "プロジェクト" }}
+      </h1>
+    </template>
 
-    <div class="main-area">
-      <header class="top-bar">
-        <div class="bar-left">
-          <!-- Placeholder for sidebar toggle if needed -->
-          <h2 class="page-title">{{ project?.name || "プロジェクト" }}</h2>
+    <template #rightPanel>
+      <aside class="task-panel">
+        <header class="task-panel__header">
+          <h3>タスク詳細</h3>
+          <button
+            v-if="currentTask"
+            type="button"
+            class="task-panel__link"
+            @click="openTask(currentTask.id)"
+          >
+            詳細を開く →
+          </button>
+        </header>
+
+        <div v-if="currentTask" class="task-panel__body">
+          <h4 class="task-panel__title">{{ currentTask.title }}</h4>
+          <p class="task-panel__meta">
+            ステータス:
+            <span class="task-panel__badge">
+              {{ taskStatusLabel(currentTask.status) }}
+            </span>
+          </p>
+          <p class="task-panel__meta">
+            期限: {{ formatDueDate(currentTask.dueDate) }}
+          </p>
+          <p class="task-panel__meta">
+            担当: {{ currentTask.assigneeName || "未割当" }}
+          </p>
+          <p v-if="currentTask.description" class="task-panel__desc">
+            {{ currentTask.description }}
+          </p>
         </div>
-      </header>
 
+        <div v-else class="task-panel__empty">
+          タスクスレッドを選択すると詳細が表示されます。
+        </div>
+      </aside>
+    </template>
+
+    <div class="chat-content">
       <div class="content-grid">
         <!-- Threads Panel -->
         <aside class="threads-panel">
@@ -630,91 +668,44 @@ watch(channels, (list) => {
             </button>
           </div>
         </main>
-
-        <aside class="task-panel">
-          <header class="task-panel__header">
-            <h3>タスク詳細</h3>
-            <button
-              v-if="currentTask"
-              type="button"
-              class="task-panel__link"
-              @click="openTask(currentTask.id)"
-            >
-              詳細を開く →
-            </button>
-          </header>
-
-          <div v-if="currentTask" class="task-panel__body">
-            <h4 class="task-panel__title">{{ currentTask.title }}</h4>
-            <p class="task-panel__meta">
-              ステータス:
-              <span class="task-panel__badge">
-                {{ taskStatusLabel(currentTask.status) }}
-              </span>
-            </p>
-            <p class="task-panel__meta">
-              期限: {{ formatDueDate(currentTask.dueDate) }}
-            </p>
-            <p class="task-panel__meta">
-              担当: {{ currentTask.assigneeName || "未割当" }}
-            </p>
-            <p v-if="currentTask.description" class="task-panel__desc">
-              {{ currentTask.description }}
-            </p>
-          </div>
-
-          <div v-else class="task-panel__empty">
-            タスクスレッドを選択すると詳細が表示されます。
-          </div>
-        </aside>
       </div>
     </div>
-  </div>
+  </ProjectAppShell>
 </template>
 
 <style scoped>
-.chat-page {
-  height: 100vh;
-  display: flex;
-  background: var(--ui-surface-muted);
-  overflow: hidden;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--ui-overlay-bg);
-  z-index: var(--ui-z-overlay);
-}
-
-.main-area {
-  flex: 1;
+/* Override ProjectAppShell body for chat layout */
+:deep(.project-app-shell__body) {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  background: var(--ui-surface);
 }
 
-.top-bar {
-  height: 60px;
-  border-bottom: 1px solid var(--ui-border-light);
+:deep(.project-app-shell__body--split) {
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+:deep(.project-app-shell__body-main) {
   display: flex;
-  align-items: center;
-  padding: 0 var(--ui-space-5);
+  flex-direction: column;
+  min-height: 0;
 }
 
-.page-title {
-  font-size: var(--ui-text-lg);
-  font-weight: var(--ui-font-bold);
-  color: var(--ui-text-strong);
-  margin: 0;
+/* Chat Content */
+.chat-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
 }
 
 .content-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(240px, 260px) 1fr 320px;
+  grid-template-columns: minmax(240px, 260px) 1fr;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Threads Panel */
