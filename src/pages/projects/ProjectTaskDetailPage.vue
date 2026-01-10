@@ -245,12 +245,33 @@ onMounted(async () => {
   });
 });
 
-// taskIdのウォッチ
+// taskIdのウォッチ - リスナーの再購読
 watch(
   () => route.params.taskId,
   (newTaskId) => {
-    if (newTaskId) {
+    if (newTaskId && String(newTaskId) !== taskId.value) {
       taskId.value = String(newTaskId);
+
+      // 既存のタスク関連リスナーを停止
+      stopTask?.();
+      stopDiscussion?.();
+
+      // 新しいタスクのリスナーを開始
+      stopTask = listenTask(projectId.value, taskId.value, (doc) => {
+        task.value = doc;
+      });
+
+      stopDiscussion = listenTaskDiscussion(
+        projectId.value,
+        taskId.value,
+        (msgs) => {
+          messages.value = msgs;
+        },
+      );
+
+      // メッセージ表示をリセット
+      messageLimit.value = 20;
+      input.value = "";
     }
   },
 );
