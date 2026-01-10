@@ -2,9 +2,10 @@
 import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
-import { ROUTE_NAMES } from "@/constants/routes";
+import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import { fetchProject } from "@/firebase/projectService";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
@@ -39,9 +40,11 @@ import {
   ref,
   watch,
 } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectChat");
+
+const route = useRoute();
 
 type ChatChannel = {
   id: string;
@@ -63,6 +66,13 @@ const defaultChannel: ChatChannel = {
 const router = useRouter();
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
+
+// TaskDrawer のURL同期
+const {
+  taskId: selectedTaskId,
+  openTask,
+  closeTask,
+} = useTaskDrawerRouteSync(router, route);
 
 // ProjectAppShell用のデータ
 const { navItems, sidebarProjects, profileInfo } =
@@ -125,6 +135,8 @@ function selectCommand(cmd: string) {
 // UI state
 const customThreadFormOpen = ref(false);
 const customThreadForm = ref({ name: "", description: "" });
+const showAllTaskChannels = ref(false); // タスク一覧の「すべて表示」フラグ
+const MAX_VISIBLE_TASK_CHANNELS = 8;
 let unsubscribeChat: (() => void) | null = null;
 let unsubscribeMembers: (() => void) | null = null;
 let unsubscribeCustomChannels: (() => void) | null = null;
@@ -142,6 +154,19 @@ const taskChannels = computed<ChatChannel[]>(() =>
     })),
 );
 
+// 表示するタスクチャンネル（最大8件、またはすべて）
+const visibleTaskChannels = computed(() => {
+  if (showAllTaskChannels.value) {
+    return taskChannels.value;
+  }
+  return taskChannels.value.slice(0, MAX_VISIBLE_TASK_CHANNELS);
+});
+
+// 隠れているタスクの数
+const hiddenTaskCount = computed(() => {
+  return Math.max(0, taskChannels.value.length - MAX_VISIBLE_TASK_CHANNELS);
+});
+
 const channels = computed<ChatChannel[]>(() => {
   return [defaultChannel, ...taskChannels.value, ...customChannels.value];
 });
@@ -149,13 +174,6 @@ const channels = computed<ChatChannel[]>(() => {
 const currentChannel = computed<ChatChannel>(() => {
   return (
     channels.value.find((c) => c.id === activeChannelId.value) || defaultChannel
-  );
-});
-
-const currentTask = computed(() => {
-  if (currentChannel.value.type !== "task") return null;
-  return (
-    tasks.value.find((task) => task.id === currentChannel.value.id) || null
   );
 });
 
@@ -311,12 +329,9 @@ async function handleSend() {
   }
 }
 
-function openTask(taskId: string) {
-  router.push({
-    name: ROUTE_NAMES.projectTaskDetail,
-    params: { projectId: projectId.value, taskId },
-    query: { from: "threads" },
-  });
+// タスクをドロワーで開く（openTaskは composable から取得済み）
+function handleOpenTask(taskId: string) {
+  openTask(taskId);
 }
 
 async function createCustomThread() {
@@ -390,11 +405,6 @@ function taskStatusLabel(status?: string) {
   return "未設定";
 }
 
-function formatDueDate(dueDate?: { seconds: number; nanoseconds: number }) {
-  if (!dueDate?.seconds) return "—";
-  return new Date(dueDate.seconds * 1000).toLocaleString();
-}
-
 function formatMessage(text: string) {
   if (!text) return "";
   // 1. Escape HTML
@@ -456,44 +466,7 @@ watch(channels, (list) => {
       </h1>
     </template>
 
-    <template #rightPanel>
-      <aside class="task-panel">
-        <header class="task-panel__header">
-          <h3>タスク詳細</h3>
-          <button
-            v-if="currentTask"
-            type="button"
-            class="task-panel__link"
-            @click="openTask(currentTask.id)"
-          >
-            詳細を開く →
-          </button>
-        </header>
-
-        <div v-if="currentTask" class="task-panel__body">
-          <h4 class="task-panel__title">{{ currentTask.title }}</h4>
-          <p class="task-panel__meta">
-            ステータス:
-            <span class="task-panel__badge">
-              {{ taskStatusLabel(currentTask.status) }}
-            </span>
-          </p>
-          <p class="task-panel__meta">
-            期限: {{ formatDueDate(currentTask.dueDate) }}
-          </p>
-          <p class="task-panel__meta">
-            担当: {{ currentTask.assigneeName || "未割当" }}
-          </p>
-          <p v-if="currentTask.description" class="task-panel__desc">
-            {{ currentTask.description }}
-          </p>
-        </div>
-
-        <div v-else class="task-panel__empty">
-          タスクスレッドを選択すると詳細が表示されます。
-        </div>
-      </aside>
-    </template>
+    <!-- 右パネルは TaskDrawer に統合（ProjectAppShell の外で Teleport） -->
 
     <div class="chat-content">
       <div class="content-grid">
@@ -515,9 +488,9 @@ watch(channels, (list) => {
               <h3 class="section-title">タスク</h3>
               <span class="section-count">{{ taskChannels.length }}</span>
             </div>
-            <div class="thread-list">
+            <div class="thread-list thread-list--scrollable">
               <button
-                v-for="taskChannel in taskChannels"
+                v-for="taskChannel in visibleTaskChannels"
                 :key="taskChannel.id"
                 class="channel-item"
                 :class="{ active: activeChannelId === taskChannel.id }"
@@ -527,6 +500,26 @@ watch(channels, (list) => {
                 <span class="task-status">{{
                   taskStatusLabel(taskChannel.description)
                 }}</span>
+              </button>
+              <!-- 「すべて表示」ボタン -->
+              <button
+                v-if="hiddenTaskCount > 0 && !showAllTaskChannels"
+                type="button"
+                class="show-all-btn"
+                @click="showAllTaskChannels = true"
+              >
+                他 {{ hiddenTaskCount }} 件を表示...
+              </button>
+              <button
+                v-if="
+                  showAllTaskChannels &&
+                  taskChannels.length > MAX_VISIBLE_TASK_CHANNELS
+                "
+                type="button"
+                class="show-all-btn"
+                @click="showAllTaskChannels = false"
+              >
+                折りたたむ
               </button>
             </div>
             <p v-if="!taskChannels.length" class="empty-text">
@@ -624,7 +617,7 @@ watch(channels, (list) => {
                 <button
                   v-if="msg.linkedTaskId"
                   class="open-task-btn"
-                  @click="openTask(msg.linkedTaskId)"
+                  @click="handleOpenTask(msg.linkedTaskId)"
                 >
                   タスクを開く
                 </button>
@@ -671,6 +664,16 @@ watch(channels, (list) => {
       </div>
     </div>
   </ProjectAppShell>
+
+  <!-- TaskDrawer (Teleport to body) -->
+  <Teleport to="body">
+    <TaskDrawer
+      :project-id="projectId"
+      :task-id="selectedTaskId"
+      :tasks="tasks"
+      @close="closeTask"
+    />
+  </Teleport>
 </template>
 
 <style scoped>
@@ -828,6 +831,33 @@ watch(channels, (list) => {
   font-size: var(--ui-text-xs);
   color: var(--ui-text-subtle);
   padding: var(--ui-space-1) var(--ui-space-2);
+}
+
+/* タスク一覧のスクロール可能エリア */
+.thread-list--scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* 「すべて表示」ボタン */
+.show-all-btn {
+  display: block;
+  width: 100%;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  margin-top: var(--ui-space-1);
+  border: none;
+  background: transparent;
+  color: var(--ui-brand-600);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--ui-transition-colors);
+}
+
+.show-all-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  text-decoration: underline;
 }
 
 /* Chat Main */

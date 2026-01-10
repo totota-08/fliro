@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppBadge from "@/components/ui/AppBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -13,16 +14,25 @@ import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import { deleteTask, updateTask, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
+import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs } from "firebase/firestore";
 import { computed, onMounted, ref, onBeforeUnmount } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 const logger = getLogger("app.pages.tasks.MyTasks");
 
 const { user, profile } = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+
+// TaskDrawer のURL同期
+const {
+  taskId: selectedTaskId,
+  openTask,
+  closeTask,
+} = useTaskDrawerRouteSync(router, route);
 
 const isSidebarOpen = ref(true);
 const loading = ref(true);
@@ -324,13 +334,17 @@ const stats = computed(() => ({
   done: completedTasks.value.length,
 }));
 
+// タスクをドロワーで開く
 function goToTask(task: DecoratedTask) {
-  router.push({
-    name: ROUTE_NAMES.projectTaskDetail,
-    params: { projectId: task.projectId, taskId: task.id },
-    query: { from: "mytasks" },
-  });
+  openTask(task.id);
 }
+
+// 選択中タスクのprojectIdを取得
+const selectedTaskProjectId = computed(() => {
+  if (!selectedTaskId.value) return "";
+  const task = tasks.value.find((t) => t.id === selectedTaskId.value);
+  return task?.projectId || "";
+});
 
 /**
  * 完了トグル & 削除
@@ -827,6 +841,14 @@ onBeforeUnmount(() => {
 
     <!-- モバイルボトムナビゲーション -->
     <MobileBottomNav v-if="isMobile" :items="mobileNavItems" />
+
+    <!-- タスクドロワー -->
+    <TaskDrawer
+      :project-id="selectedTaskProjectId"
+      :task-id="selectedTaskId"
+      :tasks="tasks"
+      @close="closeTask"
+    />
   </div>
 </template>
 

@@ -8,13 +8,13 @@ import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
 import TaskCreateModal, {
   type TaskFormData,
 } from "@/components/tasks/TaskCreateModal.vue";
-import TaskPreviewDrawer from "@/components/tasks/TaskPreviewDrawer.vue";
+import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import { useUserDisplay } from "@/composables/useUserDisplay";
+import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import { appName, appVersion } from "@/constants/appMeta";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
-import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import {
   // addMessageReaction,
@@ -60,6 +60,14 @@ const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
 const projectId = ref(String(route.params.projectId || ""));
+
+// TaskDrawer のURL同期
+const {
+  taskId: selectedTaskId,
+  openTask,
+  closeTask,
+} = useTaskDrawerRouteSync(router, route);
+
 type MemberEntry = ProjectMember & {
   id: string;
   name: string;
@@ -73,9 +81,25 @@ const tasks = ref<TaskDoc[]>([]);
 const categories = ref<TaskCategory[]>([]);
 const { notifications: notificationsBar } = useNotificationCenter();
 const taskView = ref<"all" | "mine">("all");
-const selectedTask = ref<TaskDoc | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
 const chatLoading = ref(true);
+
+// O(1) 参照用のMap
+const membersById = computed(() => {
+  const map = new Map<string, MemberEntry>();
+  for (const member of members.value) {
+    map.set(member.id, member);
+  }
+  return map;
+});
+
+const categoriesById = computed(() => {
+  const map = new Map<string, TaskCategory>();
+  for (const category of categories.value) {
+    map.set(category.id, category);
+  }
+  return map;
+});
 const filters = reactive({
   search: "",
   status: "all",
@@ -414,18 +438,13 @@ async function handleTaskSubmit(data: TaskFormData) {
   closeTaskModal();
 }
 
+// タスクをドロワーで開く（selectとnavigateを統一）
 function selectTaskById(taskId: string) {
-  const match = tasks.value.find((task) => task.id === taskId);
-  if (match) selectedTask.value = match;
+  openTask(taskId);
 }
 
 function navigateToTaskDetail(taskId: string) {
-  if (!projectId.value) return;
-  router.push({
-    name: ROUTE_NAMES.projectTaskDetail,
-    params: { projectId: projectId.value, taskId },
-    query: { from: "dashboard" },
-  });
+  openTask(taskId);
 }
 
 // async function sendChatMessage(text: string) {
@@ -572,10 +591,14 @@ onBeforeUnmount(() => {
         @submit="handleTaskSubmit"
       />
 
-      <TaskPreviewDrawer
-        :task="selectedTask"
+      <TaskDrawer
         :project-id="projectId"
-        @close="selectedTask = null"
+        :task-id="selectedTaskId"
+        :tasks="tasks"
+        :categories-by-id="categoriesById"
+        :members-by-id="membersById"
+        :members="members"
+        @close="closeTask"
       />
     </Teleport>
   </ProjectAppShell>

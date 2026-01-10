@@ -211,12 +211,12 @@ async function handleStatusChange(task: TaskDoc, newStatus: TaskStatus) {
 }
 
 /**
- * タスク詳細へ遷移
+ * タスク詳細へ遷移（マイタスクでドロワーを開く）
  */
 function goToTask(task: TaskDoc) {
   router.push({
-    name: ROUTE_NAMES.projectTaskDetail,
-    params: { projectId: task.projectId, taskId: task.id },
+    name: ROUTE_NAMES.myTasks,
+    query: { taskId: task.id },
   });
 }
 
