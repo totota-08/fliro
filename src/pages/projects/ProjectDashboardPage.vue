@@ -5,13 +5,9 @@ import DashboardSummaryCards, {
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
 import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
-import TaskCreateModal, {
-  type TaskFormData,
-} from "@/components/tasks/TaskCreateModal.vue";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useProjectShellData } from "@/composables/useProjectShellData";
-import { useUserDisplay } from "@/composables/useUserDisplay";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import { appName, appVersion } from "@/constants/appMeta";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
@@ -29,12 +25,7 @@ import {
   listenTaskCategories,
   type TaskCategory,
 } from "@/services/taskCategoryService";
-import {
-  createTask,
-  listenTasks,
-  type TaskDoc,
-  type TaskStatus,
-} from "@/services/taskService";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
 import {
   getDashboardSettings,
   saveDashboardSettings,
@@ -58,7 +49,7 @@ const logger = getLogger("app.pages.projects.ProjectDashboard");
 
 const route = useRoute();
 const router = useRouter();
-const { user, profile } = useAuthStore();
+const { user } = useAuthStore();
 const projectId = ref(String(route.params.projectId || ""));
 
 // TaskDrawer のURL同期
@@ -76,7 +67,6 @@ type MemberEntry = ProjectMember & {
 
 const project = ref<ProjectDoc | null>(null);
 const members = ref<MemberEntry[]>([]);
-const { getDisplayName } = useUserDisplay(members);
 const tasks = ref<TaskDoc[]>([]);
 const categories = ref<TaskCategory[]>([]);
 const { notifications: notificationsBar } = useNotificationCenter();
@@ -108,7 +98,6 @@ const filters = reactive({
   category: "all",
 });
 const showMyTasksOnly = ref(false);
-const isTaskModalOpen = ref(false);
 
 // Dashboard card customization
 const cardConfig = ref<DashboardCardConfig[]>([]);
@@ -269,12 +258,6 @@ async function handleCardConfigUpdate(newConfig: DashboardCardConfig[]) {
   }
 }
 
-function normalizeProgress(value: number | null | undefined) {
-  if (typeof value !== "number" || Number.isNaN(value)) return 0;
-  const clamped = Math.min(100, Math.max(0, value));
-  return Math.round(clamped / 25) * 25;
-}
-
 // const chatPreviewMessages = computed<PreviewChatMessage[]>(() =>
 //   chatMessages.value.map((message) => ({
 //     id: message.id,
@@ -394,48 +377,6 @@ function resetWatchers() {
   watchCategories();
   watchChat();
   loadCardConfig();
-}
-
-function closeTaskModal() {
-  isTaskModalOpen.value = false;
-}
-
-function getMemberNameById(id?: string | null) {
-  if (!id) return "";
-  const member = members.value.find((entry) => entry.id === id);
-  return member?.name || getDisplayName(id) || "";
-}
-
-async function handleTaskSubmit(data: TaskFormData) {
-  if (!user.value || !data.title.trim()) return;
-  const assigneeId = data.assigneeId || null;
-  const normalizedProgress = normalizeProgress(data.progress);
-
-  let initialStatus: TaskStatus = "todo";
-  if (normalizedProgress === 100) initialStatus = "done";
-  else if (normalizedProgress > 0) initialStatus = "in-progress";
-
-  await createTask(
-    projectId.value,
-    {
-      title: data.title.trim(),
-      description: data.description.trim(),
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      categoryId: data.categoryId || null,
-      assigneeId,
-      assigneeName: assigneeId ? getMemberNameById(assigneeId) : null,
-      progress: normalizedProgress,
-      status: initialStatus,
-    },
-    user.value.uid,
-    {
-      origin: "ui",
-      actorId: user.value.uid,
-      actorName:
-        profile.value?.nickname || profile.value?.fullName || user.value.uid,
-    },
-  );
-  closeTaskModal();
 }
 
 // タスクをドロワーで開く（selectとnavigateを統一）
@@ -559,18 +500,18 @@ onBeforeUnmount(() => {
     <div class="dashboard__content">
       <NotificationBar :notifications="notificationsBar" />
 
+      <DashboardInsights :tasks="tasks" v-model:collapsed="insightsCollapsed" />
+
       <DashboardSummaryCards
         :title="project?.name || 'ダッシュボード'"
         :description="''"
         :cards="summaryCards"
         :rotate="false"
         :show-header="true"
-        :customizable="true"
+        :customizable="false"
         :card-config="cardConfig"
         @update:card-config="handleCardConfigUpdate"
       />
-
-      <DashboardInsights :tasks="tasks" v-model:collapsed="insightsCollapsed" />
 
       <DashboardTaskList
         v-model="filters"
@@ -583,14 +524,6 @@ onBeforeUnmount(() => {
     </div>
 
     <Teleport to="body">
-      <TaskCreateModal
-        :open="isTaskModalOpen"
-        :categories="categories"
-        :members="members"
-        @close="closeTaskModal"
-        @submit="handleTaskSubmit"
-      />
-
       <TaskDrawer
         :project-id="projectId"
         :task-id="selectedTaskId"
