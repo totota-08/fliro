@@ -29,9 +29,17 @@ export interface SidebarNavItemConfig {
 
 /**
  * プロジェクトコンテキストのサイドバー固定メニュー
- * 表示項目: マイタスク、スレッド、ログ、メンバー、設定
+ * 表示項目: ダッシュボード、マイタスク、スレッド、ログ、メンバー、設定
  */
 export const PROJECT_SIDEBAR_NAV_CONFIG: SidebarNavItemConfig[] = [
+  {
+    key: "dashboard",
+    label: "ダッシュボード",
+    icon: "dashboard",
+    routeName: ROUTE_NAMES.projectDashboard,
+    requiredPermission: ProjectPermission.VIEW_DASHBOARD,
+    requiresProjectId: true,
+  },
   {
     key: "tasks",
     label: "マイタスク",
