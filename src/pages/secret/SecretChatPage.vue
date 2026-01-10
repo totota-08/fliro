@@ -14,8 +14,7 @@ const stage = ref(1);
 const gameState = ref<"ready" | "playing" | "gameover" | "clear">("ready");
 const audioContext = ref<AudioContext | null>(null);
 
-// Pixel art scale
-const PIXEL_SIZE = 4;
+// Canvas dimensions
 const CANVAS_WIDTH = 480;
 const CANVAS_HEIGHT = 320;
 
