@@ -1,26 +1,31 @@
 /* Motion Variables */
 :root {
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --duration-page: 180ms;
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-page: 200ms;
   --duration-panel: 240ms;
 }
 
-/* Page Fade Transition (Router View) */
-.page-fade-enter-active,
-.page-fade-leave-active {
+/* Page Fade Transition (Router View) - Crossfade */
+.page-fade-enter-active {
   transition:
-    opacity var(--duration-page) var(--ease-standard),
-    transform var(--duration-page) var(--ease-standard);
+    opacity var(--duration-page) var(--ease-smooth),
+    transform var(--duration-page) var(--ease-smooth);
+  transition-delay: 50ms; /* 前のページが少し消え始めてから表示開始 */
+}
+
+.page-fade-leave-active {
+  transition: opacity calc(var(--duration-page) - 50ms) var(--ease-smooth);
+  /* transform なしでシンプルにフェードアウト */
 }
 
 .page-fade-enter-from {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(4px); /* より控えめな動き */
 }
 
 .page-fade-leave-to {
   opacity: 0;
-  /* transform: translateY(0); */ /* Leave transform optional per spec, keeping it simple to avoid jump */
 }
 
 /* Panel Slide Right Transition */

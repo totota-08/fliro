@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import AppTasksSkeleton from "@/components/ui/AppTasksSkeleton.vue";
 import { appName } from "@/constants/appMeta";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -459,9 +460,7 @@ onMounted(() => {
 
             <div class="tasks-tabs__content" role="tabpanel">
               <!-- 状態メッセージ -->
-              <section v-if="loading" class="tasks-empty">
-                読み込み中...
-              </section>
+              <AppTasksSkeleton v-if="loading" :count="5" />
               <AppEmptyState
                 v-else-if="errorMessage"
                 :title="errorMessage"
