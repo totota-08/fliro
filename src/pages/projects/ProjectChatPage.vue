@@ -2,7 +2,9 @@
 import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
@@ -89,23 +91,34 @@ const activeChannelId = ref("general");
 
 // Command Autocomplete
 const showCommandSuggestions = ref(false);
-const availableCommands = computed(() =>
-  commands.flatMap((c) =>
-    c.suggestions?.length
-      ? c.suggestions.map((s) => ({
-          label: s.name,
-          description: s.description,
-          example: s.example ?? c.example,
-        }))
-      : [
-          {
-            label: c.name,
-            description: c.description,
-            example: c.example,
-          },
-        ],
-  ),
-);
+const availableCommands = computed(() => {
+  const humorousEnabled =
+    project.value?.settings?.humorousCommandsEnabled ?? false;
+
+  return commands
+    .filter((c) => {
+      // Flilo Bot は humorousCommandsEnabled がtrueの場合のみ表示
+      if (c.name === "Flilo Bot") {
+        return humorousEnabled;
+      }
+      return true;
+    })
+    .flatMap((c) =>
+      c.suggestions?.length
+        ? c.suggestions.map((s) => ({
+            label: s.name,
+            description: s.description,
+            example: s.example ?? c.example,
+          }))
+        : [
+            {
+              label: c.name,
+              description: c.description,
+              example: c.example,
+            },
+          ],
+    );
+});
 
 const filteredCommands = computed(() => {
   if (!input.value.startsWith("/")) return [];
@@ -287,6 +300,8 @@ async function handleSend() {
       userId: user.value.uid,
       activeChannelId: activeChannelId.value,
       members: projectMembers.value,
+      humorousCommandsEnabled:
+        project.value?.settings?.humorousCommandsEnabled ?? false,
     });
 
     if (result.handled) {
@@ -400,7 +415,6 @@ function formatTime(createdAt: ChatMessage["createdAt"]) {
 function taskStatusLabel(status?: string) {
   if (status === "todo") return "未着手";
   if (status === "in-progress") return "進行中";
-  if (status === "review") return "レビュー";
   if (status === "done") return "完了";
   return "未設定";
 }
@@ -460,10 +474,17 @@ watch(channels, (list) => {
     :profile-info="profileInfo"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; スレッド</p>
-      <h1 class="project-app-shell__heading">
-        {{ project?.name || "プロジェクト" }}
-      </h1>
+      <PageHeader
+        :title="project?.name || 'スレッド'"
+        subtitle="チームのディスカッション"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: 'スレッド' },
+        ]"
+      />
     </template>
 
     <!-- 右パネルは TaskDrawer に統合（ProjectAppShell の外で Teleport） -->
@@ -681,6 +702,8 @@ watch(channels, (list) => {
 :deep(.project-app-shell__body) {
   display: flex;
   flex-direction: column;
+  padding: 0;
+  height: 100%;
 }
 
 :deep(.project-app-shell__body--split) {
@@ -693,6 +716,8 @@ watch(channels, (list) => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  flex: 1;
+  height: 100%;
 }
 
 /* Chat Content */
@@ -866,6 +891,7 @@ watch(channels, (list) => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
