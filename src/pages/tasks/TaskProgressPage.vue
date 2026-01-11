@@ -47,17 +47,12 @@ const navItems = computed<DashboardNavItem[]>(() => {
     return buildProjectNavItems(firstProjectId);
   }
 
-  return buildProjectNavItems("").map((item) => {
-    if (item.key === "tasks") {
-      return { ...item, to: { name: ROUTE_NAMES.myTasks } };
-    }
-    return {
-      ...item,
-      disabled: true,
-      to: undefined,
-      tooltip: "プロジェクトを選択してください",
-    };
-  });
+  return buildProjectNavItems("").map((item) => ({
+    ...item,
+    disabled: true,
+    to: undefined,
+    tooltip: "プロジェクトを選択してください",
+  }));
 });
 
 const sidebarProjects = computed(() =>
@@ -216,15 +211,22 @@ async function handleStatusChange(task: TaskDoc, newStatus: TaskStatus) {
 function goToTask(task: TaskDoc) {
   router.push({
     name: ROUTE_NAMES.myTasks,
+    params: { projectId: task.projectId },
     query: { taskId: task.id },
   });
 }
 
 /**
- * マイタスク一覧へ遷移
+ * マイタスク一覧へ遷移（最初のプロジェクトを使用）
  */
 function goToMyTasks() {
-  router.push({ name: ROUTE_NAMES.myTasks });
+  const firstProjectId = projects.value[0]?.id;
+  if (firstProjectId) {
+    router.push({
+      name: ROUTE_NAMES.myTasks,
+      params: { projectId: firstProjectId },
+    });
+  }
 }
 
 /**

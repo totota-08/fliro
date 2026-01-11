@@ -21,12 +21,14 @@ const props = defineProps<{
 const route = useRoute();
 
 const activeItemName = computed(() => {
-  return props.items.find(item => {
-    if (typeof item.to === "string") {
-      return route.path === item.to;
-    }
-    return route.name === item.to.name;
-  })?.name || props.items[0]?.name;
+  return (
+    props.items.find((item) => {
+      if (typeof item.to === "string") {
+        return route.path === item.to;
+      }
+      return route.name === item.to.name;
+    })?.name || props.items[0]?.name
+  );
 });
 </script>
 
@@ -60,38 +62,10 @@ const activeItemName = computed(() => {
           fill="none"
           stroke="currentColor"
         >
-          <rect
-            x="3"
-            y="3"
-            width="7"
-            height="7"
-            rx="1"
-            stroke-width="2"
-          />
-          <rect
-            x="14"
-            y="3"
-            width="7"
-            height="7"
-            rx="1"
-            stroke-width="2"
-          />
-          <rect
-            x="3"
-            y="14"
-            width="7"
-            height="7"
-            rx="1"
-            stroke-width="2"
-          />
-          <rect
-            x="14"
-            y="14"
-            width="7"
-            height="7"
-            rx="1"
-            stroke-width="2"
-          />
+          <rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2" />
+          <rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2" />
+          <rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2" />
+          <rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2" />
         </svg>
         <svg
           v-else-if="item.icon === 'users'"
@@ -199,7 +173,8 @@ const activeItemName = computed(() => {
 }
 
 @keyframes bounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {

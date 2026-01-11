@@ -164,7 +164,7 @@ export const router = createRouter({
       meta: { requiresAuth: true, section: "scores" },
     },
     {
-      path: "/tasks",
+      path: "/projects/:projectId/tasks",
       name: ROUTE_NAMES.myTasks,
       component: MyTasksPage,
       meta: { requiresAuth: true, section: "tasks" },

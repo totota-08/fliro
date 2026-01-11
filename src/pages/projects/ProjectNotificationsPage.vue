@@ -110,7 +110,10 @@ const notifications = computed<NotificationItem[]>(() => {
           body: `「${task.title}」の期限が近づいています`,
           type: "deadline",
           createdAt: due,
-          link: { name: ROUTE_NAMES.myTasks },
+          link: {
+            name: ROUTE_NAMES.myTasks,
+            params: { projectId: projectId.value },
+          },
         });
       }
     });
@@ -130,7 +133,10 @@ const notifications = computed<NotificationItem[]>(() => {
         body: `あなたに「${task.title}」が割り当てられました`,
         type: "assignment",
         createdAt: ts,
-        link: { name: ROUTE_NAMES.myTasks },
+        link: {
+          name: ROUTE_NAMES.myTasks,
+          params: { projectId: projectId.value },
+        },
       });
     });
 
