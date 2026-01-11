@@ -18,10 +18,13 @@ import type { TaskCategory } from "@/services/taskCategoryService";
 import type { ProjectMember } from "@/services/projectMembers";
 import { useProjectAccess } from "@/composables/useProjectAccess";
 import {
-  listenTaskDiscussion,
-  sendTaskDiscussionMessage,
-  type TaskDiscussionMessage,
-} from "@/services/taskDiscussionService";
+  listenProjectChat,
+  sendProjectMessage,
+  addMessageReaction,
+  updateProjectMessage,
+  deleteProjectMessage,
+  type ChatMessage,
+} from "@/services/projectChat";
 import { listenProjectEvents } from "@/services/projectActivityLogService";
 import type { ProjectEvent } from "@/types/projectEvent";
 import { useAuthStore } from "@/store/auth";
@@ -54,10 +57,28 @@ const emit = defineEmits<{
 
 const { user, profile } = useAuthStore();
 const activeTab = ref<"overview" | "thread" | "log">("overview");
-const threadMessages = ref<TaskDiscussionMessage[]>([]);
+const allChatMessages = ref<ChatMessage[]>([]);
 const activityLogs = ref<ProjectEvent[]>([]);
 const messageInput = ref("");
 const isEditing = ref(false);
+
+// リアクション・編集用の状態
+const editingMessageId = ref<string | null>(null);
+const editingMessageText = ref("");
+const showEmojiPicker = ref<string | null>(null);
+const QUICK_REACTIONS = ["👍", "❤️", "🎉", "👀", "🚀"];
+
+// 説明編集用の状態
+const isEditingDescription = ref(false);
+const descriptionInput = ref("");
+
+// タスクに紐づくメッセージのみフィルタリング
+const threadMessages = computed(() => {
+  if (!props.taskId) return [];
+  return allChatMessages.value.filter(
+    (msg) => msg.linkedTaskId === props.taskId,
+  );
+});
 
 // 権限チェック
 const projectIdRef = toRef(props, "projectId");
@@ -128,6 +149,8 @@ watch(
     activeTab.value = "overview";
     isEditing.value = false;
     messageInput.value = "";
+    editingMessageId.value = null;
+    showEmojiPicker.value = null;
 
     // 購読解除
     unsubscribeThread?.();
@@ -136,14 +159,10 @@ watch(
     unsubscribeLogs = null;
 
     if (newTaskId && props.projectId) {
-      // スレッド購読
-      unsubscribeThread = listenTaskDiscussion(
-        props.projectId,
-        newTaskId,
-        (messages) => {
-          threadMessages.value = messages;
-        },
-      );
+      // プロジェクトチャット購読（タスクに紐づくメッセージはcomputedでフィルタリング）
+      unsubscribeThread = listenProjectChat(props.projectId, (messages) => {
+        allChatMessages.value = messages;
+      });
 
       // アクティビティログ購読
       unsubscribeLogs = listenProjectEvents(
@@ -281,15 +300,111 @@ async function handleSendMessage() {
   if (!messageInput.value.trim() || !task.value || !user.value) return;
 
   try {
-    await sendTaskDiscussionMessage(props.projectId, task.value.id, {
-      text: messageInput.value.trim(),
-      senderId: user.value.uid,
-      senderName:
-        profile.value?.nickname || profile.value?.fullName || "ユーザー",
-    });
+    await sendProjectMessage(
+      props.projectId,
+      user.value.uid,
+      profile.value?.nickname || profile.value?.fullName || "ユーザー",
+      messageInput.value.trim(),
+      task.value.id, // channelId = taskId for task threads
+      undefined,
+      { linkedTaskId: task.value.id, isTask: true },
+    );
     messageInput.value = "";
   } catch (error) {
     logger.error`Failed to send message: ${error}`;
+  }
+}
+
+// リアクション追加
+async function handleAddReaction(messageId: string, emoji: string) {
+  if (!user.value) return;
+  try {
+    await addMessageReaction(props.projectId, messageId, emoji, user.value.uid);
+    showEmojiPicker.value = null;
+  } catch (error) {
+    logger.error`Failed to add reaction: ${error}`;
+  }
+}
+
+// メッセージ編集開始
+function startEditMessage(msg: ChatMessage) {
+  if (msg.senderId !== user.value?.uid) return;
+  editingMessageId.value = msg.id;
+  editingMessageText.value = msg.text;
+}
+
+// メッセージ編集保存
+async function saveEditMessage() {
+  if (!editingMessageId.value || !editingMessageText.value.trim()) return;
+  try {
+    await updateProjectMessage(
+      props.projectId,
+      editingMessageId.value,
+      editingMessageText.value.trim(),
+    );
+    editingMessageId.value = null;
+    editingMessageText.value = "";
+  } catch (error) {
+    logger.error`Failed to update message: ${error}`;
+  }
+}
+
+// メッセージ編集キャンセル
+function cancelEditMessage() {
+  editingMessageId.value = null;
+  editingMessageText.value = "";
+}
+
+// メッセージ削除
+async function handleDeleteMessage(messageId: string) {
+  if (!confirm("このメッセージを削除しますか？")) return;
+  try {
+    await deleteProjectMessage(props.projectId, messageId);
+  } catch (error) {
+    logger.error`Failed to delete message: ${error}`;
+  }
+}
+
+// 時間フォーマット（ChatMessage用）
+function formatMessageTime(createdAt: ChatMessage["createdAt"]): string {
+  if (!createdAt) return "";
+  const date = new Date(createdAt);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// 説明編集開始
+function startEditDescription() {
+  descriptionInput.value = task.value?.description || "";
+  isEditingDescription.value = true;
+}
+
+// 説明編集キャンセル
+function cancelEditDescription() {
+  isEditingDescription.value = false;
+  descriptionInput.value = "";
+}
+
+// 説明保存
+async function saveDescription() {
+  if (!task.value || !props.projectId) return;
+  try {
+    await updateTask(
+      props.projectId,
+      task.value.id,
+      {
+        description: descriptionInput.value.trim(),
+      },
+      {
+        userId: user.value?.uid ?? null,
+        actorName:
+          profile.value?.nickname || profile.value?.fullName || "Unknown",
+        origin: "ui",
+      },
+    );
+    isEditingDescription.value = false;
+    descriptionInput.value = "";
+  } catch (error) {
+    logger.error`Failed to update description: ${error}`;
   }
 }
 
@@ -389,11 +504,51 @@ function formatEventDetail(event: ProjectEvent): string {
       >
         <template v-if="!isEditing">
           <!-- 読み取り専用モード -->
+          <!-- 説明（マークダウン対応のテキストエリア） -->
           <section class="task-drawer__section">
-            <p class="task-drawer__label">ステータス</p>
-            <div class="task-drawer__value">
-              <TaskStatusBadge :status="task.status" />
+            <div class="task-drawer__description-header">
+              <p class="task-drawer__label">説明</p>
+              <button
+                v-if="canEditTask && !isEditingDescription"
+                type="button"
+                class="task-drawer__description-edit-btn"
+                @click="startEditDescription"
+              >
+                ✏️ 編集
+              </button>
             </div>
+            <template v-if="isEditingDescription">
+              <textarea
+                v-model="descriptionInput"
+                class="task-drawer__description-textarea"
+                rows="6"
+                placeholder="タスクの説明を入力（マークダウン対応）..."
+              />
+              <div class="task-drawer__description-actions">
+                <button
+                  type="button"
+                  class="task-drawer__edit-btn task-drawer__edit-btn--cancel"
+                  @click="cancelEditDescription"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  class="task-drawer__edit-btn task-drawer__edit-btn--save"
+                  @click="saveDescription"
+                >
+                  保存
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <div v-if="task.description" class="task-drawer__description">
+                {{ task.description }}
+              </div>
+              <p v-else class="task-drawer__description-empty">
+                説明がありません
+              </p>
+            </template>
           </section>
 
           <!-- 進捗率（権限があれば即座に変更可能） -->
@@ -438,13 +593,6 @@ function formatEventDetail(event: ProjectEvent): string {
               >
                 {{ getDueMessage(task) }}
               </span>
-            </div>
-          </section>
-
-          <section v-if="task.description" class="task-drawer__section">
-            <p class="task-drawer__label">説明</p>
-            <div class="task-drawer__description">
-              {{ task.description }}
             </div>
           </section>
 
@@ -572,23 +720,104 @@ function formatEventDetail(event: ProjectEvent): string {
             v-for="msg in threadMessages"
             :key="msg.id"
             class="task-drawer__message"
-            :class="{ 'is-decision': msg.type === 'decision' }"
+            :class="{ 'is-bot': msg.isBot }"
           >
             <UserAvatar
+              v-if="!msg.isBot"
               :url="null"
-              :name="msg.senderName"
+              :name="msg.senderName || 'ゲスト'"
               class="task-drawer__message-avatar"
             />
+            <div v-else class="task-drawer__bot-avatar">🤖</div>
             <div class="task-drawer__message-content">
               <div class="task-drawer__message-meta">
                 <span class="task-drawer__message-sender">{{
                   msg.senderName
                 }}</span>
                 <span class="task-drawer__message-time">{{
-                  formatDateTime(msg.createdAt)
+                  formatMessageTime(msg.createdAt)
                 }}</span>
+                <!-- 自分のメッセージのみ編集・削除可能 -->
+                <div
+                  v-if="msg.senderId === user?.uid && !msg.isBot"
+                  class="task-drawer__message-actions"
+                >
+                  <button
+                    type="button"
+                    class="task-drawer__action-btn"
+                    title="編集"
+                    @click="startEditMessage(msg)"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    class="task-drawer__action-btn"
+                    title="削除"
+                    @click="handleDeleteMessage(msg.id)"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
-              <p class="task-drawer__message-text">{{ msg.text }}</p>
+              <!-- 編集モード -->
+              <template v-if="editingMessageId === msg.id">
+                <div class="task-drawer__edit-form">
+                  <input
+                    v-model="editingMessageText"
+                    type="text"
+                    class="task-drawer__edit-input"
+                    @keydown.enter="saveEditMessage"
+                    @keydown.escape="cancelEditMessage"
+                  />
+                  <div class="task-drawer__edit-actions">
+                    <button
+                      type="button"
+                      class="task-drawer__edit-btn task-drawer__edit-btn--cancel"
+                      @click="cancelEditMessage"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      class="task-drawer__edit-btn task-drawer__edit-btn--save"
+                      @click="saveEditMessage"
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <p class="task-drawer__message-text">{{ msg.text }}</p>
+              </template>
+              <!-- リアクション表示 -->
+              <div
+                v-if="msg.reactionSummary?.length"
+                class="task-drawer__reactions"
+              >
+                <span
+                  v-for="reaction in msg.reactionSummary"
+                  :key="reaction.emoji"
+                  class="task-drawer__reaction"
+                  @click="handleAddReaction(msg.id, reaction.emoji)"
+                >
+                  {{ reaction.emoji }} {{ reaction.count }}
+                </span>
+              </div>
+              <!-- リアクション追加ボタン -->
+              <div class="task-drawer__reaction-bar">
+                <button
+                  v-for="emoji in QUICK_REACTIONS"
+                  :key="emoji"
+                  type="button"
+                  class="task-drawer__reaction-btn"
+                  :title="`${emoji} でリアクション`"
+                  @click="handleAddReaction(msg.id, emoji)"
+                >
+                  {{ emoji }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -598,7 +827,7 @@ function formatEventDetail(event: ProjectEvent): string {
             v-model="messageInput"
             type="text"
             class="task-drawer__composer-input"
-            placeholder="メッセージを入力... (/decide で決定事項)"
+            placeholder="メッセージを入力..."
             @keydown.enter="handleSendMessage"
           />
           <AppButton
@@ -808,6 +1037,54 @@ function formatEventDetail(event: ProjectEvent): string {
   color: var(--ui-warning);
 }
 
+.task-drawer__description-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.task-drawer__description-edit-btn {
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: none;
+  background: transparent;
+  color: var(--ui-brand-600);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-medium);
+  cursor: pointer;
+  border-radius: var(--ui-radius-sm);
+  transition: var(--ui-transition-colors);
+}
+
+.task-drawer__description-edit-btn:hover {
+  background: var(--ui-brand-100);
+}
+
+.task-drawer__description-textarea {
+  width: 100%;
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-brand-600);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-sm);
+  font-family: inherit;
+  line-height: var(--ui-leading-relaxed);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  resize: vertical;
+  min-height: 120px;
+}
+
+.task-drawer__description-textarea:focus {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
+}
+
+.task-drawer__description-actions {
+  display: flex;
+  gap: var(--ui-space-2);
+  justify-content: flex-end;
+  margin-top: var(--ui-space-2);
+}
+
 .task-drawer__description {
   padding: var(--ui-space-3);
   background: var(--ui-surface-muted);
@@ -816,6 +1093,14 @@ function formatEventDetail(event: ProjectEvent): string {
   line-height: var(--ui-leading-relaxed);
   color: var(--ui-text);
   white-space: pre-wrap;
+}
+
+.task-drawer__description-empty {
+  padding: var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-subtle);
+  font-style: italic;
+  margin: 0;
 }
 
 /* 編集フォーム */
@@ -921,9 +1206,21 @@ function formatEventDetail(event: ProjectEvent): string {
   background: var(--ui-surface-muted);
 }
 
-.task-drawer__message.is-decision {
-  background: var(--ui-success-light, #dcfce7);
+.task-drawer__message.is-bot {
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border-light);
+}
+
+.task-drawer__bot-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ui-success-50, #f0fdf4);
+  display: grid;
+  place-items: center;
+  font-size: var(--ui-text-base);
   border: 1px solid var(--ui-success-200, #bbf7d0);
+  flex-shrink: 0;
 }
 
 .task-drawer__message-avatar {
@@ -962,6 +1259,135 @@ function formatEventDetail(event: ProjectEvent): string {
   color: var(--ui-text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* メッセージアクション（編集・削除） */
+.task-drawer__message-actions {
+  display: none;
+  gap: var(--ui-space-1);
+  margin-left: auto;
+}
+
+.task-drawer__message:hover .task-drawer__message-actions {
+  display: flex;
+}
+
+.task-drawer__action-btn {
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--ui-text-xs);
+  opacity: 0.6;
+  transition: var(--ui-transition-colors);
+}
+
+.task-drawer__action-btn:hover {
+  opacity: 1;
+}
+
+/* 編集フォーム */
+.task-drawer__edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.task-drawer__edit-input {
+  width: 100%;
+  padding: var(--ui-space-2);
+  border: 1px solid var(--ui-brand-600);
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--ui-text-sm);
+  outline: none;
+}
+
+.task-drawer__edit-actions {
+  display: flex;
+  gap: var(--ui-space-2);
+  justify-content: flex-end;
+}
+
+.task-drawer__edit-btn {
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-medium);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.task-drawer__edit-btn--cancel {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-muted);
+}
+
+.task-drawer__edit-btn--cancel:hover {
+  background: var(--ui-border-light);
+}
+
+.task-drawer__edit-btn--save {
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse, #fff);
+}
+
+.task-drawer__edit-btn--save:hover {
+  background: var(--ui-brand-700);
+}
+
+/* リアクション */
+.task-drawer__reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-1);
+  margin-top: var(--ui-space-2);
+}
+
+.task-drawer__reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px var(--ui-space-2);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border-light);
+  border-radius: var(--ui-radius-full);
+  font-size: var(--ui-text-xs);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.task-drawer__reaction:hover {
+  background: var(--ui-brand-100);
+  border-color: var(--ui-brand-300);
+}
+
+/* リアクションバー */
+.task-drawer__reaction-bar {
+  display: none;
+  gap: var(--ui-space-1);
+  margin-top: var(--ui-space-1);
+}
+
+.task-drawer__message:hover .task-drawer__reaction-bar {
+  display: flex;
+}
+
+.task-drawer__reaction-btn {
+  padding: 2px 4px;
+  border: none;
+  background: var(--ui-surface-muted);
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  font-size: var(--ui-text-sm);
+  opacity: 0.7;
+  transition: var(--ui-transition-all);
+}
+
+.task-drawer__reaction-btn:hover {
+  opacity: 1;
+  transform: scale(1.2);
+  background: var(--ui-brand-100);
 }
 
 .task-drawer__composer {
