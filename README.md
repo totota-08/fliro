@@ -29,6 +29,7 @@
 ### 設定手順
 
 1. Google Cloud SDK をインストール（未インストールの場合）
+
    ```bash
    # macOS
    brew install google-cloud-sdk
@@ -38,11 +39,13 @@
    ```
 
 2. 認証
+
    ```bash
    gcloud auth login
    ```
 
 3. CORS設定を適用
+
    ```bash
    gsutil cors set cors.json gs://teamie-dev.appspot.com
    ```
