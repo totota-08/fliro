@@ -18,8 +18,22 @@ import {
 } from "@/services/accountActions";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+
+// Konami code sequence: ↑ ↑ ↓ ↓ ← → ← → B A
+const KONAMI_CODE = [
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
+  "KeyB",
+  "KeyA",
+];
 
 const logger = getLogger("app.pages.account.AccountSettingsPage");
 const router = useRouter();
@@ -40,6 +54,9 @@ const avatarMessage = ref("");
 const showDeleteModal = ref(false);
 const deleteLoading = ref(false);
 const deleteError = ref("");
+
+// Konami code tracking
+const konamiIndex = ref(0);
 
 // Computed
 const avatarUrl = computed(
@@ -144,6 +161,30 @@ async function handleDeleteAccount(password: string) {
     deleteLoading.value = false;
   }
 }
+
+// Konami code handler
+function handleKeyDown(event: KeyboardEvent) {
+  const expectedKey = KONAMI_CODE[konamiIndex.value];
+  if (event.code === expectedKey) {
+    konamiIndex.value++;
+    if (konamiIndex.value === KONAMI_CODE.length) {
+      // Konami code completed!
+      konamiIndex.value = 0;
+      router.push({ name: ROUTE_NAMES.secretAccess });
+    }
+  } else {
+    // Reset if wrong key
+    konamiIndex.value = 0;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", handleKeyDown);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleKeyDown);
+});
 </script>
 
 <template>
