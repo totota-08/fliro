@@ -3,6 +3,9 @@
   "private": true,
   "version": "alpha-0.2.2",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "vue-tsc -b && vite build",
@@ -30,7 +33,7 @@
     "@vue/tsconfig": "^0.8.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
-    "firebase-tools": "^15.2.0",
+    "firebase-tools": "^15.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
