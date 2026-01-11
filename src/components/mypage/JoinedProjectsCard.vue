@@ -1,0 +1,207 @@
+<script setup lang="ts">
+/**
+ * JoinedProjectsCard - 参加中プロジェクトリスト
+ *
+ * 参加しているプロジェクトと招待されているプロジェクトを表示
+ */
+import SectionCard from "@/components/ui/SectionCard.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppBadge from "@/components/ui/AppBadge.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
+
+export interface ProjectItem {
+  id: string;
+  name: string;
+  role?: string;
+  lastAccessedAt?: Date;
+}
+
+export interface ProjectInvite {
+  id: string;
+  projectId: string;
+  projectName?: string;
+}
+
+defineProps<{
+  projects: ProjectItem[];
+  pendingInvites: ProjectInvite[];
+  joiningInviteId: string | null;
+}>();
+
+const emit = defineEmits<{
+  joinProject: [invite: ProjectInvite];
+}>();
+
+function getRoleBadgeVariant(
+  role?: string,
+): "owner" | "admin" | "member" | "viewer" {
+  if (!role) return "member";
+  const normalized = role.toLowerCase();
+  if (normalized === "owner") return "owner";
+  if (normalized === "admin") return "admin";
+  if (normalized === "viewer") return "viewer";
+  return "member";
+}
+
+function formatRelativeDate(date?: Date): string {
+  if (!date) return "";
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return "今日";
+  if (days === 1) return "昨日";
+  if (days < 7) return `${days}日前`;
+  if (days < 30) return `${Math.floor(days / 7)}週間前`;
+  return date.toLocaleDateString("ja-JP");
+}
+</script>
+
+<template>
+  <div class="joined-projects">
+    <!-- Joined Projects -->
+    <SectionCard
+      title="参加中のプロジェクト"
+      subtitle="プロジェクトを選択して開く"
+    >
+      <AppEmptyState
+        v-if="!projects.length"
+        icon="folder"
+        title="プロジェクトがありません"
+        description="新しいプロジェクトを作成するか、招待リンクから参加してください。"
+      >
+        <template #action>
+          <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
+            プロジェクトを作成
+          </AppButton>
+        </template>
+      </AppEmptyState>
+      <ul v-else class="project-list">
+        <li v-for="project in projects" :key="project.id" class="project-item">
+          <div class="project-item__info">
+            <div class="project-item__header">
+              <p class="project-item__name">{{ project.name }}</p>
+              <AppBadge :variant="getRoleBadgeVariant(project.role)" size="sm">
+                {{ project.role || "member" }}
+              </AppBadge>
+            </div>
+            <p v-if="project.lastAccessedAt" class="project-item__activity">
+              最終アクセス: {{ formatRelativeDate(project.lastAccessedAt) }}
+            </p>
+          </div>
+          <AppButton
+            variant="outline"
+            size="sm"
+            :to="{
+              name: ROUTE_NAMES.projectDashboard,
+              params: { projectId: project.id },
+            }"
+          >
+            開く
+          </AppButton>
+        </li>
+      </ul>
+    </SectionCard>
+
+    <!-- Invited Projects -->
+    <SectionCard
+      v-if="pendingInvites.length > 0"
+      title="招待されたプロジェクト"
+      subtitle="以下のプロジェクトに招待されています"
+    >
+      <ul class="project-list">
+        <li
+          v-for="invite in pendingInvites"
+          :key="invite.id"
+          class="project-item project-item--invite"
+        >
+          <div class="project-item__info">
+            <div class="project-item__header">
+              <p class="project-item__name">
+                {{ invite.projectName || "プロジェクト" }}
+              </p>
+              <AppBadge variant="info" size="sm">招待</AppBadge>
+            </div>
+          </div>
+          <AppButton
+            variant="primary"
+            size="sm"
+            :loading="joiningInviteId === invite.id"
+            :disabled="joiningInviteId !== null"
+            @click="emit('joinProject', invite)"
+          >
+            参加する
+          </AppButton>
+        </li>
+      </ul>
+    </SectionCard>
+  </div>
+</template>
+
+<style scoped>
+.joined-projects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-6, 1.5rem);
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3, 0.75rem);
+}
+
+.project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  background: var(--ui-surface, #ffffff);
+  transition: var(--ui-transition-all);
+}
+
+.project-item:hover {
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.project-item--invite {
+  border-color: var(--ui-brand-200, #b8e3e9);
+  background: var(--ui-brand-50, #f0fafb);
+}
+
+.project-item--invite:hover {
+  border-color: var(--ui-brand-400, #7ec3cc);
+}
+
+.project-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
+  min-width: 0;
+}
+
+.project-item__header {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3, 0.75rem);
+}
+
+.project-item__name {
+  margin: 0;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
+}
+
+.project-item__activity {
+  margin: 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+}
+</style>

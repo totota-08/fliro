@@ -1,9 +1,24 @@
 <script setup lang="ts">
-import PageSkeleton from "@/components/loading/PageSkeleton.vue";
-import AppBadge from "@/components/ui/AppBadge.vue";
-import AppButton from "@/components/ui/AppButton.vue";
-import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+/**
+ * MyPage.vue - マイページ
+ *
+ * プロジェクト一覧、タスク状況を表示
+ * プロフィール編集はAccountSettingsPageに移動
+ *
+ * 2カラムレイアウト：
+ * - 左: 参加プロジェクト（主）
+ * - 右: 今週のタスク（従）
+ */
+import ProfileSummaryCard from "@/components/mypage/ProfileSummaryCard.vue";
+import JoinedProjectsCard, {
+  type ProjectItem,
+  type ProjectInvite as InviteItem,
+} from "@/components/mypage/JoinedProjectsCard.vue";
+import WeeklyTasksCard, {
+  type TaskDoc,
+} from "@/components/mypage/WeeklyTasksCard.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
+import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
@@ -13,7 +28,7 @@ import {
   redeemInvite,
   type ProjectInvite,
 } from "@/services/projectInvites";
-import { useAuthStore } from "@/store/auth";
+import { signOutUser, useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs, query } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -21,36 +36,64 @@ import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.account.MyPage");
 
-interface TaskDoc {
-  title: string;
-  status: string;
-  dueDate?: { seconds: number };
-  projectId: string;
-  projectName: string;
-}
-
-interface ProjectItem {
-  id: string;
-  name: string;
-  role?: string;
-  lastAccessedAt?: Date;
-}
-
 const { user, profile } = useAuthStore();
+const router = useRouter();
 const loading = ref(true);
 const taskList = ref<TaskDoc[]>([]);
 const projectCount = ref(0);
 const projects = ref<ProjectItem[]>([]);
-const keyBuffer = ref("");
-const SECRET = appName.toLowerCase();
-const router = useRouter();
 
 // Invite-related state
 const invites = ref<ProjectInvite[]>([]);
-const inviteLoading = ref(false);
 const joiningInviteId = ref<string | null>(null);
 let unsubscribeInvites: (() => void) | null = null;
 
+// Computed
+const avatarUrl = computed(
+  () => profile.value?.avatarUrl || user.value?.photoURL || "",
+);
+
+const upcomingTasks = computed(() => {
+  const now = Date.now();
+  const weekAhead = now + 7 * 24 * 60 * 60 * 1000;
+  return taskList.value
+    .filter((task) => task.dueDate?.seconds)
+    .filter((task) => {
+      const due = task.dueDate!.seconds * 1000;
+      return due >= now && due <= weekAhead;
+    })
+    .sort((a, b) => a.dueDate!.seconds - b.dueDate!.seconds);
+});
+
+const totalTasks = computed(() => taskList.value.length);
+const completedThisWeek = computed(
+  () =>
+    taskList.value.filter(
+      (task) => task.status === "done" || task.status === "completed",
+    ).length,
+);
+
+const pendingInvites = computed(() => {
+  const joinedProjectIds = new Set(projects.value.map((p) => p.id));
+  return invites.value.filter(
+    (invite) => !joinedProjectIds.has(invite.projectId),
+  ) as InviteItem[];
+});
+
+const profileData = computed(() => ({
+  nickname: profile.value?.nickname,
+  fullName: profile.value?.fullName,
+  email: profile.value?.email,
+  avatarUrl: avatarUrl.value,
+}));
+
+const stats = computed(() => ({
+  projectCount: projectCount.value,
+  totalTasks: totalTasks.value,
+  completedThisWeek: completedThisWeek.value,
+}));
+
+// Functions
 async function fetchTasks() {
   if (!user.value) return;
   loading.value = true;
@@ -76,11 +119,11 @@ async function fetchTasks() {
         query(collection(db, "projects", projectId, "tasks")),
       );
       tasksSnap.forEach((task) => {
-        const data = task.data() as any;
+        const taskData = task.data();
         items.push({
-          title: data.title ?? "タスク",
-          status: data.status ?? "todo",
-          dueDate: data.dueDate,
+          title: taskData.title ?? "タスク",
+          status: taskData.status ?? "todo",
+          dueDate: taskData.dueDate,
           projectId,
           projectName,
         });
@@ -95,66 +138,6 @@ async function fetchTasks() {
   }
 }
 
-const upcomingTasks = computed(() => {
-  const now = Date.now();
-  const weekAhead = now + 7 * 24 * 60 * 60 * 1000;
-  return taskList.value
-    .filter((task) => task.dueDate?.seconds)
-    .filter((task) => {
-      const due = task.dueDate!.seconds * 1000;
-      return due >= now && due <= weekAhead;
-    })
-    .sort((a, b) => a.dueDate!.seconds - b.dueDate!.seconds);
-});
-
-const totalTasks = computed(() => taskList.value.length);
-const completedThisWeek = computed(
-  () =>
-    taskList.value.filter(
-      (task) => task.status === "done" || task.status === "completed",
-    ).length,
-);
-
-function getRoleBadgeVariant(
-  role?: string,
-): "owner" | "admin" | "member" | "viewer" {
-  if (!role) return "member";
-  const normalized = role.toLowerCase();
-  if (normalized === "owner") return "owner";
-  if (normalized === "admin") return "admin";
-  if (normalized === "viewer") return "viewer";
-  return "member";
-}
-
-function formatRelativeDate(date?: Date): string {
-  if (!date) return "";
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return "今日";
-  if (days === 1) return "昨日";
-  if (days < 7) return `${days}日前`;
-  if (days < 30) return `${Math.floor(days / 7)}週間前`;
-  return date.toLocaleDateString("ja-JP");
-}
-
-function handleKeydown(event: KeyboardEvent) {
-  keyBuffer.value = (keyBuffer.value + event.key.toLowerCase()).slice(
-    -SECRET.length,
-  );
-  if (keyBuffer.value === SECRET) {
-    router.push({ name: ROUTE_NAMES.secretAccess });
-  }
-}
-
-// Filter out invites for projects the user has already joined
-const pendingInvites = computed(() => {
-  const joinedProjectIds = new Set(projects.value.map((p) => p.id));
-  return invites.value.filter(
-    (invite) => !joinedProjectIds.has(invite.projectId),
-  );
-});
-
 function setupInviteListener() {
   if (unsubscribeInvites) {
     unsubscribeInvites();
@@ -167,26 +150,22 @@ function setupInviteListener() {
     return;
   }
 
-  inviteLoading.value = true;
   unsubscribeInvites = listenUserInvites(email, (list) => {
     invites.value = list;
-    inviteLoading.value = false;
   });
 }
 
-async function handleJoinProject(invite: ProjectInvite) {
+async function handleJoinProject(invite: InviteItem) {
   if (!user.value || joiningInviteId.value) return;
 
   joiningInviteId.value = invite.id;
   try {
     const projectId = await redeemInvite(
-      invite.token,
+      (invite as ProjectInvite).token,
       user.value.uid,
       user.value.email || profile.value?.email || "",
     );
-    // Refresh tasks to update the projects list
     await fetchTasks();
-    // Navigate to the project dashboard
     router.push({
       name: ROUTE_NAMES.projectDashboard,
       params: { projectId },
@@ -198,13 +177,17 @@ async function handleJoinProject(invite: ProjectInvite) {
   }
 }
 
+// Sign out
+async function handleSignOut() {
+  await signOutUser();
+  await router.push({ name: ROUTE_NAMES.login });
+}
+
 onMounted(async () => {
   await fetchTasks();
   setupInviteListener();
-  window.addEventListener("keydown", handleKeydown);
 });
 
-// Watch for profile changes to update invite listener
 watch(
   () => profile.value?.email,
   () => {
@@ -213,7 +196,6 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleKeydown);
   if (unsubscribeInvites) {
     unsubscribeInvites();
     unsubscribeInvites = null;
@@ -225,160 +207,51 @@ onBeforeUnmount(() => {
   <AppShell>
     <div class="mypage">
       <!-- Profile Section -->
-      <SectionCard elevated>
-        <div class="profile">
-          <div class="profile__info">
-            <p class="profile__eyebrow">My Page</p>
-            <h1 class="profile__name">
-              {{
-                profile?.nickname || profile?.fullName || `${appName} ユーザー`
-              }}
-            </h1>
-            <p class="profile__email">{{ profile?.email }}</p>
-            <div class="profile__actions">
-              <AppButton
-                :to="{ name: ROUTE_NAMES.authDebug }"
-                variant="outline"
-              >
-                アカウント設定
-              </AppButton>
-              <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
-                新しいプロジェクト
-              </AppButton>
-            </div>
-          </div>
-          <dl class="profile__stats">
-            <div class="profile__stat">
-              <dt>参加プロジェクト</dt>
-              <dd>{{ projectCount }}</dd>
-            </div>
-            <div class="profile__stat">
-              <dt>タスク総数</dt>
-              <dd>{{ totalTasks }}</dd>
-            </div>
-            <div class="profile__stat">
-              <dt>完了タスク（週）</dt>
-              <dd>{{ completedThisWeek }}</dd>
-            </div>
-          </dl>
+      <ProfileSummaryCard
+        :profile="profileData"
+        :stats="stats"
+        :app-name="appName"
+        @sign-out="handleSignOut"
+      />
+
+      <!-- Two Column Layout -->
+      <div class="mypage__columns">
+        <!-- Left Column: Projects (Primary) -->
+        <div class="mypage__column mypage__column--primary">
+          <JoinedProjectsCard
+            :projects="projects"
+            :pending-invites="pendingInvites"
+            :joining-invite-id="joiningInviteId"
+            @join-project="handleJoinProject"
+          />
         </div>
-      </SectionCard>
 
-      <!-- Projects Section -->
-      <SectionCard
-        title="参加中のプロジェクト"
-        subtitle="プロジェクトを選択して開く"
-      >
-        <AppEmptyState
-          v-if="!projects.length"
-          icon="folder"
-          title="プロジェクトがありません"
-          description="新しいプロジェクトを作成するか、招待リンクから参加してください。"
-        >
-          <template #action>
-            <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
-              プロジェクトを作成
-            </AppButton>
-          </template>
-        </AppEmptyState>
-        <ul v-else class="project-list">
-          <li
-            v-for="project in projects"
-            :key="project.id"
-            class="project-item"
-          >
-            <div class="project-item__info">
-              <div class="project-item__header">
-                <p class="project-item__name">{{ project.name }}</p>
-                <AppBadge
-                  :variant="getRoleBadgeVariant(project.role)"
-                  size="sm"
-                >
-                  {{ project.role || "member" }}
-                </AppBadge>
-              </div>
-              <p v-if="project.lastAccessedAt" class="project-item__activity">
-                最終アクセス: {{ formatRelativeDate(project.lastAccessedAt) }}
-              </p>
-            </div>
-            <AppButton
-              variant="outline"
-              size="sm"
-              :to="{
-                name: ROUTE_NAMES.projectDashboard,
-                params: { projectId: project.id },
-              }"
-            >
-              開く
-            </AppButton>
-          </li>
-        </ul>
-      </SectionCard>
+        <!-- Right Column: Tasks (Secondary) -->
+        <div class="mypage__column mypage__column--secondary">
+          <WeeklyTasksCard
+            :loading="loading"
+            :tasks="taskList"
+            :upcoming-tasks="upcomingTasks"
+          />
+        </div>
+      </div>
 
-      <!-- Invited Projects Section -->
-      <SectionCard
-        v-if="pendingInvites.length > 0"
-        title="招待されたプロジェクト"
-        subtitle="以下のプロジェクトに招待されています"
-      >
-        <ul class="project-list">
-          <li
-            v-for="invite in pendingInvites"
-            :key="invite.id"
-            class="project-item project-item--invite"
-          >
-            <div class="project-item__info">
-              <div class="project-item__header">
-                <p class="project-item__name">
-                  {{ invite.projectName || "プロジェクト" }}
-                </p>
-                <AppBadge variant="info" size="sm">招待</AppBadge>
-              </div>
-            </div>
-            <AppButton
-              variant="primary"
-              size="sm"
-              :loading="joiningInviteId === invite.id"
-              :disabled="joiningInviteId !== null"
-              @click="handleJoinProject(invite)"
-            >
-              参加する
-            </AppButton>
-          </li>
-        </ul>
-      </SectionCard>
-
-      <!-- Tasks Section -->
-      <SectionCard
-        title="今週のタスク状況"
-        subtitle="期限が近いタスクをチェックして、優先順位を整えましょう。"
-      >
-        <PageSkeleton v-if="loading" variant="default" />
-        <AppEmptyState
-          v-else-if="!taskList.length"
-          icon="empty"
-          title="タスクがありません"
-          description="プロジェクトでタスクを追加してみましょう。"
-        />
-        <AppEmptyState
-          v-else-if="!upcomingTasks.length"
-          icon="search"
-          title="今週の予定タスクはありません"
-          description="期限のあるタスクがあると、ここに表示されます。"
-        />
-        <div v-else class="task-grid">
-          <article
-            v-for="task in upcomingTasks"
-            :key="task.title + task.projectId"
-            class="task-card"
-          >
-            <p class="task-card__title">{{ task.title }}</p>
-            <p class="task-card__project">{{ task.projectName }}</p>
-            <p class="task-card__due">
-              期限:
-              {{ new Date(task.dueDate!.seconds * 1000).toLocaleDateString() }}
+      <!-- Account Settings Link -->
+      <SectionCard size="sm">
+        <div class="settings-link">
+          <div class="settings-link__info">
+            <p class="settings-link__title">アカウント設定</p>
+            <p class="settings-link__description">
+              プロフィール編集やアカウントの削除などを行えます
             </p>
-          </article>
+          </div>
+          <AppButton
+            variant="outline"
+            size="sm"
+            :to="{ name: ROUTE_NAMES.accountSettings }"
+          >
+            設定を開く
+          </AppButton>
         </div>
       </SectionCard>
     </div>
@@ -392,173 +265,63 @@ onBeforeUnmount(() => {
   gap: var(--ui-space-6, 1.5rem);
 }
 
-/* Profile */
-.profile {
+/* Two Column Layout */
+.mypage__columns {
   display: grid;
+  grid-template-columns: 1fr 380px;
   gap: var(--ui-space-6, 1.5rem);
-  grid-template-columns: 1fr auto;
   align-items: start;
 }
 
-.profile__eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-brand-600, #4f7c82);
+.mypage__column--primary {
+  min-width: 0; /* Prevent overflow */
 }
 
-.profile__name {
-  margin: var(--ui-space-2, 0.5rem) 0 0;
-  font-size: var(--ui-text-2xl, 1.5rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text-strong, #0f172a);
+.mypage__column--secondary {
+  min-width: 0;
 }
 
-.profile__email {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.profile__actions {
-  display: flex;
-  gap: var(--ui-space-3, 0.75rem);
-  margin-top: var(--ui-space-4, 1rem);
-  flex-wrap: wrap;
-}
-
-.profile__stats {
-  display: flex;
-  gap: var(--ui-space-6, 1.5rem);
-  margin: 0;
-}
-
-.profile__stat {
-  text-align: center;
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-lg, 1rem);
-  min-width: 90px;
-}
-
-.profile__stat dt {
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.profile__stat dd {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-2xl, 1.5rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-700, #1a4a51);
-}
-
-/* Projects */
-.project-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.project-item {
+/* Settings Link */
+.settings-link {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-4, 1rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-lg, 1rem);
-  background: var(--ui-surface, #ffffff);
-  transition: var(--ui-transition-all);
 }
 
-.project-item:hover {
-  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
-  box-shadow: var(--ui-shadow-sm);
+.settings-link__info {
+  flex: 1;
 }
 
-.project-item--invite {
-  border-color: var(--ui-brand-200, #b8e3e9);
-  background: var(--ui-brand-50, #f0fafb);
-}
-
-.project-item--invite:hover {
-  border-color: var(--ui-brand-400, #7ec3cc);
-}
-
-.project-item__info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-  min-width: 0;
-}
-
-.project-item__header {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.project-item__name {
+.settings-link__title {
   margin: 0;
+  font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
+  color: var(--ui-text-strong, #0f172a);
 }
 
-.project-item__activity {
-  margin: 0;
+.settings-link__description {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text-muted, #64748b);
 }
 
-/* Tasks */
-.task-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--ui-space-4, 1rem);
-}
-
-.task-card {
-  padding: var(--ui-space-4, 1rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  background: var(--ui-surface, #ffffff);
-  transition: var(--ui-transition-all);
-}
-
-.task-card:hover {
-  border-color: var(--ui-brand-300, #b8e3e9);
-  box-shadow: var(--ui-shadow-sm);
-}
-
-.task-card__title {
-  margin: 0;
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
-}
-
-.task-card__project,
-.task-card__due {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
 /* Responsive */
-@media (max-width: 768px) {
-  .profile {
+@media (max-width: 960px) {
+  .mypage__columns {
     grid-template-columns: 1fr;
   }
 
-  .profile__stats {
-    justify-content: flex-start;
+  .mypage__column--secondary {
+    order: -1; /* タスクを上に表示（モバイルではより重要） */
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-link {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
   }
 }
 </style>

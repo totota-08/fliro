@@ -21,6 +21,7 @@ export const ROUTE_NAMES = {
   projectScores: "project-scores",
   inviteAccept: "invite-accept",
   myPage: "my-page",
+  accountSettings: "account-settings",
   myTasks: "my-tasks",
   taskProgress: "task-progress",
   secretAccess: "secret-access",
