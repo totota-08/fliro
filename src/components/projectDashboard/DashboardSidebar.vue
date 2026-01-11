@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SidebarUserProfile from "@/components/common/SidebarUserProfile.vue";
+import { useNavigationState } from "@/composables/useNavigationState";
 import { appName } from "@/constants/appMeta";
 import type {
   DashboardNavItem,
@@ -63,6 +64,7 @@ const emit = defineEmits<{
 }>();
 
 const route = useRoute();
+const { isNavigating, targetPath } = useNavigationState();
 
 const currentSection = computed(() => {
   if (typeof route.meta.section === "string") {
@@ -98,11 +100,25 @@ const rootClasses = computed(() => [
 
 const handleClose = () => emit("close");
 
-const handleNavigate = () => {
+const handleNavigate = (event?: MouseEvent) => {
+  // ナビゲーション中は追加のクリックを無視
+  if (isNavigating.value) {
+    event?.preventDefault();
+    return;
+  }
   if (window.matchMedia("(max-width: 1200px)").matches) {
     emit("close");
   }
 };
+
+/**
+ * 指定されたパスがナビゲーション中かどうかを判定
+ */
+function isNavigatingToPath(to: string | object | undefined): boolean {
+  if (!isNavigating.value || !to) return false;
+  const path = typeof to === "string" ? to : (to as { path?: string }).path;
+  return path === targetPath.value;
+}
 </script>
 
 <template>
@@ -132,12 +148,33 @@ const handleNavigate = () => {
             v-if="item.to && !item.disabled"
             :to="item.to"
             class="sidebar__nav-button"
-            :class="{ 'is-active': item.active }"
+            :class="{
+              'is-active': item.active,
+              'is-navigating': isNavigatingToPath(item.to),
+            }"
             @click="handleNavigate"
           >
             <span class="sidebar__nav-icon" aria-hidden="true">
+              <!-- ローディングスピナー -->
               <svg
-                v-if="item.icon === 'dashboard'"
+                v-if="isNavigatingToPath(item.to)"
+                class="sidebar__spinner"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke-width="2"
+                  stroke-dasharray="31.4 31.4"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <!-- 通常アイコン -->
+              <svg
+                v-else-if="item.icon === 'dashboard'"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

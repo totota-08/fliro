@@ -44,6 +44,11 @@ const activeTab = ref<"active" | "completed">("active");
 const tasks = ref<TaskDoc[]>([]);
 const projectName = ref("");
 
+// フィルター関連
+const showFilterPopover = ref(false);
+const filterPriority = ref<"all" | "high" | "medium" | "low">("all");
+const filterDueDate = ref<"all" | "overdue" | "today" | "week" | "none">("all");
+
 // モバイル検出
 const isMobile = ref(false);
 const checkMobile = () => {
@@ -257,9 +262,6 @@ function decorate(task: TaskDoc): DecoratedTask {
     case "in-progress":
       displayStatus = "進行中";
       break;
-    case "review":
-      displayStatus = "レビュー待ち";
-      break;
     case "todo":
     default:
       displayStatus = "未着手";
@@ -294,11 +296,57 @@ function decorate(task: TaskDoc): DecoratedTask {
 }
 
 const decoratedTasks = computed(() => tasks.value.map(decorate));
+
+/**
+ * フィルター適用ロジック
+ */
+function applyFilters(taskList: DecoratedTask[]): DecoratedTask[] {
+  return taskList.filter((task) => {
+    // 優先度フィルター
+    if (filterPriority.value !== "all") {
+      if ((task as any).priority !== filterPriority.value) {
+        return false;
+      }
+    }
+
+    // 期限フィルター
+    if (filterDueDate.value !== "all") {
+      const due = (task as any).dueDate?.seconds
+        ? new Date((task as any).dueDate.seconds * 1000)
+        : null;
+
+      switch (filterDueDate.value) {
+        case "overdue":
+          if (!due || getDaysDiff(due) >= 0) return false;
+          break;
+        case "today":
+          if (!due || getDaysDiff(due) !== 0) return false;
+          break;
+        case "week": {
+          if (!due) return false;
+          const diff = getDaysDiff(due);
+          if (diff < 0 || diff > 7) return false;
+          break;
+        }
+        case "none":
+          if (due) return false;
+          break;
+      }
+    }
+
+    return true;
+  });
+}
+
 const activeTasks = computed(() =>
-  decoratedTasks.value.filter((task) => (task as any).status !== "done"),
+  applyFilters(
+    decoratedTasks.value.filter((task) => (task as any).status !== "done"),
+  ),
 );
 const completedTasks = computed(() =>
-  decoratedTasks.value.filter((task) => (task as any).status === "done"),
+  applyFilters(
+    decoratedTasks.value.filter((task) => (task as any).status === "done"),
+  ),
 );
 
 const stats = computed(() => ({
@@ -306,11 +354,29 @@ const stats = computed(() => ({
   progress: decoratedTasks.value.filter(
     (task) => (task as any).status === "in-progress",
   ).length,
-  review: decoratedTasks.value.filter(
-    (task) => (task as any).status === "review",
-  ).length,
   done: completedTasks.value.length,
 }));
+
+// フィルターがアクティブかどうか
+const hasActiveFilters = computed(
+  () => filterPriority.value !== "all" || filterDueDate.value !== "all",
+);
+
+// フィルターをクリア
+function clearFilters() {
+  filterPriority.value = "all";
+  filterDueDate.value = "all";
+}
+
+// フィルターポップオーバーを切り替え
+function toggleFilterPopover() {
+  showFilterPopover.value = !showFilterPopover.value;
+}
+
+// フィルターポップオーバーを閉じる
+function closeFilterPopover() {
+  showFilterPopover.value = false;
+}
 
 // タスクをドロワーで開く
 function goToTask(task: DecoratedTask) {
@@ -453,17 +519,153 @@ onBeforeUnmount(() => {
               <p>あなたに割り当てられたタスクの一覧です</p>
             </div>
             <div class="tasks-page__actions">
-              <button type="button" class="tasks-page__filter">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path
-                    d="M4 6h16M6 12h12M10 18h4"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                  />
-                </svg>
-                フィルター
-              </button>
+              <div class="tasks-page__filter-wrapper">
+                <button
+                  type="button"
+                  class="tasks-page__filter"
+                  :class="{ 'is-active': hasActiveFilters }"
+                  @click="toggleFilterPopover"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path
+                      d="M4 6h16M6 12h12M10 18h4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="1.8"
+                    />
+                  </svg>
+                  フィルター
+                  <span v-if="hasActiveFilters" class="tasks-page__filter-badge"
+                    >ON</span
+                  >
+                </button>
+
+                <!-- フィルターポップオーバー -->
+                <div v-if="showFilterPopover" class="filter-popover">
+                  <div class="filter-popover__header">
+                    <h4>フィルター</h4>
+                    <button
+                      type="button"
+                      class="filter-popover__close"
+                      @click="closeFilterPopover"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path
+                          d="M6 6l12 12M18 6l-12 12"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="1.8"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="filter-popover__section">
+                    <label class="filter-popover__label">優先度</label>
+                    <div class="filter-popover__options">
+                      <button
+                        type="button"
+                        class="filter-popover__option"
+                        :class="{ 'is-selected': filterPriority === 'all' }"
+                        @click="filterPriority = 'all'"
+                      >
+                        すべて
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option filter-popover__option--danger"
+                        :class="{ 'is-selected': filterPriority === 'high' }"
+                        @click="filterPriority = 'high'"
+                      >
+                        高
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option filter-popover__option--warning"
+                        :class="{ 'is-selected': filterPriority === 'medium' }"
+                        @click="filterPriority = 'medium'"
+                      >
+                        中
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option"
+                        :class="{ 'is-selected': filterPriority === 'low' }"
+                        @click="filterPriority = 'low'"
+                      >
+                        低
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="filter-popover__section">
+                    <label class="filter-popover__label">期限</label>
+                    <div class="filter-popover__options">
+                      <button
+                        type="button"
+                        class="filter-popover__option"
+                        :class="{ 'is-selected': filterDueDate === 'all' }"
+                        @click="filterDueDate = 'all'"
+                      >
+                        すべて
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option filter-popover__option--danger"
+                        :class="{ 'is-selected': filterDueDate === 'overdue' }"
+                        @click="filterDueDate = 'overdue'"
+                      >
+                        期限切れ
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option filter-popover__option--warning"
+                        :class="{ 'is-selected': filterDueDate === 'today' }"
+                        @click="filterDueDate = 'today'"
+                      >
+                        今日
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option"
+                        :class="{ 'is-selected': filterDueDate === 'week' }"
+                        @click="filterDueDate = 'week'"
+                      >
+                        1週間以内
+                      </button>
+                      <button
+                        type="button"
+                        class="filter-popover__option"
+                        :class="{ 'is-selected': filterDueDate === 'none' }"
+                        @click="filterDueDate = 'none'"
+                      >
+                        期限なし
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="hasActiveFilters" class="filter-popover__footer">
+                    <button
+                      type="button"
+                      class="filter-popover__clear"
+                      @click="clearFilters"
+                    >
+                      フィルターをクリア
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ポップオーバー背景オーバーレイ -->
+                <div
+                  v-if="showFilterPopover"
+                  class="filter-popover__backdrop"
+                  @click="closeFilterPopover"
+                />
+              </div>
             </div>
           </header>
 
@@ -475,10 +677,6 @@ onBeforeUnmount(() => {
             <article class="tasks-stats__card">
               <p>進行中</p>
               <strong class="tone-progress">{{ stats.progress }}</strong>
-            </article>
-            <article class="tasks-stats__card">
-              <p>レビュー待ち</p>
-              <strong class="tone-review">{{ stats.review }}</strong>
             </article>
             <article class="tasks-stats__card">
               <p>完了</p>
@@ -1063,6 +1261,169 @@ onBeforeUnmount(() => {
 .tasks-page__filter svg {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+.tasks-page__filter.is-active {
+  background: var(--ui-brand-100, #e5f6f8);
+  border-color: var(--ui-brand-600, #4f7c82);
+}
+
+.tasks-page__filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: var(--ui-font-bold, 700);
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-surface, #ffffff);
+  border-radius: var(--ui-radius-full, 9999px);
+  margin-left: var(--ui-space-1, 0.25rem);
+}
+
+.tasks-page__filter-wrapper {
+  position: relative;
+}
+
+/* フィルターポップオーバー */
+.filter-popover {
+  position: absolute;
+  top: calc(100% + var(--ui-space-2, 0.5rem));
+  right: 0;
+  z-index: var(--ui-z-dropdown, 100);
+  min-width: 280px;
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  box-shadow: var(--ui-shadow-xl);
+}
+
+.filter-popover__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--ui-z-dropdown, 100) - 1);
+  background: transparent;
+}
+
+.filter-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ui-space-4, 1rem);
+  padding-bottom: var(--ui-space-3, 0.75rem);
+  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+}
+
+.filter-popover__header h4 {
+  margin: 0;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
+}
+
+.filter-popover__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-muted, #64748b);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.filter-popover__close:hover {
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-strong, #0f172a);
+}
+
+.filter-popover__close svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.filter-popover__section {
+  margin-bottom: var(--ui-space-4, 1rem);
+}
+
+.filter-popover__section:last-of-type {
+  margin-bottom: 0;
+}
+
+.filter-popover__label {
+  display: block;
+  margin-bottom: var(--ui-space-2, 0.5rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.filter-popover__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.filter-popover__option {
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #0b2e33);
+  background: var(--ui-surface-muted, #f1f5f9);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  cursor: pointer;
+  transition: var(--ui-transition-all);
+}
+
+.filter-popover__option:hover {
+  background: var(--ui-brand-100, #e5f6f8);
+  border-color: var(--ui-brand-300, #b8e3e9);
+}
+
+.filter-popover__option.is-selected {
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-surface, #ffffff);
+  border-color: var(--ui-brand-600, #4f7c82);
+}
+
+.filter-popover__option--danger.is-selected {
+  background: var(--ui-danger, #d64545);
+  border-color: var(--ui-danger, #d64545);
+}
+
+.filter-popover__option--warning.is-selected {
+  background: var(--ui-warning, #f59e0b);
+  border-color: var(--ui-warning, #f59e0b);
+}
+
+.filter-popover__footer {
+  margin-top: var(--ui-space-4, 1rem);
+  padding-top: var(--ui-space-3, 0.75rem);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+}
+
+.filter-popover__clear {
+  width: 100%;
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-muted, #64748b);
+  background: transparent;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  cursor: pointer;
+  transition: var(--ui-transition-all);
+}
+
+.filter-popover__clear:hover {
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
 }
 
 .tasks-stats {

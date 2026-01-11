@@ -2,7 +2,6 @@ import { ROUTE_NAMES } from "@/constants/routes";
 
 /**
  * プロジェクト権限のキー定義
- * Discord風の細かい権限制御を想定
  */
 export const ProjectPermission = {
   /** ダッシュボード閲覧 */

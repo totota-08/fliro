@@ -33,7 +33,6 @@ const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: "todo", label: "未着手" },
   { value: "in-progress", label: "進行中" },
-  { value: "review", label: "レビュー" },
   { value: "done", label: "完了" },
 ];
 

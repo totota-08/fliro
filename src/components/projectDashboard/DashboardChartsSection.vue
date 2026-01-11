@@ -25,7 +25,6 @@ const statusCounts = computed(() => {
   const counts: Record<TaskStatus, number> = {
     todo: 0,
     "in-progress": 0,
-    review: 0,
     done: 0,
   };
   props.tasks.forEach((task) => {
@@ -151,20 +150,6 @@ const gaugeSegmentStyles = computed(() => {
               class="status-bars__fill status-bars__fill--progress"
               :style="{
                 width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%`,
-              }"
-            />
-          </div>
-        </li>
-        <li class="status-bars__row">
-          <div class="status-bars__label">
-            <span>レビュー</span>
-            <strong>{{ statusCounts.review }}</strong>
-          </div>
-          <div class="status-bars__track">
-            <div
-              class="status-bars__fill status-bars__fill--review"
-              :style="{
-                width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%`,
               }"
             />
           </div>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import WeeklyEventSparkline from "@/components/projectActivity/WeeklyEventSparkline.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import {
@@ -326,11 +328,17 @@ onBeforeUnmount(() => {
     brand-subtitle="ログ"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; ログ</p>
-      <div class="log-header__row">
-        <h1 class="project-app-shell__heading">活動ログ</h1>
-        <span class="log-header__count">{{ decoratedEvents.length }}件</span>
-      </div>
+      <PageHeader
+        title="活動ログ"
+        :subtitle="`${decoratedEvents.length}件のイベント`"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: 'ログ' },
+        ]"
+      />
     </template>
 
     <div class="log-layout">

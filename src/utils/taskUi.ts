@@ -5,7 +5,7 @@ import type { TaskStatus, TaskDoc } from "@/services/taskService";
  * ステータスラベル、期限判定、フォーマットなど
  */
 
-export type DisplayStatus = "完了" | "進行中" | "レビュー待ち" | "未着手";
+export type DisplayStatus = "完了" | "進行中" | "未着手";
 export type DisplayPriority = "高" | "中" | "低";
 
 /**
@@ -17,8 +17,6 @@ export function getStatusLabel(status: TaskStatus): DisplayStatus {
       return "完了";
     case "in-progress":
       return "進行中";
-    case "review":
-      return "レビュー待ち";
     case "todo":
     default:
       return "未着手";
@@ -30,14 +28,12 @@ export function getStatusLabel(status: TaskStatus): DisplayStatus {
  */
 export function getStatusBadgeVariant(
   status: TaskStatus,
-): "success" | "primary" | "info" | "default" {
+): "success" | "primary" | "default" {
   switch (status) {
     case "done":
       return "success";
     case "in-progress":
       return "primary";
-    case "review":
-      return "info";
     default:
       return "default";
   }

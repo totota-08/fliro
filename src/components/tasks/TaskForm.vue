@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DatePicker from "@/components/ui/DatePicker.vue";
 import type { TaskDoc, CreateTaskPayload } from "@/services/taskService";
 import { computed, reactive, watch } from "vue";
 
@@ -143,10 +144,14 @@ function handleCancel() {
         ></textarea>
       </label>
 
-      <label class="task-form__field">
+      <div class="task-form__field">
         <span class="task-form__label">期限</span>
-        <input v-model="form.dueDate" type="date" :disabled="submitting" />
-      </label>
+        <DatePicker
+          v-model="form.dueDate"
+          placeholder="期限を選択"
+          :disabled="submitting"
+        />
+      </div>
 
       <label class="task-form__field">
         <span class="task-form__label">カテゴリ</span>
