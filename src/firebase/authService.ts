@@ -4,6 +4,8 @@ import {
   confirmPasswordReset,
   createUserWithEmailAndPassword,
   deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -136,6 +138,38 @@ export async function deleteCurrentAccount() {
 
   await deleteDoc(doc(db, "profiles", user.uid));
   await deleteUser(user);
+}
+
+export async function deleteAccountWithPassword(password: string) {
+  const user = await requireCurrentUser();
+
+  if (!user.email) {
+    throw new Error("メールアドレスが設定されていません。");
+  }
+
+  // Re-authenticate before deletion
+  const credential = EmailAuthProvider.credential(user.email, password);
+  await reauthenticateWithCredential(user, credential);
+
+  await deleteDoc(doc(db, "profiles", user.uid));
+  await deleteUser(user);
+}
+
+export async function updateUserProfile(payload: {
+  nickname?: string;
+  fullName?: string;
+}) {
+  const user = await requireCurrentUser();
+
+  const displayName = payload.nickname?.trim() || payload.fullName;
+  if (displayName) {
+    await updateProfile(user, { displayName });
+  }
+
+  return persistProfile(user, {
+    nickname: payload.nickname,
+    fullName: payload.fullName,
+  });
 }
 
 async function persistProfile(
