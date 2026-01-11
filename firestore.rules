@@ -114,20 +114,25 @@ service cloud.firestore {
       allow delete: if isProjectOwner(projectId);
 
       match /members/{memberId} {
+        // 有効なロール一覧（フロントエンドと統一）
+        function isValidRole(role) {
+          return role in ['owner','admin','manager','pm','member','viewer','observer'];
+        }
+
         allow create: if (isProjectOwner(projectId) || canInviteMembers(projectId))
                       && request.resource.data.userId is string
-                      && request.resource.data.role in ['owner','admin','member','viewer']
+                      && isValidRole(request.resource.data.role)
                       && request.resource.data.permissions is map
                       && request.resource.data.joinedAt is timestamp
                       && request.resource.data.lastAccessedAt is timestamp
                       && request.resource.data.invitedBy is string
                       && (request.resource.data.email == null || request.resource.data.email is string)
                       && (request.resource.data.avatarUrl == null || request.resource.data.avatarUrl is string);
-        
+
         allow create: if isSignedIn()
                       && memberId == request.auth.uid
                       && request.resource.data.userId == request.auth.uid
-                      && request.resource.data.role in ['owner','admin','member','viewer']
+                      && isValidRole(request.resource.data.role)
                       && request.resource.data.permissions is map
                       && request.resource.data.joinedAt is timestamp
                       && request.resource.data.lastAccessedAt is timestamp
@@ -136,7 +141,7 @@ service cloud.firestore {
                       && (request.resource.data.avatarUrl == null || request.resource.data.avatarUrl is string)
                       && request.resource.data.inviteToken is string
                       && isValidInviteToken(request.resource.data.inviteToken, projectId);
-        
+
         allow read: if isProjectMember(projectId);
         allow update, delete: if isProjectOwner(projectId)
                               || (isSignedIn() && request.auth.uid == memberId)
@@ -176,7 +181,9 @@ service cloud.firestore {
                     || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
         // Owner/Adminはフル編集可能、Memberは自分担当タスクの進捗のみ更新可能
         allow update: if canManageTasks(projectId) || canUpdateOwnTaskProgress(projectId);
-        allow delete: if isProjectMember(projectId);
+        // タスク削除はOwner/Admin/Manager、または作成者のみ
+        allow delete: if canManageTasks(projectId)
+                      || (isProjectMember(projectId) && resource.data.createdBy == request.auth.uid);
 
         match /messages/{messageId} {
           allow read: if isProjectMember(projectId)
@@ -187,7 +194,32 @@ service cloud.firestore {
                         && request.resource.data.senderName is string
                         && request.resource.data.createdAt is timestamp
                         && request.resource.data.type in ['normal', 'decision'];
+          // メッセージ編集・削除は送信者本人またはOwner/Adminのみ
+          allow update: if isProjectMember(projectId)
+                        && (resource.data.senderId == request.auth.uid || canManageTasks(projectId))
+                        && request.resource.data.senderId == resource.data.senderId
+                        && request.resource.data.createdAt == resource.data.createdAt;
+          allow delete: if isProjectMember(projectId)
+                        && (resource.data.senderId == request.auth.uid || canManageTasks(projectId));
         }
+      }
+
+      // プロジェクトチャットメッセージ
+      match /messages/{messageId} {
+        allow read: if isProjectMember(projectId)
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+        allow create: if isProjectMember(projectId)
+                      && request.resource.data.text is string
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.senderName is string
+                      && request.resource.data.createdAt is timestamp;
+        // メッセージ編集・削除は送信者本人またはOwner/Adminのみ
+        allow update: if isProjectMember(projectId)
+                      && (resource.data.senderId == request.auth.uid || canManageTasks(projectId))
+                      && request.resource.data.senderId == resource.data.senderId
+                      && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isProjectMember(projectId)
+                      && (resource.data.senderId == request.auth.uid || canManageTasks(projectId));
       }
 
       match /threads/{threadId} {
