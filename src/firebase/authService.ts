@@ -4,6 +4,8 @@ import {
   confirmPasswordReset,
   createUserWithEmailAndPassword,
   deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -131,11 +133,39 @@ export async function uploadAvatar(file: File) {
   return persistProfile(user, { avatarUrl: url });
 }
 
+export async function updateProfileInfo(updates: {
+  nickname?: string;
+  fullName?: string;
+}) {
+  const user = await requireCurrentUser();
+
+  // Update Firebase Auth displayName if nickname is provided
+  if (updates.nickname) {
+    await updateProfile(user, { displayName: updates.nickname });
+  }
+
+  return persistProfile(user, updates);
+}
+
+export async function reauthenticateWithPassword(password: string) {
+  const user = await requireCurrentUser();
+  if (!user.email) {
+    throw new Error("メールアドレスが設定されていません。");
+  }
+  const credential = EmailAuthProvider.credential(user.email, password);
+  await reauthenticateWithCredential(user, credential);
+}
+
 export async function deleteCurrentAccount() {
   const user = await requireCurrentUser();
 
   await deleteDoc(doc(db, "profiles", user.uid));
   await deleteUser(user);
+}
+
+export async function deleteCurrentAccountWithPassword(password: string) {
+  await reauthenticateWithPassword(password);
+  await deleteCurrentAccount();
 }
 
 async function persistProfile(

@@ -14,7 +14,7 @@ import ResetPasswordConfirmPage from "@/pages/auth/ResetPasswordConfirmPage.vue"
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage.vue";
 import SignUpPage from "@/pages/auth/SignUpPage.vue";
 import VerifyEmailPage from "@/pages/auth/VerifyEmailPage.vue";
-import AuthDebugPage from "@/pages/debug/AuthDebugPage.vue";
+// AuthDebugPage removed - account settings integrated into MyPage
 import ProjectDebugPage from "@/pages/debug/ProjectDebugPage.vue";
 import DashboardDemoPage from "@/pages/demo/DashboardDemoPage.vue";
 import DemoMyTasksPage from "@/pages/demo/MyTasksPage.vue";
@@ -76,12 +76,7 @@ export const router = createRouter({
       component: ResetPasswordPage,
       meta: { layout: "full" },
     },
-    {
-      path: "/debug/auth",
-      name: ROUTE_NAMES.authDebug,
-      component: AuthDebugPage,
-      meta: { requiresAuth: true, layout: "full" },
-    },
+    // /debug/auth removed - account settings integrated into MyPage
     {
       path: "/debug/projects/new",
       name: ROUTE_NAMES.projectCreate,

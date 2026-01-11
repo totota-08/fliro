@@ -2,10 +2,12 @@ import {
   applyEmailVerificationCode,
   confirmPasswordResetWithCode,
   deleteCurrentAccount,
+  deleteCurrentAccountWithPassword,
   loginWithEmail,
   loginWithProvider,
   saveProfileDetails,
   sendPasswordReset,
+  updateProfileInfo,
   uploadAvatar,
 } from "@/firebase/authService";
 import { setProfile } from "@/store/auth";
@@ -42,6 +44,22 @@ export async function updateAccountAvatar(file: File) {
 export async function removeAccount(): Promise<void> {
   await deleteCurrentAccount();
   setProfile(null);
+}
+
+export async function removeAccountWithPassword(
+  password: string,
+): Promise<void> {
+  await deleteCurrentAccountWithPassword(password);
+  setProfile(null);
+}
+
+export async function updateProfile(updates: {
+  nickname?: string;
+  fullName?: string;
+}) {
+  const profile = await updateProfileInfo(updates);
+  setProfile(profile);
+  return profile;
 }
 
 export function requestPasswordReset(email: string) {
