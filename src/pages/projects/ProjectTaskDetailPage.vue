@@ -66,7 +66,10 @@ const backRouteInfo = computed(() => {
     case "mytasks":
       return {
         label: "← マイタスクへ戻る",
-        to: { name: ROUTE_NAMES.myTasks },
+        to: {
+          name: ROUTE_NAMES.myTasks,
+          params: { projectId: projectId.value },
+        },
       };
     case "dashboard":
     default:

@@ -27,6 +27,9 @@ const { user, profile } = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
+// ルートパラメータからプロジェクトIDを取得
+const projectId = computed(() => String(route.params.projectId || ""));
+
 // TaskDrawer のURL同期
 const {
   taskId: selectedTaskId,
@@ -39,7 +42,7 @@ const loading = ref(true);
 const errorMessage = ref("");
 const activeTab = ref<"active" | "completed">("active");
 const tasks = ref<TaskDoc[]>([]);
-const projects = ref<{ id: string; name: string }[]>([]);
+const projectName = ref("");
 
 // モバイル検出
 const isMobile = ref(false);
@@ -55,14 +58,14 @@ const mobileNavItems = computed(() => [
     icon: "home",
     to: {
       name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: projects.value[0]?.id || "" },
+      params: { projectId: projectId.value },
     },
   },
   {
     name: "tasks",
     label: "タスク",
     icon: "tasks",
-    to: { name: ROUTE_NAMES.myTasks },
+    to: { name: ROUTE_NAMES.myTasks, params: { projectId: projectId.value } },
   },
   {
     name: "team",
@@ -70,7 +73,7 @@ const mobileNavItems = computed(() => [
     icon: "users",
     to: {
       name: ROUTE_NAMES.projectMembers,
-      params: { projectId: projects.value[0]?.id || "" },
+      params: { projectId: projectId.value },
     },
   },
   {
@@ -83,44 +86,35 @@ const mobileNavItems = computed(() => [
 
 /**
  * Sidebar 用ナビゲーション
- * projectIdがない場合は項目をdisabledにする
  */
 const navItems = computed<DashboardNavItem[]>(() => {
-  const firstProjectId = projects.value[0]?.id;
-
-  if (firstProjectId) {
-    return buildProjectNavItems(firstProjectId);
+  if (projectId.value) {
+    return buildProjectNavItems(projectId.value);
   }
 
   // プロジェクトがない場合、共通のナビ項目をdisabled状態で返す
-  return buildProjectNavItems("").map((item) => {
-    // マイタスクは常に有効
-    if (item.key === "tasks") {
-      return { ...item, to: { name: ROUTE_NAMES.myTasks } };
-    }
-    // 他の項目はdisabled
-    return {
-      ...item,
-      disabled: true,
-      to: undefined,
-      tooltip: "プロジェクトを選択してください",
-    };
-  });
+  return buildProjectNavItems("").map((item) => ({
+    ...item,
+    disabled: true,
+    to: undefined,
+    tooltip: "プロジェクトを選択してください",
+  }));
 });
 
 const sidebarProjects = computed(() =>
-  projects.value.map((project, index) => ({
-    key: project.id,
-    label: project.name,
-    to: {
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: project.id },
-    },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
+  projectId.value && projectName.value
+    ? [
+        {
+          key: projectId.value,
+          label: projectName.value,
+          to: {
+            name: ROUTE_NAMES.projectDashboard,
+            params: { projectId: projectId.value },
+          },
+          accent: "primary" as const,
+        },
+      ]
+    : [],
 );
 
 const profileInfo = computed(() => ({
@@ -129,35 +123,32 @@ const profileInfo = computed(() => ({
 }));
 
 /**
- * Firestore からタスク読み込み
+ * Firestore からタスク読み込み（現在のプロジェクトのみ）
  */
 async function loadTasks() {
-  if (!user.value) return;
+  if (!user.value || !projectId.value) return;
   loading.value = true;
   errorMessage.value = "";
   try {
-    const projectEntries: { id: string; name: string }[] = [];
-    const items: TaskDoc[] = [];
-
-    const projectsSnap = await getDocs(
+    // プロジェクト情報を取得
+    const projectDoc = await getDocs(
       collection(db, "userProjects", user.value.uid, "projects"),
     );
+    const projectData = projectDoc.docs.find((d) => d.id === projectId.value);
+    projectName.value =
+      (projectData?.data().projectName as string) || "プロジェクト";
 
-    for (const docSnap of projectsSnap.docs) {
-      const name = (docSnap.data().projectName as string) || "プロジェクト";
-      const projectId = docSnap.id;
-      projectEntries.push({ id: projectId, name });
+    // 現在のプロジェクトのタスクのみ取得
+    const taskSnap = await getDocs(
+      collection(db, "projects", projectId.value, "tasks"),
+    );
+    const items: TaskDoc[] = [];
+    taskSnap.forEach((taskDoc) => {
+      const data = taskDoc.data() as TaskDoc;
+      items.push({ ...data, id: taskDoc.id, projectId: projectId.value });
+    });
 
-      const taskSnap = await getDocs(
-        collection(db, "projects", projectId, "tasks"),
-      );
-      taskSnap.forEach((taskDoc) => {
-        const data = taskDoc.data() as TaskDoc;
-        items.push({ ...data, id: taskDoc.id, projectId });
-      });
-    }
-
-    projects.value = projectEntries;
+    // 自分に割り当てられたタスクのみフィルタ
     tasks.value = items.filter((task) => task.assigneeId === user.value?.uid);
   } catch (error) {
     logger.error`Failed to load tasks: ${error}`;
@@ -230,21 +221,8 @@ const getDaysDiff = (due: Date, base = new Date()) => {
  * Firestore タスク → UI 用タスクに変換
  */
 function decorate(task: TaskDoc): DecoratedTask {
-  const projectIndex = projects.value.findIndex(
-    (entry) => entry.id === task.projectId,
-  );
-  const project = projects.value[projectIndex];
-  const projectName: string = project?.name ?? "プロジェクト";
-  const projectColors = [
-    "task-dot--primary",
-    "task-dot--secondary",
-    "task-dot--accent",
-  ];
-  const projectColor: string =
-    projectIndex >= 0
-      ? (projectColors[projectIndex % projectColors.length] ??
-        "task-dot--primary")
-      : "task-dot--primary";
+  const displayProjectName: string = projectName.value || "プロジェクト";
+  const projectColor: string = "task-dot--primary";
 
   const due = (task as any).dueDate?.seconds
     ? new Date((task as any).dueDate.seconds * 1000)
@@ -305,7 +283,7 @@ function decorate(task: TaskDoc): DecoratedTask {
 
   return {
     ...(task as TaskDoc),
-    projectName,
+    projectName: displayProjectName,
     projectColor,
     dueMessage,
     dueClass,
@@ -475,25 +453,6 @@ onBeforeUnmount(() => {
               <p>あなたに割り当てられたタスクの一覧です</p>
             </div>
             <div class="tasks-page__actions">
-              <button
-                type="button"
-                class="tasks-page__action-btn tasks-page__action-btn--primary"
-                @click="router.push({ name: ROUTE_NAMES.taskProgress })"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                >
-                  <path
-                    d="M12 20v-6m0 0V4m0 10h6m-6 0H6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-                進捗を更新
-              </button>
               <button type="button" class="tasks-page__filter">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path
@@ -577,14 +536,14 @@ onBeforeUnmount(() => {
               >
                 <template #action>
                   <AppButton
-                    v-if="projects.length > 0 && projects[0]"
+                    v-if="projectId"
                     variant="primary"
                     :to="{
                       name: ROUTE_NAMES.projectDashboard,
-                      params: { projectId: projects[0].id },
+                      params: { projectId: projectId },
                     }"
                   >
-                    プロジェクトを開く
+                    ダッシュボードを開く
                   </AppButton>
                 </template>
               </AppEmptyState>
@@ -641,14 +600,14 @@ onBeforeUnmount(() => {
               >
                 <template #action>
                   <AppButton
-                    v-if="projects.length > 0 && projects[0]"
+                    v-if="projectId"
                     variant="primary"
                     :to="{
                       name: ROUTE_NAMES.projectDashboard,
-                      params: { projectId: projects[0].id },
+                      params: { projectId: projectId },
                     }"
                   >
-                    プロジェクトを開く
+                    ダッシュボードを開く
                   </AppButton>
                 </template>
               </AppEmptyState>

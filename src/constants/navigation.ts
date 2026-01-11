@@ -46,7 +46,7 @@ export const PROJECT_SIDEBAR_NAV_CONFIG: SidebarNavItemConfig[] = [
     icon: "tasks",
     routeName: ROUTE_NAMES.myTasks,
     requiredPermission: null,
-    requiresProjectId: false,
+    requiresProjectId: true,
   },
   {
     key: "team",
