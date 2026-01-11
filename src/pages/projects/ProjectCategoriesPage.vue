@@ -371,11 +371,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 編集モーダル -->
-    <AppModal
-      :open="isEditModalOpen"
-      size="md"
-      @close="closeEditModal"
-    >
+    <AppModal :open="isEditModalOpen" size="md" @close="closeEditModal">
       <template #header>
         <h3>カテゴリを編集</h3>
       </template>
@@ -434,10 +430,7 @@ onBeforeUnmount(() => {
       </form>
 
       <template #footer>
-        <AppButton
-          variant="ghost"
-          @click="closeEditModal"
-        >
+        <AppButton variant="ghost" @click="closeEditModal">
           キャンセル
         </AppButton>
         <AppButton
@@ -452,18 +445,15 @@ onBeforeUnmount(() => {
     </AppModal>
 
     <!-- 削除確認モーダル -->
-    <AppModal
-      :open="isDeleteModalOpen"
-      size="sm"
-      @close="closeDeleteModal"
-    >
+    <AppModal :open="isDeleteModalOpen" size="sm" @close="closeDeleteModal">
       <template #header>
         <h3>カテゴリを削除</h3>
       </template>
 
       <div>
         <p>
-          「<strong>{{ deletingCategory?.name }}</strong>」を削除しますか？
+          「<strong>{{ deletingCategory?.name }}</strong
+          >」を削除しますか？
         </p>
         <p class="modal__warning">この操作は取り消せません。</p>
 
@@ -473,10 +463,7 @@ onBeforeUnmount(() => {
       </div>
 
       <template #footer>
-        <AppButton
-          variant="ghost"
-          @click="closeDeleteModal"
-        >
+        <AppButton variant="ghost" @click="closeDeleteModal">
           キャンセル
         </AppButton>
         <AppButton

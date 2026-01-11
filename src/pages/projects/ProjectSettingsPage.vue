@@ -3,6 +3,10 @@ import AppButton from "@/components/ui/AppButton.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
+import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
+import SettingsToggleRow from "@/components/settings/SettingsToggleRow.vue";
+import SettingsLinkList from "@/components/settings/SettingsLinkList.vue";
+import DangerZoneCard from "@/components/settings/DangerZoneCard.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { buildFilteredProjectNavItems } from "@/constants/projectNav";
@@ -56,17 +60,20 @@ const canManageNotifications = computed(() =>
   can(ProjectPermission.MANAGE_NOTIFICATIONS),
 );
 
+// AI設定
 const aiEnabled = ref(false);
 const aiKey = ref("");
 const aiPrompt = ref("");
 const aiResponse = ref("");
 const aiLoading = ref(false);
+const aiSaving = ref(false);
 const tasks = ref<TaskDoc[]>([]);
 let stopTasks: (() => void) | null = null;
 
 // Dashboard card configuration
 const cardConfig = ref<DashboardCardConfig[]>([]);
 const cardConfigSaving = ref(false);
+const initialCardConfig = ref<string>("");
 
 // カードラベルのマッピング
 const CARD_LABELS: Record<string, string> = {
@@ -77,12 +84,23 @@ const CARD_LABELS: Record<string, string> = {
   "weekly-score": "週次スコア",
 };
 
+// 基本設定フォーム
 const form = ref({
   name: "",
   description: "",
+});
+const initialForm = ref({ name: "", description: "" });
+
+// 公開設定フォーム
+const publicSettings = ref({
   isPublic: false,
   allowGuestView: false,
 });
+const initialPublicSettings = ref({ isPublic: false, allowGuestView: false });
+const publicSaving = ref(false);
+
+// AI設定の初期値
+const initialAiSettings = ref({ enabled: false, key: "" });
 
 const navItems = computed(() =>
   buildFilteredProjectNavItems(projectId.value, can),
@@ -114,6 +132,30 @@ const canDeleteProject = computed(
 
 const canEdit = computed(() => canManage.value);
 
+// dirty flags
+const isBasicDirty = computed(
+  () =>
+    form.value.name !== initialForm.value.name ||
+    form.value.description !== initialForm.value.description,
+);
+
+const isPublicDirty = computed(
+  () =>
+    publicSettings.value.isPublic !== initialPublicSettings.value.isPublic ||
+    publicSettings.value.allowGuestView !==
+      initialPublicSettings.value.allowGuestView,
+);
+
+const isCardConfigDirty = computed(
+  () => JSON.stringify(cardConfig.value) !== initialCardConfig.value,
+);
+
+const isAiDirty = computed(
+  () =>
+    aiEnabled.value !== initialAiSettings.value.enabled ||
+    aiKey.value !== initialAiSettings.value.key,
+);
+
 const summaryInfo = computed(() => {
   const created = project.value?.createdAt;
   const createdLabel =
@@ -129,6 +171,26 @@ const summaryInfo = computed(() => {
     ownerId: project.value?.ownerUserId ?? "-",
     members: project.value?.stats?.totalMembers ?? "-",
   };
+});
+
+// 関連設定リンク
+const relatedLinks = computed(() => {
+  const links = [];
+  if (canManageCategories.value) {
+    links.push({
+      title: "カテゴリ管理",
+      description: "タスクのカテゴリを管理",
+      onClick: goToCategories,
+    });
+  }
+  if (canManageNotifications.value) {
+    links.push({
+      title: "通知設定",
+      description: "通知の設定を管理",
+      onClick: goToNotifications,
+    });
+  }
+  return links;
 });
 
 function goToCategories() {
@@ -154,15 +216,17 @@ async function loadCardConfig() {
       projectId.value,
     );
     cardConfig.value = settings.cards;
+    initialCardConfig.value = JSON.stringify(settings.cards);
   } catch (error) {
     logger.error`Failed to load card config: ${error}`;
-    // デフォルト設定を使用
-    cardConfig.value = [
+    const defaultConfig = [
       { id: "overdue", type: "overdue", position: 0, visible: true },
       { id: "due-soon", type: "due-soon", position: 1, visible: true },
       { id: "active", type: "active", position: 2, visible: true },
       { id: "done", type: "done", position: 3, visible: true },
     ];
+    cardConfig.value = defaultConfig;
+    initialCardConfig.value = JSON.stringify(defaultConfig);
   }
 }
 
@@ -209,7 +273,7 @@ function moveCardDown(cardId: string) {
 
 // カード設定を保存
 async function saveCardConfig() {
-  if (!user.value) return;
+  if (!user.value || !isCardConfigDirty.value) return;
   cardConfigSaving.value = true;
   try {
     await saveDashboardSettings(
@@ -217,6 +281,7 @@ async function saveCardConfig() {
       projectId.value,
       cardConfig.value,
     );
+    initialCardConfig.value = JSON.stringify(cardConfig.value);
   } catch (error) {
     logger.error`Failed to save card config: ${error}`;
   } finally {
@@ -254,11 +319,16 @@ async function loadProject() {
     form.value = {
       name: fetched.name,
       description: fetched.description ?? "",
+    };
+    initialForm.value = { ...form.value };
+    publicSettings.value = {
       isPublic: Boolean(fetched.settings?.isPublic),
       allowGuestView: Boolean(fetched.settings?.allowGuestView),
     };
+    initialPublicSettings.value = { ...publicSettings.value };
     aiEnabled.value = Boolean(fetched.settings?.aiChatEnabled);
     aiKey.value = fetched.settings?.aiApiKey ?? "";
+    initialAiSettings.value = { enabled: aiEnabled.value, key: aiKey.value };
   } catch (error) {
     logger.error`Failed to load project settings: ${error}`;
     errorMessage.value = "設定情報の取得に失敗しました。";
@@ -273,20 +343,68 @@ function watchTasks() {
   });
 }
 
+// 基本設定を保存
+async function handleSaveBasic() {
+  if (!canEdit.value || !project.value || !isBasicDirty.value) return;
+  if (!form.value.name.trim()) {
+    errorMessage.value = "プロジェクト名は必須です。";
+    return;
+  }
+  saving.value = true;
+  errorMessage.value = "";
+  successMessage.value = "";
+  try {
+    await updateProjectMetadata(projectId.value, {
+      name: form.value.name,
+      description: form.value.description,
+    });
+    initialForm.value = { ...form.value };
+    successMessage.value = "設定を保存しました。";
+    setTimeout(() => {
+      successMessage.value = "";
+    }, 3000);
+  } catch (error) {
+    logger.error`Failed to save project settings: ${error}`;
+    errorMessage.value = "設定の保存に失敗しました。";
+  } finally {
+    saving.value = false;
+  }
+}
+
+// 公開設定を保存
+async function handleSavePublic() {
+  if (!canEdit.value || !project.value || !isPublicDirty.value) return;
+  publicSaving.value = true;
+  errorMessage.value = "";
+  try {
+    await updateProjectMetadata(projectId.value, {
+      isPublic: publicSettings.value.isPublic,
+      allowGuestView: publicSettings.value.allowGuestView,
+    });
+    initialPublicSettings.value = { ...publicSettings.value };
+  } catch (error) {
+    logger.error`Failed to save public settings: ${error}`;
+    errorMessage.value = "公開設定の保存に失敗しました。";
+  } finally {
+    publicSaving.value = false;
+  }
+}
+
+// AI設定を保存
 async function saveAiSettings() {
-  if (!canEdit.value) return;
+  if (!canEdit.value || !isAiDirty.value) return;
+  aiSaving.value = true;
   try {
     await updateProjectSettings(projectId.value, {
       aiChatEnabled: aiEnabled.value,
       aiApiKey: aiKey.value,
     });
-    successMessage.value = "AI設定を保存しました。";
-    setTimeout(() => {
-      successMessage.value = "";
-    }, 3000);
+    initialAiSettings.value = { enabled: aiEnabled.value, key: aiKey.value };
   } catch (error) {
     logger.error`Failed to save AI settings: ${error}`;
     errorMessage.value = "AI設定の保存に失敗しました。";
+  } finally {
+    aiSaving.value = false;
   }
 }
 
@@ -332,35 +450,10 @@ async function askAi() {
     const data = await response.json();
     aiResponse.value =
       data.choices?.[0]?.message?.content || "回答を取得できませんでした。";
-  } catch (error: any) {
-    aiResponse.value = error?.message || "AI 応答に失敗しました。";
+  } catch (error: unknown) {
+    aiResponse.value = (error as Error)?.message || "AI 応答に失敗しました。";
   } finally {
     aiLoading.value = false;
-  }
-}
-
-async function handleSave() {
-  if (!canEdit.value || !project.value) return;
-  if (!form.value.name.trim()) {
-    errorMessage.value = "プロジェクト名は必須です。";
-    return;
-  }
-  saving.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
-  try {
-    await updateProjectMetadata(projectId.value, {
-      name: form.value.name,
-      description: form.value.description,
-      isPublic: form.value.isPublic,
-      allowGuestView: form.value.allowGuestView,
-    });
-    successMessage.value = "設定を保存しました。";
-  } catch (error) {
-    logger.error`Failed to save project settings: ${error}`;
-    errorMessage.value = "設定の保存に失敗しました。";
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -429,46 +522,79 @@ watch(projectId, async (newId, oldId) => {
     </AppAlert>
     <div v-else class="settings-container">
       <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
+        <div class="spinner" />
         <p>読み込み中...</p>
       </div>
 
-      <div v-else-if="errorMessage" class="error-state">
+      <div v-else-if="errorMessage && !project" class="error-state">
         <p>{{ errorMessage }}</p>
       </div>
 
       <template v-else>
-        <div class="settings-grid">
-          <!-- Main Settings Column -->
-          <div class="settings-main">
-            <section class="card" :class="{ 'is-disabled': !canEdit }">
-              <header class="card-header">
-                <div class="card-header__icon">
-                  <svg
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2>基本設定</h2>
-                  <p>プロジェクトの基本情報を管理します</p>
-                </div>
-              </header>
+        <!-- Success/Error Messages -->
+        <transition name="fade">
+          <div
+            v-if="successMessage"
+            class="message-toast message-toast--success"
+          >
+            <svg
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              width="18"
+              height="18"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            {{ successMessage }}
+          </div>
+        </transition>
+        <transition name="fade">
+          <div
+            v-if="errorMessage && project"
+            class="message-toast message-toast--error"
+          >
+            {{ errorMessage }}
+          </div>
+        </transition>
 
-              <form @submit.prevent="handleSave" class="form-stack">
+        <div class="settings-layout">
+          <!-- Primary Column (Left) -->
+          <div class="settings-primary">
+            <!-- 1. 基本設定 -->
+            <SettingsSectionCard
+              title="基本設定"
+              description="プロジェクトの基本情報を管理します"
+              :dirty="isBasicDirty"
+              :saving="saving"
+              :save-disabled="!canEdit"
+              @save="handleSaveBasic"
+            >
+              <template #icon>
+                <svg
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </template>
+              <div class="form-fields">
                 <AppInput
                   id="projectName"
                   v-model="form.name"
@@ -477,295 +603,152 @@ watch(projectId, async (newId, oldId) => {
                   required
                   placeholder="プロジェクト名を入力"
                 />
-
                 <AppTextarea
                   id="projectDesc"
                   v-model="form.description"
                   label="説明"
-                  :rows="4"
+                  :rows="3"
                   :disabled="!canEdit"
                   placeholder="プロジェクトの目的や概要を入力してください"
                 />
+              </div>
+            </SettingsSectionCard>
 
-                <div class="form-toggles">
-                  <label class="toggle-switch">
+            <!-- 2. 公開・閲覧設定 -->
+            <SettingsSectionCard
+              title="公開・閲覧設定"
+              description="プロジェクトの公開範囲を管理します"
+              :dirty="isPublicDirty"
+              :saving="publicSaving"
+              :save-disabled="!canEdit"
+              @save="handleSavePublic"
+            >
+              <template #icon>
+                <svg
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </template>
+              <div class="toggle-list">
+                <SettingsToggleRow
+                  v-model="publicSettings.isPublic"
+                  label="公開プロジェクト"
+                  description="誰でもこのプロジェクトを閲覧できるようになります"
+                  :disabled="!canEdit"
+                />
+                <SettingsToggleRow
+                  v-model="publicSettings.allowGuestView"
+                  label="ゲスト閲覧を許可"
+                  description="アカウントを持たないユーザーも閲覧可能にします"
+                  :disabled="!canEdit"
+                />
+              </div>
+            </SettingsSectionCard>
+
+            <!-- 3. ダッシュボードカード設定 -->
+            <SettingsSectionCard
+              title="ダッシュボードカード設定"
+              description="サマリーカードの表示・並び順を管理します"
+              :dirty="isCardConfigDirty"
+              :saving="cardConfigSaving"
+              @save="saveCardConfig"
+            >
+              <template #icon>
+                <svg
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                  />
+                </svg>
+              </template>
+              <div class="card-config-list">
+                <div
+                  v-for="(config, index) in sortedCardConfig"
+                  :key="config.id"
+                  class="card-config-item"
+                >
+                  <label class="card-config-checkbox">
                     <input
                       type="checkbox"
-                      v-model="form.isPublic"
-                      :disabled="!canEdit"
+                      :checked="config.visible"
+                      @change="toggleCardVisible(config.id)"
                     />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">
-                      <span class="toggle-title">公開プロジェクト</span>
-                      <span class="toggle-desc"
-                        >誰でもこのプロジェクトを閲覧できるようになります</span
-                      >
-                    </span>
+                    <span class="card-config-label">{{
+                      getCardLabel(config.id)
+                    }}</span>
                   </label>
-
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      v-model="form.allowGuestView"
-                      :disabled="!canEdit"
-                    />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">
-                      <span class="toggle-title">ゲスト閲覧を許可</span>
-                      <span class="toggle-desc"
-                        >アカウントを持たないユーザーも閲覧可能にします</span
-                      >
-                    </span>
-                  </label>
-                </div>
-
-                <div class="form-actions">
-                  <AppButton
-                    type="submit"
-                    :loading="saving"
-                    :disabled="!canEdit"
-                    variant="primary"
-                  >
-                    変更を保存
-                  </AppButton>
-                  <transition name="fade">
-                    <span v-if="successMessage" class="success-badge">
+                  <div class="card-config-actions">
+                    <button
+                      type="button"
+                      class="card-config-btn"
+                      :disabled="index === 0"
+                      aria-label="上に移動"
+                      @click="moveCardUp(config.id)"
+                    >
                       <svg
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
                         width="16"
                         height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
                       >
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M5 13l4 4L19 7"
+                          d="M5 15l7-7 7 7"
                         />
                       </svg>
-                      {{ successMessage }}
-                    </span>
-                  </transition>
-                </div>
-              </form>
-            </section>
-
-            <!-- ダッシュボードカード設定セクション -->
-            <section class="card">
-              <header class="card-header">
-                <div class="card-header__icon">
-                  <svg
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2>ダッシュボードカード設定</h2>
-                  <p>サマリーカードの表示・並び順を管理します</p>
-                </div>
-              </header>
-
-              <div class="form-stack">
-                <div class="card-config-list">
-                  <div
-                    v-for="(config, index) in sortedCardConfig"
-                    :key="config.id"
-                    class="card-config-item"
-                  >
-                    <label class="card-config-checkbox">
-                      <input
-                        type="checkbox"
-                        :checked="config.visible"
-                        @change="toggleCardVisible(config.id)"
-                      />
-                      <span class="card-config-label">{{
-                        getCardLabel(config.id)
-                      }}</span>
-                    </label>
-                    <div class="card-config-actions">
-                      <button
-                        type="button"
-                        class="card-config-btn"
-                        :disabled="index === 0"
-                        @click="moveCardUp(config.id)"
-                        aria-label="上に移動"
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M5 15l7-7 7 7"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        class="card-config-btn"
-                        :disabled="index === sortedCardConfig.length - 1"
-                        @click="moveCardDown(config.id)"
-                        aria-label="下に移動"
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="form-actions">
-                  <AppButton
-                    type="button"
-                    :loading="cardConfigSaving"
-                    variant="primary"
-                    @click="saveCardConfig"
-                  >
-                    設定を保存
-                  </AppButton>
-                </div>
-              </div>
-            </section>
-
-            <section class="card" :class="{ 'is-disabled': !canEdit }">
-              <header class="card-header">
-                <div class="card-header__icon">
-                  <svg
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2>AI アシスタント</h2>
-                  <p>OpenAI API を使用してタスクのサポートを行います</p>
-                </div>
-              </header>
-
-              <div class="form-stack">
-                <div class="form-toggles">
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      v-model="aiEnabled"
-                      :disabled="!canEdit"
-                    />
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-label">
-                      <span class="toggle-title">AI アシスタントを有効化</span>
-                      <span class="toggle-desc"
-                        >タスクの内容に基づいてAIが回答します</span
-                      >
-                    </span>
-                  </label>
-                </div>
-
-                <AppInput
-                  id="aiKey"
-                  v-model="aiKey"
-                  type="password"
-                  label="OpenAI API Key"
-                  :disabled="!canEdit"
-                  placeholder="sk-..."
-                />
-
-                <div class="form-actions">
-                  <AppButton
-                    type="button"
-                    :disabled="!canEdit"
-                    variant="primary"
-                    @click="saveAiSettings"
-                  >
-                    設定を保存
-                  </AppButton>
-                </div>
-
-                <div v-if="aiEnabled" class="ai-playground">
-                  <h3>テストチャット</h3>
-                  <AppTextarea
-                    v-model="aiPrompt"
-                    placeholder="タスクについて質問してください"
-                  />
-                  <div class="form-actions">
-                    <AppButton
+                    </button>
+                    <button
                       type="button"
-                      :disabled="aiLoading || !aiKey"
-                      @click="askAi"
+                      class="card-config-btn"
+                      :disabled="index === sortedCardConfig.length - 1"
+                      aria-label="下に移動"
+                      @click="moveCardDown(config.id)"
                     >
-                      {{ aiLoading ? "応答中..." : "AIに聞く" }}
-                    </AppButton>
-                  </div>
-                  <div v-if="aiResponse" class="ai-response">
-                    <p>{{ aiResponse }}</p>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
-            </section>
+            </SettingsSectionCard>
 
-            <section class="card card--danger">
-              <header class="card-header">
-                <div class="card-header__icon danger-icon">
-                  <svg
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2>プロジェクトの削除</h2>
-                  <p>
-                    この操作は取り消すことができません。慎重に操作してください。
-                  </p>
-                </div>
-              </header>
-
+            <!-- 4. Danger Zone（折りたたみ） -->
+            <DangerZoneCard title="プロジェクトの削除">
               <div class="danger-content">
                 <div class="danger-warning">
                   <p>
-                    プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。
+                    プロジェクトを削除すると、関連するすべてのタスク、チャット、ファイルが完全に削除されます。この操作は取り消すことができません。
                   </p>
                 </div>
-
                 <AppInput
                   id="deleteConfirm"
                   v-model="deleteConfirmInput"
@@ -774,7 +757,7 @@ watch(projectId, async (newId, oldId) => {
                   :error="Boolean(deleteError)"
                   :placeholder="confirmEmail"
                 />
-
+                <p v-if="deleteError" class="danger-error">{{ deleteError }}</p>
                 <div class="danger-actions">
                   <AppButton
                     variant="danger"
@@ -786,11 +769,12 @@ watch(projectId, async (newId, oldId) => {
                   </AppButton>
                 </div>
               </div>
-            </section>
+            </DangerZoneCard>
           </div>
 
-          <!-- Sidebar Info Column -->
-          <aside class="settings-sidebar">
+          <!-- Secondary Column (Right) -->
+          <aside class="settings-secondary">
+            <!-- 1. プロジェクト情報 -->
             <div class="info-card">
               <h3>プロジェクト情報</h3>
               <dl class="info-list">
@@ -811,65 +795,100 @@ watch(projectId, async (newId, oldId) => {
               </dl>
             </div>
 
-            <div class="info-card">
+            <!-- 2. 関連設定リンク -->
+            <div v-if="relatedLinks.length > 0" class="info-card">
               <h3>関連設定</h3>
-              <div class="related-links">
-                <button
-                  v-if="canManageCategories"
-                  type="button"
-                  class="related-link"
-                  @click="goToCategories"
-                >
-                  <span class="related-link__icon">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                      />
-                    </svg>
-                  </span>
-                  <span class="related-link__text">
-                    <span class="related-link__title">カテゴリ管理</span>
-                    <span class="related-link__desc"
-                      >タスクのカテゴリを管理</span
-                    >
-                  </span>
-                  <span class="related-link__arrow">→</span>
-                </button>
-                <button
-                  v-if="canManageNotifications"
-                  type="button"
-                  class="related-link"
-                  @click="goToNotifications"
-                >
-                  <span class="related-link__icon">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                      />
-                    </svg>
-                  </span>
-                  <span class="related-link__text">
-                    <span class="related-link__title">通知設定</span>
-                    <span class="related-link__desc">通知の設定を管理</span>
-                  </span>
-                  <span class="related-link__arrow">→</span>
-                </button>
-              </div>
+              <SettingsLinkList :items="relatedLinks">
+                <template #icon-0>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                    />
+                  </svg>
+                </template>
+                <template #icon-1>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                    />
+                  </svg>
+                </template>
+              </SettingsLinkList>
             </div>
+
+            <!-- 3. AIアシスタント -->
+            <SettingsSectionCard
+              title="AI アシスタント"
+              description="OpenAI API を使用してタスクのサポートを行います"
+              :dirty="isAiDirty"
+              :saving="aiSaving"
+              :save-disabled="!canEdit"
+              @save="saveAiSettings"
+            >
+              <template #icon>
+                <svg
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
+                </svg>
+              </template>
+              <div class="ai-settings">
+                <SettingsToggleRow
+                  v-model="aiEnabled"
+                  label="AI アシスタントを有効化"
+                  description="タスクの内容に基づいてAIが回答します"
+                  :disabled="!canEdit"
+                />
+                <AppInput
+                  id="aiKey"
+                  v-model="aiKey"
+                  type="password"
+                  label="OpenAI API Key"
+                  :disabled="!canEdit"
+                  placeholder="sk-..."
+                />
+                <div v-if="aiEnabled" class="ai-playground">
+                  <h4>テストチャット</h4>
+                  <AppTextarea
+                    v-model="aiPrompt"
+                    placeholder="タスクについて質問してください"
+                    :rows="2"
+                  />
+                  <AppButton
+                    type="button"
+                    size="sm"
+                    :disabled="aiLoading || !aiKey"
+                    @click="askAi"
+                  >
+                    {{ aiLoading ? "応答中..." : "AIに聞く" }}
+                  </AppButton>
+                  <div v-if="aiResponse" class="ai-response">
+                    <p>{{ aiResponse }}</p>
+                  </div>
+                </div>
+              </div>
+            </SettingsSectionCard>
           </aside>
         </div>
       </template>
@@ -878,215 +897,89 @@ watch(projectId, async (newId, oldId) => {
 </template>
 
 <style scoped>
-/* Layout & Container */
+/* Layout */
 .settings-alert {
-  max-width: 760px;
+  max-width: 800px;
   margin: 0 auto var(--ui-space-4, 1rem);
 }
 
 .settings-container {
-  max-width: 760px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: var(--ui-space-6, 1.5rem);
-  animation: fadeIn var(--ui-duration-base, 180ms) var(--ui-ease-standard);
+  padding: var(--ui-space-5, 1.25rem);
 }
 
-.settings-grid {
+.settings-layout {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 340px;
   gap: var(--ui-space-6, 1.5rem);
   align-items: start;
 }
 
-/* Cards */
-.card {
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  box-shadow: var(--ui-shadow-md);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  overflow: hidden;
-  margin-bottom: var(--ui-space-8, 2rem);
-}
-
-.card-header {
-  padding: var(--ui-space-6, 1.5rem);
-  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  display: flex;
-  align-items: flex-start;
-  gap: var(--ui-space-4, 1rem);
-}
-
-.card-header__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  background: var(--ui-brand-100, #e5f6f8);
-  color: var(--ui-brand-600, #4f7c82);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.card-header__icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.card-header h2 {
-  font-size: var(--ui-text-lg, 1.125rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text-strong, #0f172a);
-  margin: 0 0 var(--ui-space-1, 0.25rem) 0;
-}
-
-.card-header p {
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-  margin: 0;
-}
-
-/* Forms */
-.form-stack {
-  padding: var(--ui-space-6, 1.5rem);
+.settings-primary {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-6, 1.5rem);
+  gap: var(--ui-space-5, 1.25rem);
 }
 
-/* Toggles */
-.form-toggles {
+.settings-secondary {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-4, 1rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  position: sticky;
+  top: calc(var(--ui-topbar-height, 64px) + var(--ui-space-5, 1.25rem));
 }
 
-.toggle-switch {
+@media (max-width: 960px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-secondary {
+    position: static;
+  }
+}
+
+/* Form Fields */
+.form-fields {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.toggle-list {
+  display: flex;
+  flex-direction: column;
   gap: var(--ui-space-3, 0.75rem);
-  cursor: pointer;
 }
 
-.toggle-switch input {
-  display: none;
-}
-
-.toggle-slider {
-  position: relative;
-  width: 44px;
-  height: 24px;
-  background-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
-  border-radius: var(--ui-radius-full, 9999px);
-  transition: var(--ui-transition-colors);
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.toggle-slider:before {
-  content: "";
-  position: absolute;
-  height: 20px;
-  width: 20px;
-  left: 2px;
-  bottom: 2px;
-  background-color: white;
-  border-radius: var(--ui-radius-full, 9999px);
-  transition: var(--ui-transition-transform);
-  box-shadow: var(--ui-shadow-sm);
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background-color: var(--ui-brand-600, #4f7c82);
-}
-
-.toggle-switch input:checked + .toggle-slider:before {
-  transform: translateX(20px);
-}
-
-.toggle-label {
-  display: flex;
-  flex-direction: column;
-}
-
-.toggle-title {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-medium, 500);
-  color: var(--ui-text, #0b2e33);
-}
-
-.toggle-desc {
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-/* Actions */
-.form-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-4, 1rem);
-  margin-top: var(--ui-space-2, 0.5rem);
-}
-
-.success-badge {
+/* Message Toasts */
+.message-toast {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  background: var(--ui-success-bg, #ecfdf5);
-  color: var(--ui-success, #16a34a);
-  border-radius: var(--ui-radius-full, 9999px);
+  gap: var(--ui-space-2, 0.5rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-medium, 500);
+  margin-bottom: var(--ui-space-4, 1rem);
 }
 
-/* Danger Zone */
-.card--danger {
-  border-color: var(--ui-danger-bg, #fee2e2);
+.message-toast--success {
+  background: var(--ui-success-light, #dcfce7);
+  color: var(--ui-success-text, #166534);
 }
 
-.card--danger .card-header {
-  background: var(--ui-danger-bg, #fee2e2);
-  border-bottom-color: var(--ui-danger-bg, #fee2e2);
+.message-toast--error {
+  background: var(--ui-danger-light, #fee2e2);
+  color: var(--ui-danger-text, #991b1b);
 }
 
-.card--danger .card-header__icon {
-  background: rgba(214, 69, 69, 0.1);
-  color: var(--ui-danger, #d64545);
-}
-
-.danger-content {
-  padding: var(--ui-space-6, 1.5rem);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-6, 1.5rem);
-}
-
-.danger-warning {
-  padding: var(--ui-space-3, 0.75rem);
-  background: var(--ui-danger-bg, #fee2e2);
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  color: #991b1b;
-  font-size: var(--ui-text-sm, 0.875rem);
-  border-left: 4px solid var(--ui-danger, #d64545);
-}
-
-.danger-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-4, 1rem);
-  flex-wrap: wrap;
-}
-
-/* Sidebar Info */
+/* Info Card (Secondary) */
 .info-card {
   background: var(--ui-surface, #ffffff);
   border-radius: var(--ui-radius-xl, 1.25rem);
-  padding: var(--ui-space-6, 1.5rem);
+  padding: var(--ui-space-5, 1.25rem);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   box-shadow: var(--ui-shadow-sm);
 }
@@ -1103,7 +996,7 @@ watch(projectId, async (newId, oldId) => {
 .info-list {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-3, 0.75rem);
   margin: 0;
 }
 
@@ -1121,7 +1014,7 @@ watch(projectId, async (newId, oldId) => {
 .info-item dd {
   font-weight: var(--ui-font-medium, 500);
   color: var(--ui-text-strong, #0f172a);
-  max-width: 150px;
+  max-width: 160px;
 }
 
 .truncate {
@@ -1130,155 +1023,7 @@ watch(projectId, async (newId, oldId) => {
   text-overflow: ellipsis;
 }
 
-/* Related Links */
-.related-links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.related-link {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  background: var(--ui-surface, #ffffff);
-  cursor: pointer;
-  text-align: left;
-  transition: var(--ui-transition-all);
-  width: 100%;
-}
-
-.related-link:hover {
-  border-color: var(--ui-brand-600, #4f7c82);
-  background: var(--ui-brand-100, #e5f6f8);
-}
-
-.related-link:focus {
-  outline: none;
-  box-shadow: var(--ui-ring-focus);
-}
-
-.related-link__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  background: var(--ui-brand-100, #e5f6f8);
-  color: var(--ui-brand-600, #4f7c82);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.related-link__icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.related-link__text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
-}
-
-.related-link__title {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.related-link__desc {
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.related-link__arrow {
-  color: var(--ui-text-muted, #64748b);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-/* Loading & Animations */
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-16, 4rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-top-color: var(--ui-brand-600, #4f7c82);
-  border-radius: var(--ui-radius-full, 9999px);
-  animation: spin 1s linear infinite;
-  margin-bottom: var(--ui-space-4, 1rem);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity var(--ui-duration-base, 180ms) var(--ui-ease-standard);
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.ai-playground {
-  margin-top: var(--ui-space-6, 1.5rem);
-  padding-top: var(--ui-space-6, 1.5rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.ai-playground h3 {
-  font-size: var(--ui-text-base, 1rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
-  margin: 0 0 var(--ui-space-4, 1rem) 0;
-}
-
-.ai-response {
-  margin-top: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-4, 1rem);
-  background: var(--ui-brand-100, #e5f6f8);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-brand-200, #b8e3e9);
-  color: var(--ui-brand-900, #0b2e33);
-  font-size: var(--ui-text-sm, 0.875rem);
-  white-space: pre-wrap;
-}
-
-.error-state {
-  padding: var(--ui-space-8, 2rem);
-  text-align: center;
-  color: var(--ui-danger, #d64545);
-}
-
-/* Card Config (Dashboard Card Settings) */
+/* Card Config */
 .card-config-list {
   display: flex;
   flex-direction: column;
@@ -1290,7 +1035,7 @@ watch(projectId, async (newId, oldId) => {
   align-items: center;
   justify-content: space-between;
   padding: var(--ui-space-3, 0.75rem);
-  background: var(--ui-surface-muted, #f8fafa);
+  background: var(--ui-surface-muted, #f1f5f9);
   border-radius: var(--ui-radius-md, 0.75rem);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
@@ -1300,6 +1045,7 @@ watch(projectId, async (newId, oldId) => {
   align-items: center;
   gap: var(--ui-space-3, 0.75rem);
   cursor: pointer;
+  flex: 1;
 }
 
 .card-config-checkbox input[type="checkbox"] {
@@ -1340,9 +1086,126 @@ watch(projectId, async (newId, oldId) => {
   background: var(--ui-brand-100, #e5f6f8);
 }
 
+.card-config-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
+}
+
 .card-config-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Danger Zone */
+.danger-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.danger-warning {
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-danger-light, #fee2e2);
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  color: var(--ui-danger-text, #991b1b);
+  font-size: var(--ui-text-sm, 0.875rem);
+  border-left: 3px solid var(--ui-danger, #d64545);
+}
+
+.danger-warning p {
+  margin: 0;
+}
+
+.danger-error {
+  color: var(--ui-danger, #d64545);
+  font-size: var(--ui-text-sm, 0.875rem);
+  margin: 0;
+}
+
+.danger-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4, 1rem);
+}
+
+/* AI Settings */
+.ai-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.ai-playground {
+  margin-top: var(--ui-space-4, 1rem);
+  padding-top: var(--ui-space-4, 1rem);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3, 0.75rem);
+}
+
+.ai-playground h4 {
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
+  margin: 0;
+}
+
+.ai-response {
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-brand-100, #e5f6f8);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-brand-300, #b8e3e9);
+  color: var(--ui-brand-900, #0b2e33);
+  font-size: var(--ui-text-sm, 0.875rem);
+  white-space: pre-wrap;
+}
+
+.ai-response p {
+  margin: 0;
+}
+
+/* Loading & Error */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ui-space-16, 4rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-top-color: var(--ui-brand-600, #4f7c82);
+  border-radius: var(--ui-radius-full, 9999px);
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--ui-space-4, 1rem);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-state {
+  padding: var(--ui-space-8, 2rem);
+  text-align: center;
+  color: var(--ui-danger, #d64545);
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--ui-duration-base, 180ms) var(--ui-ease-standard);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
