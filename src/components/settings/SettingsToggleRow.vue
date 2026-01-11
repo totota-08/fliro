@@ -64,7 +64,7 @@ function handleKeydown(event: KeyboardEvent) {
         {{ disabledReason }}
       </span>
     </div>
-    <div class="settings-toggle__switch" @click.stop>
+    <label :for="inputId" class="settings-toggle__switch" @click.stop>
       <input
         :id="inputId"
         type="checkbox"
@@ -77,7 +77,7 @@ function handleKeydown(event: KeyboardEvent) {
         class="settings-toggle__slider"
         :class="{ 'settings-toggle__slider--active': modelValue }"
       />
-    </div>
+    </label>
   </div>
 </template>
 

@@ -3,16 +3,33 @@
  * DashboardInsights コンポーネント
  *
  * プロジェクトの進捗、ステータス別タスク数、ヘルススコアを表示するチャート群。
+ * カードの表示/非表示と並び順は cardConfig で制御可能。
  */
+import type { InsightCardConfig } from "@/services/dashboardSettingsService";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
 import { computed } from "vue";
 
 interface Props {
   /** タスク一覧 */
   tasks: TaskDoc[];
+  /** カード設定（オプション） */
+  cardConfig?: InsightCardConfig[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  cardConfig: () => [
+    { id: "progress", type: "progress", position: 0, visible: true },
+    { id: "status", type: "status", position: 1, visible: true },
+    { id: "health", type: "health", position: 2, visible: true },
+  ],
+});
+
+// 表示するカードを並び順でソート（visible: true のみ）
+const visibleCards = computed(() =>
+  [...props.cardConfig]
+    .filter((c) => c.visible)
+    .sort((a, b) => a.position - b.position),
+);
 
 // 全体の進捗率
 const overallProgress = computed(() => {
@@ -29,7 +46,6 @@ const statusCounts = computed(() => {
   const counts: Record<TaskStatus, number> = {
     todo: 0,
     "in-progress": 0,
-    review: 0,
     done: 0,
   };
   props.tasks.forEach((task) => {
@@ -110,173 +126,175 @@ function isTaskOverdue(task: TaskDoc) {
 </script>
 
 <template>
-  <section class="dashboard-insights">
+  <section v-if="visibleCards.length > 0" class="dashboard-insights">
     <header class="dashboard-insights__header">
       <h3 class="dashboard-insights__title">インサイト</h3>
     </header>
 
     <div class="dashboard-insights__content">
       <div class="dashboard-insights__charts">
-        <!-- 全体の進捗 -->
-        <div class="chart-card chart-card--progress">
-          <header class="chart-card__header">
-            <p class="chart-card__eyebrow">全体の進捗</p>
-            <h4>プロジェクト進捗</h4>
-            <span class="chart-card__meta">{{ tasks.length }}件のタスク</span>
-          </header>
-          <span class="chart-card__metric">{{ overallProgress }}%</span>
-          <div class="progress-chart">
-            <div class="progress-chart__track">
-              <div
-                class="progress-chart__fill"
-                :style="{ width: `${overallProgress}%` }"
-              />
-            </div>
-            <div class="progress-chart__labels">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ステータス別タスク数 -->
-        <div class="chart-card chart-card--bars">
-          <header class="chart-card__header">
-            <p class="chart-card__eyebrow">タスクの状況</p>
-            <h4>ステータス別タスク数</h4>
-          </header>
-          <ul class="status-bars">
-            <li class="status-bars__row">
-              <div class="status-bars__label">
-                <span>未着手</span>
-                <strong>{{ statusCounts.todo }}</strong>
-              </div>
-              <div class="status-bars__track">
+        <template v-for="card in visibleCards" :key="card.id">
+          <!-- 全体の進捗 -->
+          <div
+            v-if="card.type === 'progress'"
+            class="chart-card chart-card--progress"
+          >
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">全体の進捗</p>
+              <h4>プロジェクト進捗</h4>
+              <span class="chart-card__meta">{{ tasks.length }}件のタスク</span>
+            </header>
+            <span class="chart-card__metric">{{ overallProgress }}%</span>
+            <div class="progress-chart">
+              <div class="progress-chart__track">
                 <div
-                  class="status-bars__fill status-bars__fill--todo"
-                  :style="{
-                    width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%`,
-                  }"
+                  class="progress-chart__fill"
+                  :style="{ width: `${overallProgress}%` }"
                 />
               </div>
-            </li>
-            <li class="status-bars__row">
-              <div class="status-bars__label">
-                <span>進行中</span>
-                <strong>{{ statusCounts["in-progress"] }}</strong>
+              <div class="progress-chart__labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
               </div>
-              <div class="status-bars__track">
-                <div
-                  class="status-bars__fill status-bars__fill--progress"
-                  :style="{
-                    width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%`,
-                  }"
-                />
-              </div>
-            </li>
-            <li class="status-bars__row">
-              <div class="status-bars__label">
-                <span>レビュー</span>
-                <strong>{{ statusCounts.review }}</strong>
-              </div>
-              <div class="status-bars__track">
-                <div
-                  class="status-bars__fill status-bars__fill--review"
-                  :style="{
-                    width: `${Math.max((statusCounts.review / maxStatusCount) * 100, 6)}%`,
-                  }"
-                />
-              </div>
-            </li>
-            <li class="status-bars__row">
-              <div class="status-bars__label">
-                <span>完了</span>
-                <strong>{{ statusCounts.done }}</strong>
-              </div>
-              <div class="status-bars__track">
-                <div
-                  class="status-bars__fill status-bars__fill--done"
-                  :style="{
-                    width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%`,
-                  }"
-                />
-              </div>
-            </li>
-          </ul>
-        </div>
-
-        <!-- ヘルススコア -->
-        <div class="chart-card chart-card--gauge">
-          <header class="chart-card__header">
-            <p class="chart-card__eyebrow">プロジェクトの危険度</p>
-            <h4>ヘルススコア</h4>
-            <span class="chart-card__meta">期限・進捗から算出</span>
-          </header>
-          <span class="chart-card__metric chart-card__metric--health">
-            {{ healthScore }}%
-          </span>
-          <div class="gauge-chart">
-            <svg viewBox="0 0 200 120">
-              <path
-                class="gauge-chart__base"
-                d="M20 120 A80 80 0 0 1 180 120"
-              />
-              <path
-                v-for="(segment, index) in gaugeSegments"
-                :key="segment.id"
-                class="gauge-chart__segment"
-                d="M20 120 A80 80 0 0 1 180 120"
-                :style="gaugeSegmentStyles[index]"
-              />
-              <path
-                class="gauge-chart__value-path"
-                d="M20 120 A80 80 0 0 1 180 120"
-                :style="{
-                  strokeDasharray: `${gaugeCircumference}`,
-                  strokeDashoffset: `${gaugeDashoffset}`,
-                  stroke: healthColor,
-                }"
-              />
-              <polygon
-                class="gauge-chart__needle"
-                points="100,28 96,120 104,120"
-                :transform="`rotate(${healthNeedleRotation} 100 120)`"
-              />
-              <circle class="gauge-chart__needle-hub" cx="100" cy="120" r="6" />
-            </svg>
-            <div class="gauge-chart__legend">
-              <span class="gauge-chart__legend-item">
-                <span
-                  class="gauge-chart__legend-dot gauge-chart__legend-dot--danger"
-                  aria-hidden="true"
-                />
-                危険
-              </span>
-              <span class="gauge-chart__legend-item">
-                <span
-                  class="gauge-chart__legend-dot gauge-chart__legend-dot--warn"
-                  aria-hidden="true"
-                />
-                要対応
-              </span>
-              <span class="gauge-chart__legend-item">
-                <span
-                  class="gauge-chart__legend-dot gauge-chart__legend-dot--caution"
-                  aria-hidden="true"
-                />
-                注意
-              </span>
-              <span class="gauge-chart__legend-item">
-                <span
-                  class="gauge-chart__legend-dot gauge-chart__legend-dot--good"
-                  aria-hidden="true"
-                />
-                良好
-              </span>
             </div>
           </div>
-        </div>
+
+          <!-- ステータス別タスク数 -->
+          <div
+            v-else-if="card.type === 'status'"
+            class="chart-card chart-card--bars"
+          >
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">タスクの状況</p>
+              <h4>ステータス別タスク数</h4>
+            </header>
+            <ul class="status-bars">
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>未着手</span>
+                  <strong>{{ statusCounts.todo }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--todo"
+                    :style="{
+                      width: `${Math.max((statusCounts.todo / maxStatusCount) * 100, 6)}%`,
+                    }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>進行中</span>
+                  <strong>{{ statusCounts["in-progress"] }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--progress"
+                    :style="{
+                      width: `${Math.max((statusCounts['in-progress'] / maxStatusCount) * 100, 6)}%`,
+                    }"
+                  />
+                </div>
+              </li>
+              <li class="status-bars__row">
+                <div class="status-bars__label">
+                  <span>完了</span>
+                  <strong>{{ statusCounts.done }}</strong>
+                </div>
+                <div class="status-bars__track">
+                  <div
+                    class="status-bars__fill status-bars__fill--done"
+                    :style="{
+                      width: `${Math.max((statusCounts.done / maxStatusCount) * 100, 6)}%`,
+                    }"
+                  />
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- ヘルススコア -->
+          <div
+            v-else-if="card.type === 'health'"
+            class="chart-card chart-card--gauge"
+          >
+            <header class="chart-card__header">
+              <p class="chart-card__eyebrow">プロジェクトの危険度</p>
+              <h4>ヘルススコア</h4>
+              <span class="chart-card__meta">期限・進捗から算出</span>
+            </header>
+            <span class="chart-card__metric chart-card__metric--health">
+              {{ healthScore }}%
+            </span>
+            <div class="gauge-chart">
+              <svg viewBox="0 0 200 120">
+                <path
+                  class="gauge-chart__base"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                />
+                <path
+                  v-for="(segment, index) in gaugeSegments"
+                  :key="segment.id"
+                  class="gauge-chart__segment"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                  :style="gaugeSegmentStyles[index]"
+                />
+                <path
+                  class="gauge-chart__value-path"
+                  d="M20 120 A80 80 0 0 1 180 120"
+                  :style="{
+                    strokeDasharray: `${gaugeCircumference}`,
+                    strokeDashoffset: `${gaugeDashoffset}`,
+                    stroke: healthColor,
+                  }"
+                />
+                <polygon
+                  class="gauge-chart__needle"
+                  points="100,28 96,120 104,120"
+                  :transform="`rotate(${healthNeedleRotation} 100 120)`"
+                />
+                <circle
+                  class="gauge-chart__needle-hub"
+                  cx="100"
+                  cy="120"
+                  r="6"
+                />
+              </svg>
+              <div class="gauge-chart__legend">
+                <span class="gauge-chart__legend-item">
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--danger"
+                    aria-hidden="true"
+                  />
+                  危険
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--warn"
+                    aria-hidden="true"
+                  />
+                  要対応
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--caution"
+                    aria-hidden="true"
+                  />
+                  注意
+                </span>
+                <span class="gauge-chart__legend-item">
+                  <span
+                    class="gauge-chart__legend-dot gauge-chart__legend-dot--good"
+                    aria-hidden="true"
+                  />
+                  良好
+                </span>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </section>

@@ -5,6 +5,7 @@ export interface CommandContext {
   userId: string;
   activeChannelId: string;
   members: ProjectMember[];
+  humorousCommandsEnabled?: boolean;
 }
 
 export interface ChatCommand {

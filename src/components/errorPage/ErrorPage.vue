@@ -3,7 +3,12 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ROUTE_NAMES } from "@/constants/routes";
 
-export type ErrorType = "forbidden" | "not_found" | "network" | "unknown";
+export type ErrorType =
+  | "forbidden"
+  | "not_found"
+  | "path_not_found"
+  | "network"
+  | "unknown";
 
 interface ErrorConfig {
   code: string;
@@ -22,6 +27,7 @@ const errorType = computed(
 );
 const projectId = computed(() => route.query.projectId as string | undefined);
 const customReason = computed(() => route.query.reason as string | undefined);
+const invalidPath = computed(() => route.query.path as string | undefined);
 
 const errorConfigs: Record<ErrorType, ErrorConfig> = {
   forbidden: {
@@ -37,6 +43,14 @@ const errorConfigs: Record<ErrorType, ErrorConfig> = {
     title: "ページが見つかりません",
     message: "お探しのプロジェクトまたはページは存在しません。",
     hint: "URLが正しいか確認するか、マイページから別のプロジェクトを選択してください。",
+    color: "#f59e0b",
+    canRetry: false,
+  },
+  path_not_found: {
+    code: "404",
+    title: "ページが見つかりません",
+    message: "リクエストされたパスは存在しません。",
+    hint: "URLが正しいか確認するか、トップページからやり直してください。",
     color: "#f59e0b",
     canRetry: false,
   },
@@ -76,6 +90,10 @@ function goBack() {
   }
 }
 
+function goHome() {
+  router.push({ name: ROUTE_NAMES.home });
+}
+
 function retry() {
   window.location.reload();
 }
@@ -91,12 +109,22 @@ function retry() {
       <p class="error-page__message">
         {{ displayMessage }}
       </p>
+      <p v-if="invalidPath" class="error-page__path-container">
+        <span class="error-page__path">{{ invalidPath }}</span>
+      </p>
       <p class="error-page__hint">
         {{ config.hint }}
       </p>
       <div class="error-page__actions">
         <button v-if="config.canRetry" class="error-page__cta" @click="retry">
           再試行
+        </button>
+        <button
+          v-else-if="errorType === 'path_not_found'"
+          class="error-page__cta"
+          @click="goHome"
+        >
+          トップページへ
         </button>
         <button v-else class="error-page__cta" @click="goBack">戻る</button>
         <RouterLink :to="{ name: ROUTE_NAMES.myPage }" class="error-page__link">
@@ -148,6 +176,23 @@ function retry() {
   color: var(--ui-text, #0b2e33);
   line-height: var(--ui-leading-relaxed, 1.625);
   font-size: var(--ui-text-base, 1rem);
+}
+
+.error-page__path-container {
+  margin: 0;
+}
+
+.error-page__path {
+  display: inline-block;
+  font-family:
+    "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+    monospace;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-strong, #0f172a);
+  font-size: var(--ui-text-sm, 0.875rem);
+  word-break: break-all;
 }
 
 .error-page__hint {

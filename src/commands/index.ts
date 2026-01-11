@@ -18,6 +18,11 @@ export async function executeCommand(
     return { handled: false };
   }
 
+  // Flilo Bot（ユーモラスコマンド）は設定が有効な場合のみ実行
+  if (command.name === "Flilo Bot" && !context.humorousCommandsEnabled) {
+    return { handled: false };
+  }
+
   const result = await command.execute(text, context);
   return { handled: true, result };
 }

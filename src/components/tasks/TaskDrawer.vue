@@ -68,10 +68,6 @@ const editingMessageText = ref("");
 const showEmojiPicker = ref<string | null>(null);
 const QUICK_REACTIONS = ["👍", "❤️", "🎉", "👀", "🚀"];
 
-// 説明編集用の状態
-const isEditingDescription = ref(false);
-const descriptionInput = ref("");
-
 // タスクに紐づくメッセージのみフィルタリング
 const threadMessages = computed(() => {
   if (!props.taskId) return [];
@@ -101,6 +97,7 @@ const editForm = ref({
   dueDate: "",
   progress: 0,
   categoryId: "" as string | null,
+  description: "",
 });
 
 let unsubscribeThread: (() => void) | null = null;
@@ -186,6 +183,7 @@ watch(isEditing, (editing) => {
       dueDate: formatDueDateISO(task.value.dueDate),
       progress: task.value.progress ?? 0,
       categoryId: task.value.categoryId || null,
+      description: task.value.description || "",
     };
   }
 });
@@ -210,7 +208,14 @@ async function handleSaveEdit() {
       dueDate: Date | null;
       progress: number;
       categoryId: string | null;
+      description: string;
     }> = {};
+
+    // 説明の変更
+    const trimmedDescription = editForm.value.description.trim();
+    if (trimmedDescription !== (task.value.description || "")) {
+      updates.description = trimmedDescription;
+    }
 
     // ステータスの変更
     if (editForm.value.status !== task.value.status) {
@@ -280,7 +285,15 @@ async function handleProgressChange(newProgress: number) {
     if (newProgress === 100 && task.value.status !== "done") {
       updates.status = "done";
     }
-    // 完了状態から戻す場合は進行中に
+    // 進捗が0より大きく未着手の場合は進行中に
+    else if (
+      newProgress > 0 &&
+      newProgress < 100 &&
+      task.value.status === "todo"
+    ) {
+      updates.status = "in-progress";
+    }
+    // 完了状態から100%未満に戻す場合は進行中に
     else if (newProgress < 100 && task.value.status === "done") {
       updates.status = "in-progress";
     }
@@ -370,42 +383,6 @@ function formatMessageTime(createdAt: ChatMessage["createdAt"]): string {
   if (!createdAt) return "";
   const date = new Date(createdAt);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-// 説明編集開始
-function startEditDescription() {
-  descriptionInput.value = task.value?.description || "";
-  isEditingDescription.value = true;
-}
-
-// 説明編集キャンセル
-function cancelEditDescription() {
-  isEditingDescription.value = false;
-  descriptionInput.value = "";
-}
-
-// 説明保存
-async function saveDescription() {
-  if (!task.value || !props.projectId) return;
-  try {
-    await updateTask(
-      props.projectId,
-      task.value.id,
-      {
-        description: descriptionInput.value.trim(),
-      },
-      {
-        userId: user.value?.uid ?? null,
-        actorName:
-          profile.value?.nickname || profile.value?.fullName || "Unknown",
-        origin: "ui",
-      },
-    );
-    isEditingDescription.value = false;
-    descriptionInput.value = "";
-  } catch (error) {
-    logger.error`Failed to update description: ${error}`;
-  }
 }
 
 function formatEventType(event: ProjectEvent): string {
@@ -504,51 +481,15 @@ function formatEventDetail(event: ProjectEvent): string {
       >
         <template v-if="!isEditing">
           <!-- 読み取り専用モード -->
-          <!-- 説明（マークダウン対応のテキストエリア） -->
+          <!-- 説明 -->
           <section class="task-drawer__section">
-            <div class="task-drawer__description-header">
-              <p class="task-drawer__label">説明</p>
-              <button
-                v-if="canEditTask && !isEditingDescription"
-                type="button"
-                class="task-drawer__description-edit-btn"
-                @click="startEditDescription"
-              >
-                ✏️ 編集
-              </button>
+            <p class="task-drawer__label">説明</p>
+            <div v-if="task.description" class="task-drawer__description">
+              {{ task.description }}
             </div>
-            <template v-if="isEditingDescription">
-              <textarea
-                v-model="descriptionInput"
-                class="task-drawer__description-textarea"
-                rows="6"
-                placeholder="タスクの説明を入力（マークダウン対応）..."
-              />
-              <div class="task-drawer__description-actions">
-                <button
-                  type="button"
-                  class="task-drawer__edit-btn task-drawer__edit-btn--cancel"
-                  @click="cancelEditDescription"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  class="task-drawer__edit-btn task-drawer__edit-btn--save"
-                  @click="saveDescription"
-                >
-                  保存
-                </button>
-              </div>
-            </template>
-            <template v-else>
-              <div v-if="task.description" class="task-drawer__description">
-                {{ task.description }}
-              </div>
-              <p v-else class="task-drawer__description-empty">
-                説明がありません
-              </p>
-            </template>
+            <p v-else class="task-drawer__description-empty">
+              説明がありません
+            </p>
           </section>
 
           <!-- 進捗率（権限があれば即座に変更可能） -->
@@ -606,6 +547,19 @@ function formatEventDetail(event: ProjectEvent): string {
         <template v-else>
           <!-- 編集モード -->
           <section class="task-drawer__section">
+            <label class="task-drawer__label" for="edit-description"
+              >説明</label
+            >
+            <textarea
+              id="edit-description"
+              v-model="editForm.description"
+              class="task-drawer__description-textarea"
+              rows="4"
+              placeholder="タスクの説明を入力..."
+            />
+          </section>
+
+          <section class="task-drawer__section">
             <label class="task-drawer__label" for="edit-status"
               >ステータス</label
             >
@@ -616,7 +570,6 @@ function formatEventDetail(event: ProjectEvent): string {
             >
               <option value="todo">未着手</option>
               <option value="in-progress">進行中</option>
-              <option value="review">レビュー待ち</option>
               <option value="done">完了</option>
             </select>
           </section>

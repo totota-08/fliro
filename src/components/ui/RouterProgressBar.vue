@@ -1,16 +1,19 @@
 <script setup lang="ts">
+import { useNavigationState } from "@/composables/useNavigationState";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+const { startNavigation, finishNavigation } = useNavigationState();
 const isLoading = ref(false);
 const progress = ref(0);
 
 let progressInterval: ReturnType<typeof setInterval> | null = null;
 
-function startProgress() {
+function startProgress(fromPath: string, toPath: string) {
   isLoading.value = true;
   progress.value = 0;
+  startNavigation(fromPath, toPath);
 
   // プログレスバーを徐々に進める（90%まで）
   progressInterval = setInterval(() => {
@@ -28,6 +31,8 @@ function finishProgress() {
     progressInterval = null;
   }
 
+  finishNavigation();
+
   // 100%まで一気に進めてからフェードアウト
   progress.value = 100;
   setTimeout(() => {
@@ -39,8 +44,8 @@ function finishProgress() {
 }
 
 onMounted(() => {
-  router.beforeEach(() => {
-    startProgress();
+  router.beforeEach((to, from) => {
+    startProgress(from.path, to.path);
   });
 
   router.afterEach(() => {

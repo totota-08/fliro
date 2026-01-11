@@ -83,22 +83,6 @@ const fallbackColumns: BoardColumn[] = [
     ],
   },
   {
-    key: "review",
-    title: "レビュー",
-    badge: "3",
-    tasks: [
-      {
-        title: "コンテンツ校正",
-        description: "ブログ用コピーを最終チェック",
-        status: "レビュー",
-        priority: "中",
-        due: "2025-11-09",
-        assignee: "山本大輔",
-        comments: 4,
-      },
-    ],
-  },
-  {
     key: "done",
     title: "完了",
     badge: "0",

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageHeader from "@/components/ui/PageHeader.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
@@ -116,10 +118,17 @@ onBeforeUnmount(() => {
     brand-subtitle="プロジェクト"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; スコア</p>
-      <h1 class="project-app-shell__heading">
-        {{ project?.name || "プロジェクト" }}
-      </h1>
+      <PageHeader
+        :title="project?.name || 'スコア'"
+        subtitle="メンバーのパフォーマンスを確認"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: 'スコア' },
+        ]"
+      />
     </template>
 
     <div class="scores-content">

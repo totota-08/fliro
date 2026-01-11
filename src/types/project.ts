@@ -7,6 +7,7 @@ export interface ProjectSettings {
   aiChatEnabled?: boolean;
   aiApiKey?: string;
   notificationEnabled?: boolean;
+  humorousCommandsEnabled?: boolean;
 }
 
 export interface ProjectStatsCache {

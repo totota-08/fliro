@@ -253,10 +253,6 @@ const stats = computed(() => ({
               <strong class="tone-progress">{{ stats.progress }}</strong>
             </article>
             <article class="tasks-stats__card">
-              <p>レビュー待ち</p>
-              <strong class="tone-review">{{ stats.review }}</strong>
-            </article>
-            <article class="tasks-stats__card">
               <p>完了</p>
               <strong class="tone-done">{{ stats.done }}</strong>
             </article>

@@ -4,6 +4,7 @@ import SectionCard from "@/components/ui/SectionCard.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { buildProjectNavItems } from "@/constants/projectNav";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
@@ -239,9 +240,19 @@ onBeforeUnmount(() => {
   >
     <template #headerTitle>
       <PageHeader
-        breadcrumb="プロジェクト > カテゴリ"
         title="カテゴリ管理"
         subtitle="タスクを整理するためのカテゴリを管理します"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          {
+            label: '設定',
+            to: { name: ROUTE_NAMES.projectSettings, params: { projectId } },
+          },
+          { label: 'カテゴリ' },
+        ]"
       />
     </template>
 

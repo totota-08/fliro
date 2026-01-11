@@ -28,6 +28,7 @@ export async function createProject(
       defaultTaskStatus: "todo",
       aiChatEnabled: false,
       notificationEnabled: true,
+      humorousCommandsEnabled: false,
     },
     stats: {
       totalTasks: 0,

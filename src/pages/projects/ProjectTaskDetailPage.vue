@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import TaskForm from "@/components/tasks/TaskForm.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import TaskStatusBadge from "@/components/ui/TaskStatusBadge.vue";
 import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
@@ -295,10 +296,17 @@ onBeforeUnmount(() => {
     :profile-info="profileInfo"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; タスク詳細</p>
-      <h1 class="project-app-shell__heading">
-        {{ project?.name || "プロジェクト" }}
-      </h1>
+      <PageHeader
+        :title="project?.name || 'タスク詳細'"
+        :subtitle="task?.title || 'タスクの詳細を確認'"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: 'タスク詳細' },
+        ]"
+      />
     </template>
     <template #headerActions>
       <button @click="goBack" class="back-link">

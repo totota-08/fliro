@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
@@ -288,8 +289,17 @@ onBeforeUnmount(() => {
     brand-subtitle="通知センター"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; 通知</p>
-      <h1 class="project-app-shell__heading">通知センター</h1>
+      <PageHeader
+        title="通知センター"
+        subtitle="プロジェクトの通知設定を管理します"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: '通知' },
+        ]"
+      />
     </template>
     <template #headerActions>
       <AppButton variant="secondary" @click="requestPushPermission">

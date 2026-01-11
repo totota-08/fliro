@@ -1,5 +1,4 @@
 import ErrorPage from "@/components/errorPage/ErrorPage.vue";
-import NotFoundPage from "@/components/errorPage/404.vue";
 import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { fetchProjectAccess } from "@/composables/useProjectAccess";
@@ -40,6 +39,21 @@ import { createRouter, createWebHistory } from "vue-router";
 
 export const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, from, savedPosition) {
+    // ブラウザの戻る/進むボタンで保存された位置に戻る
+    if (savedPosition) {
+      return savedPosition;
+    }
+
+    // 同じパスでクエリパラメータのみが変更された場合（TaskDrawerの開閉など）
+    // スクロール位置を維持する
+    if (to.path === from.path) {
+      return false; // スクロール位置を変更しない
+    }
+
+    // 新しいページへの遷移時はトップへスクロール
+    return { top: 0 };
+  },
   routes: [
     {
       path: "/",
@@ -238,8 +252,10 @@ export const router = createRouter({
     {
       path: "/:pathMatch(.*)*",
       name: ROUTE_NAMES.notFound,
-      component: NotFoundPage,
-      meta: { layout: "full" },
+      redirect: (to) => ({
+        name: ROUTE_NAMES.error,
+        query: { errorType: "path_not_found", path: to.fullPath },
+      }),
     },
   ],
 });

@@ -24,7 +24,6 @@ const props = withDefaults(
 const statusLabels: Record<TaskStatus, string> = {
   todo: "未着手",
   "in-progress": "進行中",
-  review: "レビュー",
   done: "完了",
 };
 
@@ -37,8 +36,6 @@ const variantClass = computed(() => {
       return "task-status-badge--todo";
     case "in-progress":
       return "task-status-badge--progress";
-    case "review":
-      return "task-status-badge--review";
     case "done":
       return "task-status-badge--done";
     default:
@@ -79,19 +76,6 @@ const variantClass = computed(() => {
       stroke-linejoin="round"
     >
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-    </svg>
-    <svg
-      v-else-if="showIcon && status === 'review'"
-      class="task-status-badge__icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
     <svg
       v-else-if="showIcon && status === 'done'"
@@ -151,12 +135,6 @@ const variantClass = computed(() => {
   background: var(--ui-brand-100, #e5f6f8);
   color: var(--ui-brand-700, #1a4a51);
   border-color: rgba(79, 124, 130, 0.25);
-}
-
-.task-status-badge--review {
-  background: var(--ui-warning-light, #fef3c7);
-  color: #92400e;
-  border-color: rgba(245, 158, 11, 0.25);
 }
 
 .task-status-badge--done {
