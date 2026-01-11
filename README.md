@@ -21,3 +21,48 @@
   - テスト手順と実施結果
   - 影響範囲
   - セルフレビューのチェックリスト
+
+## Firebase Storage CORS設定
+
+ローカル開発環境でファイルアップロードを行う場合、Firebase StorageのCORS設定が必要です。
+
+### 設定手順
+
+1. Google Cloud SDK をインストール（未インストールの場合）
+   ```bash
+   # macOS
+   brew install google-cloud-sdk
+
+   # または公式サイトからダウンロード
+   # https://cloud.google.com/sdk/docs/install
+   ```
+
+2. 認証
+   ```bash
+   gcloud auth login
+   ```
+
+3. CORS設定を適用
+   ```bash
+   gsutil cors set cors.json gs://teamie-dev.appspot.com
+   ```
+
+4. 設定確認
+   ```bash
+   gsutil cors get gs://teamie-dev.appspot.com
+   ```
+
+### 本番環境への設定
+
+本番環境では `cors.json` の `origin` に本番ドメインを追加してください。
+
+```json
+[
+  {
+    "origin": ["http://localhost:5173", "https://your-production-domain.com"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization", "x-goog-resumable"]
+  }
+]
+```
