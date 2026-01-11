@@ -86,7 +86,6 @@ function formatDueDate(task: TaskDoc) {
 
 function taskStatusLabel(status: TaskStatus) {
   if (status === "in-progress") return "進行中";
-  if (status === "review") return "レビュー";
   if (status === "done") return "完了";
   return "未着手";
 }
@@ -118,7 +117,8 @@ function displayAssignee(task: TaskDoc) {
   if (task.assigneeName) return task.assigneeName;
   if (!task.assigneeId) return "未割当";
   const member = props.members.find((m) => m.id === task.assigneeId);
-  return member?.name || task.assigneeId;
+  // uidがそのまま表示されないようフォールバック
+  return member?.name || "不明なユーザー";
 }
 
 function handleSelect(taskId: string) {

@@ -2,7 +2,13 @@
 import ButtonLoading from "@/components/loading/ButtonLoading.vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
-type MemberRole = "owner" | "admin" | "member" | "viewer";
+type MemberRole = string;
+
+type RoleInfo = {
+  id: string;
+  name: string;
+  color: string;
+};
 
 type PanelMember = {
   userId: string;
@@ -20,20 +26,26 @@ const props = withDefaults(
     open: boolean;
     member: PanelMember | null;
     roleOptions: MemberRole[];
+    roleInfoMap?: Map<string, RoleInfo>;
     canEditRole: boolean;
     canRemove: boolean;
+    canManageRoles?: boolean;
     currentUserId?: string | null;
     saveRole?: (role: MemberRole) => Promise<void>;
     removeMember?: () => Promise<void>;
+    goToRoleSettings?: () => void;
   }>(),
   {
     open: false,
     member: null,
+    roleInfoMap: undefined,
     canEditRole: false,
     canRemove: false,
+    canManageRoles: false,
     currentUserId: null,
     saveRole: undefined,
     removeMember: undefined,
+    goToRoleSettings: undefined,
   },
 );
 
@@ -116,10 +128,27 @@ const roleHint = computed(() => {
 });
 
 const roleLabel = (role: MemberRole) => {
+  // Check roleInfoMap first for custom role names
+  if (props.roleInfoMap?.has(role)) {
+    return props.roleInfoMap.get(role)!.name;
+  }
+  // Fallback to default labels
   if (role === "owner") return "Owner";
   if (role === "admin") return "Admin";
   if (role === "member") return "Member";
-  return "Viewer";
+  if (role === "viewer") return "Viewer";
+  // For unknown custom roles, capitalize first letter
+  return role.charAt(0).toUpperCase() + role.slice(1);
+};
+
+const getRoleColor = (role: MemberRole) => {
+  if (props.roleInfoMap?.has(role)) {
+    return props.roleInfoMap.get(role)!.color;
+  }
+  // Default colors
+  if (role === "owner") return "#0b2e33";
+  if (role === "admin") return "#4f7c82";
+  return "#64748b";
 };
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -384,7 +413,13 @@ async function handleRemove() {
                 <span class="member-panel__status-text">
                   {{ member.statusLabel }}
                 </span>
-                <span class="badge" :class="`role-${member.role}`">
+                <span
+                  class="badge"
+                  :style="{
+                    backgroundColor: getRoleColor(member.role) + '20',
+                    color: getRoleColor(member.role),
+                  }"
+                >
                   {{ roleLabel(member.role) }}
                 </span>
               </div>
@@ -447,7 +482,17 @@ async function handleRemove() {
         </section>
 
         <section class="member-panel__section">
-          <h4>ロール</h4>
+          <div class="member-panel__section-header">
+            <h4>ロール</h4>
+            <button
+              v-if="canManageRoles && goToRoleSettings"
+              type="button"
+              class="member-panel__link-button"
+              @click="goToRoleSettings"
+            >
+              ロール設定 →
+            </button>
+          </div>
           <div v-if="isOwner" class="member-panel__role">
             <span class="badge role-owner">Owner</span>
           </div>
@@ -655,6 +700,29 @@ async function handleRemove() {
   margin: 0;
   font-size: 1rem;
   color: var(--text-strong);
+}
+
+.member-panel__section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.member-panel__link-button {
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.member-panel__link-button:hover {
+  color: var(--primary-strong);
+  text-decoration: underline;
 }
 
 .member-panel__row {

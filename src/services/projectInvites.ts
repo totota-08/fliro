@@ -23,6 +23,7 @@ interface CreateInviteOptions {
   projectId: string;
   projectName?: string | null;
   createdBy: string;
+  createdByName?: string | null;
   password?: string | null;
   expiresInHours?: number | null;
   maxUses?: number | null;
@@ -33,6 +34,7 @@ export interface ProjectInviteDoc {
   projectName?: string | null;
   token: string;
   createdBy: string;
+  createdByName?: string | null;
   createdAt: any;
   acceptedAt?: any | null;
   acceptedBy?: string;
@@ -82,6 +84,7 @@ export async function createProjectInvite({
   projectId,
   projectName,
   createdBy,
+  createdByName,
   password,
   expiresInHours,
   maxUses,
@@ -123,6 +126,7 @@ export async function createProjectInvite({
     projectId,
     projectName: resolvedProjectName,
     createdBy,
+    createdByName: createdByName || null,
     token,
     passwordHash,
     createdAt: serverTimestamp(),

@@ -17,7 +17,7 @@ import {
 
 const logger = getLogger("app.services.task");
 
-export type TaskStatus = "todo" | "in-progress" | "review" | "done";
+export type TaskStatus = "todo" | "in-progress" | "done";
 
 export interface TaskDoc {
   id: string;
@@ -30,6 +30,7 @@ export interface TaskDoc {
   assigneeId?: string;
   assigneeName?: string;
   createdBy: string;
+  createdByName?: string;
   projectId: string;
   createdAt?: { seconds: number; nanoseconds: number };
   updatedAt?: { seconds: number; nanoseconds: number };
@@ -110,6 +111,7 @@ export async function createTask(
         assigneeName: payload.assigneeName ?? null,
         progress: payload.progress ?? 0,
         createdBy: userId,
+        createdByName: actorName,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         hasThread,
