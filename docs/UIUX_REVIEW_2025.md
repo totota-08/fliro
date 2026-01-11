@@ -8,13 +8,13 @@
 
 ## 📊 総合評価（初心者視点）
 
-| 評価項目 | スコア | コメント |
-|---------|--------|---------|
-| **シンプルさ** | ⭐⭐⭐⭐☆ (4/5) | デザインシステムは優秀だが、一部ページで一貫性に欠ける |
-| **導線の明確さ** | ⭐⭐⭐⭐⭐ (5/5) | ダッシュボードの「Nowファースト」設計が優れている |
-| **UI快感** | ⭐⭐⭐☆☆ (3/5) | デザイントークンは美しいが、実装の不統一が快感を損なう |
-| **学習曲線** | ⭐⭐⭐⭐☆ (4/5) | 主要導線は直感的。一部の機能発見に課題 |
-| **一貫性** | ⭐⭐⭐☆☆ (3/5) | プロジェクト系ページは良好、マイタスクページに大きな問題 |
+| 評価項目         | スコア           | コメント                                                 |
+| ---------------- | ---------------- | -------------------------------------------------------- |
+| **シンプルさ**   | ⭐⭐⭐⭐☆ (4/5)  | デザインシステムは優秀だが、一部ページで一貫性に欠ける   |
+| **導線の明確さ** | ⭐⭐⭐⭐⭐ (5/5) | ダッシュボードの「Nowファースト」設計が優れている        |
+| **UI快感**       | ⭐⭐⭐☆☆ (3/5)   | デザイントークンは美しいが、実装の不統一が快感を損なう   |
+| **学習曲線**     | ⭐⭐⭐⭐☆ (4/5)  | 主要導線は直感的。一部の機能発見に課題                   |
+| **一貫性**       | ⭐⭐⭐☆☆ (3/5)   | プロジェクト系ページは良好、マイタスクページに大きな問題 |
 
 **総合スコア: 3.8 / 5.0**
 
@@ -28,23 +28,18 @@
 
 ```css
 /* Deep Green基調の美しいカラーパレット */
---ui-brand-900: #0b2e33  /* メインカラー - 落ち着きと信頼感 */
---ui-brand-600: #4f7c82  /* アクセント - 視覚的に心地よい */
---ui-brand-100: #e5f6f8  /* 淡色 - 優しい背景色 */
-
-/* 意味的な色（success / warning / danger）が明確 */
---ui-success: #16a34a
---ui-warning: #f59e0b
---ui-danger: #d64545
-
-/* 8pxスケールの一貫したスペーシング */
---ui-space-1: 0.25rem  /* 4px */
---ui-space-2: 0.5rem   /* 8px */
---ui-space-4: 1rem     /* 16px */
---ui-space-8: 2rem     /* 32px */
+--ui-brand-900: #0b2e33 /* メインカラー - 落ち着きと信頼感 */
+  --ui-brand-600: #4f7c82 /* アクセント - 視覚的に心地よい */
+  --ui-brand-100: #e5f6f8 /* 淡色 - 優しい背景色 */
+  /* 意味的な色（success / warning / danger）が明確 */ --ui-success: #16a34a
+  --ui-warning: #f59e0b --ui-danger: #d64545
+  /* 8pxスケールの一貫したスペーシング */ --ui-space-1: 0.25rem /* 4px */
+  --ui-space-2: 0.5rem /* 8px */ --ui-space-4: 1rem /* 16px */
+  --ui-space-8: 2rem /* 32px */;
 ```
 
 **初心者への影響:**
+
 - 色の使い方が一貫していれば、「成功」「警告」「危険」が直感的にわかる
 - 余白が規則的なので、画面が整然として見える（混乱しない）
 
@@ -52,15 +47,16 @@
 
 ### 2. 共通UIコンポーネントの品質が高い
 
-| コンポーネント | 評価 | 理由 |
-|-------------|------|------|
-| **AppButton** | ⭐⭐⭐⭐⭐ | variant（primary/outline/ghost/danger）が明確で、使い分けが直感的 |
-| **AppBadge** | ⭐⭐⭐⭐⭐ | ロール（Owner/Admin/Member）が視覚的に区別しやすい |
-| **AppModal** | ⭐⭐⭐⭐⭐ | サイズ展開（sm/md/lg/xl）が豊富で、柔軟に対応 |
-| **AppDrawer** | ⭐⭐⭐⭐⭐ | 右からスライド＋オーバーレイで、詳細表示が直感的 |
-| **AppEmptyState** | ⭐⭐⭐⭐⭐ | 空状態が親切（アイコン＋説明文で次のアクションがわかる） |
+| コンポーネント    | 評価       | 理由                                                              |
+| ----------------- | ---------- | ----------------------------------------------------------------- |
+| **AppButton**     | ⭐⭐⭐⭐⭐ | variant（primary/outline/ghost/danger）が明確で、使い分けが直感的 |
+| **AppBadge**      | ⭐⭐⭐⭐⭐ | ロール（Owner/Admin/Member）が視覚的に区別しやすい                |
+| **AppModal**      | ⭐⭐⭐⭐⭐ | サイズ展開（sm/md/lg/xl）が豊富で、柔軟に対応                     |
+| **AppDrawer**     | ⭐⭐⭐⭐⭐ | 右からスライド＋オーバーレイで、詳細表示が直感的                  |
+| **AppEmptyState** | ⭐⭐⭐⭐⭐ | 空状態が親切（アイコン＋説明文で次のアクションがわかる）          |
 
 **初心者への影響:**
+
 - ボタンの見た目が統一されているので、「どれを押せばいいか」が迷わない
 - 空状態の説明が丁寧なので、「次に何をすべきか」がわかる
 
@@ -78,7 +74,7 @@ if (overdue > 0) {
     label: "期限切れ",
     value: String(overdue),
     caption: "すぐに対応が必要",
-    tone: "alert",  // 色で警告
+    tone: "alert", // 色で警告
     icon: "alert",
   });
 }
@@ -94,6 +90,7 @@ cards.push({
 ```
 
 **初心者への影響:**
+
 - ログインしたら「今やるべきこと」が一目でわかる
 - 期限切れ → 直近期限 → 進行中 → 完了の順に表示されるので、優先度が明確
 - 「管理のための管理」ではなく、「行動を促す」デザイン
@@ -116,6 +113,7 @@ cards.push({
 ```
 
 **初心者への影響:**
+
 - スマホでもデスクトップでも同じ操作感で使える
 - サイドバーが自動的に隠れる/表示されるので、画面が狭くても使いやすい
 
@@ -143,6 +141,7 @@ cards.push({
 ```
 
 **初心者への影響:**
+
 - キーボードだけでも操作できる（マウスが苦手な人にも優しい）
 - スクリーンリーダーで読み上げられる（視覚障害のある人も使える）
 
@@ -164,9 +163,7 @@ cards.push({
   </span>
 
   <!-- ❌ 独自のボタンスタイル（AppButtonを使うべき） -->
-  <button type="button" class="task-card__actions">
-    完了にする
-  </button>
+  <button type="button" class="task-card__actions">完了にする</button>
 </template>
 
 <style scoped>
@@ -204,6 +201,7 @@ cards.push({
 #### 推奨される修正例
 
 **Before（現状）:**
+
 ```vue
 <template>
   <span :class="getStatusBadgeClass(task.displayStatus)">
@@ -221,6 +219,7 @@ cards.push({
 ```
 
 **After（推奨）:**
+
 ```vue
 <template>
   <AppBadge variant="success">{{ task.displayStatus }}</AppBadge>
@@ -232,6 +231,7 @@ cards.push({
 ```
 
 **効果:**
+
 - 約300行のCSSを削減可能
 - 全ページでバッジの見た目が統一される
 - 初心者が「どこでも同じ操作感」を体験できる
@@ -247,7 +247,11 @@ cards.push({
 ```vue
 <template>
   <!-- ❌ AppModalを使わず独自実装 -->
-  <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
+  <div
+    v-if="isEditModalOpen"
+    class="modal-overlay"
+    @click.self="closeEditModal"
+  >
     <div class="modal" role="dialog">
       <!-- 独自のモーダルスタイル -->
     </div>
@@ -259,8 +263,8 @@ cards.push({
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);  /* デザイントークンを使うべき */
-  z-index: 50;  /* --ui-z-modal を使うべき */
+  background: rgba(0, 0, 0, 0.5); /* デザイントークンを使うべき */
+  z-index: 50; /* --ui-z-modal を使うべき */
 }
 </style>
 ```
@@ -293,6 +297,7 @@ const insightsCollapsed = ref(true); // Now First設計
 #### 推奨される改善
 
 **段階1: サマリー表示（デフォルト）**
+
 ```
 ┌─────────────────────────────┐
 │ 📌 タスクタイトル           │
@@ -302,6 +307,7 @@ const insightsCollapsed = ref(true); // Now First設計
 ```
 
 **段階2: 詳細表示（クリック/ドロワー）**
+
 ```
 ┌─────────────────────────────┐
 │ タスクタイトル              │
@@ -325,7 +331,8 @@ const insightsCollapsed = ref(true); // Now First設計
   <div v-if="canManageMembers" class="team-page__header-actions">
     <button @click="openInviteModal">
       <svg><!-- アイコン --></svg>
-      メンバーを招待  <!-- ← 何ができるか明確 -->
+      メンバーを招待
+      <!-- ← 何ができるか明確 -->
     </button>
   </div>
 </template>
@@ -348,9 +355,7 @@ const insightsCollapsed = ref(true); // Now First設計
   >
     <!-- ✅ 次のアクションを明示 -->
     <template #action>
-      <AppButton @click="openCreateDrawer">
-        招待リンクを作成
-      </AppButton>
+      <AppButton @click="openCreateDrawer"> 招待リンクを作成 </AppButton>
     </template>
   </AppEmptyState>
 </template>
@@ -367,11 +372,13 @@ const insightsCollapsed = ref(true); // Now First設計
 ### 📋 フェーズ0: 事前準備（1日）
 
 #### 目的
+
 - 現状のベースラインを記録し、改革の影響を測定できるようにする
 
 #### タスク
 
 1. **スクリーンショットの記録**
+
    ```bash
    # 主要ページのスクリーンショットを撮影
    - Dashboard
@@ -382,6 +389,7 @@ const insightsCollapsed = ref(true); // Now First設計
    ```
 
 2. **デザイントークン使用状況の監査**
+
    ```bash
    # ハードコードされた色を検索
    grep -r "#[0-9a-fA-F]\{3,6\}" src/pages --include="*.vue"
@@ -398,6 +406,7 @@ const insightsCollapsed = ref(true); // Now First設計
 ### 🎨 フェーズ1: デザイントークンの完全移行（2-3日）
 
 #### 目的
+
 - すべてのページでデザイントークンを使用し、一貫性を確保
 
 #### 優先度: 🔴 高（これがすべての基盤）
@@ -405,6 +414,7 @@ const insightsCollapsed = ref(true); // Now First設計
 #### タスク
 
 **1-1. ハードコードされた色の変数化**
+
 ```bash
 # 対象ファイル
 - src/pages/tasks/MyTasksPage.vue  # 最優先
@@ -414,28 +424,30 @@ const insightsCollapsed = ref(true); // Now First設計
 ```
 
 **修正例:**
+
 ```vue
 <!-- Before -->
 <style scoped>
 .task-card__actions button.is-danger:hover {
-  background: #c03939;  /* ❌ ハードコード */
+  background: #c03939; /* ❌ ハードコード */
 }
 </style>
 
 <!-- After -->
 <style scoped>
 .task-card__actions button.is-danger:hover {
-  background: var(--ui-danger);  /* ✅ トークン使用 */
+  background: var(--ui-danger); /* ✅ トークン使用 */
 }
 </style>
 ```
 
 **1-2. ハードコードされたpx単位の変数化**
+
 ```vue
 <!-- Before -->
 <style scoped>
 .avatar {
-  width: 48px;  /* ❌ ハードコード */
+  width: 48px; /* ❌ ハードコード */
   height: 48px;
 }
 </style>
@@ -443,19 +455,21 @@ const insightsCollapsed = ref(true); // Now First設計
 <!-- After -->
 <style scoped>
 .avatar {
-  width: var(--ui-space-12);  /* ✅ 48px = 3rem */
+  width: var(--ui-space-12); /* ✅ 48px = 3rem */
   height: var(--ui-space-12);
 }
 </style>
 ```
 
 **1-3. 検証**
+
 ```bash
 # 再度検索して、ハードコードが残っていないか確認
 grep -r "#[0-9a-fA-F]\{3,6\}" src/pages --include="*.vue"
 ```
 
 **成果物:**
+
 - すべてのページでデザイントークンを使用
 - 将来的にカラーテーマの変更が容易になる
 
@@ -464,6 +478,7 @@ grep -r "#[0-9a-fA-F]\{3,6\}" src/pages --include="*.vue"
 ### 🧩 フェーズ2: MyTasksPage の共通コンポーネント化（3-5日）
 
 #### 目的
+
 - MyTasksPageのハードコードされたUIを共通コンポーネントに置き換え
 
 #### 優先度: 🔴 高（最も目立つ問題）
@@ -473,6 +488,7 @@ grep -r "#[0-9a-fA-F]\{3,6\}" src/pages --include="*.vue"
 **2-1. バッジの置き換え**
 
 **Before:**
+
 ```vue
 <template>
   <span :class="getStatusBadgeClass(task.displayStatus)">
@@ -505,6 +521,7 @@ const getStatusBadgeClass = (status: DisplayStatus) => {
 ```
 
 **After:**
+
 ```vue
 <template>
   <AppBadge :variant="getStatusVariant(task.status)">
@@ -546,17 +563,14 @@ const getPriorityVariant = (priority: string) => {
 **2-2. ボタンの置き換え**
 
 **Before:**
+
 ```vue
 <template>
   <div class="task-card__actions">
     <button type="button" @click.stop="toggleComplete(task)">
       {{ task.status === "done" ? "未完了に戻す" : "完了にする" }}
     </button>
-    <button
-      type="button"
-      class="is-danger"
-      @click.stop="removeTask(task)"
-    >
+    <button type="button" class="is-danger" @click.stop="removeTask(task)">
       削除
     </button>
   </div>
@@ -585,27 +599,20 @@ const getPriorityVariant = (priority: string) => {
 }
 
 .task-card__actions button.is-danger:hover {
-  background: #c03939;  /* ❌ ハードコード */
+  background: #c03939; /* ❌ ハードコード */
 }
 </style>
 ```
 
 **After:**
+
 ```vue
 <template>
   <div class="task-card__actions">
-    <AppButton
-      size="sm"
-      variant="primary"
-      @click.stop="toggleComplete(task)"
-    >
+    <AppButton size="sm" variant="primary" @click.stop="toggleComplete(task)">
       {{ task.status === "done" ? "未完了に戻す" : "完了にする" }}
     </AppButton>
-    <AppButton
-      size="sm"
-      variant="danger"
-      @click.stop="removeTask(task)"
-    >
+    <AppButton size="sm" variant="danger" @click.stop="removeTask(task)">
       削除
     </AppButton>
   </div>
@@ -627,6 +634,7 @@ const getPriorityVariant = (priority: string) => {
 **2-3. タスクカードの整理**
 
 **Before:**
+
 ```vue
 <style scoped>
 /* 約500行のタスクカードスタイル */
@@ -647,6 +655,7 @@ const getPriorityVariant = (priority: string) => {
 ```
 
 **After:**
+
 ```vue
 <!-- SectionCardコンポーネントを使用 -->
 <template>
@@ -711,6 +720,7 @@ const getPriorityVariant = (priority: string) => {
 ---
 
 **総削減効果（フェーズ2）:**
+
 - 約480行のCSS削減（全体の約40%）
 - 一貫性の向上
 - 保守性の向上
@@ -720,6 +730,7 @@ const getPriorityVariant = (priority: string) => {
 ### 🏗️ フェーズ3: ProjectCategoriesPage のモーダル統一（1-2日）
 
 #### 目的
+
 - 独自モーダル実装をAppModalに置き換え
 
 #### 優先度: 🟡 中（UX改善効果は大きいが、影響範囲は限定的）
@@ -729,9 +740,14 @@ const getPriorityVariant = (priority: string) => {
 **3-1. 独自モーダルをAppModalに置き換え**
 
 **Before:**
+
 ```vue
 <template>
-  <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
+  <div
+    v-if="isEditModalOpen"
+    class="modal-overlay"
+    @click.self="closeEditModal"
+  >
     <div class="modal" role="dialog">
       <header>
         <h3>カテゴリを編集</h3>
@@ -751,13 +767,10 @@ const getPriorityVariant = (priority: string) => {
 ```
 
 **After:**
+
 ```vue
 <template>
-  <AppModal
-    :open="isEditModalOpen"
-    size="md"
-    @close="closeEditModal"
-  >
+  <AppModal :open="isEditModalOpen" size="md" @close="closeEditModal">
     <template #header>
       <h3>カテゴリを編集</h3>
     </template>
@@ -770,9 +783,7 @@ const getPriorityVariant = (priority: string) => {
       <AppButton variant="secondary" @click="closeEditModal">
         キャンセル
       </AppButton>
-      <AppButton type="submit" @click="handleEditSubmit">
-        保存
-      </AppButton>
+      <AppButton type="submit" @click="handleEditSubmit"> 保存 </AppButton>
     </template>
   </AppModal>
 </template>
@@ -785,6 +796,7 @@ const getPriorityVariant = (priority: string) => {
 **削減効果:** 約150行のCSS削減
 
 **UX改善:**
+
 - フォーカストラップ（モーダル内でTabキーが閉じ込められる）
 - Escキーで閉じる
 - オーバーレイクリックで閉じる
@@ -795,6 +807,7 @@ const getPriorityVariant = (priority: string) => {
 ### 📐 フェーズ4: 情報密度の最適化（2-3日）
 
 #### 目的
+
 - 初心者が「どこを見ればいいか」を明確にする
 
 #### 優先度: 🟡 中（学習曲線の改善）
@@ -804,6 +817,7 @@ const getPriorityVariant = (priority: string) => {
 **4-1. タスクカードの情報を段階的に表示**
 
 **Before（すべての情報を一度に表示）:**
+
 ```vue
 <template>
   <article class="task-card">
@@ -829,6 +843,7 @@ const getPriorityVariant = (priority: string) => {
 ```
 
 **After（重要な情報のみを表示）:**
+
 ```vue
 <template>
   <article class="task-card" @click="openTaskDrawer(task)">
@@ -862,6 +877,7 @@ const getPriorityVariant = (priority: string) => {
 ```
 
 **初心者への効果:**
+
 - 一目で「何が重要か」がわかる（タイトル＋期限＋優先度）
 - 詳細を見たい時だけドロワーを開く（情報過多を防ぐ）
 
@@ -870,6 +886,7 @@ const getPriorityVariant = (priority: string) => {
 **4-2. ダッシュボードの「もっと見る」ボタン追加**
 
 **Before（すべてのタスクを一度に表示）:**
+
 ```vue
 <template>
   <DashboardTaskList
@@ -880,6 +897,7 @@ const getPriorityVariant = (priority: string) => {
 ```
 
 **After（最初は10件のみ表示）:**
+
 ```vue
 <template>
   <DashboardTaskList
@@ -908,6 +926,7 @@ function loadMoreTasks() {
 ```
 
 **初心者への効果:**
+
 - 画面が軽快に読み込まれる
 - スクロールが減る（最初は重要な情報だけ）
 - 「さらに表示」ボタンで、必要な時だけ追加情報を取得
@@ -917,6 +936,7 @@ function loadMoreTasks() {
 ### 🎯 フェーズ5: 「次のアクション」の明示化（1-2日）
 
 #### 目的
+
 - 初心者が「次に何をすべきか」を迷わないようにする
 
 #### 優先度: 🟢 低（ただし、初心者体験の向上には効果的）
@@ -926,6 +946,7 @@ function loadMoreTasks() {
 **5-1. EmptyStateに具体的なアクションを追加**
 
 **Before:**
+
 ```vue
 <template>
   <AppEmptyState
@@ -938,6 +959,7 @@ function loadMoreTasks() {
 ```
 
 **After:**
+
 ```vue
 <template>
   <AppEmptyState
@@ -947,15 +969,14 @@ function loadMoreTasks() {
     icon="empty"
   >
     <template #action>
-      <AppButton @click="openCreateDrawer">
-        招待リンクを作成
-      </AppButton>
+      <AppButton @click="openCreateDrawer"> 招待リンクを作成 </AppButton>
     </template>
   </AppEmptyState>
 </template>
 ```
 
 **初心者への効果:**
+
 - 「次に何をすべきか」が一目でわかる
 - ボタンをクリックするだけで次のステップに進める
 
@@ -965,7 +986,12 @@ function loadMoreTasks() {
 
 ```vue
 <template>
-  <AppAlert v-if="showOnboardingHint" variant="info" dismissible @dismiss="dismissHint">
+  <AppAlert
+    v-if="showOnboardingHint"
+    variant="info"
+    dismissible
+    @dismiss="dismissHint"
+  >
     <template #icon>💡</template>
     <template #title>ヒント: 招待リンクの使い方</template>
     <p>
@@ -976,15 +1002,15 @@ function loadMoreTasks() {
 </template>
 
 <script setup>
-const showOnboardingHint = ref(true);  // 初回のみ表示
+const showOnboardingHint = ref(true); // 初回のみ表示
 
 function dismissHint() {
   showOnboardingHint.value = false;
-  localStorage.setItem('onboarding-invites-dismissed', 'true');
+  localStorage.setItem("onboarding-invites-dismissed", "true");
 }
 
 onMounted(() => {
-  if (localStorage.getItem('onboarding-invites-dismissed')) {
+  if (localStorage.getItem("onboarding-invites-dismissed")) {
     showOnboardingHint.value = false;
   }
 });
@@ -992,6 +1018,7 @@ onMounted(() => {
 ```
 
 **初心者への効果:**
+
 - 初めて使う機能の使い方がわかる
 - 一度dismissすれば二度と表示されない（邪魔にならない）
 
@@ -1000,6 +1027,7 @@ onMounted(() => {
 ### 🔍 フェーズ6: モバイルUXの最適化（2-3日）
 
 #### 目的
+
 - スマホでの使いやすさをさらに向上
 
 #### 優先度: 🟢 低（ただし、モバイルユーザーが多い場合は🟡中）
@@ -1012,11 +1040,11 @@ onMounted(() => {
 /* タッチターゲットを大きく（推奨: 最小44px × 44px） */
 .task-card {
   min-height: 44px;
-  padding: var(--ui-space-4);  /* 16px */
+  padding: var(--ui-space-4); /* 16px */
 }
 
 .app-button--sm {
-  min-height: 44px;  /* タッチしやすいサイズ */
+  min-height: 44px; /* タッチしやすいサイズ */
   padding: var(--ui-space-3) var(--ui-space-4);
 }
 ```
@@ -1065,8 +1093,8 @@ table {
 </template>
 
 <script setup>
-import { useMediaQuery } from '@vueuse/core';
-const isMobile = useMediaQuery('(max-width: 768px)');
+import { useMediaQuery } from "@vueuse/core";
+const isMobile = useMediaQuery("(max-width: 768px)");
 </script>
 ```
 
@@ -1075,6 +1103,7 @@ const isMobile = useMediaQuery('(max-width: 768px)');
 ### 📊 フェーズ7: 測定と改善（1日）
 
 #### 目的
+
 - 改革の効果を測定し、さらなる改善点を発見
 
 #### 優先度: 🟢 低（ただし、長期的には重要）
@@ -1115,24 +1144,27 @@ cloc src/pages --by-file --include-lang=Vue
 
 ## 📅 実施スケジュール例（2週間）
 
-| フェーズ | 日数 | 優先度 | 実施時期 |
-|---------|------|--------|---------|
-| **フェーズ0: 事前準備** | 1日 | 🔴 必須 | Week 1: Day 1 |
-| **フェーズ1: デザイントークン移行** | 2-3日 | 🔴 高 | Week 1: Day 2-4 |
-| **フェーズ2: MyTasksPage 改修** | 3-5日 | 🔴 高 | Week 1-2: Day 5-9 |
-| **フェーズ3: モーダル統一** | 1-2日 | 🟡 中 | Week 2: Day 10-11 |
-| **フェーズ4: 情報密度最適化** | 2-3日 | 🟡 中 | Week 2: Day 12-14 |
-| **フェーズ5: アクション明示化** | 1-2日 | 🟢 低 | （余裕があれば） |
-| **フェーズ6: モバイル最適化** | 2-3日 | 🟢 低 | （余裕があれば） |
-| **フェーズ7: 測定と改善** | 1日 | 🟢 低 | 最終日 |
+| フェーズ                            | 日数  | 優先度  | 実施時期          |
+| ----------------------------------- | ----- | ------- | ----------------- |
+| **フェーズ0: 事前準備**             | 1日   | 🔴 必須 | Week 1: Day 1     |
+| **フェーズ1: デザイントークン移行** | 2-3日 | 🔴 高   | Week 1: Day 2-4   |
+| **フェーズ2: MyTasksPage 改修**     | 3-5日 | 🔴 高   | Week 1-2: Day 5-9 |
+| **フェーズ3: モーダル統一**         | 1-2日 | 🟡 中   | Week 2: Day 10-11 |
+| **フェーズ4: 情報密度最適化**       | 2-3日 | 🟡 中   | Week 2: Day 12-14 |
+| **フェーズ5: アクション明示化**     | 1-2日 | 🟢 低   | （余裕があれば）  |
+| **フェーズ6: モバイル最適化**       | 2-3日 | 🟢 低   | （余裕があれば）  |
+| **フェーズ7: 測定と改善**           | 1日   | 🟢 低   | 最終日            |
 
 **最短（必須のみ）: 1週間**
+
 - フェーズ0 + フェーズ1 + フェーズ2 = 6-9日
 
 **推奨（高～中優先度）: 2週間**
+
 - フェーズ0-4 = 9-14日
 
 **完全版: 3週間**
+
 - すべてのフェーズ = 13-20日
 
 ---
@@ -1141,13 +1173,13 @@ cloc src/pages --by-file --include-lang=Vue
 
 ### 定量的効果
 
-| 指標 | 改善前 | 改善後（推定） |
-|-----|-------|--------------|
-| **CSS総行数** | 約1,500行 | 約900行（40%削減） |
-| **ハードコードされた色** | 23箇所 | 0箇所 |
-| **独自UI実装** | 3ページ | 0ページ |
-| **コンポーネント再利用率** | 60% | 90% |
-| **Lighthouse Accessibility** | 85点 | 95点（推定） |
+| 指標                         | 改善前    | 改善後（推定）     |
+| ---------------------------- | --------- | ------------------ |
+| **CSS総行数**                | 約1,500行 | 約900行（40%削減） |
+| **ハードコードされた色**     | 23箇所    | 0箇所              |
+| **独自UI実装**               | 3ページ   | 0ページ            |
+| **コンポーネント再利用率**   | 60%       | 90%                |
+| **Lighthouse Accessibility** | 85点      | 95点（推定）       |
 
 ### 定性的効果
 
@@ -1222,6 +1254,7 @@ Fliroは**非常に優秀な基盤**を持っています：
 しかし、**一部のページで一貫性が欠けている**ため、初心者が混乱する可能性があります。
 
 **最も重要な改善点:**
+
 1. **MyTasksPage の共通コンポーネント化**（約480行のCSS削減）
 2. **ハードコードされた色の完全排除**（23箇所 → 0箇所）
 3. **モーダルの統一**（独自実装 → AppModal）
