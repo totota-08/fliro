@@ -8,7 +8,7 @@
   color: var(--ui-sidebar-text-strong);
   padding: var(--ui-space-8) var(--ui-space-6);
   gap: var(--ui-space-8);
-  overflow-y: auto;
+  overflow: hidden;
   flex-shrink: 0;
   opacity: 1;
   transition:
@@ -172,6 +172,39 @@
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-3);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar__projects ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-sidebar-border) transparent;
+}
+
+.sidebar__projects ul::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar__projects ul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar__projects ul::-webkit-scrollbar-thumb {
+  background: var(--ui-sidebar-border);
+  border-radius: 3px;
+}
+
+.sidebar__projects ul::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-sidebar-border-hover);
 }
 
 .sidebar__projects-header {
@@ -199,15 +232,6 @@
   background: var(--ui-sidebar-hover-strong);
   color: var(--ui-sidebar-text-strong);
   border-color: var(--ui-sidebar-border-strong);
-}
-
-.sidebar__projects ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
 }
 
 .sidebar__projects li {
