@@ -5,7 +5,9 @@ import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import { buildPermissionsFromRoles } from "@/constants/roles";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
@@ -159,7 +161,17 @@ function formatUses(invite: ProjectInvite) {
 }
 
 function getCreatorName(invite: ProjectInvite) {
-  return memberNameMap.value.get(invite.createdBy) || invite.createdBy || "—";
+  // まずFirestoreに保存された作成者名を使用
+  if (invite.createdByName) {
+    return invite.createdByName;
+  }
+  // 次にメンバーマップから取得
+  const memberName = memberNameMap.value.get(invite.createdBy);
+  if (memberName) {
+    return memberName;
+  }
+  // フォールバック表示
+  return "不明なユーザー";
 }
 
 function statusLabel(status: ProjectInviteStatus) {
@@ -419,10 +431,17 @@ onBeforeUnmount(() => {
     brand-subtitle="プロジェクト"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; 招待リンク</p>
-      <h1 class="project-app-shell__heading">
-        {{ project?.name || "プロジェクト" }}
-      </h1>
+      <PageHeader
+        :title="project?.name || '招待リンク'"
+        subtitle="プロジェクトへの招待リンクを管理します"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: '招待リンク' },
+        ]"
+      />
     </template>
 
     <PageSkeleton v-if="isInitialLoading" variant="invites" />

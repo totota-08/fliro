@@ -130,7 +130,8 @@ export function useTaskCreateData(projectIdRef: Ref<string>) {
 
           return {
             id: memberId,
-            name: name || docSnap.id,
+            // uidがそのまま表示されないようフォールバック
+            name: name || `メンバー#${memberId.slice(-1)}`,
           };
         });
 

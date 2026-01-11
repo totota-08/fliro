@@ -6,10 +6,12 @@ import DashboardSummaryCards, {
 import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
 import { useProjectShellData } from "@/composables/useProjectShellData";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
-import { appName, appVersion } from "@/constants/appMeta";
+import { appVersion } from "@/constants/appMeta";
 import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
@@ -29,7 +31,9 @@ import { listenTasks, type TaskDoc } from "@/services/taskService";
 import {
   getDashboardSettings,
   saveDashboardSettings,
+  getDefaultInsightCards,
   type DashboardCardConfig,
+  type InsightCardConfig,
 } from "@/services/dashboardSettingsService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
@@ -101,6 +105,7 @@ const showMyTasksOnly = ref(false);
 
 // Dashboard card customization
 const cardConfig = ref<DashboardCardConfig[]>([]);
+const insightCardConfig = ref<InsightCardConfig[]>([]);
 
 // ProjectAppShell用のデータを取得
 const { navItems, sidebarProjects, profileInfo } =
@@ -234,6 +239,7 @@ async function loadCardConfig() {
       projectId.value,
     );
     cardConfig.value = settings.cards;
+    insightCardConfig.value = settings.insightCards ?? getDefaultInsightCards();
   } catch (error) {
     logger.error`Failed to load dashboard settings: ${error}`;
     // Use default config on error
@@ -243,6 +249,7 @@ async function loadCardConfig() {
       { id: "active", type: "active", position: 2, visible: true },
       { id: "done", type: "done", position: 3, visible: true },
     ];
+    insightCardConfig.value = getDefaultInsightCards();
   }
 }
 
@@ -319,16 +326,19 @@ function watchProject() {
           }
         }
 
+        // uidがそのまま表示されないようフォールバック
+        const fallbackName = name || `メンバー#${memberId.slice(-1)}`;
+
         return {
           id: memberId,
-          name: name || docSnap.id,
+          name: fallbackName,
           userId: memberId,
           role: (data.role as ProjectMember["role"]) || "member",
           projectRole:
             (data.projectRole as ProjectMember["projectRole"]) || "member",
           nickname: data.nickname,
           fullName: data.fullName,
-          displayName: data.nickname || data.fullName || name || docSnap.id,
+          displayName: data.nickname || data.fullName || fallbackName,
           email: data.email,
           lastAccessedAt: data.lastAccessedAt,
         };
@@ -486,12 +496,17 @@ onBeforeUnmount(() => {
     :profile-info="profileInfo"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">
-        {{ appName }} &gt; ダッシュボード
-      </p>
-      <h1 class="project-app-shell__heading">
-        {{ project?.name || "プロジェクト" }}
-      </h1>
+      <PageHeader
+        :title="project?.name || 'ダッシュボード'"
+        subtitle="プロジェクトの概要"
+        :breadcrumbs="[
+          {
+            label: 'マイページ',
+            to: { name: ROUTE_NAMES.myPage },
+          },
+          { label: 'ダッシュボード' },
+        ]"
+      />
     </template>
     <template #headerActions>
       <span class="dashboard__version" v-if="appVersion">{{ appVersion }}</span>
@@ -500,7 +515,11 @@ onBeforeUnmount(() => {
     <div class="dashboard__content">
       <NotificationBar :notifications="notificationsBar" />
 
-      <DashboardInsights :tasks="tasks" v-model:collapsed="insightsCollapsed" />
+      <DashboardInsights
+        :tasks="tasks"
+        :card-config="insightCardConfig"
+        v-model:collapsed="insightsCollapsed"
+      />
 
       <DashboardSummaryCards
         :title="project?.name || 'ダッシュボード'"

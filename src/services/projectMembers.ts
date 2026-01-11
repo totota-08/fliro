@@ -30,7 +30,7 @@ export interface ProjectMember {
 interface AddProjectMemberOptions {
   projectId: string;
   userId: string;
-  role?: "owner" | "admin" | "member" | "viewer";
+  role?: ProjectMember["role"];
   projectRole?: "owner" | "member";
   roles?: string[];
   invitedBy: string;

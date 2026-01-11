@@ -2,6 +2,7 @@
 import InviteLinksMiniCard from "@/components/invites/InviteLinksMiniCard.vue";
 import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
+import PageHeader from "@/components/ui/PageHeader.vue";
 import { ProjectPermission } from "@/constants/permissions";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -14,6 +15,7 @@ import {
   removeProjectMember,
   updateProjectMemberRole,
 } from "@/services/projectMembers";
+import { listenProjectRoles, type ProjectRole } from "@/services/rolesService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -22,7 +24,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectMembers");
-type MemberRole = "owner" | "admin" | "member" | "viewer";
+type MemberRole = string;
 type MemberDisplay = {
   id: string;
   userId: string;
@@ -47,7 +49,28 @@ const selectedMemberId = ref<string | null>(null);
 const latestInviteLink = ref("");
 const memberQuery = ref("");
 const isInviteOpen = ref(false);
-const roleOptions: MemberRole[] = ["admin", "member", "viewer"];
+const projectRoles = ref<ProjectRole[]>([]);
+let stopRoles: (() => void) | null = null;
+
+// ロールオプション（owner以外のすべてのロール）
+const roleOptions = computed(() => {
+  return projectRoles.value
+    .filter((role) => role.id !== "owner")
+    .map((role) => role.id);
+});
+
+// ロール情報のマップ（表示名と色）
+const roleInfoMap = computed(() => {
+  const map = new Map<string, { id: string; name: string; color: string }>();
+  // ownerを追加
+  map.set("owner", { id: "owner", name: "Owner", color: "#0b2e33" });
+  // その他のロール
+  for (const role of projectRoles.value) {
+    map.set(role.id, { id: role.id, name: role.name, color: role.color });
+  }
+  return map;
+});
+
 const roleOrder: MemberRole[] = ["owner", "admin", "member", "viewer"];
 
 const saveRoleHandler = async (role: MemberRole) => {
@@ -157,13 +180,6 @@ const recentAccessMembers = computed(() => {
     .slice(0, 5);
 });
 
-const queryMemberId = computed(() => {
-  const value = route.query.memberId;
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) return value[0] || null;
-  return null;
-});
-
 const selectedMember = computed(
   () =>
     members.value.find((member) => member.userId === selectedMemberId.value) ??
@@ -195,29 +211,24 @@ const canManageMembers = computed(
 );
 
 function setMemberQuery(memberId: string | null) {
-  const nextQuery = { ...route.query };
+  // Use history API directly to avoid Vue Router triggering component updates
+  const url = new URL(window.location.href);
   if (memberId) {
-    nextQuery.memberId = memberId;
+    url.searchParams.set("memberId", memberId);
   } else {
-    delete nextQuery.memberId;
+    url.searchParams.delete("memberId");
   }
-  void router.replace({ query: nextQuery });
+  window.history.replaceState({}, "", url.toString());
 }
 
 function openMemberPanel(member: MemberDisplay) {
   selectedMemberId.value = member.userId;
-  if (queryMemberId.value !== member.userId) {
-    setMemberQuery(member.userId);
-  }
+  setMemberQuery(member.userId);
 }
 
 function closeMemberPanel() {
-  if (selectedMemberId.value) {
-    selectedMemberId.value = null;
-  }
-  if (queryMemberId.value) {
-    setMemberQuery(null);
-  }
+  selectedMemberId.value = null;
+  setMemberQuery(null);
 }
 
 function getRoleLabel(role: MemberRole) {
@@ -245,32 +256,46 @@ function watchProject() {
           const permissions =
             data.permissions ?? buildPermissionsFromRoles(roles);
           const statusLabel = getStatusLabel(data.lastAccessedAt);
+          // Check member document fields first (nickname and fullName are what we store)
           const baseName = [
+            data.nickname,
+            data.fullName,
             data.displayName,
             data.name,
             data.userName,
             data.username,
-            data.nickname,
-            data.fullName,
           ].find(
             (value): value is string =>
               typeof value === "string" && value.trim().length > 0,
           );
           let displayName = baseName ? baseName.trim() : "";
-          const looksLikeUid =
-            displayName === userId || displayName === docSnap.id;
 
-          if (!displayName || looksLikeUid) {
+          // Helper to check if a string looks like a UID
+          const looksLikeUid = (name: string) =>
+            !name ||
+            name === userId ||
+            name === docSnap.id ||
+            /^[a-zA-Z0-9]{20,}$/.test(name);
+
+          // If no valid name or looks like UID, try fetching from profile
+          if (looksLikeUid(displayName)) {
             try {
               const profileSnap = await getDoc(doc(db, "profiles", userId));
               if (profileSnap.exists()) {
                 const profile = profileSnap.data() as {
                   nickname?: string;
                   fullName?: string;
+                  displayName?: string;
                 };
-                const profileName = [profile.nickname, profile.fullName].find(
+                const profileName = [
+                  profile.nickname,
+                  profile.fullName,
+                  profile.displayName,
+                ].find(
                   (value): value is string =>
-                    typeof value === "string" && value.trim().length > 0,
+                    typeof value === "string" &&
+                    value.trim().length > 0 &&
+                    !looksLikeUid(value.trim()),
                 );
                 if (profileName) {
                   displayName = profileName.trim();
@@ -281,7 +306,8 @@ function watchProject() {
             }
           }
 
-          if (!displayName) {
+          // Final fallback
+          if (looksLikeUid(displayName)) {
             displayName = `メンバー ${userId.slice(-4)}`;
           }
 
@@ -300,20 +326,28 @@ function watchProject() {
           } satisfies MemberDisplay;
         }),
       );
-      const rank: Record<MemberRole, number> = {
+      const rank: Record<string, number> = {
         owner: 0,
         admin: 1,
         member: 2,
         viewer: 3,
       };
-      members.value = list.sort((a, b) => rank[a.role] - rank[b.role]);
+      members.value = list.sort(
+        (a, b) => (rank[a.role] ?? 99) - (rank[b.role] ?? 99),
+      );
     },
   );
+
+  // ロールの監視
+  stopRoles = listenProjectRoles(projectId.value, (roles) => {
+    projectRoles.value = roles;
+  });
 }
 
 function resetWatchers() {
   stopProject?.();
   stopMembers?.();
+  stopRoles?.();
   watchProject();
 }
 
@@ -447,21 +481,22 @@ function getInitials(name: string) {
   return trimmed.length <= 2 ? trimmed : trimmed.slice(0, 2);
 }
 
+// Sync from URL on initial load only (when members are loaded)
 watch(
-  [queryMemberId, members],
-  ([memberId, list]) => {
-    if (!memberId) {
-      selectedMemberId.value = null;
-      return;
-    }
+  members,
+  (list) => {
+    // Only sync from URL if we don't have a selection yet
+    if (selectedMemberId.value) return;
+
+    // Check URL for memberId parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const memberId = urlParams.get("memberId");
+    if (!memberId) return;
+
+    // If member exists in list, select it
     const exists = list.some((member) => member.userId === memberId);
     if (exists) {
       selectedMemberId.value = memberId;
-      return;
-    }
-    selectedMemberId.value = null;
-    if (queryMemberId.value) {
-      setMemberQuery(null);
     }
   },
   { immediate: true },
@@ -488,10 +523,17 @@ watch(isInviteOpen, (open) => {
 onBeforeUnmount(() => {
   stopProject?.();
   stopMembers?.();
+  stopRoles?.();
   if (typeof window !== "undefined") {
     window.removeEventListener("keydown", handleInviteKeydown);
   }
 });
+
+// ロール設定ページへのナビゲーションハンドラ
+const goToRoleSettingsHandler = () => {
+  closeMemberPanel();
+  goToRoles();
+};
 </script>
 
 <template>
@@ -503,10 +545,17 @@ onBeforeUnmount(() => {
     brand-subtitle="プロジェクト"
   >
     <template #headerTitle>
-      <p class="project-app-shell__breadcrumb">プロジェクト &gt; メンバー</p>
-      <h1 class="project-app-shell__heading">
-        {{ project?.name || "プロジェクト" }}
-      </h1>
+      <PageHeader
+        :title="project?.name || 'メンバー'"
+        subtitle="チームメンバーを管理します"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          { label: 'メンバー' },
+        ]"
+      />
     </template>
 
     <div class="members-content">
@@ -767,11 +816,14 @@ onBeforeUnmount(() => {
           :open="Boolean(selectedMember)"
           :member="selectedMember"
           :role-options="roleOptions"
+          :role-info-map="roleInfoMap"
           :can-edit-role="currentPermissions.canEditRoles"
           :can-remove="currentPermissions.canManageMembers"
+          :can-manage-roles="canManageRolesViaAccess"
           :current-user-id="user?.uid"
           :save-role="saveRoleHandler"
           :remove-member="removeMemberHandler"
+          :go-to-role-settings="goToRoleSettingsHandler"
           @close="closeMemberPanel"
         />
       </section>

@@ -5,6 +5,7 @@ import {
   ProjectPermission,
   type ProjectPermissionKey,
 } from "@/constants/permissions";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectShellData } from "@/composables/useProjectShellData";
@@ -56,14 +57,16 @@ const newRole = ref({
 });
 const isCreating = ref(false);
 
-// ロール編集モーダル
+// ロール編集モーダル（名前・色・権限を統合）
 const isEditModalOpen = ref(false);
 const editingRole = ref<ProjectRole | null>(null);
 const editForm = ref({
   name: "",
   color: "",
+  permissions: new Set<ProjectPermissionKey>(),
 });
 const isUpdating = ref(false);
+const editActiveTab = ref<"basic" | "permissions">("basic");
 
 // 権限編集モーダル
 const isPermissionModalOpen = ref(false);
@@ -89,126 +92,142 @@ const presetColors = [
   { value: "#64748b", label: "Slate" },
 ];
 
-// 権限定義（日本語ラベル付き）
+// デフォルトロールの説明
+const defaultRoleDescriptions = [
+  {
+    id: "owner",
+    name: "オーナー",
+    description:
+      "プロジェクトの作成者です。全ての権限を持ち、プロジェクトの削除が可能です。",
+    color: "#0b2e33",
+    isEditable: false,
+  },
+  {
+    id: "admin",
+    name: "管理者",
+    description:
+      "プロジェクトの管理権限を持ちます。メンバーの招待・管理、タスクの作成・編集・削除などが可能です。",
+    color: "#4f7c82",
+    isEditable: true,
+  },
+  {
+    id: "member",
+    name: "メンバー",
+    description:
+      "プロジェクトの基本機能を利用できます。タスクの閲覧、自分の担当タスクの進捗更新が可能です。",
+    color: "#64748b",
+    isEditable: true,
+  },
+];
+
+// ページ/機能ごとの権限定義
+const pagePermissions: {
+  page: string;
+  description: string;
+  permissions: { key: ProjectPermissionKey; label: string }[];
+}[] = [
+  {
+    page: "ダッシュボード",
+    description: "プロジェクトの概要を表示するページ",
+    permissions: [{ key: ProjectPermission.VIEW_DASHBOARD, label: "閲覧" }],
+  },
+  {
+    page: "タスク",
+    description: "タスクの一覧・詳細ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_TASKS, label: "閲覧" },
+      { key: ProjectPermission.MANAGE_TASKS, label: "作成・編集" },
+      { key: ProjectPermission.DELETE_TASKS, label: "削除" },
+      {
+        key: ProjectPermission.UPDATE_OWN_PROGRESS,
+        label: "自分の進捗のみ更新",
+      },
+    ],
+  },
+  {
+    page: "スレッド",
+    description: "チームのコミュニケーションページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_THREADS, label: "閲覧" },
+      { key: ProjectPermission.POST_THREADS, label: "投稿" },
+    ],
+  },
+  {
+    page: "メンバー",
+    description: "プロジェクトメンバーの一覧ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_MEMBERS, label: "閲覧" },
+      { key: ProjectPermission.INVITE_MEMBERS, label: "招待" },
+      { key: ProjectPermission.MANAGE_MEMBERS, label: "管理（キック等）" },
+    ],
+  },
+  {
+    page: "カテゴリ",
+    description: "タスクカテゴリの管理ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_CATEGORIES, label: "閲覧" },
+      { key: ProjectPermission.MANAGE_CATEGORIES, label: "管理" },
+    ],
+  },
+  {
+    page: "招待リンク",
+    description: "招待リンクの管理ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_INVITES, label: "閲覧" },
+      { key: ProjectPermission.MANAGE_INVITES, label: "管理" },
+    ],
+  },
+  {
+    page: "プロジェクト設定",
+    description: "プロジェクトの設定ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_SETTINGS, label: "閲覧" },
+      { key: ProjectPermission.MANAGE_SETTINGS, label: "変更" },
+    ],
+  },
+  {
+    page: "ロール管理",
+    description: "ロールと権限の管理ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_ROLES, label: "閲覧" },
+      { key: ProjectPermission.MANAGE_ROLES, label: "管理" },
+    ],
+  },
+  {
+    page: "アクティビティ",
+    description: "プロジェクトの活動履歴ページ",
+    permissions: [{ key: ProjectPermission.VIEW_ACTIVITY, label: "閲覧" }],
+  },
+  {
+    page: "通知",
+    description: "通知設定ページ",
+    permissions: [
+      { key: ProjectPermission.VIEW_NOTIFICATIONS, label: "閲覧" },
+      { key: ProjectPermission.MANAGE_NOTIFICATIONS, label: "変更" },
+    ],
+  },
+  {
+    page: "週次スコア",
+    description: "チームの週次パフォーマンスページ",
+    permissions: [{ key: ProjectPermission.VIEW_SCORES, label: "閲覧" }],
+  },
+];
+
+// 権限定義（日本語ラベル付き）- 後方互換のため保持
 const permissionDefinitions: {
   key: ProjectPermissionKey;
   label: string;
   category: string;
-}[] = [
-  // ダッシュボード
-  {
-    key: ProjectPermission.VIEW_DASHBOARD,
-    label: "ダッシュボード閲覧",
-    category: "ダッシュボード",
-  },
-  // タスク
-  {
-    key: ProjectPermission.VIEW_TASKS,
-    label: "タスク閲覧",
-    category: "タスク",
-  },
-  {
-    key: ProjectPermission.MANAGE_TASKS,
-    label: "タスク作成・編集",
-    category: "タスク",
-  },
-  {
-    key: ProjectPermission.DELETE_TASKS,
-    label: "タスク削除",
-    category: "タスク",
-  },
-  // スレッド
-  {
-    key: ProjectPermission.VIEW_THREADS,
-    label: "スレッド閲覧",
-    category: "スレッド",
-  },
-  {
-    key: ProjectPermission.POST_THREADS,
-    label: "スレッド投稿",
-    category: "スレッド",
-  },
-  // メンバー
-  {
-    key: ProjectPermission.VIEW_MEMBERS,
-    label: "メンバー一覧閲覧",
-    category: "メンバー",
-  },
-  {
-    key: ProjectPermission.INVITE_MEMBERS,
-    label: "メンバー招待",
-    category: "メンバー",
-  },
-  {
-    key: ProjectPermission.MANAGE_MEMBERS,
-    label: "メンバー管理",
-    category: "メンバー",
-  },
-  // カテゴリ
-  {
-    key: ProjectPermission.VIEW_CATEGORIES,
-    label: "カテゴリ閲覧",
-    category: "カテゴリ",
-  },
-  {
-    key: ProjectPermission.MANAGE_CATEGORIES,
-    label: "カテゴリ管理",
-    category: "カテゴリ",
-  },
-  // 招待
-  {
-    key: ProjectPermission.VIEW_INVITES,
-    label: "招待リンク閲覧",
-    category: "招待",
-  },
-  {
-    key: ProjectPermission.MANAGE_INVITES,
-    label: "招待リンク管理",
-    category: "招待",
-  },
-  // 設定
-  {
-    key: ProjectPermission.VIEW_SETTINGS,
-    label: "プロジェクト設定閲覧",
-    category: "設定",
-  },
-  {
-    key: ProjectPermission.MANAGE_SETTINGS,
-    label: "プロジェクト設定変更",
-    category: "設定",
-  },
-  // ロール
-  {
-    key: ProjectPermission.VIEW_ROLES,
-    label: "ロール閲覧",
-    category: "ロール",
-  },
-  {
-    key: ProjectPermission.MANAGE_ROLES,
-    label: "ロール管理",
-    category: "ロール",
-  },
-  // アクティビティ
-  {
-    key: ProjectPermission.VIEW_ACTIVITY,
-    label: "アクティビティログ閲覧",
-    category: "アクティビティ",
-  },
-  // 通知
-  {
-    key: ProjectPermission.VIEW_NOTIFICATIONS,
-    label: "通知設定閲覧",
-    category: "通知",
-  },
-  {
-    key: ProjectPermission.MANAGE_NOTIFICATIONS,
-    label: "通知設定変更",
-    category: "通知",
-  },
-];
+}[] = pagePermissions.flatMap((page) =>
+  page.permissions.map((perm) => ({
+    key: perm.key,
+    label: `${page.page} - ${perm.label}`,
+    category: page.page,
+  })),
+);
 
-// カテゴリごとに権限をグループ化
-const permissionsByCategory = computed(() => {
+// カテゴリごとに権限をグループ化（将来使用予定）
+const _permissionsByCategory = computed(() => {
   const groups: Record<string, { key: ProjectPermissionKey; label: string }[]> =
     {};
   for (const perm of permissionDefinitions) {
@@ -219,11 +238,28 @@ const permissionsByCategory = computed(() => {
   }
   return groups;
 });
+void _permissionsByCategory;
 
 // メンバーに割り当て可能なロール（デフォルト+カスタム）
 const roleOptions = computed(() => {
   return roles.value.map((r) => r.id);
 });
+
+// メンバー表示用ヘルパー関数
+function getMemberDisplayName(member: ProjectMember): string {
+  return (
+    member.displayName || member.nickname || member.fullName || "不明なユーザー"
+  );
+}
+
+function getMemberInitials(member: ProjectMember): string {
+  const name = getMemberDisplayName(member);
+  return name.slice(0, 2);
+}
+
+function getMemberSecondaryInfo(member: ProjectMember): string {
+  return member.email || "メールアドレス未設定";
+}
 
 function watchMembers() {
   stopMembers = listenProjectMembers(projectId.value, (list) => {
@@ -300,14 +336,27 @@ function openEditModal(role: ProjectRole) {
   editForm.value = {
     name: role.name,
     color: role.color,
+    permissions: new Set(role.permissions),
   };
+  editActiveTab.value = "basic";
   isEditModalOpen.value = true;
 }
 
 function closeEditModal() {
   isEditModalOpen.value = false;
   editingRole.value = null;
-  editForm.value = { name: "", color: "" };
+  editForm.value = { name: "", color: "", permissions: new Set() };
+  editActiveTab.value = "basic";
+}
+
+function toggleEditPermission(key: ProjectPermissionKey) {
+  if (editForm.value.permissions.has(key)) {
+    editForm.value.permissions.delete(key);
+  } else {
+    editForm.value.permissions.add(key);
+  }
+  // 強制再描画のためにSetを再生成
+  editForm.value.permissions = new Set(editForm.value.permissions);
 }
 
 async function saveRoleEdit() {
@@ -317,10 +366,17 @@ async function saveRoleEdit() {
 
   isUpdating.value = true;
   try {
+    // 名前・色を更新
     await updateRole(projectId.value, editingRole.value.id, {
       name: editForm.value.name.trim(),
       color: editForm.value.color,
     });
+    // 権限を更新
+    await updateRolePermissions(
+      projectId.value,
+      editingRole.value.id,
+      Array.from(editForm.value.permissions),
+    );
     closeEditModal();
   } catch (error) {
     logger.error`Failed to update role: ${error}`;
@@ -473,7 +529,18 @@ onBeforeUnmount(() => {
     <template #headerTitle>
       <PageHeader
         title="ロール管理"
-        subtitle="Discord風にロールと権限を管理します"
+        subtitle="プロジェクトのロールと権限を管理します"
+        :breadcrumbs="[
+          {
+            label: 'ダッシュボード',
+            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
+          },
+          {
+            label: 'メンバー',
+            to: { name: ROUTE_NAMES.projectMembers, params: { projectId } },
+          },
+          { label: 'ロール' },
+        ]"
       />
     </template>
 
@@ -486,8 +553,55 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
-      <!-- ロール一覧セクション -->
-      <SectionCard title="ロール一覧">
+      <!-- デフォルトロール説明セクション -->
+      <SectionCard title="プロジェクトのロール">
+        <p class="section-description">
+          このプロジェクトには以下の3つのロールがあります。各ロールには異なる権限が設定されています。
+        </p>
+        <ul class="default-role-list">
+          <li
+            v-for="roleDesc in defaultRoleDescriptions"
+            :key="roleDesc.id"
+            class="default-role-item"
+          >
+            <div class="default-role-item__header">
+              <span
+                class="default-role-item__color"
+                :style="{ backgroundColor: roleDesc.color }"
+              />
+              <h4 class="default-role-item__name">{{ roleDesc.name }}</h4>
+              <span
+                v-if="!roleDesc.isEditable"
+                class="default-role-item__fixed"
+              >
+                固定
+              </span>
+            </div>
+            <p class="default-role-item__description">
+              {{ roleDesc.description }}
+            </p>
+            <div
+              v-if="
+                roleDesc.isEditable &&
+                canEdit &&
+                roles.find((r) => r.id === roleDesc.id)
+              "
+              class="default-role-item__actions"
+            >
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                @click="openEditModal(roles.find((r) => r.id === roleDesc.id)!)"
+              >
+                編集
+              </button>
+            </div>
+          </li>
+        </ul>
+      </SectionCard>
+
+      <!-- カスタムロール一覧セクション -->
+      <SectionCard title="カスタムロール">
         <template #headerActions>
           <button
             v-if="canEdit"
@@ -499,8 +613,12 @@ onBeforeUnmount(() => {
           </button>
         </template>
 
-        <ul v-if="roles.length" class="role-list">
-          <li v-for="role in roles" :key="role.id" class="role-item">
+        <ul v-if="roles.filter((r) => !r.isDefault).length" class="role-list">
+          <li
+            v-for="role in roles.filter((r) => !r.isDefault)"
+            :key="role.id"
+            class="role-item"
+          >
             <div class="role-item__main">
               <span
                 class="role-item__color"
@@ -509,9 +627,6 @@ onBeforeUnmount(() => {
               <div class="role-item__info">
                 <p class="role-item__name">
                   {{ role.name }}
-                  <span v-if="role.isDefault" class="role-item__badge"
-                    >デフォルト</span
-                  >
                 </p>
                 <p class="role-item__meta">
                   {{ role.permissions.length }}個の権限
@@ -534,7 +649,6 @@ onBeforeUnmount(() => {
                 編集
               </button>
               <button
-                v-if="!role.isDefault"
                 type="button"
                 class="btn btn--danger-outline btn--sm"
                 @click="openDeleteModal(role)"
@@ -545,7 +659,7 @@ onBeforeUnmount(() => {
           </li>
         </ul>
         <div v-else class="empty-state">
-          <p>ロールがまだありません。</p>
+          <p>カスタムロールはまだありません。必要に応じて追加できます。</p>
         </div>
       </SectionCard>
 
@@ -559,14 +673,14 @@ onBeforeUnmount(() => {
           >
             <div class="member-item__persona">
               <div class="avatar" aria-hidden="true">
-                {{ (member.displayName || member.userId).slice(0, 2) }}
+                {{ getMemberInitials(member) }}
               </div>
               <div>
                 <p class="member-item__name">
-                  {{ member.displayName || member.userId }}
+                  {{ getMemberDisplayName(member) }}
                 </p>
                 <p class="member-item__meta">
-                  {{ member.email || member.userId }}
+                  {{ getMemberSecondaryInfo(member) }}
                 </p>
               </div>
             </div>
@@ -713,9 +827,15 @@ onBeforeUnmount(() => {
         class="modal-overlay"
         @click.self="closeEditModal"
       >
-        <div class="modal" role="dialog" aria-labelledby="edit-modal-title">
+        <div
+          class="modal modal--lg"
+          role="dialog"
+          aria-labelledby="edit-modal-title"
+        >
           <header class="modal__header">
-            <h3 id="edit-modal-title">ロールを編集</h3>
+            <h3 id="edit-modal-title">
+              ロールを編集 - {{ editingRole?.name }}
+            </h3>
             <button
               type="button"
               class="modal__close"
@@ -726,44 +846,109 @@ onBeforeUnmount(() => {
             </button>
           </header>
 
+          <!-- タブ切り替え -->
+          <div class="modal-tabs">
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'modal-tab--active': editActiveTab === 'basic' }"
+              @click="editActiveTab = 'basic'"
+            >
+              基本情報
+            </button>
+            <button
+              type="button"
+              class="modal-tab"
+              :class="{ 'modal-tab--active': editActiveTab === 'permissions' }"
+              @click="editActiveTab = 'permissions'"
+            >
+              権限
+            </button>
+          </div>
+
           <form class="modal__body" @submit.prevent="saveRoleEdit">
-            <div class="form-field">
-              <label class="form-label">
-                ロール名 <span class="required">*</span>
-              </label>
-              <input
-                v-model="editForm.name"
-                type="text"
-                class="form-input"
-                maxlength="30"
-                required
-              />
+            <!-- 基本情報タブ -->
+            <div v-if="editActiveTab === 'basic'">
+              <div class="form-field">
+                <label class="form-label">
+                  ロール名 <span class="required">*</span>
+                </label>
+                <input
+                  v-model="editForm.name"
+                  type="text"
+                  class="form-input"
+                  maxlength="30"
+                  required
+                />
+              </div>
+
+              <div class="form-field">
+                <label class="form-label">カラー</label>
+                <div class="color-picker">
+                  <div class="color-picker__presets">
+                    <button
+                      v-for="preset in presetColors"
+                      :key="preset.value"
+                      type="button"
+                      class="color-preset"
+                      :class="{
+                        'is-selected': editForm.color === preset.value,
+                      }"
+                      :style="{ backgroundColor: preset.value }"
+                      :title="preset.label"
+                      @click="selectPresetColor(preset.value, 'edit')"
+                    />
+                  </div>
+                  <div class="color-picker__custom">
+                    <label class="color-custom-label">
+                      その他:
+                      <input
+                        type="color"
+                        class="color-custom-input"
+                        :value="editForm.color || '#64748b'"
+                        @input="handleCustomColorChange($event, 'edit')"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="form-field">
-              <label class="form-label">カラー</label>
-              <div class="color-picker">
-                <div class="color-picker__presets">
-                  <button
-                    v-for="preset in presetColors"
-                    :key="preset.value"
-                    type="button"
-                    class="color-preset"
-                    :class="{ 'is-selected': editForm.color === preset.value }"
-                    :style="{ backgroundColor: preset.value }"
-                    :title="preset.label"
-                    @click="selectPresetColor(preset.value, 'edit')"
-                  />
+            <!-- 権限タブ -->
+            <div
+              v-if="editActiveTab === 'permissions'"
+              class="permission-modal-body"
+            >
+              <p class="permission-modal-intro">
+                各ページ・機能へのアクセス権限を設定します。
+              </p>
+              <div
+                v-for="pagePerm in pagePermissions"
+                :key="pagePerm.page"
+                class="permission-page-group"
+              >
+                <div class="permission-page-group__header">
+                  <h4 class="permission-page-group__title">
+                    {{ pagePerm.page }}
+                  </h4>
+                  <p class="permission-page-group__desc">
+                    {{ pagePerm.description }}
+                  </p>
                 </div>
-                <div class="color-picker__custom">
-                  <label class="color-custom-label">
-                    その他:
+                <div class="permission-page-group__items">
+                  <label
+                    v-for="perm in pagePerm.permissions"
+                    :key="perm.key"
+                    class="permission-checkbox"
+                  >
                     <input
-                      type="color"
-                      class="color-custom-input"
-                      :value="editForm.color || '#64748b'"
-                      @input="handleCustomColorChange($event, 'edit')"
+                      type="checkbox"
+                      :checked="editForm.permissions.has(perm.key)"
+                      @change="toggleEditPermission(perm.key)"
                     />
+                    <span class="permission-checkbox__label">{{
+                      perm.label
+                    }}</span>
                   </label>
                 </div>
               </div>
@@ -817,15 +1002,25 @@ onBeforeUnmount(() => {
           </header>
 
           <div class="modal__body permission-modal-body">
+            <p class="permission-modal-intro">
+              各ページ・機能へのアクセス権限を設定します。
+            </p>
             <div
-              v-for="(perms, category) in permissionsByCategory"
-              :key="category"
-              class="permission-group"
+              v-for="pagePerm in pagePermissions"
+              :key="pagePerm.page"
+              class="permission-page-group"
             >
-              <h4 class="permission-group__title">{{ category }}</h4>
-              <div class="permission-group__items">
+              <div class="permission-page-group__header">
+                <h4 class="permission-page-group__title">
+                  {{ pagePerm.page }}
+                </h4>
+                <p class="permission-page-group__desc">
+                  {{ pagePerm.description }}
+                </p>
+              </div>
+              <div class="permission-page-group__items">
                 <label
-                  v-for="perm in perms"
+                  v-for="perm in pagePerm.permissions"
                   :key="perm.key"
                   class="permission-checkbox"
                 >
@@ -948,6 +1143,72 @@ onBeforeUnmount(() => {
 .permission-warning__desc {
   margin: var(--ui-space-1, 0.25rem) 0 0;
   color: var(--color-warning-text-muted, #92400e);
+}
+
+/* セクション説明 */
+.section-description {
+  margin: 0 0 var(--ui-space-4, 1rem);
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
+}
+
+/* デフォルトロール一覧 */
+.default-role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.default-role-item {
+  padding: var(--ui-space-4, 1rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  background: var(--ui-surface, #ffffff);
+}
+
+.default-role-item__header {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  margin-bottom: var(--ui-space-2, 0.5rem);
+}
+
+.default-role-item__color {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  flex-shrink: 0;
+}
+
+.default-role-item__name {
+  margin: 0;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
+}
+
+.default-role-item__fixed {
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-medium, 500);
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-muted, #64748b);
+  padding: var(--ui-space-px, 2px) var(--ui-space-2, 0.5rem);
+  border-radius: var(--ui-radius-full, 9999px);
+}
+
+.default-role-item__description {
+  margin: 0 0 var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
+  line-height: 1.5;
+}
+
+.default-role-item__actions {
+  display: flex;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 /* ロール一覧 */
@@ -1235,6 +1496,46 @@ onBeforeUnmount(() => {
   color: var(--ui-brand-900, #0b2e33);
 }
 
+/* モーダルタブ */
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  padding: 0 var(--ui-space-5, 1.25rem);
+  gap: var(--ui-space-1, 0.25rem);
+}
+
+.modal-tab {
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border: none;
+  background: transparent;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text-muted, #64748b);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.modal-tab:hover {
+  color: var(--ui-text, #0b2e33);
+}
+
+.modal-tab--active {
+  color: var(--ui-brand-600, #4f7c82);
+  font-weight: var(--ui-font-semibold, 600);
+}
+
+.modal-tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ui-brand-600, #4f7c82);
+  border-radius: var(--ui-radius-full, 9999px) var(--ui-radius-full, 9999px) 0 0;
+}
+
 .modal__close {
   background: transparent;
   border: none;
@@ -1361,6 +1662,46 @@ onBeforeUnmount(() => {
 .permission-modal-body {
   max-height: 60vh;
   overflow-y: auto;
+}
+
+.permission-modal-intro {
+  margin: 0 0 var(--ui-space-4, 1rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.permission-page-group {
+  margin-bottom: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-md, 0.75rem);
+}
+
+.permission-page-group:last-child {
+  margin-bottom: 0;
+}
+
+.permission-page-group__header {
+  margin-bottom: var(--ui-space-2, 0.5rem);
+}
+
+.permission-page-group__title {
+  margin: 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-brand-900, #0b2e33);
+}
+
+.permission-page-group__desc {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.permission-page-group__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .permission-group {

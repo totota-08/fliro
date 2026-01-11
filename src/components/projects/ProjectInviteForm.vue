@@ -22,7 +22,7 @@ const emit = defineEmits<{
   (e: "generated", link: string): void;
 }>();
 
-const { user } = useAuthStore();
+const { user, profile } = useAuthStore();
 const enablePassword = ref(false);
 const password = ref("");
 const expiryOptions = [
@@ -69,6 +69,7 @@ async function handleGenerate() {
       projectId: props.projectId,
       projectName: props.projectName,
       createdBy: user.value.uid,
+      createdByName: profile.value?.nickname || profile.value?.fullName || null,
       password: enablePassword.value ? password.value.trim() : null,
       expiresInHours: expiry.value ?? null,
       maxUses: maxUsesNumber,
