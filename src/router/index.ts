@@ -9,6 +9,7 @@ import { getLogger } from "@logtape/logtape";
 const logger = getLogger("app.router");
 import HomePage from "@/pages/HomePage.vue";
 import MyPage from "@/pages/account/MyPage.vue";
+import AccountSettingsPage from "@/pages/account/AccountSettingsPage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
 import ResetPasswordConfirmPage from "@/pages/auth/ResetPasswordConfirmPage.vue";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage.vue";
@@ -185,6 +186,12 @@ export const router = createRouter({
       path: "/my",
       name: ROUTE_NAMES.myPage,
       component: MyPage,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/my/settings",
+      name: ROUTE_NAMES.accountSettings,
+      component: AccountSettingsPage,
       meta: { requiresAuth: true },
     },
     {
