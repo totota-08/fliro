@@ -1,0 +1,22 @@
+{
+  "workers": [
+    {
+      "id": "worker-1",
+      "status": "busy",
+      "currentTask": "rev-012",
+      "lastSeen": "2026-01-12T10:35:00Z"
+    },
+    {
+      "id": "worker-2",
+      "status": "busy",
+      "currentTask": "rev-004",
+      "lastSeen": "2026-01-12T09:05:00Z"
+    },
+    {
+      "id": "worker-3",
+      "status": "busy",
+      "currentTask": "rev-005",
+      "lastSeen": "2026-01-12T09:05:00Z"
+    }
+  ]
+}

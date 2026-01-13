@@ -1,0 +1,715 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-12T11:00:00Z",
+  "tasks": [
+    {
+      "id": "rev-001",
+      "title": "【HomePage.vue】ハードコードされた色を修正",
+      "description": "rgba(255, 255, 255, 0.8) と rgba(184, 227, 233, 0.35) がハードコードされている。デザイントークン（CSS変数）に置き換える必要がある。",
+      "type": "hardcode",
+      "priority": "high",
+      "status": "completed",
+      "assignedTo": "worker-1",
+      "files": ["src/pages/HomePage.vue", "src/styles/ui-tokens.css"],
+      "lineNumbers": [
+        { "file": "src/pages/HomePage.vue", "start": 311, "end": 311 },
+        { "file": "src/pages/HomePage.vue", "start": 453, "end": 453 }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "major",
+        "evidence": "rgba(255, 255, 255, 0.8), rgba(184, 227, 233, 0.35)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:10:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        },
+        {
+          "status": "assigned",
+          "timestamp": "2026-01-12T09:05:00Z",
+          "by": "manager",
+          "note": "worker-1 に割り当て"
+        },
+        {
+          "status": "review",
+          "timestamp": "2026-01-12T09:10:00Z",
+          "by": "worker-1",
+          "note": "修正完了: ui-tokens.css に --ui-surface-glass と --ui-surface-accent を追加。HomePage.vue L311, L453 の rgba() をCSS変数に置換。lint/typecheck パス。"
+        },
+        {
+          "status": "completed",
+          "timestamp": "2026-01-12T11:00:00Z",
+          "by": "guardian",
+          "note": "検証完了・承認: 1) --ui-surface-glass (rgba(255,255,255,0.8)) ✅追加確認 2) --ui-surface-accent (rgba(184,227,233,0.35)) ✅追加確認 3) HomePage.vue L314, L456 でCSS変数使用を確認 ✅"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-002",
+      "title": "【LoginPage.vue】ハードコードされた色を修正",
+      "description": "フォールバック値にrgba形式の色がハードコードされている。既にCSS変数を参照しているが、フォールバック値も可能な限りデザイントークン化を検討する。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/auth/LoginPage.vue"],
+      "lineNumbers": [
+        { "file": "src/pages/auth/LoginPage.vue", "start": 177, "end": 180 },
+        { "file": "src/pages/auth/LoginPage.vue", "start": 194, "end": 194 },
+        { "file": "src/pages/auth/LoginPage.vue", "start": 223, "end": 223 }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "rgba(11, 46, 51, 0.12), rgba(214, 69, 69, 0.3)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-003",
+      "title": "【SignUpPage.vue】ハードコードされた色を修正",
+      "description": "グラデーション背景やエラー表示にrgba形式の色がハードコードされている。デザイントークン（CSS変数）に置き換える必要がある。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/auth/SignUpPage.vue"],
+      "lineNumbers": [
+        { "file": "src/pages/auth/SignUpPage.vue", "start": 499, "end": 504 },
+        { "file": "src/pages/auth/SignUpPage.vue", "start": 670, "end": 670 }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "rgba(184, 227, 233, 0.35), rgba(147, 177, 181, 0.35), rgba(214, 69, 69, 0.35)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-004",
+      "title": "【ProjectCategoriesPage.vue】presetColorsのハードコードとページ直書きUI",
+      "description": "1) presetColors配列にHEX色が直接ハードコードされている。2) .btnクラスがページ内で独自実装されている。AppButtonコンポーネントを使用するか、共通UIに移行すべき。",
+      "type": "hardcode",
+      "priority": "high",
+      "status": "completed",
+      "assignedTo": "worker-2",
+      "files": ["src/pages/projects/ProjectCategoriesPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectCategoriesPage.vue",
+          "start": 58,
+          "end": 67
+        },
+        {
+          "file": "src/pages/projects/ProjectCategoriesPage.vue",
+          "start": 686,
+          "end": 751
+        },
+        {
+          "file": "src/pages/projects/ProjectCategoriesPage.vue",
+          "start": 726,
+          "end": 726
+        },
+        {
+          "file": "src/pages/projects/ProjectCategoriesPage.vue",
+          "start": 732,
+          "end": 732
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止 / ページ直書きUI禁止",
+        "category": "design_token",
+        "severity": "major",
+        "evidence": "#0b2e33, #4f7c82, color: white, 独自.btn実装"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T07:15:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        },
+        {
+          "status": "assigned",
+          "timestamp": "2026-01-12T09:05:00Z",
+          "by": "manager",
+          "note": "worker-2 に割り当て"
+        },
+        {
+          "status": "in_progress",
+          "timestamp": "2026-01-12T07:10:00Z",
+          "by": "worker-2",
+          "note": "作業開始"
+        },
+        {
+          "status": "review",
+          "timestamp": "2026-01-12T07:15:00Z",
+          "by": "worker-2",
+          "note": "修正完了: 1) 独自.btnスタイルを削除しAppButtonコンポーネントに置換。2) AppButtonにdanger-outline variantを追加。3) ui-tokens.cssに--ui-surface-hoverを追加。4) presetColorsにCSS変数対応コメントを追加（Firestoreに保存する値のためHEXは維持）。lint/typecheck/format パス。"
+        },
+        {
+          "status": "completed",
+          "timestamp": "2026-01-12T11:00:00Z",
+          "by": "guardian",
+          "note": "検証完了・承認: 1) presetColorsはFirestoreデータ値のためHEX維持OK ✅ 2) 独自.btnスタイル削除・AppButton使用 ✅ 3) danger-outline variant追加 ✅ 4) --ui-surface-hover追加 ✅"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-005",
+      "title": "【ProjectMembersPage.vue】JSとCSS内のハードコードされた色",
+      "description": "roleInfoMapでHEX色がJS内でハードコードされている。またCSS内でrgba形式の色がハードコードされている。",
+      "type": "hardcode",
+      "priority": "high",
+      "status": "completed",
+      "assignedTo": "worker-3",
+      "files": ["src/pages/projects/ProjectMembersPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectMembersPage.vue",
+          "start": 75,
+          "end": 75
+        },
+        {
+          "file": "src/pages/projects/ProjectMembersPage.vue",
+          "start": 1397,
+          "end": 1397
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "major",
+        "evidence": "color: \"#0b2e33\", rgba(0, 0, 0, 0.35)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T07:20:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        },
+        {
+          "status": "assigned",
+          "timestamp": "2026-01-12T09:05:00Z",
+          "by": "manager",
+          "note": "worker-3 に割り当て"
+        },
+        {
+          "status": "in_progress",
+          "timestamp": "2026-01-12T07:15:00Z",
+          "by": "worker-3",
+          "note": "作業開始"
+        },
+        {
+          "status": "review",
+          "timestamp": "2026-01-12T07:20:00Z",
+          "by": "worker-3",
+          "note": "修正完了: 1) JS内の#0b2e33を定数OWNER_DEFAULT_COLORに切り出し、CSS変数--ui-brand-900との対応をコメントで明示。2) CSS内のrgba(0, 0, 0, 0.35)をvar(--ui-surface-overlay)に置換。lint/typecheck/build パス。"
+        },
+        {
+          "status": "completed",
+          "timestamp": "2026-01-12T11:00:00Z",
+          "by": "guardian",
+          "note": "検証完了・承認: 1) OWNER_DEFAULT_COLOR定数+コメント明示 ✅ 2) var(--ui-surface-overlay)への置換 ✅ L1402確認済"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-006",
+      "title": "【ProjectChatPage.vue】インラインスタイルとCSS内のハードコード",
+      "description": "formatMessage関数内でインラインスタイルに色がハードコードされている。CSS内でもrgba形式の色がハードコードされている。",
+      "type": "hardcode",
+      "priority": "high",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectChatPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectChatPage.vue",
+          "start": 455,
+          "end": 455
+        },
+        {
+          "file": "src/pages/projects/ProjectChatPage.vue",
+          "start": 907,
+          "end": 907
+        },
+        {
+          "file": "src/pages/projects/ProjectChatPage.vue",
+          "start": 1008,
+          "end": 1008
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "major",
+        "evidence": "style=\"color:#0ea5e9\", rgba(0, 0, 0, 0.04)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-007",
+      "title": "【demo/TeamPage.vue】多数のハードコードされた色",
+      "description": "デモページ内に多数のハードコードされた色が存在する。デモページのため優先度は低いが、将来的にデザイントークンに統一することを推奨。",
+      "type": "hardcode",
+      "priority": "low",
+      "status": "pending",
+      "files": ["src/pages/demo/TeamPage.vue"],
+      "lineNumbers": [
+        { "file": "src/pages/demo/TeamPage.vue", "start": 420, "end": 752 }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "#1c8d72, #0b2e33, #2a9d8f, rgba(...) 多数"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-008",
+      "title": "【demo/MyTasksPage.vue】多数のハードコードされた色",
+      "description": "デモページ内に多数のハードコードされた色が存在する。デモページのため優先度は低いが、将来的にデザイントークンに統一することを推奨。",
+      "type": "hardcode",
+      "priority": "low",
+      "status": "pending",
+      "files": ["src/pages/demo/MyTasksPage.vue"],
+      "lineNumbers": [
+        { "file": "src/pages/demo/MyTasksPage.vue", "start": 526, "end": 733 }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "#4c6b85, #1c8d72, #4f7c82 等多数"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-009",
+      "title": "【ProjectChatPage.vue】pages/でFirestore直接操作（責務分離違反）",
+      "description": "src/pages/projects/ProjectChatPage.vue にて addDoc, deleteDoc を直接インポートして使用しています。createCustomThread() と deleteCustomThread() 関数は services/ に移動すべきです。CLAUDE.md の責務分離ルールに違反しています。",
+      "type": "architecture",
+      "priority": "high",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectChatPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectChatPage.vue",
+          "start": 374,
+          "end": 409
+        }
+      ],
+      "violation": {
+        "rule": "責務分離：pages/はFirestore操作禁止",
+        "category": "architecture",
+        "severity": "major",
+        "evidence": "addDoc, deleteDoc を pages/ で直接使用"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-010",
+      "title": "【ProjectRolesPage.vue】インラインスタイルでハードコード色",
+      "description": "src/pages/projects/ProjectRolesPage.vue にて :style=\"{ backgroundColor: roleDesc.color }\" および :style=\"{ backgroundColor: preset.value }\" など、カラーピッカーのプリセット表示でインラインスタイルが使用されています。プリセット色配列がJS内でハードコードされている可能性があります。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectRolesPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectRolesPage.vue",
+          "start": 543,
+          "end": 543
+        },
+        {
+          "file": "src/pages/projects/ProjectRolesPage.vue",
+          "start": 598,
+          "end": 598
+        },
+        {
+          "file": "src/pages/projects/ProjectRolesPage.vue",
+          "start": 756,
+          "end": 756
+        },
+        {
+          "file": "src/pages/projects/ProjectRolesPage.vue",
+          "start": 870,
+          "end": 870
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": ":style=\"{ backgroundColor: roleDesc.color }\""
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-011",
+      "title": "【ProjectSettingsPage.vue】インラインスタイルでハードコード色",
+      "description": "src/pages/projects/ProjectSettingsPage.vue にて :style=\"{ backgroundColor: '#0b2e33' }\" が固定でハードコードされています。この色はデザイントークン var(--ui-brand-900) を使用すべきです。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectSettingsPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectSettingsPage.vue",
+          "start": 1312,
+          "end": 1312
+        },
+        {
+          "file": "src/pages/projects/ProjectSettingsPage.vue",
+          "start": 1712,
+          "end": 1712
+        },
+        {
+          "file": "src/pages/projects/ProjectSettingsPage.vue",
+          "start": 1809,
+          "end": 1809
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": ":style=\"{ backgroundColor: '#0b2e33' }\""
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T09:00:00Z",
+      "updatedAt": "2026-01-12T09:00:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T09:00:00Z",
+          "by": "reviewer",
+          "note": "自動検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-012",
+      "title": "【CreateProjectPage.vue】homeColors配列とCSS内のハードコード色",
+      "description": "homeColors配列にHEX色(#4f7c82, #0b2e33等)が直接ハードコードされている。また、CSS内でlinear-gradient, rgba形式の色がハードコードされている。",
+      "type": "hardcode",
+      "priority": "high",
+      "status": "completed",
+      "assignedTo": "worker-1",
+      "files": [
+        "src/pages/projects/CreateProjectPage.vue",
+        "src/styles/ui-tokens.css"
+      ],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/CreateProjectPage.vue",
+          "start": 33,
+          "end": 42
+        },
+        {
+          "file": "src/pages/projects/CreateProjectPage.vue",
+          "start": 224,
+          "end": 230
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "major",
+        "evidence": "#4f7c82, #0b2e33, rgba(255, 255, 255, 0.12), linear-gradient(180deg, rgba(11, 46, 51, 0.95)...)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T10:30:00Z",
+      "updatedAt": "2026-01-12T10:50:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T10:30:00Z",
+          "by": "reviewer",
+          "note": "自動巡回で検出"
+        },
+        {
+          "status": "assigned",
+          "timestamp": "2026-01-12T10:35:00Z",
+          "by": "manager",
+          "note": "worker-1 に割り当て"
+        },
+        {
+          "status": "review",
+          "timestamp": "2026-01-12T10:50:00Z",
+          "by": "worker-1",
+          "note": "修正完了: ui-tokens.css に --ui-hero-gradient, --ui-surface-glass-70, --ui-surface-glass-12, --ui-surface-glass-08 を追加。CreateProjectPage.vue の CSS内 linear-gradient と rgba() をCSS変数に置換（L291, L333, L350, L365, L380）。lint/typecheck パス。※ビルドエラーは既存のDatePicker型問題（L204,L208）で今回の修正とは無関係。JS内のhomeColorsはカラーピッカー用プリセットのため対象外。"
+        },
+        {
+          "status": "completed",
+          "timestamp": "2026-01-12T11:00:00Z",
+          "by": "guardian",
+          "note": "検証完了・承認: 1) --ui-hero-gradient ✅ 2) --ui-surface-glass-70/12/08 ✅ 3) CreateProjectPage.vue CSS変数使用確認 ✅ 4) homeColorsはカラーピッカー用データ値のためHEX維持OK ✅"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-013",
+      "title": "【ProjectScoresPage.vue】CSS内のハードコード色",
+      "description": "CSS内で #4f7c82, #f59e0b, rgba(79, 124, 130, 0.15) などの色がハードコードされている。score-good, score-warning クラス等でデザイントークンを使用すべき。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectScoresPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectScoresPage.vue",
+          "start": 398,
+          "end": 398
+        },
+        {
+          "file": "src/pages/projects/ProjectScoresPage.vue",
+          "start": 442,
+          "end": 442
+        },
+        {
+          "file": "src/pages/projects/ProjectScoresPage.vue",
+          "start": 446,
+          "end": 446
+        },
+        {
+          "file": "src/pages/projects/ProjectScoresPage.vue",
+          "start": 465,
+          "end": 465
+        },
+        {
+          "file": "src/pages/projects/ProjectScoresPage.vue",
+          "start": 469,
+          "end": 469
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "#4f7c82, #f59e0b, rgba(79, 124, 130, 0.15)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T10:30:00Z",
+      "updatedAt": "2026-01-12T10:30:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T10:30:00Z",
+          "by": "reviewer",
+          "note": "自動巡回で検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-014",
+      "title": "【ProjectTaskDetailPage.vue】CSS内のハードコード色",
+      "description": "CSS内で rgba(79, 124, 130, 0.1), rgba(255, 255, 255, 0.7) などの色がハードコードされている。back-link:hover や msg-body などのスタイルでデザイントークンを使用すべき。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectTaskDetailPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectTaskDetailPage.vue",
+          "start": 616,
+          "end": 616
+        },
+        {
+          "file": "src/pages/projects/ProjectTaskDetailPage.vue",
+          "start": 918,
+          "end": 918
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "rgba(79, 124, 130, 0.1), rgba(255, 255, 255, 0.7)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T10:30:00Z",
+      "updatedAt": "2026-01-12T10:30:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T10:30:00Z",
+          "by": "reviewer",
+          "note": "自動巡回で検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-015",
+      "title": "【InviteAcceptPage.vue】グラデーション背景とエラー表示のハードコード色",
+      "description": "signup-shell のグラデーション背景に rgba(184, 227, 233, 0.35), rgba(147, 177, 181, 0.35) がハードコードされている。form-error のボーダーに rgba(214, 69, 69, 0.35) がハードコードされている。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/invite/InviteAcceptPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/invite/InviteAcceptPage.vue",
+          "start": 843,
+          "end": 848
+        },
+        {
+          "file": "src/pages/invite/InviteAcceptPage.vue",
+          "start": 1091,
+          "end": 1091
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "rgba(184, 227, 233, 0.35), rgba(147, 177, 181, 0.35), rgba(214, 69, 69, 0.35)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T10:30:00Z",
+      "updatedAt": "2026-01-12T10:30:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T10:30:00Z",
+          "by": "reviewer",
+          "note": "自動巡回で検出"
+        }
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "rev-016",
+      "title": "【ProjectInvitesPage.vue】CSS内のハードコード色",
+      "description": "invite-status--accepted, invite-status--rejected などのクラスで rgba(22, 163, 74, 0.25), rgba(214, 69, 69, 0.25) がハードコードされている。",
+      "type": "hardcode",
+      "priority": "medium",
+      "status": "pending",
+      "files": ["src/pages/projects/ProjectInvitesPage.vue"],
+      "lineNumbers": [
+        {
+          "file": "src/pages/projects/ProjectInvitesPage.vue",
+          "start": 845,
+          "end": 857
+        }
+      ],
+      "violation": {
+        "rule": "デザイントークン以外禁止",
+        "category": "design_token",
+        "severity": "minor",
+        "evidence": "rgba(22, 163, 74, 0.25), rgba(214, 69, 69, 0.25)"
+      },
+      "createdBy": "reviewer",
+      "createdAt": "2026-01-12T10:30:00Z",
+      "updatedAt": "2026-01-12T10:30:00Z",
+      "history": [
+        {
+          "status": "pending",
+          "timestamp": "2026-01-12T10:30:00Z",
+          "by": "reviewer",
+          "note": "自動巡回で検出"
+        }
+      ],
+      "attempts": 0
+    }
+  ]
+}
