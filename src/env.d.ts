@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_DATABASE_URL: string;
   readonly VITE_API_BASE_URL: string;
   readonly VITE_USE_FIREBASE_EMULATORS?: string;
+  readonly VITE_BETA_INVITE_ONLY?: string;
 }
 
 interface ImportMeta {
