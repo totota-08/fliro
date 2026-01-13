@@ -11,6 +11,10 @@ export interface UserProfile {
   createdAt: string;
   updatedAt: string;
   setUp: boolean;
+  // ベータアクセス関連（Cloud Functionsから設定）
+  betaAccess?: boolean;
+  betaCodeUsed?: string;
+  betaAccessAt?: string;
 }
 
 export interface CredentialSignUpPayload {

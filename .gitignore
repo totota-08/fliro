@@ -29,3 +29,10 @@ AGENTS.md
 *.sln
 *.sw?
 firestore.rules
+
+# Agent system reports (generated)
+.agent-system/reports/*.md
+!.agent-system/reports/.gitkeep
+
+# Firebase Cloud Functions build output
+functions/lib/

@@ -9,6 +9,7 @@ import {
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectDatabaseEmulator, getDatabase } from "firebase/database";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -24,6 +25,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 const database = getDatabase(app);
+const functions = getFunctions(app, "asia-northeast1");
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
@@ -39,6 +41,16 @@ if (useEmulators) {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectDatabaseEmulator(database, "localhost", 9000);
   connectStorageEmulator(storage, "localhost", 9199);
+  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
 }
 
-export { app, auth, database, db, githubProvider, googleProvider, storage };
+export {
+  app,
+  auth,
+  database,
+  db,
+  functions,
+  githubProvider,
+  googleProvider,
+  storage,
+};

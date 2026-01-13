@@ -1,8 +1,9 @@
 name: Auto Version Bump
 
 on:
-  push:
+  pull_request:
     branches: [develop]
+    types: [closed]
 
 permissions:
   contents: write
@@ -12,49 +13,64 @@ env:
 
 jobs:
   bump-version:
-    if: github.actor != 'github-actions'
+    # PRがマージされた場合のみ実行（クローズのみの場合は実行しない）
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
+          ref: develop
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Use Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Bump version (patch)
         run: |
           node -e "
           const fs = require('fs');
+
+          // version.json を更新
+          const versionPath = 'version.json';
+          const versionData = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+          const [major, minor, patch] = versionData.version.split('.').map(Number);
+          const newVersion = [major, minor, patch + 1].join('.');
+          versionData.version = newVersion;
+          versionData.updatedAt = new Date().toISOString();
+          fs.writeFileSync(versionPath, JSON.stringify(versionData, null, 2) + '\n');
+
+          // package.json も同期
           const pkgPath = 'package.json';
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-          const match = pkg.version.match(/^(.*?)(\\d+)\\.(\\d+)\\.(\\d+)$/);
-          if (!match) throw new Error('Unexpected version format: ' + pkg.version);
-          const prefix = match[1];
-          let [major, minor, patch] = match.slice(2).map(Number);
-          patch += 1;
-          const next = `${prefix}${major}.${minor}.${patch}`;
-          pkg.version = next;
-          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\\n');
+          pkg.version = versionData.prefix + '-' + newVersion;
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 
+          // package-lock.json も同期
           const lockPath = 'package-lock.json';
           if (fs.existsSync(lockPath)) {
             const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-            lock.version = next;
+            lock.version = pkg.version;
             if (lock.packages && lock.packages['']) {
-              lock.packages[''].version = next;
+              lock.packages[''].version = pkg.version;
             }
-            fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\\n');
+            fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n');
           }
-          console.log(`Bumped version to ${pkg.version}`);
+
+          console.log('Bumped version to ' + newVersion + ' (full: ' + pkg.version + ')');
           "
+
       - name: Commit and push
         run: |
           if git diff --quiet; then
-            echo "No changes to commit"; exit 0; fi
+            echo "No changes to commit"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore: bump version"
-          git push origin HEAD:develop
+          git add version.json package.json package-lock.json
+          git commit -m "chore: bump version [skip ci]"
+          git push origin develop

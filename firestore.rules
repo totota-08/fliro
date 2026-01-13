@@ -6,13 +6,33 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // 招待コード（ベータゲート用）: クライアントからの直接アクセスを禁止
+    // Cloud Functions の Admin SDK は Rules をバイパスするため問題なし
+    match /invitationCodes/{codeId} {
+      allow read, write: if false;
+    }
+
     match /profiles/{userId} {
+      // betaAccess, betaCodeUsed, betaAccessAt はクライアントから直接設定不可（Cloud Functionsのみ）
+      function isBetaFieldChange() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['betaAccess', 'betaCodeUsed', 'betaAccessAt']);
+      }
+
+      function hasBetaFieldsInCreate() {
+        return 'betaAccess' in request.resource.data
+               || 'betaCodeUsed' in request.resource.data
+               || 'betaAccessAt' in request.resource.data;
+      }
+
       allow create: if isSignedIn()
                     && request.auth.uid == userId
-                    && !exists(/databases/$(database)/documents/profiles/$(userId));
+                    && !exists(/databases/$(database)/documents/profiles/$(userId))
+                    && !hasBetaFieldsInCreate();
       allow update: if isSignedIn()
                     && request.auth.uid == userId
-                    && exists(/databases/$(database)/documents/profiles/$(userId));
+                    && exists(/databases/$(database)/documents/profiles/$(userId))
+                    && !isBetaFieldChange();
       allow read, delete: if isSignedIn() && request.auth.uid == userId;
 
       // Dashboard settings per project (personal customization)
