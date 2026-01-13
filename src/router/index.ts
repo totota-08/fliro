@@ -34,6 +34,7 @@ import SecretAccessPage from "@/pages/secret/SecretAccessPage.vue";
 import SecretChatPage from "@/pages/secret/SecretChatPage.vue";
 import MyTasksPage from "@/pages/tasks/MyTasksPage.vue";
 import TaskProgressPage from "@/pages/tasks/TaskProgressPage.vue";
+import ProjectLayout from "@/layouts/ProjectLayout.vue";
 import { useAuthStore, waitForAuthReady } from "@/store/auth";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -98,7 +99,7 @@ export const router = createRouter({
       meta: { requiresAuth: true, layout: "full" },
     },
     {
-      path: "/debug/projects/new",
+      path: "/projects/new",
       name: ROUTE_NAMES.projectCreate,
       component: CreateProjectPage,
       meta: { requiresAuth: true, layout: "full" },
@@ -110,79 +111,86 @@ export const router = createRouter({
       meta: { requiresAuth: true, layout: "full" },
     },
     {
-      path: "/projects/:projectId/dashboard",
-      name: ROUTE_NAMES.projectDashboard,
-      component: ProjectDashboardPage,
-      meta: { requiresAuth: true, section: "dashboard" },
-    },
-    {
-      path: "/projects/:projectId/threads",
-      name: ROUTE_NAMES.projectThreads,
-      component: ProjectChatPage,
-      meta: { requiresAuth: true, section: "team" },
-    },
-    {
-      path: "/projects/:projectId/members",
-      name: ROUTE_NAMES.projectMembers,
-      component: ProjectMembersPage,
-      meta: { requiresAuth: true, section: "members" },
-    },
-    {
-      path: "/projects/:projectId/invites",
-      name: ROUTE_NAMES.projectInvites,
-      component: ProjectInvitesPage,
-      meta: { requiresAuth: true, section: "invites" },
-    },
-    {
-      path: "/projects/:projectId/roles",
-      name: ROUTE_NAMES.projectRoles,
-      component: ProjectRolesPage,
-      meta: { requiresAuth: true, section: "members" },
-    },
-    {
-      path: "/projects/:projectId/categories",
-      name: ROUTE_NAMES.projectCategories,
-      component: ProjectCategoriesPage,
-      meta: { requiresAuth: true, section: "settings" },
-    },
-    {
-      path: "/projects/:projectId/activity",
-      name: ROUTE_NAMES.projectActivity,
-      component: ProjectActivityLogPage,
-      meta: { requiresAuth: true, section: "timeline" },
-    },
-    {
-      path: "/projects/:projectId/settings",
-      name: ROUTE_NAMES.projectSettings,
-      component: ProjectSettingsPage,
-      meta: { requiresAuth: true, section: "settings" },
-    },
-    {
-      path: "/projects/:projectId/notifications",
-      name: ROUTE_NAMES.projectNotifications,
-      component: ProjectNotificationsPage,
-      meta: { requiresAuth: true, section: "notifications" },
-    },
-    {
-      path: "/projects/:projectId/tasks/:taskId",
-      name: ROUTE_NAMES.projectTaskDetail,
-      redirect: (to) => ({
-        name: ROUTE_NAMES.projectDashboard,
-        params: { projectId: to.params.projectId },
-        query: { taskId: to.params.taskId },
-      }),
-    },
-    {
-      path: "/projects/:projectId/scores",
-      name: ROUTE_NAMES.projectScores,
-      component: () => import("@/pages/projects/ProjectScoresPage.vue"),
-      meta: { requiresAuth: true, section: "scores" },
-    },
-    {
-      path: "/projects/:projectId/tasks",
-      name: ROUTE_NAMES.myTasks,
-      component: MyTasksPage,
-      meta: { requiresAuth: true, section: "tasks" },
+      path: "/projects/:projectId",
+      component: ProjectLayout,
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: "dashboard",
+          name: ROUTE_NAMES.projectDashboard,
+          component: ProjectDashboardPage,
+          meta: { section: "dashboard" },
+        },
+        {
+          path: "threads",
+          name: ROUTE_NAMES.projectThreads,
+          component: ProjectChatPage,
+          meta: { section: "team" },
+        },
+        {
+          path: "members",
+          name: ROUTE_NAMES.projectMembers,
+          component: ProjectMembersPage,
+          meta: { section: "members" },
+        },
+        {
+          path: "invites",
+          name: ROUTE_NAMES.projectInvites,
+          component: ProjectInvitesPage,
+          meta: { section: "invites" },
+        },
+        {
+          path: "roles",
+          name: ROUTE_NAMES.projectRoles,
+          component: ProjectRolesPage,
+          meta: { section: "members" },
+        },
+        {
+          path: "categories",
+          name: ROUTE_NAMES.projectCategories,
+          component: ProjectCategoriesPage,
+          meta: { section: "settings" },
+        },
+        {
+          path: "activity",
+          name: ROUTE_NAMES.projectActivity,
+          component: ProjectActivityLogPage,
+          meta: { section: "timeline" },
+        },
+        {
+          path: "settings",
+          name: ROUTE_NAMES.projectSettings,
+          component: ProjectSettingsPage,
+          meta: { section: "settings" },
+        },
+        {
+          path: "notifications",
+          name: ROUTE_NAMES.projectNotifications,
+          component: ProjectNotificationsPage,
+          meta: { section: "notifications" },
+        },
+        {
+          path: "tasks/:taskId",
+          name: ROUTE_NAMES.projectTaskDetail,
+          redirect: (to) => ({
+            name: ROUTE_NAMES.projectDashboard,
+            params: { projectId: to.params.projectId },
+            query: { taskId: to.params.taskId },
+          }),
+        },
+        {
+          path: "scores",
+          name: ROUTE_NAMES.projectScores,
+          component: () => import("@/pages/projects/ProjectScoresPage.vue"),
+          meta: { section: "scores" },
+        },
+        {
+          path: "tasks",
+          name: ROUTE_NAMES.myTasks,
+          component: MyTasksPage,
+          meta: { section: "tasks" },
+        },
+      ],
     },
     {
       path: "/tasks/progress",

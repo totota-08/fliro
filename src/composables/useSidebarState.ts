@@ -5,9 +5,9 @@ export function useSidebarState() {
   let mediaQuery: MediaQueryList | null = null;
 
   const handleMediaChange = (event: MediaQueryListEvent) => {
-    if (event.matches) {
-      isSidebarOpen.value = false;
-    }
+    // 画面が小さくなった場合はサイドバーを閉じる
+    // 画面が大きくなった場合はサイドバーを開く
+    isSidebarOpen.value = !event.matches;
   };
 
   onMounted(() => {
