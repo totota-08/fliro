@@ -34,6 +34,7 @@ export function useProjectShellData(projectIdRef: Ref<string>) {
     name:
       profile.value?.nickname || profile.value?.fullName || `${appName} User`,
     email: profile.value?.email || "",
+    avatar: profile.value?.avatarUrl || user.value?.photoURL || undefined,
   }));
 
   async function loadProjectList() {

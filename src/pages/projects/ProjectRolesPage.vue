@@ -1,15 +1,12 @@
 <script setup lang="ts">
-import PageHeader from "@/components/ui/PageHeader.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import {
   ProjectPermission,
   type ProjectPermissionKey,
 } from "@/constants/permissions";
-import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectAccess } from "@/composables/useProjectAccess";
-import { useProjectShellData } from "@/composables/useProjectShellData";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import {
   listenProjectMembers,
   updateProjectMemberRole,
@@ -36,6 +33,9 @@ type MemberRole = ProjectMember["role"];
 const { projectId } = useProjectIdRoute();
 const members = ref<ProjectMember[]>([]);
 const roles = ref<ProjectRole[]>([]);
+
+// ページタイトル設定
+usePageTitle("ロール管理", "プロジェクトのロールと権限を管理します");
 const updating = ref<string | null>(null);
 
 let stopMembers: (() => void) | null = null;
@@ -44,10 +44,6 @@ let stopRoles: (() => void) | null = null;
 // useProjectAccess で権限管理を統一
 const { can } = useProjectAccess(projectId);
 const canEdit = computed(() => can(ProjectPermission.MANAGE_ROLES));
-
-// ProjectAppShell用のデータ
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 
 // 新規ロール作成フォーム
 const isCreateModalOpen = ref(false);
@@ -519,31 +515,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="ロール管理"
-  >
-    <template #headerTitle>
-      <PageHeader
-        title="ロール管理"
-        subtitle="プロジェクトのロールと権限を管理します"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          {
-            label: 'メンバー',
-            to: { name: ROUTE_NAMES.projectMembers, params: { projectId } },
-          },
-          { label: 'ロール' },
-        ]"
-      />
-    </template>
-
+  <div class="project-roles-page">
     <div class="roles-content">
       <!-- 権限警告 -->
       <div v-if="!canEdit" class="permission-warning">
@@ -1114,7 +1086,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </Teleport>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>

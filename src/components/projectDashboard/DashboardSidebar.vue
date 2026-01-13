@@ -7,8 +7,9 @@ import type {
   DashboardProfileInfo,
   DashboardProjectItem,
 } from "@/types/projectDashboard";
+import { ROUTE_NAMES } from "@/constants/routes";
 import { computed } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 type NavItem = DashboardNavItem & { active: boolean };
 
@@ -22,6 +23,7 @@ const props = withDefaults(
     dashboardTo?: string | object;
   }>(),
   {
+    dashboardTo: "/",
     navItems: () =>
       [
         {
@@ -64,6 +66,7 @@ const emit = defineEmits<{
 }>();
 
 const route = useRoute();
+const router = useRouter();
 const { isNavigating, targetPath } = useNavigationState();
 
 const currentSection = computed(() => {
@@ -106,6 +109,14 @@ const handleNavigate = (event?: MouseEvent) => {
     event?.preventDefault();
     return;
   }
+  if (window.matchMedia("(max-width: 1200px)").matches) {
+    emit("close");
+  }
+};
+
+const handleCreateProject = () => {
+  if (isNavigating.value) return;
+  router.push({ name: ROUTE_NAMES.projectCreate });
   if (window.matchMedia("(max-width: 1200px)").matches) {
     emit("close");
   }
@@ -315,6 +326,7 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
           type="button"
           class="sidebar__add"
           aria-label="プロジェクトを追加"
+          @click="handleCreateProject"
         >
           +
         </button>

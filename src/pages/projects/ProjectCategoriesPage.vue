@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import PageHeader from "@/components/ui/PageHeader.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
-import { appName } from "@/constants/appMeta";
-import { ROUTE_NAMES } from "@/constants/routes";
-import { buildProjectNavItems } from "@/constants/projectNav";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   addTaskCategory,
@@ -19,14 +16,17 @@ import {
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { doc, getDoc } from "firebase/firestore";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const logger = getLogger("app.pages.projects.ProjectCategoriesPage");
 
-const { user, profile } = useAuthStore();
+const { user } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const categories = ref<TaskCategory[]>([]);
 const canEdit = ref(false);
+
+// ページタイトル設定
+usePageTitle("カテゴリ管理", "タスクを整理するためのカテゴリを管理します");
 
 // 作成フォーム
 const newCategory = ref({
@@ -54,7 +54,19 @@ const isDeleting = ref(false);
 const isCreating = ref(false);
 const isUpdating = ref(false);
 
-// プリセットカラー（Deep Greenパレットに合う色）
+/**
+ * プリセットカラー（Deep Greenパレットに合う色）
+ * 注: これらの値はFirestoreに保存されるデータ値のため、HEXコードを直接使用。
+ * CSS変数との対応:
+ *   #0b2e33 = --ui-brand-900 (Deep Green)
+ *   #4f7c82 = --ui-brand-600 (Teal)
+ *   #16a34a = --ui-success (Green)
+ *   #f59e0b = --ui-warning (Amber)
+ *   #ef4444 = Red (--ui-danger は #d64545)
+ *   #8b5cf6 = Purple (トークン未定義)
+ *   #3b82f6 = Blue (トークン未定義)
+ *   #64748b = --ui-text-muted (Slate)
+ */
 const presetColors = [
   { value: "#0b2e33", label: "Deep Green" },
   { value: "#4f7c82", label: "Teal" },
@@ -67,13 +79,6 @@ const presetColors = [
 ];
 
 let stopCategories: (() => void) | null = null;
-
-const navItems = computed(() => buildProjectNavItems(projectId.value));
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
 
 async function evaluatePermissions() {
   if (!user.value) {
@@ -231,31 +236,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="[]"
-    :profile-info="profileInfo"
-    brand-subtitle="カテゴリ"
-  >
-    <template #headerTitle>
-      <PageHeader
-        title="カテゴリ管理"
-        subtitle="タスクを整理するためのカテゴリを管理します"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          {
-            label: '設定',
-            to: { name: ROUTE_NAMES.projectSettings, params: { projectId } },
-          },
-          { label: 'カテゴリ' },
-        ]"
-      />
-    </template>
-
+  <div class="project-categories-page">
     <div class="category-content">
       <!-- 権限警告 -->
       <div v-if="!canEdit" class="permission-warning">
@@ -322,13 +303,13 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="create-form__actions">
-            <button
+            <AppButton
               type="submit"
-              class="btn btn--primary"
+              variant="primary"
               :disabled="!newCategory.name.trim() || isCreating"
             >
               {{ isCreating ? "作成中..." : "カテゴリを追加" }}
-            </button>
+            </AppButton>
           </div>
         </form>
       </SectionCard>
@@ -355,29 +336,33 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div v-if="canEdit" class="category-item__actions">
-              <button
-                type="button"
-                class="btn btn--ghost btn--sm"
+              <AppButton
+                variant="ghost"
+                size="sm"
                 @click="openEditModal(category)"
               >
                 編集
-              </button>
-              <button
-                type="button"
-                class="btn btn--danger-outline btn--sm"
+              </AppButton>
+              <AppButton
+                variant="danger-outline"
+                size="sm"
                 @click="openDeleteModal(category)"
               >
                 削除
-              </button>
+              </AppButton>
             </div>
           </li>
         </ul>
-        <div v-else class="empty-state">
-          <p>カテゴリがまだありません。</p>
-          <p v-if="canEdit" class="empty-state__hint">
-            上のフォームから新しいカテゴリを作成してください。
-          </p>
-        </div>
+        <AppEmptyState
+          v-else
+          icon="folder"
+          title="カテゴリがまだありません"
+          :description="
+            canEdit
+              ? '上のフォームから新しいカテゴリを作成してください。'
+              : 'カテゴリはまだ作成されていません。'
+          "
+        />
       </SectionCard>
     </div>
 
@@ -486,46 +471,49 @@ onBeforeUnmount(() => {
         </AppButton>
       </template>
     </AppModal>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>
+.project-categories-page {
+  padding: var(--ui-space-6, 1.5rem);
+}
+
 .category-content {
-  padding: 0 var(--gap-lg) var(--gap-2xl);
   max-width: 800px;
 }
 
 /* 権限警告 */
 .permission-warning {
-  border: 1px solid var(--color-warning-border, #f59e0b44);
-  background: var(--color-warning-bg, #fff7ed);
-  border-radius: var(--radius-md);
-  padding: var(--gap-md) var(--gap-lg);
-  margin-bottom: var(--gap-lg);
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 27%, transparent);
+  background: var(--ui-warning-light, #fff7ed);
+  border-radius: var(--ui-radius-md);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  margin-bottom: var(--ui-space-4);
 }
 
 .permission-warning__title {
   margin: 0;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-warning-text, #b45309);
+  font-weight: var(--ui-font-bold);
+  color: var(--ui-warning-dark, #b45309);
 }
 
 .permission-warning__desc {
-  margin: var(--gap-xs) 0 0;
-  color: var(--color-warning-text-muted, #92400e);
+  margin: var(--ui-space-1) 0 0;
+  color: var(--ui-warning-text, #92400e);
 }
 
 /* フォーム */
 .create-form {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-lg);
+  gap: var(--ui-space-4);
 }
 
 .create-form__field {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  gap: var(--ui-space-2);
 }
 
 .create-form__actions {
@@ -536,35 +524,35 @@ onBeforeUnmount(() => {
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
-  margin-bottom: var(--gap-lg);
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-4);
 }
 
 .form-label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-strong);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-semibold);
+  color: var(--ui-text-strong);
 }
 
 .required {
-  color: var(--color-danger, #ef4444);
+  color: var(--ui-danger, #ef4444);
 }
 
 .form-input,
 .form-textarea {
   width: 100%;
-  padding: var(--gap-sm) var(--gap-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-md);
-  background: var(--surface);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-base);
+  background: var(--ui-surface);
   transition: border-color 0.15s ease;
 }
 
 .form-input:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: var(--brand);
+  border-color: var(--ui-brand-600);
 }
 
 .form-textarea {
@@ -576,19 +564,19 @@ onBeforeUnmount(() => {
 .color-picker {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  gap: var(--ui-space-2);
 }
 
 .color-picker__presets {
   display: flex;
-  gap: var(--gap-xs);
+  gap: var(--ui-space-1);
   flex-wrap: wrap;
 }
 
 .color-preset {
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ui-radius-sm);
   border: 2px solid transparent;
   cursor: pointer;
   transition:
@@ -601,10 +589,10 @@ onBeforeUnmount(() => {
 }
 
 .color-preset.is-selected {
-  border-color: var(--brand);
+  border-color: var(--ui-brand-600);
   box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 4px var(--brand);
+    0 0 0 2px var(--ui-surface),
+    0 0 0 4px var(--ui-brand-600);
 }
 
 .color-picker__custom {
@@ -615,9 +603,9 @@ onBeforeUnmount(() => {
 .color-custom-label {
   display: flex;
   align-items: center;
-  gap: var(--gap-sm);
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
+  gap: var(--ui-space-2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
 }
 
 .color-custom-input {
@@ -625,7 +613,7 @@ onBeforeUnmount(() => {
   height: 32px;
   padding: 0;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ui-radius-sm);
   cursor: pointer;
 }
 
@@ -636,35 +624,35 @@ onBeforeUnmount(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  gap: var(--ui-space-2);
 }
 
 .category-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--gap-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
   transition: border-color 0.15s ease;
 }
 
 .category-item:hover {
-  border-color: var(--brand-muted);
+  border-color: var(--ui-brand-400);
 }
 
 .category-item__main {
   display: flex;
   align-items: center;
-  gap: var(--gap-md);
+  gap: var(--ui-space-3);
   min-width: 0;
 }
 
 .category-item__color {
   width: 24px;
   height: 24px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--ui-radius-sm);
   flex-shrink: 0;
 }
 
@@ -674,14 +662,14 @@ onBeforeUnmount(() => {
 
 .category-item__name {
   margin: 0;
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-strong);
+  font-weight: var(--ui-font-semibold);
+  color: var(--ui-text-strong);
 }
 
 .category-item__desc {
-  margin: var(--gap-xs) 0 0;
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
+  margin: var(--ui-space-1) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -690,106 +678,38 @@ onBeforeUnmount(() => {
 
 .category-item__actions {
   display: flex;
-  gap: var(--gap-xs);
+  gap: var(--ui-space-1);
   flex-shrink: 0;
 }
 
 /* 空状態 */
 .empty-state {
   text-align: center;
-  padding: var(--gap-2xl);
-  color: var(--text-muted);
+  padding: var(--ui-space-8);
+  color: var(--ui-text-muted);
 }
 
 .empty-state__hint {
-  margin-top: var(--gap-sm);
-  font-size: var(--font-size-sm);
-}
-
-/* ボタン */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-xs);
-  padding: var(--gap-sm) var(--gap-lg);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
-}
-
-.btn--sm {
-  padding: var(--gap-xs) var(--gap-sm);
-  font-size: var(--font-size-sm);
-}
-
-.btn--primary {
-  background: var(--brand);
-  color: var(--text-on-brand);
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: var(--brand-hover);
-}
-
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-strong);
-}
-
-.btn--ghost:hover {
-  background: var(--surface-hover);
-}
-
-.btn--danger {
-  background: var(--color-danger, #ef4444);
-  color: white;
-}
-
-.btn--danger:hover:not(:disabled) {
-  background: var(--color-danger-hover, #dc2626);
-}
-
-.btn--danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--danger-outline {
-  background: transparent;
-  border: 1px solid var(--color-danger, #ef4444);
-  color: var(--color-danger, #ef4444);
-}
-
-.btn--danger-outline:hover {
-  background: var(--color-danger-bg, #fef2f2);
+  margin-top: var(--ui-space-2);
+  font-size: var(--ui-text-sm);
 }
 
 /* モーダルスタイルは AppModal コンポーネントで管理 */
 
 .modal__warning {
-  margin-top: var(--gap-sm);
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
+  margin-top: var(--ui-space-2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text-muted);
 }
 
 /* エラーアラート */
 .error-alert {
-  margin-top: var(--gap-lg);
-  padding: var(--gap-md);
-  background: var(--color-danger-bg, #fef2f2);
-  border: 1px solid var(--color-danger, #ef4444);
-  border-radius: var(--radius-md);
-  color: var(--color-danger, #ef4444);
+  margin-top: var(--ui-space-4);
+  padding: var(--ui-space-3);
+  background: var(--ui-danger-light, #fef2f2);
+  border: 1px solid var(--ui-danger, #ef4444);
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-danger, #ef4444);
 }
 
 .error-alert p {
@@ -799,13 +719,13 @@ onBeforeUnmount(() => {
 /* レスポンシブ */
 @media (max-width: 768px) {
   .category-content {
-    padding: 0 var(--gap-md) var(--gap-xl);
+    padding: 0 var(--ui-space-3) var(--ui-space-6);
   }
 
   .category-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--gap-md);
+    gap: var(--ui-space-3);
   }
 
   .category-item__actions {

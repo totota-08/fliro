@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import AppButton from "@/components/ui/AppButton.vue";
+import AppInput from "@/components/ui/AppInput.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
+import AppToggle from "@/components/ui/AppToggle.vue";
 import { createProjectInvite } from "@/services/projectInvites";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 const logger = getLogger("app.components.projects.ProjectInviteForm");
 
@@ -25,13 +29,16 @@ const emit = defineEmits<{
 const { user, profile } = useAuthStore();
 const enablePassword = ref(false);
 const password = ref("");
-const expiryOptions = [
-  { label: "24時間", value: 24 },
-  { label: "7日間", value: 24 * 7 },
-  { label: "30日間", value: 24 * 30 },
-  { label: "期限なし", value: null },
-];
-const expiry = ref<number | null>(24 * 7);
+const expirySelectOptions = computed(() => [
+  { label: "24時間", value: "24" },
+  { label: "7日間", value: String(24 * 7) },
+  { label: "30日間", value: String(24 * 30) },
+  { label: "期限なし", value: "" },
+]);
+const expiryValue = ref(String(24 * 7));
+const expiry = computed(() =>
+  expiryValue.value ? Number(expiryValue.value) : null,
+);
 const maxUses = ref<string>("");
 const generating = ref(false);
 const errorMessage = ref("");
@@ -145,44 +152,48 @@ function tryFallbackCopy(text: string) {
     </header>
 
     <div class="invite-options">
-      <label class="toggle">
-        <input type="checkbox" v-model="enablePassword" />
-        <span>パスワードを設定する</span>
-      </label>
+      <AppToggle v-model="enablePassword" label="パスワードを設定する" />
 
-      <input
+      <AppInput
         v-if="enablePassword"
         v-model="password"
         type="password"
         placeholder="共有用パスワード（4文字以上）"
       />
 
-      <label class="small-label">有効期限</label>
-      <select v-model="expiry">
-        <option
-          v-for="opt in expiryOptions"
-          :key="String(opt.value)"
-          :value="opt.value"
-        >
-          {{ opt.label }}
-        </option>
-      </select>
+      <div class="invite-field">
+        <label class="invite-label">有効期限</label>
+        <AppSelect
+          v-model="expiryValue"
+          :options="expirySelectOptions"
+          placeholder="期限を選択"
+        />
+      </div>
 
-      <label class="small-label">利用回数上限（任意・未入力で無制限）</label>
-      <input v-model="maxUses" type="number" min="1" placeholder="例) 10" />
+      <div class="invite-field">
+        <label class="invite-label">利用回数上限（任意・未入力で無制限）</label>
+        <AppInput v-model="maxUses" type="number" placeholder="例) 10" />
+      </div>
     </div>
 
     <div class="invite-actions">
-      <button type="button" :disabled="generating" @click="handleGenerate">
-        {{ generating ? "生成中..." : "参加リンクを生成" }}
-      </button>
+      <AppButton
+        variant="primary"
+        :disabled="generating"
+        :loading="generating"
+        @click="handleGenerate"
+      >
+        参加リンクを生成
+      </AppButton>
     </div>
 
     <div v-if="generatedLink" class="invite-result">
-      <label>共有リンク</label>
+      <label class="invite-label">共有リンク</label>
       <div class="link-box">
         <span>{{ generatedLink }}</span>
-        <button type="button" @click="copyLink">コピー</button>
+        <AppButton variant="ghost" size="sm" @click="copyLink">
+          コピー
+        </AppButton>
       </div>
       <p v-if="enablePassword" class="password-note">
         ※ パスワードはリンクとは別に安全な経路で共有してください。
@@ -196,121 +207,86 @@ function tryFallbackCopy(text: string) {
 
 <style scoped>
 .invite-card {
-  border: 2px dashed #b8e3e9;
-  border-radius: 1.25rem;
-  padding: 1.25rem;
+  border: 2px dashed var(--ui-brand-100, #e5f6f8);
+  border-radius: var(--ui-radius-xl, 1.25rem);
+  padding: var(--ui-space-5, 1.25rem);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
+  background: var(--ui-surface, #ffffff);
 }
 
 .invite-card header h3 {
   margin: 0;
-  color: #0b2e33;
+  color: var(--ui-text-strong, #0f172a);
+  font-size: var(--ui-text-lg, 1.125rem);
+  font-weight: var(--ui-font-bold, 700);
 }
 
 .invite-card header p {
-  margin: 0.35rem 0 0;
-  color: #4f7c82;
-  font-size: 0.9rem;
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .invite-options {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--ui-space-4, 1rem);
 }
 
-.invite-options select,
-.invite-options input[type="number"] {
-  border: 2px solid #b8e3e9;
-  border-radius: 0.9rem;
-  padding: 0.6rem 0.9rem;
+.invite-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  color: #0b2e33;
+.invite-label {
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #0b2e33);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
-.small-label {
-  font-weight: 600;
-  color: #0b2e33;
-  font-size: 0.9rem;
-}
-
-.invite-options input[type="password"] {
-  border: 2px solid #b8e3e9;
-  border-radius: 0.9rem;
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-}
-
-.invite-actions button {
-  border: none;
-  border-radius: 0.95rem;
-  padding: 0.75rem 1.25rem;
-  font-weight: 600;
-  color: #fff;
-  background: linear-gradient(90deg, #4f7c82, #0b2e33);
-  cursor: pointer;
-}
-
-.invite-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.invite-actions {
+  padding-top: var(--ui-space-2, 0.5rem);
 }
 
 .invite-result {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-.invite-result label {
-  font-weight: 600;
-  color: #0b2e33;
+  gap: var(--ui-space-2, 0.5rem);
 }
 
 .link-box {
-  border: 1px solid #b8e3e9;
-  border-radius: 0.9rem;
-  padding: 0.65rem;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
   display: flex;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
   align-items: center;
   justify-content: space-between;
-  background: #f5fbfb;
-  font-size: 0.9rem;
+  background: var(--ui-surface-muted, #f1f5f9);
+  font-size: var(--ui-text-sm, 0.875rem);
   word-break: break-all;
-}
-
-.link-box button {
-  border: none;
-  background: transparent;
-  color: #0b2e33;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .password-note {
   margin: 0;
-  font-size: 0.85rem;
-  color: #4f7c82;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .invite-error {
   margin: 0;
-  color: #d64545;
-  font-weight: 600;
+  color: var(--ui-danger, #d64545);
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .invite-message {
   margin: 0;
-  color: #0b2e33;
-  font-weight: 600;
+  color: var(--ui-text-strong, #0f172a);
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 </style>

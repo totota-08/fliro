@@ -10,7 +10,13 @@ import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 const props = withDefaults(
   defineProps<{
-    variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
+    variant?:
+      | "primary"
+      | "secondary"
+      | "outline"
+      | "ghost"
+      | "danger"
+      | "danger-outline";
     size?: "sm" | "md" | "lg";
     loading?: boolean;
     to?: RouteLocationRaw;
@@ -169,6 +175,22 @@ const classes = computed(() => [
 }
 
 .app-button--danger:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-danger);
+}
+
+/* Danger Outline */
+.app-button--danger-outline {
+  background: transparent;
+  border-color: var(--ui-danger, #d64545);
+  color: var(--ui-danger, #d64545);
+}
+
+.app-button--danger-outline:not(:disabled):hover {
+  background: var(--ui-danger-light, #fee2e2);
+}
+
+.app-button--danger-outline:focus-visible {
   outline: none;
   box-shadow: var(--ui-ring-danger);
 }

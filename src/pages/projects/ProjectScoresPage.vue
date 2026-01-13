@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import PageHeader from "@/components/ui/PageHeader.vue";
-import { ROUTE_NAMES } from "@/constants/routes";
+import { usePageTitle } from "@/composables/usePageTitle";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { useProjectShellData } from "@/composables/useProjectShellData";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   computeWeeklyScores,
@@ -17,10 +14,21 @@ import type { ProjectDoc } from "@/types/project";
 const logger = getLogger("app.pages.projects.ProjectScores");
 
 const { projectId } = useProjectIdRoute();
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 
 const project = ref<ProjectDoc | null>(null);
+
+// ページタイトル設定
+const { setTitle } = usePageTitle(
+  "週次タスク完了率",
+  "メンバーごとのタスク完了状況を確認",
+);
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 const weeklyScores = ref<WeeklyScoreResult | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -110,34 +118,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="プロジェクト"
-  >
-    <template #headerTitle>
-      <PageHeader
-        :title="project?.name || 'スコア'"
-        subtitle="メンバーのパフォーマンスを確認"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: 'スコア' },
-        ]"
-      />
-    </template>
-
+  <div class="project-scores-page">
     <div class="scores-content">
       <section class="scores-page">
         <header class="scores-page__header">
-          <div>
-            <h2>週次タスク完了率</h2>
-            <p>メンバーごとのタスク完了状況を確認できます。</p>
-          </div>
           <div class="scores-page__week-select">
             <label for="week-select" class="sr-only">週を選択</label>
             <select
@@ -246,7 +230,7 @@ onBeforeUnmount(() => {
         </template>
       </section>
     </div>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>

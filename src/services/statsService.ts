@@ -1,16 +1,29 @@
-import { collection, getCountFromServer, getDocs } from "firebase/firestore";
+import {
+  collection,
+  collectionGroup,
+  getCountFromServer,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { TaskDoc } from "@/services/taskService";
 
-export async function fetchScaleStats() {
-  const [userSnap, projectSnap] = await Promise.all([
+export interface ScaleStats {
+  users: number;
+  projects: number;
+  tasks: number;
+}
+
+export async function fetchScaleStats(): Promise<ScaleStats> {
+  const [userSnap, projectSnap, taskSnap] = await Promise.all([
     getCountFromServer(collection(db, "profiles")),
     getCountFromServer(collection(db, "projects")),
+    getCountFromServer(collectionGroup(db, "tasks")),
   ]);
 
   return {
     users: userSnap.data().count,
     projects: projectSnap.data().count,
+    tasks: taskSnap.data().count,
   };
 }
 

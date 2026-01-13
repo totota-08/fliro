@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import WeeklyEventSparkline from "@/components/projectActivity/WeeklyEventSparkline.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
-import { ROUTE_NAMES } from "@/constants/routes";
-import { useProjectShellData } from "@/composables/useProjectShellData";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import {
   fetchProjectEventsPage,
   listenProjectEvents,
@@ -68,12 +65,13 @@ const iconMap = {
 
 const route = useRoute();
 const projectId = ref(String(route.params.projectId || ""));
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 const filterType = ref<ProjectEventCategory | "all">("all");
 const loading = ref(true);
 const loadingMore = ref(false);
 const hasMore = ref(true);
+
+// ページタイトル設定
+usePageTitle("活動ログ", "プロジェクトのイベント");
 const previewLimit = 5;
 const isLogExpanded = ref(false);
 const liveEvents = ref<ProjectEvent[]>([]);
@@ -320,27 +318,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="ログ"
-  >
-    <template #headerTitle>
-      <PageHeader
-        title="活動ログ"
-        :subtitle="`${decoratedEvents.length}件のイベント`"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: 'ログ' },
-        ]"
-      />
-    </template>
-
+  <div class="project-activity-log-page">
     <div class="log-layout">
       <div class="log-content">
         <section class="log-toolbar">
@@ -454,10 +432,14 @@ onBeforeUnmount(() => {
         </div>
       </aside>
     </div>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>
+.project-activity-log-page {
+  padding: var(--ui-space-6, 1.5rem);
+}
+
 .log-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;

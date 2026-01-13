@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { commands, executeCommand } from "@/commands";
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppDrawer from "@/components/ui/AppDrawer.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
+import AppInput from "@/components/ui/AppInput.vue";
+import AppTextarea from "@/components/ui/AppTextarea.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
-import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { useProjectShellData } from "@/composables/useProjectShellData";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import { fetchProject } from "@/firebase/projectService";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   listenProjectChat,
@@ -76,12 +77,19 @@ const {
   closeTask,
 } = useTaskDrawerRouteSync(router, route);
 
-// ProjectAppShell用のデータ
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 const messages = ref<ChatMessage[]>([]);
 const input = ref("");
 const project = ref<ProjectDoc | null>(null);
+
+// ページタイトル設定
+const { setTitle } = usePageTitle("スレッド", "チームのディスカッション");
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 const projectMembers = ref<ProjectMember[]>([]);
 const tasks = ref<TaskDoc[]>([]);
 const customChannels = ref<ChatChannel[]>([]);
@@ -148,7 +156,11 @@ function selectCommand(cmd: string) {
 // UI state
 const customThreadFormOpen = ref(false);
 const customThreadForm = ref({ name: "", description: "" });
+const isCreateThreadDisabled = computed(
+  () => !customThreadForm.value.name.trim(),
+);
 const showAllTaskChannels = ref(false); // タスク一覧の「すべて表示」フラグ
+const showMobileThreads = ref(false); // モバイル用スレッドドロワー
 const MAX_VISIBLE_TASK_CHANNELS = 8;
 let unsubscribeChat: (() => void) | null = null;
 let unsubscribeMembers: (() => void) | null = null;
@@ -205,6 +217,16 @@ const currentChannelMessages = computed(() => {
 function selectChannel(id: string) {
   if (activeChannelId.value === id) return;
   activeChannelId.value = id;
+}
+
+// モバイルドロワーでのチャンネル選択（選択後にドロワーを閉じる）
+function selectChannelWithClose(id: string) {
+  selectChannel(id);
+  showMobileThreads.value = false;
+}
+
+function toggleMobileThreads() {
+  showMobileThreads.value = !showMobileThreads.value;
 }
 
 // Watchers
@@ -430,7 +452,7 @@ function formatMessage(text: string) {
   // 2. Parse Markdown Links [Text](URL)
   formatted = formatted.replace(
     /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#0ea5e9;text-decoration:underline;">$1</a>',
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>',
   );
 
   // 3. New lines to <br>
@@ -467,28 +489,7 @@ watch(channels, (list) => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-  >
-    <template #headerTitle>
-      <PageHeader
-        :title="project?.name || 'スレッド'"
-        subtitle="チームのディスカッション"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: 'スレッド' },
-        ]"
-      />
-    </template>
-
-    <!-- 右パネルは TaskDrawer に統合（ProjectAppShell の外で Teleport） -->
-
+  <div class="project-chat-page">
     <div class="chat-content">
       <div class="content-grid">
         <!-- Threads Panel -->
@@ -560,21 +561,33 @@ watch(channels, (list) => {
               </button>
             </div>
             <div v-if="customThreadFormOpen" class="thread-form">
-              <input
+              <AppInput
                 v-model="customThreadForm.name"
-                placeholder="スレッド名"
-                class="thread-input"
+                placeholder="スレッド名（必須）"
+                size="sm"
+              />
+              <AppTextarea
+                v-model="customThreadForm.description"
+                placeholder="説明（任意）"
+                :rows="2"
+                resize="none"
               />
               <div class="form-actions">
-                <button
+                <AppButton
+                  variant="ghost"
+                  size="sm"
                   @click="customThreadFormOpen = false"
-                  class="cancel-btn"
                 >
-                  ×
-                </button>
-                <button @click="createCustomThread" class="confirm-btn">
+                  キャンセル
+                </AppButton>
+                <AppButton
+                  variant="primary"
+                  size="sm"
+                  :disabled="isCreateThreadDisabled"
+                  @click="createCustomThread"
+                >
                   作成
-                </button>
+                </AppButton>
               </div>
             </div>
             <div class="thread-list">
@@ -684,40 +697,168 @@ watch(channels, (list) => {
         </main>
       </div>
     </div>
-  </ProjectAppShell>
 
-  <!-- TaskDrawer (Teleport to body) -->
-  <Teleport to="body">
-    <TaskDrawer
-      :project-id="projectId"
-      :task-id="selectedTaskId"
-      :tasks="tasks"
-      @close="closeTask"
-    />
-  </Teleport>
+    <!-- モバイル用スレッド切替FABボタン -->
+    <button
+      type="button"
+      class="mobile-threads-fab"
+      aria-label="スレッド一覧を開く"
+      @click="toggleMobileThreads"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+
+    <!-- モバイル用スレッドドロワー -->
+    <AppDrawer
+      :open="showMobileThreads"
+      title="スレッド"
+      width="280px"
+      class="mobile-threads-drawer"
+      @close="showMobileThreads = false"
+    >
+      <div class="mobile-threads-content">
+        <!-- チャンネル -->
+        <div class="panel-section">
+          <h3 class="section-title">チャンネル</h3>
+          <button
+            class="channel-item"
+            :class="{ active: activeChannelId === 'general' }"
+            @click="selectChannelWithClose('general')"
+          >
+            # {{ defaultChannel.name }}
+          </button>
+        </div>
+
+        <!-- タスク -->
+        <div class="panel-section">
+          <div class="section-header">
+            <h3 class="section-title">タスク</h3>
+            <span class="section-count">{{ taskChannels.length }}</span>
+          </div>
+          <div class="thread-list thread-list--scrollable">
+            <button
+              v-for="taskChannel in visibleTaskChannels"
+              :key="taskChannel.id"
+              class="channel-item"
+              :class="{ active: activeChannelId === taskChannel.id }"
+              @click="selectChannelWithClose(taskChannel.id)"
+            >
+              <span class="channel-name"># {{ taskChannel.name }}</span>
+              <span class="task-status">{{
+                taskStatusLabel(taskChannel.description)
+              }}</span>
+            </button>
+            <button
+              v-if="hiddenTaskCount > 0 && !showAllTaskChannels"
+              type="button"
+              class="show-all-btn"
+              @click="showAllTaskChannels = true"
+            >
+              他 {{ hiddenTaskCount }} 件を表示...
+            </button>
+            <button
+              v-if="
+                showAllTaskChannels &&
+                taskChannels.length > MAX_VISIBLE_TASK_CHANNELS
+              "
+              type="button"
+              class="show-all-btn"
+              @click="showAllTaskChannels = false"
+            >
+              折りたたむ
+            </button>
+          </div>
+          <p v-if="!taskChannels.length" class="empty-text">
+            タスクのスレッドがありません。
+          </p>
+        </div>
+
+        <!-- カスタムスレッド -->
+        <div class="panel-section">
+          <div class="section-header">
+            <h3 class="section-title">カスタムスレッド</h3>
+            <button
+              class="add-btn"
+              @click="customThreadFormOpen = true"
+              title="新規スレッド"
+            >
+              +
+            </button>
+          </div>
+          <div v-if="customThreadFormOpen" class="thread-form">
+            <AppInput
+              v-model="customThreadForm.name"
+              placeholder="スレッド名（必須）"
+              size="sm"
+            />
+            <AppTextarea
+              v-model="customThreadForm.description"
+              placeholder="説明（任意）"
+              :rows="2"
+              resize="none"
+            />
+            <div class="form-actions">
+              <AppButton
+                variant="ghost"
+                size="sm"
+                @click="customThreadFormOpen = false"
+              >
+                キャンセル
+              </AppButton>
+              <AppButton
+                variant="primary"
+                size="sm"
+                :disabled="isCreateThreadDisabled"
+                @click="createCustomThread"
+              >
+                作成
+              </AppButton>
+            </div>
+          </div>
+          <div class="thread-list">
+            <button
+              v-for="th in customChannels"
+              :key="th.id"
+              class="channel-item"
+              :class="{ active: activeChannelId === th.id }"
+              @click="selectChannelWithClose(th.id)"
+            >
+              <span class="channel-name"># {{ th.name }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </AppDrawer>
+
+    <!-- TaskDrawer (Teleport to body) -->
+    <Teleport to="body">
+      <TaskDrawer
+        :project-id="projectId"
+        :task-id="selectedTaskId"
+        :tasks="tasks"
+        @close="closeTask"
+      />
+    </Teleport>
+  </div>
 </template>
 
 <style scoped>
-/* Override ProjectAppShell body for chat layout */
-:deep(.project-app-shell__body) {
+/* Page Layout - 画面いっぱいに配置 */
+.project-chat-page {
   display: flex;
   flex-direction: column;
+  flex: 1;
   padding: 0;
-  height: 100%;
-}
-
-:deep(.project-app-shell__body--split) {
-  flex: 1;
   min-height: 0;
-  align-items: stretch;
-}
-
-:deep(.project-app-shell__body-main) {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
   height: 100%;
+  overflow: hidden;
 }
 
 /* Chat Content */
@@ -726,6 +867,7 @@ watch(channels, (list) => {
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  height: 100%;
 }
 
 .content-grid {
@@ -733,6 +875,7 @@ watch(channels, (list) => {
   display: grid;
   grid-template-columns: minmax(240px, 260px) 1fr;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -806,26 +949,20 @@ watch(channels, (list) => {
 }
 
 .thread-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
   margin-bottom: var(--ui-space-2);
-  padding: var(--ui-space-2);
+  padding: var(--ui-space-3);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
   background: var(--ui-surface);
 }
 
-.thread-input {
-  width: 100%;
-  border: 1px solid var(--ui-border-light);
-  padding: var(--ui-space-1);
-  border-radius: var(--ui-radius-sm);
-  margin-bottom: var(--ui-space-1);
-  font-size: var(--ui-text-sm);
-}
-
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--ui-space-1);
+  gap: var(--ui-space-2);
 }
 
 .channel-name {
@@ -892,10 +1029,12 @@ watch(channels, (list) => {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
 }
 
 .chat-header {
+  flex-shrink: 0;
   height: 60px;
   display: flex;
   flex-direction: column;
@@ -919,6 +1058,7 @@ watch(channels, (list) => {
 
 .msg-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--ui-space-5);
   display: flex;
@@ -1015,6 +1155,7 @@ watch(channels, (list) => {
 }
 
 .composer {
+  flex-shrink: 0;
   padding: var(--ui-space-5);
   border-top: 1px solid var(--ui-border-light);
   display: flex;
@@ -1209,5 +1350,82 @@ watch(channels, (list) => {
   font-size: var(--ui-text-xs);
   color: var(--ui-text-subtle);
   margin-top: 2px;
+}
+
+/* Mobile Threads FAB */
+.mobile-threads-fab {
+  display: none;
+  position: fixed;
+  bottom: var(--ui-space-6);
+  left: var(--ui-space-4);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ui-radius-full);
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse);
+  border: none;
+  box-shadow: var(--ui-shadow-lg);
+  cursor: pointer;
+  z-index: var(--ui-z-sticky);
+  align-items: center;
+  justify-content: center;
+  transition: var(--ui-transition-all);
+}
+
+.mobile-threads-fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+.mobile-threads-fab:hover {
+  background: var(--ui-brand-700);
+  transform: scale(1.05);
+}
+
+.mobile-threads-fab:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .mobile-threads-fab {
+    display: flex;
+  }
+}
+
+/* Mobile Drawer Content */
+.mobile-threads-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-6);
+  padding: var(--ui-space-2);
+}
+
+/* Mobile Drawer を左からスライドさせる */
+.mobile-threads-drawer :deep(.app-drawer__overlay) {
+  justify-content: flex-start;
+}
+
+.mobile-threads-drawer :deep(.app-drawer__panel) {
+  border-radius: 0 var(--ui-radius-lg) var(--ui-radius-lg) 0;
+}
+
+.mobile-threads-drawer :deep(.app-drawer-enter-from .app-drawer__panel),
+.mobile-threads-drawer :deep(.app-drawer-leave-to .app-drawer__panel) {
+  transform: translateX(-100%);
+}
+
+.mobile-threads-drawer :deep(.app-drawer-enter-to .app-drawer__panel),
+.mobile-threads-drawer :deep(.app-drawer-leave-from .app-drawer__panel) {
+  transform: translateX(0);
+}
+
+/* Chat link styles (for v-html content) */
+.msg-text :deep(.chat-link) {
+  color: var(--ui-info, #0284c7);
+  text-decoration: underline;
+}
+
+.msg-text :deep(.chat-link:hover) {
+  color: var(--ui-brand-600, #4f7c82);
 }
 </style>

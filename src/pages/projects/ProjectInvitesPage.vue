@@ -5,12 +5,9 @@ import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import { buildPermissionsFromRoles } from "@/constants/roles";
-import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { useProjectShellData } from "@/composables/useProjectShellData";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   buildInviteStatus,
@@ -40,6 +37,19 @@ type MemberSummary = {
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const project = ref<ProjectDoc | null>(null);
+
+// ページタイトル設定
+const { setTitle } = usePageTitle(
+  "招待リンク",
+  "招待リンクの発行状況と無効化を管理",
+);
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 const members = ref<MemberSummary[]>([]);
 const statusFilter = ref<InviteFilter>("all");
 const inviteQuery = ref("");
@@ -60,10 +70,6 @@ let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 let stopInvites: (() => void) | null = null;
 let actionTimer: ReturnType<typeof setTimeout> | null = null;
-
-// ProjectAppShell用のデータ
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 
 const memberNameMap = computed(() => {
   const map = new Map<string, string>();
@@ -423,36 +429,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="プロジェクト"
-  >
-    <template #headerTitle>
-      <PageHeader
-        :title="project?.name || '招待リンク'"
-        subtitle="プロジェクトへの招待リンクを管理します"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: '招待リンク' },
-        ]"
-      />
-    </template>
-
+  <div class="project-invites-page">
     <PageSkeleton v-if="isInitialLoading" variant="invites" />
     <template v-else>
       <div class="invites-content">
         <section class="invites-page">
           <header class="invites-page__header">
-            <div>
-              <h2>招待リンク</h2>
-              <p>招待リンクの発行状況と無効化を管理できます。</p>
-            </div>
             <div
               class="invites-page__header-action"
               :title="!canCreateInvite ? '作成権限がありません' : undefined"
@@ -635,7 +617,7 @@ onBeforeUnmount(() => {
       @close="closeCreateDrawer"
       @created="handleInviteCreated"
     />
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>
