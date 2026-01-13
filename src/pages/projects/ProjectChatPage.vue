@@ -615,10 +615,31 @@ watch(channels, (list) => {
         <!-- Chat Area -->
         <main class="chat-main">
           <header class="chat-header">
-            <h3># {{ currentChannel.name }}</h3>
-            <p v-if="currentChannel.description" class="desc">
-              {{ currentChannel.description }}
-            </p>
+            <div class="chat-header__main">
+              <h3># {{ currentChannel.name }}</h3>
+              <p v-if="currentChannel.description" class="desc">
+                {{ currentChannel.description }}
+              </p>
+            </div>
+            <button
+              v-if="currentChannel.type === 'task'"
+              class="chat-header__task-btn"
+              @click="handleOpenTask(currentChannel.id)"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                width="16"
+                height="16"
+              >
+                <path
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+              タスクを開く
+            </button>
           </header>
 
           <div class="msg-list" ref="chatContainer">
@@ -648,8 +669,9 @@ watch(channels, (list) => {
                   <span class="time">{{ formatTime(msg.createdAt) }}</span>
                 </div>
                 <div class="msg-text" v-html="formatMessage(msg.text)"></div>
+                <!-- タスクチャンネル以外でlinkedTaskIdがある場合のみ表示 -->
                 <button
-                  v-if="msg.linkedTaskId"
+                  v-if="msg.linkedTaskId && currentChannel.type !== 'task'"
                   class="open-task-btn"
                   @click="handleOpenTask(msg.linkedTaskId)"
                 >
@@ -1035,12 +1057,20 @@ watch(channels, (list) => {
 
 .chat-header {
   flex-shrink: 0;
-  height: 60px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-5);
+  border-bottom: 1px solid var(--ui-border-light);
+}
+
+.chat-header__main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 var(--ui-space-5);
-  border-bottom: 1px solid var(--ui-border-light);
+  min-width: 0;
 }
 
 .chat-header h3 {
@@ -1054,6 +1084,31 @@ watch(channels, (list) => {
   margin: 0;
   font-size: var(--ui-text-xs);
   color: var(--ui-text-muted);
+}
+
+.chat-header__task-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-brand-100);
+  color: var(--ui-brand-700);
+  border: 1px solid var(--ui-brand-300);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--ui-transition-colors);
+}
+
+.chat-header__task-btn:hover {
+  background: var(--ui-brand-200);
+  border-color: var(--ui-brand-400);
+}
+
+.chat-header__task-btn svg {
+  flex-shrink: 0;
 }
 
 .msg-list {
