@@ -22,20 +22,27 @@
   --ui-brand-500: #6a9ea5;
   --ui-brand-400: #8cb8be;
   --ui-brand-300: #b8e3e9;
+  --ui-brand-200: #d4f1f5;
   --ui-brand-100: #e5f6f8;
   --ui-brand-50: #f5fcff;
 
   /* Semantic Colors */
   --ui-success: #16a34a;
+  --ui-success-dark: #15803d;
   --ui-success-light: #dcfce7;
+  --ui-success-50: #f0fdf4;
+  --ui-success-200: #bbf7d0;
   --ui-success-text: #166534;
   --ui-warning: #f59e0b;
+  --ui-warning-dark: #b45309;
   --ui-warning-light: #fef3c7;
   --ui-warning-text: #7c4a00;
   --ui-warn: #f97316; /* Orange - 要対応レベル */
   --ui-warn-light: #ffedd5;
   --ui-danger: #d64545;
+  --ui-danger-dark: #b73a3a;
   --ui-danger-light: #fee2e2;
+  --ui-danger-bg: rgba(214, 69, 69, 0.1);
   --ui-danger-text: #991b1b;
   --ui-info: #0284c7;
   --ui-info-light: #e0f2fe;
@@ -61,6 +68,19 @@
   --ui-surface-elevated: #ffffff;
   --ui-surface-muted: #f1f5f9;
   --ui-surface-overlay: rgba(0, 0, 0, 0.35);
+  --ui-surface-glass: rgba(255, 255, 255, 0.8);
+  --ui-surface-glass-70: rgba(255, 255, 255, 0.7);
+  --ui-surface-glass-12: rgba(255, 255, 255, 0.12);
+  --ui-surface-glass-08: rgba(255, 255, 255, 0.08);
+  --ui-surface-accent: rgba(184, 227, 233, 0.35);
+  --ui-surface-hover: rgba(11, 46, 51, 0.04);
+
+  /* Hero Gradients (Deep Green hero section backgrounds) */
+  --ui-hero-gradient: linear-gradient(
+    180deg,
+    rgba(11, 46, 51, 0.95),
+    rgba(79, 124, 130, 0.9)
+  );
 
   /* Border Colors */
   --ui-border: rgba(11, 46, 51, 0.12);
@@ -187,6 +207,17 @@
   --ui-sidebar-width: 260px;
   --ui-topbar-height: 64px;
   --ui-content-max-width: 1200px;
+
+  /* Responsive Breakpoints (CSS var for reference, use in media queries directly) */
+  /* --ui-breakpoint-sm: 640px; */
+  /* --ui-breakpoint-md: 768px; */
+  /* --ui-breakpoint-lg: 1024px; */
+  /* --ui-breakpoint-xl: 1200px; */
+
+  /* Form/Card Max Widths */
+  --ui-card-width-sm: 320px;
+  --ui-card-width-md: 480px;
+  --ui-card-width-lg: 600px;
 
   /* ========================================
    * 9. Sidebar Colors (Dark background用)
