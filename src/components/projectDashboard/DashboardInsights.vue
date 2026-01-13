@@ -302,40 +302,40 @@ function isTaskOverdue(task: TaskDoc) {
 
 <style scoped>
 .dashboard-insights {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border-color, rgba(11, 46, 51, 0.08));
-  border-radius: var(--radius-lg, 1.25rem);
-  padding: var(--gap-lg, 1.25rem);
-  margin-bottom: var(--gap-lg, 1.5rem);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  margin-bottom: var(--ui-space-4, 1rem);
 }
 
 .dashboard-insights__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--gap-lg, 1rem);
+  margin-bottom: var(--ui-space-4, 1rem);
 }
 
 .dashboard-insights__title {
   margin: 0;
-  font-size: var(--font-size-lg, 1.15rem);
-  font-weight: var(--font-weight-bold, 700);
-  color: var(--brand, #0b2e33);
+  font-size: var(--ui-text-lg, 1.125rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-brand-600, #0b2e33);
 }
 
 .dashboard-insights__charts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--gap-lg, 1rem);
+  gap: var(--ui-space-4, 1rem);
 }
 
 /* Chart Card */
 .chart-card {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border-color, rgba(11, 46, 51, 0.08));
-  border-radius: var(--radius-md, 1.1rem);
-  padding: var(--gap-lg, 1rem) var(--gap-lg, 1.25rem);
-  box-shadow: var(--shadow-sm, 0 4px 12px rgba(11, 46, 51, 0.04));
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-4, 1rem);
+  box-shadow: var(--ui-shadow-sm, 0 4px 12px rgba(11, 46, 51, 0.04));
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
@@ -351,25 +351,25 @@ function isTaskOverdue(task: TaskDoc) {
 .chart-card__header h4 {
   margin: 0;
   font-size: 1.05rem;
-  color: var(--brand, #0b2e33);
+  color: var(--ui-brand-600, #0b2e33);
 }
 
 .chart-card__eyebrow {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-muted, #4f7c82);
+  color: var(--ui-text-muted, #4f7c82);
 }
 
 .chart-card__meta {
   font-size: 0.85rem;
-  color: var(--text-muted, #4f7c82);
+  color: var(--ui-text-muted, #4f7c82);
 }
 
 .chart-card__metric {
   position: absolute;
   top: 0.85rem;
   right: 1rem;
-  background: var(--brand, #0b2e33);
+  background: var(--ui-brand-600, #0b2e33);
   color: #fff;
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
@@ -379,7 +379,7 @@ function isTaskOverdue(task: TaskDoc) {
 }
 
 .chart-card__metric--health {
-  background: var(--brand-muted, #4f7c82);
+  background: var(--ui-brand-400, #4f7c82);
 }
 
 /* Progress Chart */
@@ -402,8 +402,8 @@ function isTaskOverdue(task: TaskDoc) {
   border-radius: inherit;
   background: linear-gradient(
     90deg,
-    var(--brand-600, #4f7c82),
-    var(--brand-900, #0b2e33)
+    var(--ui-brand-600, #4f7c82),
+    var(--ui-brand-900, #0b2e33)
   );
   transition: width 0.3s ease;
 }
@@ -412,7 +412,7 @@ function isTaskOverdue(task: TaskDoc) {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: var(--text-muted, #4f7c82);
+  color: var(--ui-text-muted, #4f7c82);
 }
 
 /* Status Bars */
@@ -436,7 +436,7 @@ function isTaskOverdue(task: TaskDoc) {
   justify-content: space-between;
   align-items: center;
   font-size: 0.9rem;
-  color: var(--brand, #0b2e33);
+  color: var(--ui-brand-600, #0b2e33);
 }
 
 .status-bars__label strong {
@@ -461,15 +461,15 @@ function isTaskOverdue(task: TaskDoc) {
 }
 
 .status-bars__fill--progress {
-  background: var(--brand-600, #4f7c82);
+  background: var(--ui-brand-600, #4f7c82);
 }
 
 .status-bars__fill--review {
-  background: var(--warning, #f59e0b);
+  background: var(--ui-warning, #f59e0b);
 }
 
 .status-bars__fill--done {
-  background: var(--success, #16a34a);
+  background: var(--ui-success, #16a34a);
 }
 
 /* Gauge Chart */
@@ -499,20 +499,20 @@ function isTaskOverdue(task: TaskDoc) {
 
 .gauge-chart__value-path {
   fill: none;
-  stroke: var(--brand-600, #4f7c82);
+  stroke: var(--ui-brand-600, #4f7c82);
   stroke-width: 20;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.4s ease;
 }
 
 .gauge-chart__needle {
-  fill: var(--text, #0b2e33);
+  fill: var(--ui-text, #0b2e33);
   transition: transform 0.35s ease;
 }
 
 .gauge-chart__needle-hub {
-  fill: var(--surface, #fff);
-  stroke: var(--brand-900, #0b2e33);
+  fill: var(--ui-surface, #fff);
+  stroke: var(--ui-brand-900, #0b2e33);
   stroke-width: 2;
 }
 
@@ -522,7 +522,7 @@ function isTaskOverdue(task: TaskDoc) {
   gap: 0.35rem;
   text-align: left;
   font-size: 0.8rem;
-  color: var(--text-muted, #4f7c82);
+  color: var(--ui-text-muted, #4f7c82);
   margin-top: 0.15rem;
 }
 
@@ -541,19 +541,19 @@ function isTaskOverdue(task: TaskDoc) {
 }
 
 .gauge-chart__legend-dot--danger {
-  background: var(--danger, #ef4444);
+  background: var(--ui-danger, #ef4444);
 }
 
 .gauge-chart__legend-dot--warn {
-  background: var(--warn, #f97316);
+  background: var(--ui-warn, #f97316);
 }
 
 .gauge-chart__legend-dot--caution {
-  background: var(--warning, #f59e0b);
+  background: var(--ui-warning, #f59e0b);
 }
 
 .gauge-chart__legend-dot--good {
-  background: var(--success, #16a34a);
+  background: var(--ui-success, #16a34a);
 }
 
 /* Screen reader only */

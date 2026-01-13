@@ -6,13 +6,9 @@ import DashboardSummaryCards, {
 import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
-import { ROUTE_NAMES } from "@/constants/routes";
+import { usePageTitle } from "@/composables/usePageTitle";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
-import { useProjectShellData } from "@/composables/useProjectShellData";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
-import { appVersion } from "@/constants/appMeta";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   // addMessageReaction,
@@ -74,6 +70,16 @@ const members = ref<MemberEntry[]>([]);
 const tasks = ref<TaskDoc[]>([]);
 const categories = ref<TaskCategory[]>([]);
 const { notifications: notificationsBar } = useNotificationCenter();
+
+// ページタイトル設定
+const { setTitle } = usePageTitle("ダッシュボード", "プロジェクトの概要");
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 const taskView = ref<"all" | "mine">("all");
 const chatMessages = ref<ChatMessage[]>([]);
 const chatLoading = ref(true);
@@ -101,15 +107,10 @@ const filters = reactive({
   due: "all",
   category: "all",
 });
-const showMyTasksOnly = ref(false);
-
 // Dashboard card customization
 const cardConfig = ref<DashboardCardConfig[]>([]);
 const insightCardConfig = ref<InsightCardConfig[]>([]);
 
-// ProjectAppShell用のデータを取得
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 const insightsCollapsed = ref(true); // デフォルトで折りたたむ（Now First設計）
 
 let stopTasks: (() => void) | null = null;
@@ -288,18 +289,6 @@ async function handleCardConfigUpdate(newConfig: DashboardCardConfig[]) {
 //     statusClass: memberStatusClass(member),
 //   })),
 // )
-
-watch(
-  taskView,
-  (mode) => {
-    showMyTasksOnly.value = mode === "mine";
-  },
-  { immediate: true },
-);
-
-watch(showMyTasksOnly, (flag) => {
-  taskView.value = flag ? "mine" : "all";
-});
 
 function watchProject() {
   stopProject = onSnapshot(doc(db, "projects", projectId.value), (snapshot) => {
@@ -489,29 +478,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-  >
-    <template #headerTitle>
-      <PageHeader
-        :title="project?.name || 'ダッシュボード'"
-        subtitle="プロジェクトの概要"
-        :breadcrumbs="[
-          {
-            label: 'マイページ',
-            to: { name: ROUTE_NAMES.myPage },
-          },
-          { label: 'ダッシュボード' },
-        ]"
-      />
-    </template>
-    <template #headerActions>
-      <span class="dashboard__version" v-if="appVersion">{{ appVersion }}</span>
-    </template>
-
+  <div class="dashboard-page">
     <div class="dashboard__content">
       <NotificationBar :notifications="notificationsBar" />
 
@@ -533,7 +500,8 @@ onBeforeUnmount(() => {
       />
 
       <DashboardTaskList
-        v-model="filters"
+        :model-value="filters"
+        @update:model-value="(val) => Object.assign(filters, val)"
         :tasks="filteredTasks"
         :members="members"
         :categories="categories"
@@ -553,10 +521,15 @@ onBeforeUnmount(() => {
         @close="closeTask"
       />
     </Teleport>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>
+/* Dashboard Page Layout */
+.dashboard-page {
+  padding: var(--ui-space-6, 1.5rem);
+}
+
 /* Dashboard Content Layout */
 .dashboard__content {
   display: flex;
@@ -573,5 +546,14 @@ onBeforeUnmount(() => {
   font-weight: var(--ui-font-bold);
   font-size: var(--ui-text-sm);
   color: var(--ui-brand-900);
+  flex-shrink: 0;
+}
+
+/* モバイル: サイドバー非表示時の余白確保 */
+@media (max-width: 768px) {
+  .dashboard-page {
+    padding: var(--ui-space-4, 1rem);
+    min-height: calc(100vh - 4rem);
+  }
 }
 </style>

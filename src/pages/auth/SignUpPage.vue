@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
 import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthCredentialFields from "@/components/ui/AuthCredentialFields.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
@@ -111,7 +112,7 @@ const stepLabels: Record<SignUpStep, string> = {
 
 const credentialValid = computed(() => {
   return (
-    credentialForm.email.includes("@") && credentialForm.password.length >= 6
+    credentialForm.email.includes("@") && credentialForm.password.length >= 8
   );
 });
 
@@ -288,7 +289,7 @@ function mapFirebaseError(error: unknown) {
     if (code === "auth/invalid-email")
       return "メールアドレスの形式を確認してください。";
     if (code === "auth/weak-password")
-      return "パスワードは 6 文字以上で設定してください。";
+      return "パスワードは 8 文字以上で設定してください。";
   }
   return "リクエストを処理できませんでした。時間を置いて再度お試しください。";
 }
@@ -372,6 +373,13 @@ function mapFirebaseError(error: unknown) {
             <div class="verify-step__actions">
               <AppButton
                 type="button"
+                variant="ghost"
+                @click="currentStep = 'credentials'"
+              >
+                戻る
+              </AppButton>
+              <AppButton
+                type="button"
                 variant="secondary"
                 :disabled="resendLoading"
                 :loading="resendLoading"
@@ -418,17 +426,13 @@ function mapFirebaseError(error: unknown) {
               required
             />
 
-            <div class="job-field">
-              <label class="job-field__label" for="jobRole">職業</label>
-              <select id="jobRole" v-model="profileForm.jobRole" required>
-                <option
-                  v-for="option in jobOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </option>
-              </select>
+            <div class="form-field">
+              <label class="form-field__label">職業</label>
+              <AppSelect
+                v-model="profileForm.jobRole"
+                :options="jobOptions"
+                :placeholder="undefined"
+              />
             </div>
 
             <AuthFormField
@@ -458,15 +462,23 @@ function mapFirebaseError(error: unknown) {
 
             <p v-if="profileError" class="form-error">{{ profileError }}</p>
 
-            <AppButton
-              type="submit"
-              variant="primary"
-              block
-              :disabled="!profileValid || profileLoading"
-              :loading="profileLoading"
-            >
-              プロフィールを登録
-            </AppButton>
+            <div class="profile-actions">
+              <AppButton
+                type="button"
+                variant="ghost"
+                @click="currentStep = 'verify'"
+              >
+                戻る
+              </AppButton>
+              <AppButton
+                type="submit"
+                variant="primary"
+                :disabled="!profileValid || profileLoading"
+                :loading="profileLoading"
+              >
+                プロフィールを登録
+              </AppButton>
+            </div>
           </form>
         </section>
       </Transition>
@@ -633,32 +645,16 @@ function mapFirebaseError(error: unknown) {
   color: var(--ui-text-muted, #64748b);
 }
 
-.job-field {
+.form-field {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1, 0.25rem);
 }
 
-.job-field__label {
+.form-field__label {
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text, #0b2e33);
   font-size: var(--ui-text-sm, 0.875rem);
-}
-
-.job-field select {
-  border: 1px solid var(--ui-border-strong, rgba(11, 46, 51, 0.2));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-base, 1rem);
-  background: var(--ui-surface, #ffffff);
-  color: var(--ui-text, #0b2e33);
-  transition: var(--ui-transition-colors);
-}
-
-.job-field select:focus {
-  outline: none;
-  border-color: var(--ui-brand-600, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
 }
 
 .avatar-field__preview img {
@@ -676,6 +672,12 @@ function mapFirebaseError(error: unknown) {
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   border-radius: var(--ui-radius-md, 0.75rem);
   font-weight: var(--ui-font-semibold, 600);
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .signup-footer {
@@ -706,9 +708,19 @@ function mapFirebaseError(error: unknown) {
   transform: translateY(12px);
 }
 
+@media (max-width: 768px) {
+  .signup-shell {
+    padding: var(--ui-space-6, 1.5rem) var(--ui-space-4, 1rem);
+  }
+
+  .signup-card {
+    padding: var(--ui-space-8, 2rem);
+  }
+}
+
 @media (max-width: 600px) {
   .signup-card {
-    padding: var(--ui-space-8, 2rem) var(--ui-space-6, 1.5rem);
+    padding: var(--ui-space-6, 1.5rem) var(--ui-space-5, 1.25rem);
   }
 
   .verify-step__actions {

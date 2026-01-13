@@ -1,21 +1,17 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppBadge from "@/components/ui/AppBadge.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppTasksSkeleton from "@/components/ui/AppTasksSkeleton.vue";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav.vue";
 import SwipeableTaskCard from "@/components/mobile/SwipeableTaskCard.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import PullToRefresh from "@/components/mobile/PullToRefresh.vue";
-import { appName } from "@/constants/appMeta";
-import { buildProjectNavItems } from "@/constants/projectNav";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
 import { deleteTask, updateTask, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
-import type { DashboardNavItem } from "@/types/projectDashboard";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs } from "firebase/firestore";
 import { computed, onMounted, ref, onBeforeUnmount } from "vue";
@@ -27,6 +23,9 @@ const { user, profile } = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
+// ページタイトル設定
+usePageTitle("マイタスク", "あなたに割り当てられたタスク");
+
 // ルートパラメータからプロジェクトIDを取得
 const projectId = computed(() => String(route.params.projectId || ""));
 
@@ -37,7 +36,6 @@ const {
   closeTask,
 } = useTaskDrawerRouteSync(router, route);
 
-const isSidebarOpen = ref(true);
 const loading = ref(true);
 const errorMessage = ref("");
 const activeTab = ref<"active" | "completed">("active");
@@ -54,78 +52,6 @@ const isMobile = ref(false);
 const checkMobile = () => {
   isMobile.value = window.matchMedia("(max-width: 768px)").matches;
 };
-
-// モバイルナビゲーション項目
-const mobileNavItems = computed(() => [
-  {
-    name: "home",
-    label: "ホーム",
-    icon: "home",
-    to: {
-      name: ROUTE_NAMES.projectDashboard,
-      params: { projectId: projectId.value },
-    },
-  },
-  {
-    name: "tasks",
-    label: "タスク",
-    icon: "tasks",
-    to: { name: ROUTE_NAMES.myTasks, params: { projectId: projectId.value } },
-  },
-  {
-    name: "team",
-    label: "チーム",
-    icon: "users",
-    to: {
-      name: ROUTE_NAMES.projectMembers,
-      params: { projectId: projectId.value },
-    },
-  },
-  {
-    name: "settings",
-    label: "設定",
-    icon: "settings",
-    to: { name: ROUTE_NAMES.myPage },
-  },
-]);
-
-/**
- * Sidebar 用ナビゲーション
- */
-const navItems = computed<DashboardNavItem[]>(() => {
-  if (projectId.value) {
-    return buildProjectNavItems(projectId.value);
-  }
-
-  // プロジェクトがない場合、共通のナビ項目をdisabled状態で返す
-  return buildProjectNavItems("").map((item) => ({
-    ...item,
-    disabled: true,
-    to: undefined,
-    tooltip: "プロジェクトを選択してください",
-  }));
-});
-
-const sidebarProjects = computed(() =>
-  projectId.value && projectName.value
-    ? [
-        {
-          key: projectId.value,
-          label: projectName.value,
-          to: {
-            name: ROUTE_NAMES.projectDashboard,
-            params: { projectId: projectId.value },
-          },
-          accent: "primary" as const,
-        },
-      ]
-    : [],
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
 
 /**
  * Firestore からタスク読み込み（現在のプロジェクトのみ）
@@ -420,23 +346,9 @@ async function handleRefresh() {
 }
 
 /**
- * サイドバー制御
- */
-const closeSidebar = () => {
-  isSidebarOpen.value = false;
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
-
-/**
  * 初期ロード
  */
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   checkMobile();
   window.addEventListener("resize", checkMobile);
   loadTasks();
@@ -448,723 +360,508 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="['demo', { 'demo--sidebar-collapsed': !isSidebarOpen }]">
-    <DashboardSidebar
-      :open="isSidebarOpen"
-      :nav-items="navItems"
-      :projects="sidebarProjects"
-      :profile="profileInfo"
-      brand-subtitle="マイタスク"
-      @close="closeSidebar"
-    />
-    <div
-      v-if="isSidebarOpen"
-      class="demo__overlay"
-      aria-hidden="true"
-      @click="closeSidebar"
-    />
-
-    <div class="demo__main">
-      <header class="demo__topbar">
-        <div class="demo__topbar-left">
-          <button
-            type="button"
-            class="demo__menu-button"
-            @click="toggleSidebar"
-          >
-            <span class="sr-only">サイドバーを切り替え</span>
-            <svg
-              v-if="!isSidebarOpen"
-              aria-hidden="true"
-              class="demo__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-            <svg
-              v-else
-              aria-hidden="true"
-              class="demo__menu-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M6 6l12 12M18 6l-12 12"
-              />
-            </svg>
-          </button>
+  <div class="my-tasks-page">
+    <div class="my-tasks-page__content">
+      <section class="tasks-page">
+        <header class="tasks-page__header">
           <div>
-            <p class="demo__breadcrumb">{{ appName }} &gt; マイタスク</p>
-            <h1 class="demo__heading">{{ profileInfo.name }}</h1>
+            <h2>マイタスク</h2>
+            <p>あなたに割り当てられたタスクの一覧です</p>
           </div>
-        </div>
-      </header>
-
-      <div class="demo__content demo__content--condensed">
-        <section class="tasks-page">
-          <header class="tasks-page__header">
-            <div>
-              <h2>マイタスク</h2>
-              <p>あなたに割り当てられたタスクの一覧です</p>
-            </div>
-            <div class="tasks-page__actions">
-              <div class="tasks-page__filter-wrapper">
-                <button
-                  type="button"
-                  class="tasks-page__filter"
-                  :class="{ 'is-active': hasActiveFilters }"
-                  @click="toggleFilterPopover"
+          <div class="tasks-page__actions">
+            <div class="tasks-page__filter-wrapper">
+              <button
+                type="button"
+                class="tasks-page__filter"
+                :class="{ 'is-active': hasActiveFilters }"
+                @click="toggleFilterPopover"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path
+                    d="M4 6h16M6 12h12M10 18h4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.8"
+                  />
+                </svg>
+                フィルター
+                <span v-if="hasActiveFilters" class="tasks-page__filter-badge"
+                  >ON</span
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path
-                      d="M4 6h16M6 12h12M10 18h4"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.8"
-                    />
-                  </svg>
-                  フィルター
-                  <span v-if="hasActiveFilters" class="tasks-page__filter-badge"
-                    >ON</span
+              </button>
+
+              <!-- フィルターポップオーバー -->
+              <div v-if="showFilterPopover" class="filter-popover">
+                <div class="filter-popover__header">
+                  <h4>フィルター</h4>
+                  <button
+                    type="button"
+                    class="filter-popover__close"
+                    @click="closeFilterPopover"
                   >
-                </button>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path
+                        d="M6 6l12 12M18 6l-12 12"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </button>
+                </div>
 
-                <!-- フィルターポップオーバー -->
-                <div v-if="showFilterPopover" class="filter-popover">
-                  <div class="filter-popover__header">
-                    <h4>フィルター</h4>
+                <div class="filter-popover__section">
+                  <label class="filter-popover__label">優先度</label>
+                  <div class="filter-popover__options">
                     <button
                       type="button"
-                      class="filter-popover__close"
-                      @click="closeFilterPopover"
+                      class="filter-popover__option"
+                      :class="{ 'is-selected': filterPriority === 'all' }"
+                      @click="filterPriority = 'all'"
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                      >
-                        <path
-                          d="M6 6l12 12M18 6l-12 12"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="1.8"
-                        />
-                      </svg>
+                      すべて
                     </button>
-                  </div>
-
-                  <div class="filter-popover__section">
-                    <label class="filter-popover__label">優先度</label>
-                    <div class="filter-popover__options">
-                      <button
-                        type="button"
-                        class="filter-popover__option"
-                        :class="{ 'is-selected': filterPriority === 'all' }"
-                        @click="filterPriority = 'all'"
-                      >
-                        すべて
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option filter-popover__option--danger"
-                        :class="{ 'is-selected': filterPriority === 'high' }"
-                        @click="filterPriority = 'high'"
-                      >
-                        高
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option filter-popover__option--warning"
-                        :class="{ 'is-selected': filterPriority === 'medium' }"
-                        @click="filterPriority = 'medium'"
-                      >
-                        中
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option"
-                        :class="{ 'is-selected': filterPriority === 'low' }"
-                        @click="filterPriority = 'low'"
-                      >
-                        低
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="filter-popover__section">
-                    <label class="filter-popover__label">期限</label>
-                    <div class="filter-popover__options">
-                      <button
-                        type="button"
-                        class="filter-popover__option"
-                        :class="{ 'is-selected': filterDueDate === 'all' }"
-                        @click="filterDueDate = 'all'"
-                      >
-                        すべて
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option filter-popover__option--danger"
-                        :class="{ 'is-selected': filterDueDate === 'overdue' }"
-                        @click="filterDueDate = 'overdue'"
-                      >
-                        期限切れ
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option filter-popover__option--warning"
-                        :class="{ 'is-selected': filterDueDate === 'today' }"
-                        @click="filterDueDate = 'today'"
-                      >
-                        今日
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option"
-                        :class="{ 'is-selected': filterDueDate === 'week' }"
-                        @click="filterDueDate = 'week'"
-                      >
-                        1週間以内
-                      </button>
-                      <button
-                        type="button"
-                        class="filter-popover__option"
-                        :class="{ 'is-selected': filterDueDate === 'none' }"
-                        @click="filterDueDate = 'none'"
-                      >
-                        期限なし
-                      </button>
-                    </div>
-                  </div>
-
-                  <div v-if="hasActiveFilters" class="filter-popover__footer">
                     <button
                       type="button"
-                      class="filter-popover__clear"
-                      @click="clearFilters"
+                      class="filter-popover__option filter-popover__option--danger"
+                      :class="{ 'is-selected': filterPriority === 'high' }"
+                      @click="filterPriority = 'high'"
                     >
-                      フィルターをクリア
+                      高
+                    </button>
+                    <button
+                      type="button"
+                      class="filter-popover__option filter-popover__option--warning"
+                      :class="{ 'is-selected': filterPriority === 'medium' }"
+                      @click="filterPriority = 'medium'"
+                    >
+                      中
+                    </button>
+                    <button
+                      type="button"
+                      class="filter-popover__option"
+                      :class="{ 'is-selected': filterPriority === 'low' }"
+                      @click="filterPriority = 'low'"
+                    >
+                      低
                     </button>
                   </div>
                 </div>
 
-                <!-- ポップオーバー背景オーバーレイ -->
-                <div
-                  v-if="showFilterPopover"
-                  class="filter-popover__backdrop"
-                  @click="closeFilterPopover"
-                />
+                <div class="filter-popover__section">
+                  <label class="filter-popover__label">期限</label>
+                  <div class="filter-popover__options">
+                    <button
+                      type="button"
+                      class="filter-popover__option"
+                      :class="{ 'is-selected': filterDueDate === 'all' }"
+                      @click="filterDueDate = 'all'"
+                    >
+                      すべて
+                    </button>
+                    <button
+                      type="button"
+                      class="filter-popover__option filter-popover__option--danger"
+                      :class="{ 'is-selected': filterDueDate === 'overdue' }"
+                      @click="filterDueDate = 'overdue'"
+                    >
+                      期限切れ
+                    </button>
+                    <button
+                      type="button"
+                      class="filter-popover__option filter-popover__option--warning"
+                      :class="{ 'is-selected': filterDueDate === 'today' }"
+                      @click="filterDueDate = 'today'"
+                    >
+                      今日
+                    </button>
+                    <button
+                      type="button"
+                      class="filter-popover__option"
+                      :class="{ 'is-selected': filterDueDate === 'week' }"
+                      @click="filterDueDate = 'week'"
+                    >
+                      1週間以内
+                    </button>
+                    <button
+                      type="button"
+                      class="filter-popover__option"
+                      :class="{ 'is-selected': filterDueDate === 'none' }"
+                      @click="filterDueDate = 'none'"
+                    >
+                      期限なし
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="hasActiveFilters" class="filter-popover__footer">
+                  <button
+                    type="button"
+                    class="filter-popover__clear"
+                    @click="clearFilters"
+                  >
+                    フィルターをクリア
+                  </button>
+                </div>
               </div>
-            </div>
-          </header>
 
-          <section class="tasks-stats">
-            <article class="tasks-stats__card">
-              <p>全タスク</p>
-              <strong>{{ stats.total }}</strong>
-            </article>
-            <article class="tasks-stats__card">
-              <p>進行中</p>
-              <strong class="tone-progress">{{ stats.progress }}</strong>
-            </article>
-            <article class="tasks-stats__card">
-              <p>完了</p>
-              <strong class="tone-done">{{ stats.done }}</strong>
-            </article>
-          </section>
-
-          <section class="tasks-tabs">
-            <div
-              class="tasks-tabs__list"
-              role="tablist"
-              aria-label="タスクの状態"
-            >
-              <button
-                type="button"
-                class="tasks-tabs__trigger"
-                :class="{ 'is-active': activeTab === 'active' }"
-                role="tab"
-                :aria-selected="activeTab === 'active'"
-                @click="activeTab = 'active'"
-              >
-                進行中 ({{ activeTasks.length }})
-              </button>
-              <button
-                type="button"
-                class="tasks-tabs__trigger"
-                :class="{ 'is-active': activeTab === 'completed' }"
-                role="tab"
-                :aria-selected="activeTab === 'completed'"
-                @click="activeTab = 'completed'"
-              >
-                完了 ({{ completedTasks.length }})
-              </button>
-            </div>
-
-            <!-- モバイル: PullToRefreshでラップ -->
-            <PullToRefresh
-              v-if="isMobile"
-              class="tasks-tabs__content"
-              role="tabpanel"
-              @refresh="handleRefresh"
-            >
-              <!-- 状態メッセージ -->
-              <AppTasksSkeleton v-if="loading" :count="5" />
-              <AppEmptyState
-                v-else-if="errorMessage"
-                :title="errorMessage"
-                icon="error"
+              <!-- ポップオーバー背景オーバーレイ -->
+              <div
+                v-if="showFilterPopover"
+                class="filter-popover__backdrop"
+                @click="closeFilterPopover"
               />
-              <AppEmptyState
-                v-else-if="activeTab === 'active' && !activeTasks.length"
-                title="進行中のタスクはありません"
-                description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
-                icon="empty"
-              >
-                <template #action>
-                  <AppButton
-                    v-if="projectId"
-                    variant="primary"
-                    :to="{
-                      name: ROUTE_NAMES.projectDashboard,
-                      params: { projectId: projectId },
-                    }"
-                  >
-                    ダッシュボードを開く
-                  </AppButton>
-                </template>
-              </AppEmptyState>
-              <AppEmptyState
-                v-else-if="activeTab === 'completed' && !completedTasks.length"
-                title="完了したタスクはまだありません"
-                description="タスクを完了すると、ここに表示されます。"
-                icon="empty"
-              />
+            </div>
+          </div>
+        </header>
 
-              <template v-else>
-                <!-- 進行中タブ（モバイル: SwipeableTaskCard） -->
-                <template v-if="activeTab === 'active'">
-                  <SwipeableTaskCard
-                    v-for="task in activeTasks"
-                    :key="task.id"
-                    :task="task"
-                    @complete="toggleComplete(task)"
-                    @delete="removeTask(task)"
-                    @click="goToTask(task)"
-                  />
-                </template>
+        <section class="tasks-stats">
+          <article class="tasks-stats__card">
+            <p>全タスク</p>
+            <strong>{{ stats.total }}</strong>
+          </article>
+          <article class="tasks-stats__card">
+            <p>進行中</p>
+            <strong class="tone-progress">{{ stats.progress }}</strong>
+          </article>
+          <article class="tasks-stats__card">
+            <p>完了</p>
+            <strong class="tone-done">{{ stats.done }}</strong>
+          </article>
+        </section>
 
-                <!-- 完了タブ（モバイル: SwipeableTaskCard） -->
-                <template v-else>
-                  <SwipeableTaskCard
-                    v-for="task in completedTasks"
-                    :key="task.id"
-                    :task="task"
-                    @complete="toggleComplete(task)"
-                    @delete="removeTask(task)"
-                    @click="goToTask(task)"
-                  />
-                </template>
+        <section class="tasks-tabs">
+          <div
+            class="tasks-tabs__list"
+            role="tablist"
+            aria-label="タスクの状態"
+          >
+            <button
+              type="button"
+              class="tasks-tabs__trigger"
+              :class="{ 'is-active': activeTab === 'active' }"
+              role="tab"
+              :aria-selected="activeTab === 'active'"
+              @click="activeTab = 'active'"
+            >
+              進行中 ({{ activeTasks.length }})
+            </button>
+            <button
+              type="button"
+              class="tasks-tabs__trigger"
+              :class="{ 'is-active': activeTab === 'completed' }"
+              role="tab"
+              :aria-selected="activeTab === 'completed'"
+              @click="activeTab = 'completed'"
+            >
+              完了 ({{ completedTasks.length }})
+            </button>
+          </div>
+
+          <!-- モバイル: PullToRefreshでラップ -->
+          <PullToRefresh
+            v-if="isMobile"
+            class="tasks-tabs__content"
+            role="tabpanel"
+            @refresh="handleRefresh"
+          >
+            <!-- 状態メッセージ -->
+            <AppTasksSkeleton v-if="loading" :count="5" />
+            <AppEmptyState
+              v-else-if="errorMessage"
+              :title="errorMessage"
+              icon="error"
+            />
+            <AppEmptyState
+              v-else-if="activeTab === 'active' && !activeTasks.length"
+              title="進行中のタスクはありません"
+              description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
+              icon="empty"
+            >
+              <template #action>
+                <AppButton
+                  v-if="projectId"
+                  variant="primary"
+                  :to="{
+                    name: ROUTE_NAMES.projectDashboard,
+                    params: { projectId: projectId },
+                  }"
+                >
+                  ダッシュボードを開く
+                </AppButton>
               </template>
-            </PullToRefresh>
+            </AppEmptyState>
+            <AppEmptyState
+              v-else-if="activeTab === 'completed' && !completedTasks.length"
+              title="完了したタスクはまだありません"
+              description="タスクを完了すると、ここに表示されます。"
+              icon="empty"
+            />
 
-            <!-- デスクトップ: 通常表示 -->
-            <div v-else class="tasks-tabs__content" role="tabpanel">
-              <!-- 状態メッセージ -->
-              <section v-if="loading" class="tasks-empty">
-                読み込み中...
-              </section>
-              <AppEmptyState
-                v-else-if="errorMessage"
-                :title="errorMessage"
-                icon="error"
-              />
-              <AppEmptyState
-                v-else-if="activeTab === 'active' && !activeTasks.length"
-                title="進行中のタスクはありません"
-                description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
-                icon="empty"
-              >
-                <template #action>
-                  <AppButton
-                    v-if="projectId"
-                    variant="primary"
-                    :to="{
-                      name: ROUTE_NAMES.projectDashboard,
-                      params: { projectId: projectId },
-                    }"
-                  >
-                    ダッシュボードを開く
-                  </AppButton>
-                </template>
-              </AppEmptyState>
-              <AppEmptyState
-                v-else-if="activeTab === 'completed' && !completedTasks.length"
-                title="完了したタスクはまだありません"
-                description="タスクを完了すると、ここに表示されます。"
-                icon="empty"
-              />
+            <template v-else>
+              <!-- 進行中タブ（モバイル: SwipeableTaskCard） -->
+              <template v-if="activeTab === 'active'">
+                <SwipeableTaskCard
+                  v-for="task in activeTasks"
+                  :key="task.id"
+                  :task="task"
+                  @complete="toggleComplete(task)"
+                  @delete="removeTask(task)"
+                  @click="goToTask(task)"
+                />
+              </template>
 
+              <!-- 完了タブ（モバイル: SwipeableTaskCard） -->
               <template v-else>
-                <!-- 進行中タブ（デスクトップ: 従来のカード） -->
-                <template v-if="activeTab === 'active'">
-                  <article
-                    v-for="task in activeTasks"
-                    :key="task.id"
-                    class="task-card is-clickable"
-                    :class="{
-                      'is-overdue': task.dueClass === 'due-over',
-                    }"
-                    role="button"
-                    tabindex="0"
-                    @click="goToTask(task)"
-                    @keydown.enter.prevent="goToTask(task)"
-                    @keydown.space.prevent="goToTask(task)"
-                  >
-                    <div class="task-card__headline">
-                      <div class="task-card__project">
-                        <span
-                          :class="['task-dot', task.projectColor]"
-                          aria-hidden="true"
-                        />
-                        <span>{{ task.projectName }}</span>
-                      </div>
-                      <div class="task-card__badges">
-                        <AppBadge
-                          :variant="getStatusBadgeVariant(task.displayStatus)"
-                          size="sm"
-                        >
-                          {{ task.displayStatus }}
-                        </AppBadge>
-                        <AppBadge
-                          :variant="
-                            getPriorityBadgeVariant(task.displayPriority)
-                          "
-                          size="sm"
-                        >
-                          {{ task.displayPriority }}
-                        </AppBadge>
-                      </div>
+                <SwipeableTaskCard
+                  v-for="task in completedTasks"
+                  :key="task.id"
+                  :task="task"
+                  @complete="toggleComplete(task)"
+                  @delete="removeTask(task)"
+                  @click="goToTask(task)"
+                />
+              </template>
+            </template>
+          </PullToRefresh>
+
+          <!-- デスクトップ: 通常表示 -->
+          <div v-else class="tasks-tabs__content" role="tabpanel">
+            <!-- 状態メッセージ -->
+            <AppTasksSkeleton v-if="loading" :count="5" />
+            <AppEmptyState
+              v-else-if="errorMessage"
+              :title="errorMessage"
+              icon="error"
+            />
+            <AppEmptyState
+              v-else-if="activeTab === 'active' && !activeTasks.length"
+              title="進行中のタスクはありません"
+              description="プロジェクトダッシュボードから新しいタスクを作成しましょう。"
+              icon="empty"
+            >
+              <template #action>
+                <AppButton
+                  v-if="projectId"
+                  variant="primary"
+                  :to="{
+                    name: ROUTE_NAMES.projectDashboard,
+                    params: { projectId: projectId },
+                  }"
+                >
+                  ダッシュボードを開く
+                </AppButton>
+              </template>
+            </AppEmptyState>
+            <AppEmptyState
+              v-else-if="activeTab === 'completed' && !completedTasks.length"
+              title="完了したタスクはまだありません"
+              description="タスクを完了すると、ここに表示されます。"
+              icon="empty"
+            />
+
+            <template v-else>
+              <!-- 進行中タブ（デスクトップ: 従来のカード） -->
+              <template v-if="activeTab === 'active'">
+                <article
+                  v-for="task in activeTasks"
+                  :key="task.id"
+                  class="task-card is-clickable"
+                  :class="{
+                    'is-overdue': task.dueClass === 'due-over',
+                  }"
+                  role="button"
+                  tabindex="0"
+                  @click="goToTask(task)"
+                  @keydown.enter.prevent="goToTask(task)"
+                  @keydown.space.prevent="goToTask(task)"
+                >
+                  <div class="task-card__headline">
+                    <div class="task-card__project">
+                      <span
+                        :class="['task-dot', task.projectColor]"
+                        aria-hidden="true"
+                      />
+                      <span>{{ task.projectName }}</span>
                     </div>
-
-                    <h3>{{ task.title }}</h3>
-
-                    <!-- 説明は最初の50文字のみ表示 -->
-                    <p v-if="task.description" class="task-card__description">
-                      {{
-                        task.description.length > 50
-                          ? task.description.slice(0, 50) + "..."
-                          : task.description
-                      }}
-                    </p>
-
-                    <!-- 期限情報を目立たせる -->
-                    <div class="task-card__due-info">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        class="task-card__due-icon"
-                      >
-                        <path
-                          d="M12 6v6l3.5 3.5"
-                          stroke-width="1.7"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                        <circle cx="12" cy="12" r="8" stroke-width="1.5" />
-                      </svg>
-                      <span :class="['task-card__due-text', task.dueClass]">
-                        {{ task.dueMessage }}
-                      </span>
-                    </div>
-
-                    <div class="task-card__actions">
-                      <AppButton
-                        size="sm"
-                        variant="primary"
-                        @click.stop="toggleComplete(task)"
-                      >
-                        {{
-                          (task as any).status === "done"
-                            ? "未完了に戻す"
-                            : "完了にする"
-                        }}
-                      </AppButton>
-                      <AppButton
-                        size="sm"
-                        variant="danger"
-                        @click.stop="removeTask(task)"
-                      >
-                        削除
-                      </AppButton>
-                    </div>
-                  </article>
-                </template>
-
-                <!-- 完了タブ -->
-                <template v-else>
-                  <article
-                    v-for="task in completedTasks"
-                    :key="task.id"
-                    class="task-card is-completed is-clickable"
-                    role="button"
-                    tabindex="0"
-                    @click="goToTask(task)"
-                    @keydown.enter.prevent="goToTask(task)"
-                    @keydown.space.prevent="goToTask(task)"
-                  >
-                    <div class="task-card__headline">
-                      <div class="task-card__project">
-                        <span
-                          :class="['task-dot', task.projectColor]"
-                          aria-hidden="true"
-                        />
-                        <span>{{ task.projectName }}</span>
-                      </div>
+                    <div class="task-card__badges">
                       <AppBadge
                         :variant="getStatusBadgeVariant(task.displayStatus)"
                         size="sm"
                       >
                         {{ task.displayStatus }}
                       </AppBadge>
+                      <AppBadge
+                        :variant="getPriorityBadgeVariant(task.displayPriority)"
+                        size="sm"
+                      >
+                        {{ task.displayPriority }}
+                      </AppBadge>
                     </div>
-                    <h3>{{ task.title }}</h3>
+                  </div>
 
-                    <!-- 説明は最初の50文字のみ表示 -->
-                    <p v-if="task.description" class="task-card__description">
-                      {{
-                        task.description.length > 50
-                          ? task.description.slice(0, 50) + "..."
-                          : task.description
-                      }}
-                    </p>
+                  <h3>{{ task.title }}</h3>
 
-                    <!-- 完了済みの表示 -->
-                    <div
-                      class="task-card__due-info task-card__due-info--completed"
+                  <!-- 説明は最初の50文字のみ表示 -->
+                  <p v-if="task.description" class="task-card__description">
+                    {{
+                      task.description.length > 50
+                        ? task.description.slice(0, 50) + "..."
+                        : task.description
+                    }}
+                  </p>
+
+                  <!-- 期限情報を目立たせる -->
+                  <div class="task-card__due-info">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      class="task-card__due-icon"
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        class="task-card__due-icon"
-                      >
-                        <path
-                          d="M20 6 9 17l-5-5"
-                          stroke-width="1.6"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                      <span class="task-card__due-text">完了済み</span>
-                    </div>
+                      <path
+                        d="M12 6v6l3.5 3.5"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <circle cx="12" cy="12" r="8" stroke-width="1.5" />
+                    </svg>
+                    <span :class="['task-card__due-text', task.dueClass]">
+                      {{ task.dueMessage }}
+                    </span>
+                  </div>
 
-                    <div class="task-card__actions">
-                      <AppButton
-                        size="sm"
-                        variant="secondary"
-                        @click.stop="toggleComplete(task)"
-                      >
-                        未完了に戻す
-                      </AppButton>
-                      <AppButton
-                        size="sm"
-                        variant="danger"
-                        @click.stop="removeTask(task)"
-                      >
-                        削除
-                      </AppButton>
-                    </div>
-                  </article>
-                </template>
+                  <div class="task-card__actions">
+                    <AppButton
+                      size="sm"
+                      variant="primary"
+                      @click.stop="toggleComplete(task)"
+                    >
+                      {{
+                        (task as any).status === "done"
+                          ? "未完了に戻す"
+                          : "完了にする"
+                      }}
+                    </AppButton>
+                    <AppButton
+                      size="sm"
+                      variant="danger"
+                      @click.stop="removeTask(task)"
+                    >
+                      削除
+                    </AppButton>
+                  </div>
+                </article>
               </template>
-            </div>
-          </section>
+
+              <!-- 完了タブ -->
+              <template v-else>
+                <article
+                  v-for="task in completedTasks"
+                  :key="task.id"
+                  class="task-card is-completed is-clickable"
+                  role="button"
+                  tabindex="0"
+                  @click="goToTask(task)"
+                  @keydown.enter.prevent="goToTask(task)"
+                  @keydown.space.prevent="goToTask(task)"
+                >
+                  <div class="task-card__headline">
+                    <div class="task-card__project">
+                      <span
+                        :class="['task-dot', task.projectColor]"
+                        aria-hidden="true"
+                      />
+                      <span>{{ task.projectName }}</span>
+                    </div>
+                    <AppBadge
+                      :variant="getStatusBadgeVariant(task.displayStatus)"
+                      size="sm"
+                    >
+                      {{ task.displayStatus }}
+                    </AppBadge>
+                  </div>
+                  <h3>{{ task.title }}</h3>
+
+                  <!-- 説明は最初の50文字のみ表示 -->
+                  <p v-if="task.description" class="task-card__description">
+                    {{
+                      task.description.length > 50
+                        ? task.description.slice(0, 50) + "..."
+                        : task.description
+                    }}
+                  </p>
+
+                  <!-- 完了済みの表示 -->
+                  <div
+                    class="task-card__due-info task-card__due-info--completed"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      class="task-card__due-icon"
+                    >
+                      <path
+                        d="M20 6 9 17l-5-5"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <span class="task-card__due-text">完了済み</span>
+                  </div>
+
+                  <div class="task-card__actions">
+                    <AppButton
+                      size="sm"
+                      variant="secondary"
+                      @click.stop="toggleComplete(task)"
+                    >
+                      未完了に戻す
+                    </AppButton>
+                    <AppButton
+                      size="sm"
+                      variant="danger"
+                      @click.stop="removeTask(task)"
+                    >
+                      削除
+                    </AppButton>
+                  </div>
+                </article>
+              </template>
+            </template>
+          </div>
         </section>
-      </div>
+      </section>
     </div>
 
-    <!-- モバイルボトムナビゲーション -->
-    <MobileBottomNav v-if="isMobile" :items="mobileNavItems" />
-
     <!-- タスクドロワー -->
-    <TaskDrawer
-      :project-id="selectedTaskProjectId"
-      :task-id="selectedTaskId"
-      :tasks="tasks"
-      @close="closeTask"
-    />
+    <Teleport to="body">
+      <TaskDrawer
+        :project-id="selectedTaskProjectId"
+        :task-id="selectedTaskId"
+        :tasks="tasks"
+        @close="closeTask"
+      />
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-/* Layout Grid (from demo-shell.css) */
-.demo {
-  --sidebar-width: var(--ui-sidebar-width);
-  display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  width: 100%;
-  height: 100vh;
-  gap: 0;
-  background: var(--ui-surface-muted);
-}
-
-.demo--sidebar-collapsed {
-  --sidebar-width: 0px;
-}
-
-@supports (height: 100dvh) {
-  .demo {
-    height: 100dvh;
-  }
-}
-
-.demo__overlay {
-  display: none;
-}
-
-.demo__main {
+/* Page Layout */
+.my-tasks-page {
   display: flex;
   flex-direction: column;
-  background: var(--ui-bg);
-  border-left: 1px solid var(--ui-border-light);
-  height: 100vh;
-  overflow-y: auto;
+  gap: var(--ui-space-6, 1.5rem);
+  padding: var(--ui-space-6, 1.5rem);
 }
 
-@supports (height: 100dvh) {
-  .demo__main {
-    height: 100dvh;
-  }
-}
-
-.demo__topbar {
-  position: sticky;
-  top: 0;
-  z-index: var(--ui-z-dropdown);
+.my-tasks-page__content {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-6);
-  min-height: var(--ui-topbar-height);
-  padding: 0 var(--ui-space-6);
-  border-bottom: 1px solid var(--ui-border-light);
-  background: rgba(245, 252, 255, 0.95);
-  backdrop-filter: blur(6px);
-}
-
-.demo__topbar-left {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-5);
-}
-
-.demo__menu-button {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--ui-radius-md);
-  border: 1px solid var(--ui-border);
-  background: transparent;
-  color: var(--ui-brand-900);
-  cursor: pointer;
-  transition: var(--ui-transition-colors);
-}
-
-.demo__menu-button:hover {
-  background: var(--ui-brand-100);
-  border-color: var(--ui-border-strong);
-  box-shadow: var(--ui-shadow-md);
-}
-
-.demo__menu-icon {
-  width: 1.4rem;
-  height: 1.4rem;
-}
-
-.demo__breadcrumb {
-  margin: 0;
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-muted);
-}
-
-.demo__heading {
-  margin: 0.35rem 0 0;
-  font-size: var(--ui-text-xl);
-  font-weight: var(--ui-font-bold);
-  color: var(--ui-text-strong);
-}
-
-.demo__content {
-  padding: var(--ui-space-8);
-  display: grid;
-  gap: var(--ui-space-8);
-}
-
-@media (max-width: 1200px) {
-  .demo {
-    --sidebar-width: 0px;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .demo__overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: var(--ui-surface-overlay);
-    backdrop-filter: blur(2px);
-    z-index: var(--ui-z-sidebar);
-  }
-
-  .demo__menu-button {
-    display: inline-flex;
-  }
-
-  .demo__topbar {
-    gap: var(--ui-space-4);
-  }
-
-  .demo__content {
-    padding: var(--ui-space-6);
-  }
-}
-
-@media (max-width: 768px) {
-  .demo__content {
-    padding: var(--ui-space-6);
-  }
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Page-specific styles */
-.demo__content--condensed {
-  padding: var(--ui-space-8, 2rem);
-  gap: 0;
+  flex-direction: column;
+  gap: var(--ui-space-6, 1.5rem);
 }
 
 .tasks-page {
@@ -1659,18 +1356,6 @@ onBeforeUnmount(() => {
   font-weight: var(--ui-font-semibold, 600);
 }
 
-.tasks-empty {
-  text-align: center;
-  padding: var(--ui-space-8, 2rem) 0;
-  color: var(--ui-text-muted, #64748b);
-}
-
-@media (max-width: 1200px) {
-  .demo__content--condensed {
-    padding: var(--ui-space-6, 1.5rem);
-  }
-}
-
 @media (max-width: 768px) {
   .tasks-page__header {
     flex-direction: column;
@@ -1702,23 +1387,13 @@ onBeforeUnmount(() => {
   }
 
   /* 横スクロール完全排除 */
-  .demo__content,
-  .demo__main,
+  .my-tasks-page,
+  .my-tasks-page__content,
   .tasks-list {
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
     box-sizing: border-box;
-  }
-
-  /* モバイルボトムナビゲーション用のスペース確保 */
-  .demo__content--condensed {
-    padding-bottom: calc(var(--ui-space-6, 1.5rem) + 72px);
-  }
-
-  /* サイドバーを非表示 */
-  .demo__main {
-    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 </style>

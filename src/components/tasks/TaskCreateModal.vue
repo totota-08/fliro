@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import AppModal from "@/components/ui/AppModal.vue";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppSelect, { type SelectOption } from "@/components/ui/AppSelect.vue";
 import type { TaskCategory } from "@/services/taskCategoryService";
-import { reactive, watch } from "vue";
+import { reactive, ref, watch, computed } from "vue";
 
 export interface TaskFormData {
   title: string;
@@ -38,6 +41,27 @@ const form = reactive<TaskFormData>({
   progress: 0,
 });
 
+// バリデーションエラー
+const titleError = ref("");
+
+// カテゴリオプション（AppSelect用）
+const categoryOptions = computed<SelectOption[]>(() => [
+  { value: "", label: "カテゴリなし" },
+  ...props.categories.map((cat) => ({
+    value: cat.id,
+    label: cat.name,
+  })),
+]);
+
+// メンバーオプション（AppSelect用）
+const memberOptions = computed<SelectOption[]>(() => [
+  { value: "", label: "未割当" },
+  ...props.members.map((member) => ({
+    value: member.id,
+    label: member.name,
+  })),
+]);
+
 function resetForm() {
   form.title = "";
   form.description = "";
@@ -45,6 +69,14 @@ function resetForm() {
   form.assigneeId = "";
   form.categoryId = "";
   form.progress = 0;
+  titleError.value = "";
+}
+
+// タイトル入力時にエラーをクリア
+function handleTitleInput() {
+  if (titleError.value && form.title.trim()) {
+    titleError.value = "";
+  }
 }
 
 function handleClose() {
@@ -53,7 +85,11 @@ function handleClose() {
 }
 
 function handleSubmit() {
-  if (!form.title.trim()) return;
+  // バリデーション
+  if (!form.title.trim()) {
+    titleError.value = "タイトルは必須です";
+    return;
+  }
   emit("submit", { ...form });
   resetForm();
 }
@@ -70,162 +106,112 @@ watch(
 </script>
 
 <template>
-  <div v-if="open" class="task-modal">
-    <div class="task-modal__card">
-      <header>
-        <h3>新規タスク</h3>
-        <button type="button" @click="handleClose">×</button>
-      </header>
-      <form class="task-modal__form" @submit.prevent="handleSubmit">
-        <label>
-          タイトル
-          <input
-            v-model="form.title"
-            type="text"
-            placeholder="例）デザインレビュー"
-            required
-          />
+  <AppModal :open="open" title="新規タスク" size="md" @close="handleClose">
+    <form class="task-create-form" @submit.prevent="handleSubmit">
+      <div class="form-field" :class="{ 'has-error': titleError }">
+        <label class="form-label">
+          タイトル <span class="required">*</span>
         </label>
-        <label>
-          説明
-          <textarea
-            v-model="form.description"
-            rows="3"
-            placeholder="タスクの詳細を入力"
-          ></textarea>
-        </label>
-        <label>
-          期限
-          <input v-model="form.dueDate" type="date" />
-        </label>
-        <label>
-          カテゴリ
-          <select v-model="form.categoryId">
-            <option value="">カテゴリなし</option>
-            <option
-              v-for="category in categories"
-              :key="category.id"
-              :value="category.id"
-            >
-              {{ category.name }}
-            </option>
-          </select>
-        </label>
-        <label>
-          担当者
-          <select v-model="form.assigneeId">
-            <option value="">未割当</option>
-            <option
-              v-for="member in members"
-              :key="member.id"
-              :value="member.id"
-            >
-              {{ member.name }}
-            </option>
-          </select>
-        </label>
-        <section class="task-modal__section">
-          <div class="task-modal__range-header">
-            <p class="label">進捗率</p>
-            <span class="hint">{{ form.progress }}%</span>
-          </div>
-          <div class="progress-picker">
-            <button
-              v-for="option in PROGRESS_OPTIONS"
-              :key="`modal-progress-${option}`"
-              type="button"
-              :class="[
-                'progress-pill',
-                { 'is-active': form.progress === option },
-              ]"
-              @click="form.progress = option"
-            >
-              {{ option }}%
-            </button>
-          </div>
-        </section>
+        <input
+          v-model="form.title"
+          type="text"
+          class="form-input"
+          :class="{ 'input-error': titleError }"
+          placeholder="例）デザインレビュー"
+          aria-required="true"
+          @input="handleTitleInput"
+        />
+        <span v-if="titleError" class="error-message">{{ titleError }}</span>
+      </div>
 
-        <footer>
-          <button type="button" class="ghost" @click="handleClose">
-            キャンセル
+      <div class="form-field">
+        <label class="form-label">説明</label>
+        <textarea
+          v-model="form.description"
+          class="form-textarea"
+          rows="3"
+          placeholder="タスクの詳細を入力"
+        ></textarea>
+      </div>
+
+      <div class="form-field">
+        <label class="form-label">期限</label>
+        <input v-model="form.dueDate" type="date" class="form-input" />
+      </div>
+
+      <div class="form-field">
+        <label class="form-label">カテゴリ</label>
+        <AppSelect
+          v-model="form.categoryId"
+          :options="categoryOptions"
+          :placeholder="undefined"
+        />
+      </div>
+
+      <div class="form-field">
+        <label class="form-label">担当者</label>
+        <AppSelect
+          v-model="form.assigneeId"
+          :options="memberOptions"
+          :placeholder="undefined"
+        />
+      </div>
+
+      <div class="form-field">
+        <div class="progress-header">
+          <span class="form-label">進捗率</span>
+          <span class="progress-hint">{{ form.progress }}%</span>
+        </div>
+        <div class="progress-picker">
+          <button
+            v-for="option in PROGRESS_OPTIONS"
+            :key="`modal-progress-${option}`"
+            type="button"
+            :class="[
+              'progress-pill',
+              { 'is-active': form.progress === option },
+            ]"
+            :aria-label="`進捗を${option}%に設定`"
+            @click="form.progress = option"
+          >
+            {{ option }}%
           </button>
-          <button type="submit">作成</button>
-        </footer>
-      </form>
-    </div>
-  </div>
+        </div>
+      </div>
+    </form>
+
+    <template #footer>
+      <AppButton variant="ghost" @click="handleClose"> キャンセル </AppButton>
+      <AppButton variant="primary" @click="handleSubmit"> 作成 </AppButton>
+    </template>
+  </AppModal>
 </template>
 
 <style scoped>
-.task-modal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: var(--ui-z-modal, 50);
-}
-
-.task-modal__card {
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-6, 1.5rem);
-  width: clamp(300px, 90vw, 500px);
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--ui-shadow-xl);
-}
-
-.task-modal__card header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--ui-space-5, 1.25rem);
-}
-
-.task-modal__card header h3 {
-  margin: 0;
-  font-size: var(--ui-text-xl, 1.25rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text, #0b2e33);
-}
-
-.task-modal__card header button {
-  border: none;
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-full, 9999px);
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  font-size: var(--ui-text-lg, 1.125rem);
-  color: var(--ui-text-muted, #64748b);
-  transition: var(--ui-transition-colors);
-}
-
-.task-modal__card header button:hover {
-  background: var(--ui-brand-100, #e5f6f8);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.task-modal__form {
+.task-create-form {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4, 1rem);
 }
 
-.task-modal__form label {
+.form-field {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1, 0.25rem);
+}
+
+.form-label {
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text, #0b2e33);
 }
 
-.task-modal__form input,
-.task-modal__form textarea,
-.task-modal__form select {
+.required {
+  color: var(--ui-danger, #ef4444);
+}
+
+.form-input,
+.form-textarea {
   border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-md, 0.75rem);
   padding: var(--ui-space-3, 0.75rem);
@@ -235,34 +221,29 @@ watch(
   transition: var(--ui-transition-colors);
 }
 
-.task-modal__form input:focus,
-.task-modal__form textarea:focus,
-.task-modal__form select:focus {
+.form-input:focus,
+.form-textarea:focus {
   outline: none;
   border-color: var(--ui-brand-600, #4f7c82);
   box-shadow: var(--ui-ring-focus);
 }
 
-.task-modal__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2, 0.5rem);
+.form-input.input-error {
+  border-color: var(--ui-danger, #ef4444);
 }
 
-.task-modal__range-header {
+.error-message {
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-danger, #ef4444);
+}
+
+.progress-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.task-modal__range-header .label {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
-}
-
-.task-modal__range-header .hint {
+.progress-hint {
   font-size: var(--ui-text-sm, 0.875rem);
   color: var(--ui-text-muted, #64748b);
 }
@@ -294,42 +275,5 @@ watch(
   border-color: var(--ui-brand-900, #0b2e33);
   background: var(--ui-brand-900, #0b2e33);
   color: var(--ui-surface, #ffffff);
-}
-
-.task-modal__form footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-3, 0.75rem);
-  margin-top: var(--ui-space-4, 1rem);
-  padding-top: var(--ui-space-4, 1rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.task-modal__form footer button {
-  border: none;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-5, 1.25rem);
-  cursor: pointer;
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  transition: var(--ui-transition-colors);
-}
-
-.task-modal__form footer button[type="submit"] {
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-}
-
-.task-modal__form footer button[type="submit"]:hover {
-  background: var(--ui-brand-800, #134e4a);
-}
-
-.task-modal__form footer .ghost {
-  background: var(--ui-surface-muted, #f1f5f9);
-  color: var(--ui-text, #0b2e33);
-}
-
-.task-modal__form footer .ghost:hover {
-  background: var(--ui-border, rgba(11, 46, 51, 0.12));
 }
 </style>

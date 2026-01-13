@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import TaskForm from "@/components/tasks/TaskForm.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import TaskStatusBadge from "@/components/ui/TaskStatusBadge.vue";
 import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
@@ -43,6 +43,16 @@ const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const taskId = ref(String(route.params.taskId));
 const project = ref<ProjectDoc | null>(null);
+
+// ページタイトル設定
+const { setTitle } = usePageTitle("タスク詳細", "タスクの詳細を確認");
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 
 // ProjectAppShell用のデータ
 const { navItems, sidebarProjects, profileInfo } =

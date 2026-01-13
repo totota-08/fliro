@@ -2,18 +2,18 @@
 import InviteLinksMiniCard from "@/components/invites/InviteLinksMiniCard.vue";
 import MemberDetailPanel from "@/components/members/MemberDetailPanel.vue";
 import ProjectInviteForm from "@/components/projects/ProjectInviteForm.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
+import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import { ProjectPermission } from "@/constants/permissions";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { useProjectShellData } from "@/composables/useProjectShellData";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   removeProjectMember,
   updateProjectMemberRole,
+  type ProjectMember,
 } from "@/services/projectMembers";
 import { listenProjectRoles, type ProjectRole } from "@/services/rolesService";
 import { useAuthStore } from "@/store/auth";
@@ -21,10 +21,10 @@ import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
 import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectMembers");
-type MemberRole = string;
+type MemberRole = ProjectMember["role"];
 type MemberDisplay = {
   id: string;
   userId: string;
@@ -39,11 +39,23 @@ type MemberDisplay = {
   permissions: ReturnType<typeof buildPermissionsFromRoles>;
 };
 
-const route = useRoute();
 const router = useRouter();
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const project = ref<ProjectDoc | null>(null);
+
+// ページタイトル設定
+const { setTitle } = usePageTitle(
+  "チーム",
+  "メンバーの状態と権限をまとめて確認",
+);
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 const members = ref<MemberDisplay[]>([]);
 const selectedMemberId = ref<string | null>(null);
 const latestInviteLink = ref("");
@@ -60,10 +72,13 @@ const roleOptions = computed(() => {
 });
 
 // ロール情報のマップ（表示名と色）
+// Owner のデフォルト色（CSS変数 --ui-brand-900 と同値）
+const OWNER_DEFAULT_COLOR = "#0b2e33";
+
 const roleInfoMap = computed(() => {
   const map = new Map<string, { id: string; name: string; color: string }>();
   // ownerを追加
-  map.set("owner", { id: "owner", name: "Owner", color: "#0b2e33" });
+  map.set("owner", { id: "owner", name: "Owner", color: OWNER_DEFAULT_COLOR });
   // その他のロール
   for (const role of projectRoles.value) {
     map.set(role.id, { id: role.id, name: role.name, color: role.color });
@@ -73,9 +88,9 @@ const roleInfoMap = computed(() => {
 
 const roleOrder: MemberRole[] = ["owner", "admin", "member", "viewer"];
 
-const saveRoleHandler = async (role: MemberRole) => {
+const saveRoleHandler = async (role: string) => {
   if (!selectedMember.value) return;
-  await handleSaveRole(selectedMember.value, role);
+  await handleSaveRole(selectedMember.value, role as MemberRole);
 };
 
 const removeMemberHandler = async () => {
@@ -85,10 +100,6 @@ const removeMemberHandler = async () => {
 
 let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
-
-// ProjectAppShell用のデータ
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 
 // useProjectAccess で権限管理を統一
 const { can } = useProjectAccess(projectId);
@@ -130,8 +141,11 @@ const roleBreakdown = computed(() => {
   const counts: Record<MemberRole, number> = {
     owner: 0,
     admin: 0,
+    manager: 0,
+    pm: 0,
     member: 0,
     viewer: 0,
+    observer: 0,
   };
   members.value.forEach((member) => {
     counts[member.role] = (counts[member.role] ?? 0) + 1;
@@ -537,35 +551,11 @@ const goToRoleSettingsHandler = () => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="プロジェクト"
-  >
-    <template #headerTitle>
-      <PageHeader
-        :title="project?.name || 'メンバー'"
-        subtitle="チームメンバーを管理します"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: 'メンバー' },
-        ]"
-      />
-    </template>
-
+  <div class="project-members-page">
     <div class="members-content">
       <section class="team-page">
-        <header class="team-page__header">
-          <div>
-            <h2>チーム</h2>
-            <p>メンバーの状態と権限をまとめて確認できます。</p>
-          </div>
-          <div v-if="canManageMembers" class="team-page__header-actions">
+        <header v-if="canManageMembers" class="team-page__header">
+          <div class="team-page__header-actions">
             <button
               type="button"
               class="team-page__invite"
@@ -685,15 +675,20 @@ const goToRoleSettingsHandler = () => {
                     >
                   </div>
                 </li>
-                <li
-                  v-if="!filteredMembers.length"
-                  class="team-member team-member--empty"
-                >
-                  {{
-                    members.length
-                      ? "検索結果がありません。"
-                      : "まだメンバーがいません。"
-                  }}
+                <li v-if="!filteredMembers.length" class="team-member--empty">
+                  <AppEmptyState
+                    :icon="members.length ? 'search' : 'empty'"
+                    :title="
+                      members.length
+                        ? '検索結果がありません'
+                        : 'まだメンバーがいません'
+                    "
+                    :description="
+                      members.length
+                        ? '検索キーワードを変更してください。'
+                        : 'メンバーを招待してチームを作りましょう。'
+                    "
+                  />
                 </li>
               </ul>
             </div>
@@ -870,7 +865,7 @@ const goToRoleSettingsHandler = () => {
         </div>
       </div>
     </Teleport>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>
@@ -1306,7 +1301,7 @@ const goToRoleSettingsHandler = () => {
   width: 48px;
   height: 48px;
   border-radius: var(--ui-radius-full, 9999px);
-  background: rgba(79, 124, 130, 0.15);
+  background: color-mix(in srgb, var(--ui-brand-600) 15%, transparent);
   color: var(--ui-brand-900, #0b2e33);
   display: flex;
   align-items: center;
@@ -1347,12 +1342,12 @@ const goToRoleSettingsHandler = () => {
 }
 
 .badge.role-owner {
-  background: rgba(11, 46, 51, 0.1);
+  background: color-mix(in srgb, var(--ui-brand-900) 10%, transparent);
   color: var(--ui-brand-900, #0b2e33);
 }
 
 .badge.role-admin {
-  background: rgba(79, 124, 130, 0.2);
+  background: color-mix(in srgb, var(--ui-brand-600) 20%, transparent);
   color: var(--ui-brand-900, #0b2e33);
 }
 
@@ -1372,7 +1367,7 @@ const goToRoleSettingsHandler = () => {
 }
 
 .status-indicator.status-away {
-  color: #b07816;
+  color: var(--ui-warning-dark, #b45309);
 }
 
 .status-indicator.status-offline {
@@ -1404,7 +1399,7 @@ const goToRoleSettingsHandler = () => {
 .invite-modal__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--ui-surface-overlay);
   display: flex;
   justify-content: center;
   align-items: flex-start;

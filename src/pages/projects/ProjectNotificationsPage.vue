@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import AppButton from "@/components/ui/AppButton.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { useProjectShellData } from "@/composables/useProjectShellData";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { listenProjectChat, type ChatMessage } from "@/services/projectChat";
 import {
   listenProjectMembers,
@@ -33,6 +30,9 @@ const router = useRouter();
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const tasks = ref<TaskDoc[]>([]);
+
+// ページタイトル設定
+usePageTitle("通知センター", "プロジェクトの通知設定を管理します");
 const timeline = ref<TimelinePost[]>([]);
 const chatMessages = ref<ChatMessage[]>([]);
 const members = ref<ProjectMember[]>([]);
@@ -46,10 +46,6 @@ let stopTasks: (() => void) | null = null;
 let stopTimeline: (() => void) | null = null;
 let stopChat: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
-
-// ProjectAppShell用のデータ
-const { navItems, sidebarProjects, profileInfo } =
-  useProjectShellData(projectId);
 
 // 通知設定（computedより先に定義）
 type NotificationSettings = {
@@ -281,44 +277,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="通知センター"
-  >
-    <template #headerTitle>
-      <PageHeader
-        title="通知センター"
-        subtitle="プロジェクトの通知設定を管理します"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: '通知' },
-        ]"
-      />
-    </template>
-    <template #headerActions>
-      <AppButton variant="secondary" @click="requestPushPermission">
-        {{
-          permissionState === "granted"
-            ? "ブラウザ通知: ON"
-            : "ブラウザ通知を有効化"
-        }}
-      </AppButton>
-    </template>
-
+  <div class="project-notifications-page">
     <div class="notify-content">
       <section class="notify-settings">
         <header class="notify-settings__header">
-          <div>
-            <p class="eyebrow">設定</p>
-            <h2>通知の種類</h2>
-            <p class="muted">バックログ風にON/OFFを切り替えられます。</p>
-          </div>
+          <button
+            type="button"
+            class="notify-settings__push-btn"
+            @click="requestPushPermission"
+          >
+            {{
+              permissionState === "granted"
+                ? "ブラウザ通知: ON"
+                : "ブラウザ通知を有効化"
+            }}
+          </button>
         </header>
         <div class="notify-settings__toggles">
           <label class="toggle">
@@ -440,7 +413,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>

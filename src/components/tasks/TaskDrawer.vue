@@ -699,6 +699,7 @@ function formatEventDetail(event: ProjectEvent): string {
                     type="button"
                     class="task-drawer__action-btn"
                     title="編集"
+                    aria-label="メッセージを編集"
                     @click="startEditMessage(msg)"
                   >
                     ✏️
@@ -707,6 +708,7 @@ function formatEventDetail(event: ProjectEvent): string {
                     type="button"
                     class="task-drawer__action-btn"
                     title="削除"
+                    aria-label="メッセージを削除"
                     @click="handleDeleteMessage(msg.id)"
                   >
                     🗑️

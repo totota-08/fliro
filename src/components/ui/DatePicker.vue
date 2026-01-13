@@ -1,24 +1,23 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 interface Props {
-  modelValue: string;
+  modelValue: string | null;
   placeholder?: string;
   disabled?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  modelValue: "",
+  modelValue: null,
   placeholder: "日付を選択",
   disabled: false,
 });
 
 const emit = defineEmits<{
-  "update:modelValue": [value: string];
+  "update:modelValue": [value: string | null];
 }>();
 
 const isOpen = ref(false);
-const inputRef = ref<HTMLInputElement | null>(null);
 
 // 現在表示している月（カレンダーナビゲーション用）
 const viewDate = ref(new Date());
@@ -183,12 +182,16 @@ watch(isOpen, (open) => {
     document.removeEventListener("click", handleClickOutside);
   }
 });
+
+// コンポーネントアンマウント時にリスナーをクリーンアップ
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleClickOutside);
+});
 </script>
 
 <template>
   <div class="date-picker" :class="{ 'date-picker--disabled': disabled }">
     <button
-      ref="inputRef"
       type="button"
       class="date-picker__trigger"
       :disabled="disabled"

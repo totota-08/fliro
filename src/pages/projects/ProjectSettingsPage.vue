@@ -3,7 +3,7 @@ import AppButton from "@/components/ui/AppButton.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
-import PageHeader from "@/components/ui/PageHeader.vue";
+import { usePageTitle } from "@/composables/usePageTitle";
 import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow.vue";
 import SettingsLinkList from "@/components/settings/SettingsLinkList.vue";
@@ -11,14 +11,12 @@ import DangerZoneCard from "@/components/settings/DangerZoneCard.vue";
 import ZeldaPuzzleEffect from "@/components/effects/ZeldaPuzzleEffect.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { buildFilteredProjectNavItems } from "@/constants/projectNav";
 import {
   ProjectPermission,
   type ProjectPermissionKey,
 } from "@/constants/permissions";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useProjectAccess } from "@/composables/useProjectAccess";
-import ProjectAppShell from "@/layouts/ProjectAppShell.vue";
 import { db } from "@/lib/firebase";
 import {
   deleteProject,
@@ -53,9 +51,19 @@ import { useRouter } from "vue-router";
 const logger = getLogger("app.pages.projects.ProjectSettings");
 
 const router = useRouter();
-const { user, profile } = useAuthStore();
+const { user } = useAuthStore();
 const { projectId } = useProjectIdRoute();
 const project = ref<ProjectDoc | null>(null);
+
+// ページタイトル設定
+const { setTitle } = usePageTitle("設定", "プロジェクトの設定を管理します");
+watch(
+  project,
+  (p) => {
+    if (p?.name) setTitle(p.name);
+  },
+  { immediate: true },
+);
 const projectList = ref<{ id: string; name: string }[]>([]);
 const loading = ref(true);
 const saving = ref(false);
@@ -129,34 +137,6 @@ const presetColors = [
   { value: "#8b5cf6", label: "Purple" },
   { value: "#3b82f6", label: "Blue" },
   { value: "#64748b", label: "Slate" },
-];
-
-// デフォルトロールの説明
-const defaultRoleDescriptions = [
-  {
-    id: "owner",
-    name: "オーナー",
-    description:
-      "プロジェクトの作成者です。全ての権限を持ち、プロジェクトの削除が可能です。",
-    color: "#0b2e33",
-    isEditable: false,
-  },
-  {
-    id: "admin",
-    name: "管理者",
-    description:
-      "プロジェクトの管理権限を持ちます。メンバーの招待・管理、タスクの作成・編集・削除などが可能です。",
-    color: "#4f7c82",
-    isEditable: true,
-  },
-  {
-    id: "member",
-    name: "メンバー",
-    description:
-      "プロジェクトの基本機能を利用できます。タスクの閲覧、自分の担当タスクの進捗更新が可能です。",
-    color: "#64748b",
-    isEditable: true,
-  },
 ];
 
 // ページ/機能ごとの権限定義
@@ -295,27 +275,6 @@ const publicSaving = ref(false);
 
 // AI設定の初期値
 const initialAiSettings = ref({ enabled: false, key: "" });
-
-const navItems = computed(() =>
-  buildFilteredProjectNavItems(projectId.value, can),
-);
-
-const sidebarProjects = computed(() =>
-  projectList.value.map((entry, index) => ({
-    key: entry.id,
-    label: entry.name,
-    to: { name: ROUTE_NAMES.projectDashboard, params: { projectId: entry.id } },
-    accent: ["primary", "secondary", "accent"][index % 3] as
-      | "primary"
-      | "secondary"
-      | "accent",
-  })),
-);
-
-const profileInfo = computed(() => ({
-  name: profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-  email: profile.value?.email || "",
-}));
 
 const confirmEmail = computed(() => user.value?.email ?? "");
 const canDeleteProject = computed(
@@ -726,13 +685,6 @@ function watchRoles() {
   });
 }
 
-function openPermissionModal(role: ProjectRole) {
-  if (!canManageRoles.value) return;
-  editingPermissionRole.value = role;
-  editingPermissions.value = new Set(role.permissions);
-  isPermissionModalOpen.value = true;
-}
-
 function closePermissionModal() {
   isPermissionModalOpen.value = false;
   editingPermissionRole.value = null;
@@ -1008,27 +960,7 @@ watch(projectId, async (newId, oldId) => {
 </script>
 
 <template>
-  <ProjectAppShell
-    :project-id="projectId"
-    :nav-items="navItems"
-    :sidebar-projects="sidebarProjects"
-    :profile-info="profileInfo"
-    brand-subtitle="プロジェクト設定"
-  >
-    <template #headerTitle>
-      <PageHeader
-        :title="project?.name || '設定'"
-        subtitle="プロジェクトの設定を管理します"
-        :breadcrumbs="[
-          {
-            label: 'ダッシュボード',
-            to: { name: ROUTE_NAMES.projectDashboard, params: { projectId } },
-          },
-          { label: '設定' },
-        ]"
-      />
-    </template>
-
+  <div class="project-settings-page">
     <AppAlert v-if="!canEdit" variant="warning" class="settings-alert">
       <template #title>管理者限定</template>
       このページは管理者のみが利用できます。権限をご確認ください。
@@ -1375,10 +1307,7 @@ watch(projectId, async (newId, oldId) => {
                   <!-- オーナー（特別扱い） -->
                   <li class="role-list__item role-list__item--owner">
                     <div class="role-list__header">
-                      <span
-                        class="role-list__color"
-                        :style="{ backgroundColor: '#0b2e33' }"
-                      />
+                      <span class="role-list__color role-list__color--owner" />
                       <span class="role-list__name">オーナー</span>
                       <span class="role-list__badge">固定</span>
                     </div>
@@ -2012,11 +1941,15 @@ watch(projectId, async (newId, oldId) => {
         </div>
       </div>
     </Teleport>
-  </ProjectAppShell>
+  </div>
 </template>
 
 <style scoped>
 /* Layout */
+.project-settings-page {
+  padding: var(--ui-space-6, 1.5rem);
+}
+
 .settings-alert {
   max-width: 800px;
   margin: 0 auto var(--ui-space-4, 1rem);
@@ -2368,6 +2301,10 @@ watch(projectId, async (newId, oldId) => {
   height: 16px;
   border-radius: var(--ui-radius-sm, 0.5rem);
   flex-shrink: 0;
+}
+
+.role-list__color--owner {
+  background-color: var(--ui-brand-900, #0b2e33);
 }
 
 .role-list__name {

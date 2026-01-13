@@ -10,8 +10,14 @@ const featureCards = [
   {
     title: "直感的なタスク管理",
     description:
-      "ドラッグ&ドロップでタスクを簡単に管理。担当者の割り当て、期限設定、ステータス変更がスムーズに行えます。",
+      "タスクの作成、担当者の割り当て、期限設定、ステータス変更がスムーズに。カテゴリで整理して効率的に管理できます。",
     icon: "board",
+  },
+  {
+    title: "プロジェクトダッシュボード",
+    description:
+      "進捗状況、期限間近のタスク、滞留しているタスクを一目で把握。今やるべきことが明確になります。",
+    icon: "kanban",
   },
   {
     title: "リアルタイムチャット",
@@ -20,27 +26,21 @@ const featureCards = [
     icon: "chat",
   },
   {
-    title: "カンバンボード",
+    title: "チーム＆ロール管理",
     description:
-      "視覚的にタスクの進捗を把握。ToDo、進行中、完了のステータスを一目で確認できます。",
-    icon: "kanban",
-  },
-  {
-    title: "チーム管理",
-    description:
-      "メンバーの招待、役割の設定、進捗の確認が簡単。10名前後のチームに最適化されています。",
+      "メンバーの招待、カスタムロールの作成、きめ細かな権限設定でチームを柔軟に管理できます。",
     icon: "team",
   },
   {
-    title: "柔軟な設定",
+    title: "アクティビティログ",
     description:
-      "通知設定、プロジェクトのカスタマイズ、権限管理など、チームに合わせた設定が可能です。",
+      "プロジェクト内の操作履歴を自動記録。誰が何をしたかを追跡し、透明性のあるチーム運営を実現。",
     icon: "settings",
   },
   {
-    title: "チャットからタスク生成",
+    title: "スコア＆成績表",
     description:
-      "チャットメッセージから直接タスクを作成。会話の流れを止めずにタスク管理ができます。",
+      "タスク完了数や貢献度をスコアで可視化。チームメンバーの活躍を見える化します。",
     icon: "spark",
   },
 ];
@@ -51,7 +51,12 @@ const pricingPlans = [
     price: "¥0",
     unit: "/月",
     highlight: false,
-    features: ["最大3名まで", "基本的なタスク管理", "チャット機能"],
+    features: [
+      "最大3名まで",
+      "タスク管理・チャット",
+      "ダッシュボード",
+      "基本的なロール設定",
+    ],
     cta: "始める",
   },
   {
@@ -61,10 +66,11 @@ const pricingPlans = [
     highlight: true,
     ribbon: "人気",
     features: [
-      "最大10名まで",
+      "最大15名まで",
       "すべての機能",
-      "優先サポート",
-      "データエクスポート",
+      "カスタムロール＆権限管理",
+      "アクティビティログ",
+      "スコア＆成績表",
     ],
     cta: "始める",
   },
@@ -73,7 +79,12 @@ const pricingPlans = [
     price: "お問い合わせ",
     unit: "",
     highlight: false,
-    features: ["無制限のメンバー", "専任サポート", "カスタム統合", "SLA保証"],
+    features: [
+      "無制限のメンバー",
+      "専任サポート",
+      "SLA保証",
+      "オンボーディング支援",
+    ],
     cta: "お問い合わせ",
   },
 ];
@@ -109,7 +120,7 @@ const pricingPlans = [
             ログイン
           </AppButton>
           <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
-            >無料で始める</AppButton
+            >新規登録</AppButton
           >
         </div>
       </nav>
@@ -118,15 +129,13 @@ const pricingPlans = [
     <main>
       <section class="hero" id="demo">
         <div class="hero__content">
-          <p class="hero__eyebrow">
-            クレジットカード不要・14日間無料トライアル
-          </p>
-          <h1>チームのタスク管理とコミュニケーションを一つに</h1>
+          <p class="hero__eyebrow">小〜中規模チームのためのプロジェクト管理</p>
+          <h1>「今やるべきこと」が一目でわかる</h1>
           <p>
             {{
               appName
-            }}は、タスク管理とチャットを統合した新しいコラボレーションツールです。
-            シンプルで直感的なインターフェースで、チームの生産性を最大化します。
+            }}は、タスク管理・チャット・進捗可視化を統合したプロジェクト管理ツールです。
+            管理のための管理ではなく、チームの意思決定と実行を加速します。
           </p>
           <div class="hero__actions">
             <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
@@ -138,7 +147,7 @@ const pricingPlans = [
               >デモを見る</AppButton
             >
           </div>
-          <p class="hero__note">クレジットカード不要 • 14日間無料トライアル</p>
+          <p class="hero__note">フリープランは永久無料 • 3名まで利用可能</p>
         </div>
         <div class="hero__visual">
           <div class="hero-card">
@@ -234,8 +243,8 @@ const pricingPlans = [
         <div class="cta__inner">
           <h2>今すぐ{{ appName }}を始めましょう</h2>
           <p>
-            14日間の無料トライアルで、すべての機能をお試しいただけます。
-            クレジットカードの登録は不要です。
+            フリープランで今すぐ始められます。
+            チームの「今やるべきこと」を明確にし、プロジェクトを前に進めましょう。
           </p>
           <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="secondary"
             >無料で始める</AppButton
@@ -257,7 +266,7 @@ const pricingPlans = [
             </span>
             <span class="landing__title">{{ appName }}</span>
           </div>
-          <p>チームのタスク管理とコミュニケーションを一つに。</p>
+          <p>チームの「今やるべきこと」を明確にするプロジェクト管理ツール。</p>
         </div>
         <ul>
           <li>製品</li>
@@ -302,7 +311,7 @@ const pricingPlans = [
 .landing__header {
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--ui-surface-glass);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--ui-border);
   z-index: var(--ui-z-sticky);
@@ -444,7 +453,7 @@ const pricingPlans = [
 .hero-card__body div {
   padding: var(--ui-space-4);
   border-radius: var(--ui-radius-lg);
-  background: rgba(184, 227, 233, 0.35);
+  background: var(--ui-surface-accent);
 }
 
 .hero-card__body p {

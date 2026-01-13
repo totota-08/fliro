@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
+import AppColorPicker from "@/components/ui/AppColorPicker.vue";
+import AppTextarea from "@/components/ui/AppTextarea.vue";
+import AppToggle from "@/components/ui/AppToggle.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
+import DatePicker from "@/components/ui/DatePicker.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { createProject } from "@/firebase/projectService";
-import { fetchScaleStats } from "@/services/statsService";
+import { fetchScaleStats, type ScaleStats } from "@/services/statsService";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { computed, onMounted, ref } from "vue";
@@ -44,7 +48,7 @@ const progressPercent = computed(
   () => ((currentStepIndex.value + 1) / stepOrder.length) * 100,
 );
 const basicValid = computed(() => name.value.trim().length > 0);
-const scaleStats = ref<{ users: number; projects: number } | null>(null);
+const scaleStats = ref<ScaleStats | null>(null);
 
 onMounted(async () => {
   try {
@@ -111,177 +115,168 @@ function prevStep() {
 
 <template>
   <div class="project-shell">
-    <section class="project-hero">
-      <p class="hero-eyebrow">{{ appName }} Projects</p>
-      <h1>メッセージ</h1>
-      <!-- <p v-if="scaleStats" class="hero-scale">
-        現在 <strong>{{ scaleStats.users.toLocaleString() }}</strong> 人のユーザーが {{ appName }} を利用し、
-        <strong>{{ scaleStats.projects.toLocaleString() }}</strong> 件のプロジェクトが進行中です。
-      </p> -->
-      <ul class="hero-list">
-        <li>
-          <strong>強調</strong>
-          <span>テキスト</span>
-        </li>
-        <li>
-          <strong>強調</strong>
-          <span>テキスト</span>
-        </li>
-        <li>
-          <strong>強調</strong>
-          <span>テキスト</span>
-        </li>
-      </ul>
-    </section>
+    <div class="project-shell__inner">
+      <section class="project-hero">
+        <p class="hero-eyebrow">{{ appName }} Projects</p>
+        <h1>新しいプロジェクトを始めよう</h1>
+        <p class="hero-description">
+          チームの目標を達成するためのプロジェクトを作成し、タスク管理やメンバー間のコラボレーションを始めましょう。
+        </p>
+        <ul v-if="scaleStats" class="hero-stats">
+          <li>
+            <strong>{{ scaleStats.users.toLocaleString() }}</strong>
+            <span>ユーザー</span>
+          </li>
+          <li>
+            <strong>{{ scaleStats.projects.toLocaleString() }}</strong>
+            <span>プロジェクト</span>
+          </li>
+          <li>
+            <strong>{{ scaleStats.tasks.toLocaleString() }}</strong>
+            <span>タスク</span>
+          </li>
+        </ul>
+        <ul class="hero-features">
+          <li>
+            <strong>タスク管理</strong>
+            <span>チームのタスクを可視化し、進捗を追跡</span>
+          </li>
+          <li>
+            <strong>リアルタイムチャット</strong>
+            <span>プロジェクト内でメンバーと即座にコミュニケーション</span>
+          </li>
+          <li>
+            <strong>アクティビティログ</strong>
+            <span>プロジェクトの活動履歴を一目で把握</span>
+          </li>
+        </ul>
+      </section>
 
-    <section class="project-panel">
-      <header class="panel-header">
-        <div>
-          <p>ステップ {{ currentStepIndex + 1 }} / {{ stepOrder.length }}</p>
-          <h2>{{ stepLabels[currentStep] }}</h2>
+      <section class="project-panel">
+        <header class="panel-header">
+          <div>
+            <p>ステップ {{ currentStepIndex + 1 }} / {{ stepOrder.length }}</p>
+            <h2>{{ stepLabels[currentStep] }}</h2>
+          </div>
+          <span class="panel-pill">{{ Math.round(progressPercent) }}%</span>
+        </header>
+        <div class="panel-progress">
+          <div
+            class="panel-progress__value"
+            :style="{ width: `${progressPercent}%` }"
+          />
         </div>
-        <span class="panel-pill">{{ Math.round(progressPercent) }}%</span>
-      </header>
-      <div class="panel-progress">
-        <div
-          class="panel-progress__value"
-          :style="{ width: `${progressPercent}%` }"
-        />
-      </div>
 
-      <Transition name="slide-fade" mode="out-in">
-        <div :key="currentStep" class="panel-body">
-          <div v-if="currentStep === 'basic'" class="panel-section">
-            <AuthFormField
-              v-model="name"
-              label="プロジェクト名"
-              placeholder="例）Webサイトリニューアル"
-              required
-            />
-
-            <label class="form-block">
-              <span>プロジェクト説明</span>
-              <textarea
-                v-model="description"
-                rows="6"
-                class="project-textarea"
-                placeholder="プロジェクトの目的やゴール、主要タスクなどを記載してください"
+        <Transition name="slide-fade" mode="out-in">
+          <div :key="currentStep" class="panel-body">
+            <div v-if="currentStep === 'basic'" class="panel-section">
+              <AuthFormField
+                v-model="name"
+                label="プロジェクト名"
+                placeholder="例）Webサイトリニューアル"
+                required
               />
-            </label>
-          </div>
 
-          <div v-else-if="currentStep === 'appearance'" class="panel-section">
-            <div class="form-block">
-              <span>テーマカラー</span>
-              <p class="form-hint">
-                {{ appName }}
-                のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。
-              </p>
-              <div class="color-grid">
-                <button
-                  v-for="c in homeColors"
-                  :key="c"
-                  type="button"
-                  class="color-swatch"
-                  :class="{ 'is-active': color === c }"
-                  :style="{ background: c }"
-                  @click="color = c"
+              <div class="form-block">
+                <span>プロジェクト説明</span>
+                <AppTextarea
+                  v-model="description"
+                  :rows="6"
+                  placeholder="プロジェクトの目的やゴール、主要タスクなどを記載してください"
                 />
-                <label class="color-picker">
-                  <span>カスタム</span>
-                  <input
-                    v-model="color"
-                    type="color"
-                    aria-label="カスタムカラー"
-                  />
-                </label>
               </div>
             </div>
 
-            <div class="form-block">
-              <span>スケジュール</span>
-              <div class="date-stack">
-                <label>
-                  <span>開始日</span>
-                  <input v-model="startDate" type="date" />
-                </label>
-                <label>
-                  <span>期限</span>
-                  <input v-model="dueDate" type="date" />
-                </label>
+            <div v-else-if="currentStep === 'appearance'" class="panel-section">
+              <div class="form-block">
+                <span>テーマカラー</span>
+                <p class="form-hint">
+                  {{ appName }}
+                  のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。
+                </p>
+                <AppColorPicker v-model="color" :preset-colors="homeColors" />
               </div>
-              <p class="form-hint">
-                終了期限はいつでも更新できます。未定の場合は空欄のままでも構いません。
-              </p>
+
+              <div class="form-block">
+                <span>スケジュール</span>
+                <div class="date-stack">
+                  <div class="date-field">
+                    <span class="date-label">開始日</span>
+                    <DatePicker
+                      v-model="startDate"
+                      placeholder="開始日を選択"
+                    />
+                  </div>
+                  <div class="date-field">
+                    <span class="date-label">期限</span>
+                    <DatePicker v-model="dueDate" placeholder="期限を選択" />
+                  </div>
+                </div>
+                <p class="form-hint">
+                  終了期限はいつでも更新できます。未定の場合は空欄のままでも構いません。
+                </p>
+              </div>
+            </div>
+
+            <div v-else class="panel-section">
+              <AppToggle
+                v-model="isPublic"
+                label="公開プロジェクト"
+                description="ワークスペースの全メンバーが閲覧できる状態にします。"
+              />
+
+              <AppToggle
+                v-model="allowGuestView"
+                label="ゲスト閲覧を許可"
+                description="リンクを共有されたゲストにも読み取り専用で公開します。"
+              />
+
+              <div class="invite-hint">
+                <strong>参加リンクについて</strong>
+                <p>
+                  プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。
+                </p>
+              </div>
             </div>
           </div>
+        </Transition>
 
-          <div v-else class="panel-section">
-            <div class="toggle-card">
-              <label>
-                <input v-model="isPublic" type="checkbox" />
-                <div>
-                  <strong>公開プロジェクト</strong>
-                  <p>ワークスペースの全メンバーが閲覧できる状態にします。</p>
-                </div>
-              </label>
-            </div>
+        <p v-if="errorMsg" class="panel-error">{{ errorMsg }}</p>
 
-            <div class="toggle-card">
-              <label>
-                <input v-model="allowGuestView" type="checkbox" />
-                <div>
-                  <strong>ゲスト閲覧を許可</strong>
-                  <p>リンクを共有されたゲストにも読み取り専用で公開します。</p>
-                </div>
-              </label>
-            </div>
-
-            <div class="invite-hint">
-              <strong>参加リンクについて</strong>
-              <p>
-                プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。
-              </p>
-            </div>
-          </div>
+        <div class="panel-actions">
+          <AppButton
+            variant="secondary"
+            @click="prevStep"
+            :disabled="currentStepIndex === 0"
+            >戻る</AppButton
+          >
+          <AppButton
+            v-if="currentStepIndex < stepOrder.length - 1"
+            variant="primary"
+            :disabled="currentStep === 'basic' && !basicValid"
+            @click="nextStep"
+            >次へ進む</AppButton
+          >
+          <AppButton
+            v-else
+            type="button"
+            variant="primary"
+            :loading="submitting"
+            :disabled="submitting || !basicValid"
+            @click="handleSubmit"
+            >プロジェクトを作成</AppButton
+          >
         </div>
-      </Transition>
-
-      <p v-if="errorMsg" class="panel-error">{{ errorMsg }}</p>
-
-      <div class="panel-actions">
-        <AppButton
-          variant="secondary"
-          @click="prevStep"
-          :disabled="currentStepIndex === 0"
-          >戻る</AppButton
-        >
-        <AppButton
-          v-if="currentStepIndex < stepOrder.length - 1"
-          variant="primary"
-          :disabled="currentStep === 'basic' && !basicValid"
-          @click="nextStep"
-          >次へ進む</AppButton
-        >
-        <AppButton
-          v-else
-          type="button"
-          variant="primary"
-          :loading="submitting"
-          :disabled="submitting || !basicValid"
-          @click="handleSubmit"
-          >プロジェクトを作成</AppButton
-        >
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .project-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(320px, 480px) minmax(0, 620px);
+  display: flex;
+  justify-content: center;
   background: linear-gradient(
     135deg,
     var(--ui-brand-100, #e5f6f8),
@@ -296,17 +291,20 @@ function prevStep() {
   }
 }
 
+.project-shell__inner {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) minmax(0, 520px);
+  max-width: var(--ui-content-max-width, 1200px);
+  width: 100%;
+}
+
 .project-hero {
-  padding: var(--ui-space-16, 4rem) var(--ui-space-12, 3rem);
-  background: linear-gradient(
-    180deg,
-    rgba(11, 46, 51, 0.95),
-    rgba(79, 124, 130, 0.9)
-  );
+  padding: var(--ui-space-10, 2.5rem) var(--ui-space-8, 2rem);
+  background: var(--ui-hero-gradient);
   color: var(--ui-text-inverse, #ffffff);
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-6, 1.5rem);
+  gap: var(--ui-space-5, 1.25rem);
 }
 
 .hero-eyebrow {
@@ -327,61 +325,103 @@ function prevStep() {
   color: var(--ui-brand-100, #e5f6f8);
 }
 
-.hero-scale {
+.hero-description {
   font-size: var(--ui-text-base, 1rem);
+  line-height: 1.7;
+  color: var(--ui-brand-100, #e5f6f8);
+  max-width: 380px;
 }
 
-.hero-scale strong {
+.hero-stats {
+  list-style: none;
+  margin: var(--ui-space-2, 0.5rem) 0 0;
+  padding: 0;
+  display: flex;
+  gap: var(--ui-space-3, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.hero-stats li {
+  background: var(--ui-surface-glass-12);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-1, 0.25rem);
+  min-width: 80px;
+}
+
+.hero-stats strong {
+  font-size: var(--ui-text-2xl, 1.5rem);
   color: var(--ui-text-inverse, #ffffff);
 }
 
-.hero-list {
+.hero-stats span {
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-surface-glass-70);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hero-features {
   list-style: none;
-  margin: 0;
+  margin: var(--ui-space-2, 0.5rem) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-2, 0.5rem);
 }
 
-.hero-list li {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
+.hero-features li {
+  background: var(--ui-surface-glass-08);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1, 0.25rem);
 }
 
-.hero-list strong {
+.hero-features strong {
   font-size: var(--ui-text-base, 1rem);
+  color: var(--ui-text-inverse, #ffffff);
 }
 
-.hero-list span {
+.hero-features span {
   font-size: var(--ui-text-sm, 0.875rem);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--ui-surface-glass);
 }
 
 .project-panel {
-  background: var(--ui-surface, #ffffff);
-  margin: var(--ui-space-12, 3rem);
-  border-radius: var(--ui-radius-3xl, 2rem);
-  padding: var(--ui-space-10, 2.5rem);
-  box-shadow: var(--ui-shadow-2xl);
+  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.8));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  margin: var(--ui-space-8, 2rem);
+  border-radius: var(--ui-radius-2xl, 1.5rem);
+  padding: var(--ui-space-8, 2rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-xl);
   display: flex;
   flex-direction: column;
+}
+
+@supports not (backdrop-filter: blur(12px)) {
+  .project-panel {
+    background: var(--ui-surface, #ffffff);
+  }
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--ui-space-6, 1.5rem);
+  gap: var(--ui-space-4, 1rem);
 }
 
 .panel-header h2 {
   margin: var(--ui-space-1, 0.25rem) 0 0;
   color: var(--ui-brand-900, #0b2e33);
+  font-size: var(--ui-text-xl, 1.25rem);
 }
 
 .panel-header p {
@@ -399,10 +439,10 @@ function prevStep() {
 }
 
 .panel-progress {
-  height: 10px;
+  height: 6px;
   background: var(--ui-surface-muted, #f1f5f9);
   border-radius: var(--ui-radius-full, 9999px);
-  margin: var(--ui-space-5, 1.25rem) 0 var(--ui-space-8, 2rem);
+  margin: var(--ui-space-4, 1rem) 0 var(--ui-space-5, 1.25rem);
   overflow: hidden;
 }
 
@@ -423,13 +463,13 @@ function prevStep() {
 .panel-section {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-6, 1.5rem);
+  gap: var(--ui-space-5, 1.25rem);
 }
 
 .form-block {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
+  gap: var(--ui-space-2, 0.5rem);
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text, #0b2e33);
 }
@@ -525,46 +565,11 @@ function prevStep() {
   box-shadow: var(--ui-ring-focus);
 }
 
-.toggle-card {
-  border: 2px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  transition: var(--ui-transition-colors);
-}
-
-.toggle-card:has(input:checked) {
-  border-color: var(--ui-brand-600, #4f7c82);
-  background: var(--ui-brand-100, #e5f6f8);
-}
-
-.toggle-card label {
-  display: flex;
-  gap: var(--ui-space-3, 0.75rem);
-  align-items: flex-start;
-  cursor: pointer;
-}
-
-.toggle-card input {
-  margin-top: var(--ui-space-1, 0.25rem);
-  accent-color: var(--ui-brand-600, #4f7c82);
-}
-
-.toggle-card strong {
-  display: block;
-  color: var(--ui-text, #0b2e33);
-}
-
-.toggle-card p {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  color: var(--ui-brand-600, #4f7c82);
-  font-size: var(--ui-text-sm, 0.875rem);
-}
-
 .invite-hint {
-  border: 1px dashed var(--ui-border-strong, rgba(11, 46, 51, 0.2));
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  background: var(--ui-surface-muted, #f1f5f9);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-brand-50, #f5fcff);
 }
 
 .invite-hint strong {
@@ -592,7 +597,7 @@ function prevStep() {
   display: flex;
   justify-content: space-between;
   gap: var(--ui-space-3, 0.75rem);
-  margin-top: var(--ui-space-6, 1.5rem);
+  margin-top: var(--ui-space-5, 1.25rem);
 }
 
 .slide-fade-enter-active,
@@ -607,18 +612,92 @@ function prevStep() {
 }
 
 @media (max-width: 1024px) {
-  .project-shell {
+  .project-shell__inner {
     grid-template-columns: 1fr;
   }
 
   .project-hero {
-    border-bottom-left-radius: var(--ui-radius-3xl, 2rem);
-    border-bottom-right-radius: var(--ui-radius-3xl, 2rem);
+    border-bottom-left-radius: var(--ui-radius-2xl, 1.5rem);
+    border-bottom-right-radius: var(--ui-radius-2xl, 1.5rem);
   }
 
   .project-panel {
-    margin: var(--ui-space-8, 2rem) var(--ui-space-6, 1.5rem)
-      var(--ui-space-12, 3rem);
+    margin: var(--ui-space-6, 1.5rem) var(--ui-space-4, 1rem)
+      var(--ui-space-8, 2rem);
+  }
+}
+
+@media (max-width: 768px) {
+  .project-hero {
+    padding: var(--ui-space-8, 2rem) var(--ui-space-6, 1.5rem);
+  }
+
+  .project-hero h1 {
+    font-size: var(--ui-text-2xl, 1.5rem);
+  }
+
+  .hero-description {
+    max-width: none;
+  }
+
+  .hero-stats {
+    justify-content: center;
+  }
+
+  .project-panel {
+    padding: var(--ui-space-6, 1.5rem);
+  }
+
+  .panel-header h2 {
+    font-size: var(--ui-text-lg, 1.125rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .project-hero {
+    padding: var(--ui-space-6, 1.5rem) var(--ui-space-4, 1rem);
+  }
+
+  .project-hero h1 {
+    font-size: var(--ui-text-xl, 1.25rem);
+  }
+
+  .hero-stats li {
+    min-width: 70px;
+    padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  }
+
+  .hero-stats strong {
+    font-size: var(--ui-text-xl, 1.25rem);
+  }
+
+  .hero-features li {
+    padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  }
+
+  .project-panel {
+    margin: var(--ui-space-4, 1rem);
+    padding: var(--ui-space-5, 1.25rem);
+    border-radius: var(--ui-radius-xl, 1.25rem);
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-2, 0.5rem);
+  }
+
+  .panel-pill {
+    align-self: flex-end;
+    margin-top: calc(-1 * var(--ui-space-6, 1.5rem));
+  }
+
+  .panel-actions {
+    flex-direction: column;
+  }
+
+  .panel-actions > * {
+    width: 100%;
   }
 }
 </style>

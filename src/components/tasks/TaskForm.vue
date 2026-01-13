@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import AppButton from "@/components/ui/AppButton.vue";
+import AppInput from "@/components/ui/AppInput.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
+import AppTextarea from "@/components/ui/AppTextarea.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
 import type { TaskDoc, CreateTaskPayload } from "@/services/taskService";
 import { computed, reactive, watch } from "vue";
@@ -55,6 +59,15 @@ const formTitle = computed(() =>
 );
 
 const submitLabel = computed(() => (isEditMode.value ? "更新" : "作成"));
+
+// AppSelect用のオプション
+const categoryOptions = computed(() =>
+  props.categories.map((c) => ({ value: c.id, label: c.name })),
+);
+
+const memberOptions = computed(() =>
+  props.members.map((m) => ({ value: m.id, label: m.name })),
+);
 
 // タスクが変更されたらフォームを初期化
 watch(
@@ -123,26 +136,24 @@ function handleCancel() {
     </header>
 
     <form class="task-form__body" @submit.prevent="handleSubmit">
-      <label class="task-form__field">
+      <div class="task-form__field">
         <span class="task-form__label">タイトル</span>
-        <input
+        <AppInput
           v-model="form.title"
-          type="text"
           placeholder="例）デザインレビュー"
-          required
           :disabled="submitting"
         />
-      </label>
+      </div>
 
-      <label class="task-form__field">
+      <div class="task-form__field">
         <span class="task-form__label">説明</span>
-        <textarea
+        <AppTextarea
           v-model="form.description"
-          rows="3"
+          :rows="3"
           placeholder="タスクの詳細を入力"
           :disabled="submitting"
-        ></textarea>
-      </label>
+        />
+      </div>
 
       <div class="task-form__field">
         <span class="task-form__label">期限</span>
@@ -153,29 +164,25 @@ function handleCancel() {
         />
       </div>
 
-      <label class="task-form__field">
+      <div class="task-form__field">
         <span class="task-form__label">カテゴリ</span>
-        <select v-model="form.categoryId" :disabled="submitting">
-          <option value="">カテゴリなし</option>
-          <option
-            v-for="category in categories"
-            :key="category.id"
-            :value="category.id"
-          >
-            {{ category.name }}
-          </option>
-        </select>
-      </label>
+        <AppSelect
+          v-model="form.categoryId"
+          :options="categoryOptions"
+          placeholder="カテゴリなし"
+          :disabled="submitting"
+        />
+      </div>
 
-      <label class="task-form__field">
+      <div class="task-form__field">
         <span class="task-form__label">担当者</span>
-        <select v-model="form.assigneeId" :disabled="submitting">
-          <option value="">未割当</option>
-          <option v-for="member in members" :key="member.id" :value="member.id">
-            {{ member.name }}
-          </option>
-        </select>
-      </label>
+        <AppSelect
+          v-model="form.assigneeId"
+          :options="memberOptions"
+          placeholder="未割当"
+          :disabled="submitting"
+        />
+      </div>
 
       <section class="task-form__section">
         <div class="task-form__range-header">
@@ -200,21 +207,17 @@ function handleCancel() {
       </section>
 
       <footer class="task-form__footer">
-        <button
-          type="button"
-          class="task-form__btn task-form__btn--ghost"
-          :disabled="submitting"
-          @click="handleCancel"
-        >
+        <AppButton variant="ghost" :disabled="submitting" @click="handleCancel">
           キャンセル
-        </button>
-        <button
+        </AppButton>
+        <AppButton
           type="submit"
-          class="task-form__btn task-form__btn--primary"
+          variant="primary"
           :disabled="submitting || !form.title.trim()"
+          :loading="submitting"
         >
-          {{ submitting ? "処理中..." : submitLabel }}
-        </button>
+          {{ submitLabel }}
+        </AppButton>
       </footer>
     </form>
   </div>
@@ -280,32 +283,6 @@ function handleCancel() {
   color: var(--ui-text, #0b2e33);
 }
 
-.task-form__body input,
-.task-form__body textarea,
-.task-form__body select {
-  padding: var(--ui-space-3, 0.75rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  background: var(--ui-surface, #ffffff);
-  transition: var(--ui-transition-colors);
-}
-
-.task-form__body input:focus,
-.task-form__body textarea:focus,
-.task-form__body select:focus {
-  outline: none;
-  border-color: var(--ui-border-focus, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
-}
-
-.task-form__body input:disabled,
-.task-form__body textarea:disabled,
-.task-form__body select:disabled {
-  background: var(--ui-surface-muted, #f1f5f9);
-  cursor: not-allowed;
-}
-
 .task-form__section {
   display: flex;
   flex-direction: column;
@@ -363,39 +340,5 @@ function handleCancel() {
   gap: var(--ui-space-3, 0.75rem);
   padding-top: var(--ui-space-4, 1rem);
   border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.task-form__btn {
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-5, 1.25rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  cursor: pointer;
-  transition: var(--ui-transition-colors);
-}
-
-.task-form__btn--ghost {
-  background: transparent;
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  color: var(--ui-text-muted, #64748b);
-}
-
-.task-form__btn--ghost:hover:not(:disabled) {
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.task-form__btn--primary {
-  background: var(--ui-brand-500, #4f7c82);
-  border: none;
-  color: var(--ui-surface, #ffffff);
-}
-
-.task-form__btn--primary:hover:not(:disabled) {
-  background: var(--ui-brand-600, #3d6166);
-}
-
-.task-form__btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 </style>

@@ -138,6 +138,32 @@ function handleNavigate(taskId: string) {
         <p>{{ tasks.length }}件のタスク</p>
       </div>
       <div class="task-list__filters">
+        <div class="task-search-wrapper">
+          <svg
+            class="task-search-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <input
+            type="text"
+            :value="filters.search"
+            class="task-search-input"
+            placeholder="タスクを検索..."
+            @input="
+              updateFilter('search', ($event.target as HTMLInputElement).value)
+            "
+          />
+        </div>
         <select
           :value="filters.status"
           class="task-filter-select"
@@ -344,6 +370,45 @@ function handleNavigate(taskId: string) {
 }
 
 .task-filter-select:focus {
+  outline: none;
+  border-color: var(--ui-brand-600, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
+}
+
+.task-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.task-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--ui-text-muted, #64748b);
+  pointer-events: none;
+}
+
+.task-search-input {
+  min-width: 180px;
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  padding-left: 2.25rem;
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface, #ffffff);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text, #0b2e33);
+  transition: var(--ui-transition-colors);
+}
+
+.task-search-input::placeholder {
+  color: var(--ui-text-placeholder, #94a3b8);
+}
+
+.task-search-input:hover {
+  border-color: var(--ui-brand-600, #4f7c82);
+}
+
+.task-search-input:focus {
   outline: none;
   border-color: var(--ui-brand-600, #4f7c82);
   box-shadow: var(--ui-ring-focus);

@@ -40,7 +40,7 @@ export function useTaskCreateModal(options: { enableKeyboard?: boolean } = {}) {
     if (isTaskModalOpen.value) return;
 
     // Check if N key is pressed (case insensitive)
-    if (event.key.toLowerCase() !== "n") return;
+    if (!event.key || event.key.toLowerCase() !== "n") return;
 
     // Ignore if any modifier key is pressed
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)

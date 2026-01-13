@@ -3,8 +3,9 @@
  * ProfileSummaryCard - プロフィール情報カード
  *
  * マイページ上部のプロフィール、統計、アクションボタンを表示
- * プロフィール編集はAccountSettingsPageに移動
+ * 2行構成でコンパクトに情報を整理
  */
+import { computed } from "vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -33,158 +34,192 @@ const emit = defineEmits<{
   signOut: [];
 }>();
 
-const displayName =
-  props.profile?.nickname ||
-  props.profile?.fullName ||
-  `${props.appName} ユーザー`;
+const displayName = computed(
+  () =>
+    props.profile?.nickname ||
+    props.profile?.fullName ||
+    `${props.appName} ユーザー`,
+);
 </script>
 
 <template>
   <SectionCard elevated>
     <div class="profile">
-      <div class="profile__avatar-section">
+      <!-- 上段: アバター + 名前/メール + サインアウト -->
+      <div class="profile__header">
         <UserAvatar
           :url="profile?.avatarUrl || ''"
           :name="profile?.nickname || profile?.fullName"
-          :size="80"
+          :size="56"
         />
+        <div class="profile__info">
+          <h1 class="profile__name">{{ displayName }}</h1>
+          <p
+            v-if="profile?.fullName && profile?.nickname"
+            class="profile__meta"
+          >
+            {{ profile.fullName }}
+          </p>
+          <p class="profile__meta">{{ profile?.email }}</p>
+        </div>
+        <AppButton variant="ghost" size="sm" @click="emit('signOut')">
+          サインアウト
+        </AppButton>
       </div>
 
-      <div class="profile__info">
-        <p class="profile__eyebrow">My Page</p>
-        <h1 class="profile__name">{{ displayName }}</h1>
-        <p
-          v-if="profile?.fullName && profile?.nickname"
-          class="profile__fullname"
-        >
-          {{ profile.fullName }}
-        </p>
-        <p class="profile__email">{{ profile?.email }}</p>
-        <div class="profile__actions">
-          <AppButton variant="outline" size="sm" @click="emit('signOut')">
-            サインアウト
-          </AppButton>
-          <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
-            新しいプロジェクト
-          </AppButton>
-        </div>
+      <!-- 下段: 統計 + 新規プロジェクトボタン -->
+      <div class="profile__footer">
+        <dl class="profile__stats">
+          <div class="profile__stat">
+            <dd>{{ stats.projectCount }}</dd>
+            <dt>プロジェクト</dt>
+          </div>
+          <div class="profile__stat-divider" aria-hidden="true"></div>
+          <div class="profile__stat">
+            <dd>{{ stats.totalTasks }}</dd>
+            <dt>タスク</dt>
+          </div>
+          <div class="profile__stat-divider" aria-hidden="true"></div>
+          <div class="profile__stat profile__stat--highlight">
+            <dd>{{ stats.completedThisWeek }}</dd>
+            <dt>今週完了</dt>
+          </div>
+        </dl>
+        <AppButton :to="{ name: ROUTE_NAMES.projectCreate }">
+          + 新しいプロジェクト
+        </AppButton>
       </div>
-
-      <dl class="profile__stats">
-        <div class="profile__stat">
-          <dt>参加プロジェクト</dt>
-          <dd>{{ stats.projectCount }}</dd>
-        </div>
-        <div class="profile__stat">
-          <dt>タスク総数</dt>
-          <dd>{{ stats.totalTasks }}</dd>
-        </div>
-        <div class="profile__stat">
-          <dt>完了タスク（週）</dt>
-          <dd>{{ stats.completedThisWeek }}</dd>
-        </div>
-      </dl>
     </div>
   </SectionCard>
 </template>
 
 <style scoped>
 .profile {
-  display: grid;
-  gap: var(--ui-space-6, 1.5rem);
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-}
-
-.profile__avatar-section {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  gap: var(--ui-space-4, 1rem);
 }
 
-.profile__eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-brand-600, #4f7c82);
+/* 上段: ヘッダー */
+.profile__header {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.profile__info {
+  flex: 1;
+  min-width: 0;
 }
 
 .profile__name {
-  margin: var(--ui-space-2, 0.5rem) 0 0;
-  font-size: var(--ui-text-2xl, 1.5rem);
+  margin: 0;
+  font-size: var(--ui-text-xl, 1.25rem);
   font-weight: var(--ui-font-bold, 700);
   color: var(--ui-text-strong, #0f172a);
+  line-height: 1.3;
 }
 
-.profile__fullname {
+.profile__meta {
   margin: var(--ui-space-1, 0.25rem) 0 0;
   font-size: var(--ui-text-sm, 0.875rem);
   color: var(--ui-text-muted, #64748b);
+  line-height: 1.4;
 }
 
-.profile__email {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.profile__actions {
+/* 下段: フッター */
+.profile__footer {
   display: flex;
-  gap: var(--ui-space-3, 0.75rem);
-  margin-top: var(--ui-space-4, 1rem);
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4, 1rem);
+  padding-top: var(--ui-space-4, 1rem);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
+/* 統計 */
 .profile__stats {
   display: flex;
-  gap: var(--ui-space-6, 1.5rem);
+  align-items: center;
+  gap: var(--ui-space-4, 1rem);
   margin: 0;
 }
 
 .profile__stat {
   text-align: center;
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-lg, 1rem);
-  min-width: 90px;
+  min-width: 64px;
 }
 
 .profile__stat dt {
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text-muted, #64748b);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin-top: var(--ui-space-1, 0.25rem);
 }
 
 .profile__stat dd {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
+  margin: 0;
   font-size: var(--ui-text-2xl, 1.5rem);
   font-weight: var(--ui-font-bold, 700);
   color: var(--ui-brand-700, #1a4a51);
+  line-height: 1;
+}
+
+.profile__stat--highlight dd {
+  color: var(--ui-success, #16a34a);
+}
+
+.profile__stat--highlight dt {
+  color: var(--ui-success, #16a34a);
+}
+
+.profile__stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .profile {
-    grid-template-columns: 1fr;
-  }
-
-  .profile__avatar-section {
-    justify-self: center;
+  .profile__header {
+    flex-wrap: wrap;
   }
 
   .profile__info {
-    text-align: center;
+    flex: 1 1 calc(100% - 72px);
+    order: 1;
   }
 
-  .profile__actions {
-    justify-content: center;
+  .profile__header > :last-child {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .profile__footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--ui-space-4, 1rem);
   }
 
   .profile__stats {
     justify-content: center;
+  }
+
+  .profile__footer > :last-child {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile__stat {
+    min-width: 48px;
+  }
+
+  .profile__stat dd {
+    font-size: var(--ui-text-xl, 1.25rem);
+  }
+
+  .profile__stats {
+    gap: var(--ui-space-2, 0.5rem);
   }
 }
 </style>

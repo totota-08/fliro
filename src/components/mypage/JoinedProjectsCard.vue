@@ -3,6 +3,7 @@
  * JoinedProjectsCard - 参加中プロジェクトリスト
  *
  * 参加しているプロジェクトと招待されているプロジェクトを表示
+ * 最近アクセスしたプロジェクトを強調表示
  */
 import SectionCard from "@/components/ui/SectionCard.vue";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -44,6 +45,14 @@ function getRoleBadgeVariant(
   return "member";
 }
 
+function isRecentAccess(project: ProjectItem): boolean {
+  if (!project.lastAccessedAt) return false;
+  const now = new Date();
+  const diff = now.getTime() - project.lastAccessedAt.getTime();
+  const hours = diff / (1000 * 60 * 60);
+  return hours < 24;
+}
+
 function formatRelativeDate(date?: Date): string {
   if (!date) return "";
   const now = new Date();
@@ -53,7 +62,16 @@ function formatRelativeDate(date?: Date): string {
   if (days === 1) return "昨日";
   if (days < 7) return `${days}日前`;
   if (days < 30) return `${Math.floor(days / 7)}週間前`;
-  return date.toLocaleDateString("ja-JP");
+  return date.toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
+}
+
+function getRoleLabel(role?: string): string {
+  if (!role) return "メンバー";
+  const normalized = role.toLowerCase();
+  if (normalized === "owner") return "オーナー";
+  if (normalized === "admin") return "管理者";
+  if (normalized === "viewer") return "閲覧者";
+  return "メンバー";
 }
 </script>
 
@@ -77,16 +95,21 @@ function formatRelativeDate(date?: Date): string {
         </template>
       </AppEmptyState>
       <ul v-else class="project-list">
-        <li v-for="project in projects" :key="project.id" class="project-item">
+        <li
+          v-for="project in projects"
+          :key="project.id"
+          class="project-item"
+          :class="{ 'project-item--recent': isRecentAccess(project) }"
+        >
           <div class="project-item__info">
             <div class="project-item__header">
               <p class="project-item__name">{{ project.name }}</p>
               <AppBadge :variant="getRoleBadgeVariant(project.role)" size="sm">
-                {{ project.role || "member" }}
+                {{ getRoleLabel(project.role) }}
               </AppBadge>
             </div>
             <p v-if="project.lastAccessedAt" class="project-item__activity">
-              最終アクセス: {{ formatRelativeDate(project.lastAccessedAt) }}
+              {{ formatRelativeDate(project.lastAccessedAt) }}
             </p>
           </div>
           <AppButton
@@ -164,11 +187,22 @@ function formatRelativeDate(date?: Date): string {
   border-radius: var(--ui-radius-lg, 1rem);
   background: var(--ui-surface, #ffffff);
   transition: var(--ui-transition-all);
+  min-height: 64px;
 }
 
 .project-item:hover {
   border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
   box-shadow: var(--ui-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.project-item--recent {
+  border-left: 3px solid var(--ui-brand-500, #5a9ca6);
+  background: var(--ui-brand-50, #f0fafb);
+}
+
+.project-item--recent:hover {
+  border-left-color: var(--ui-brand-600, #4f7c82);
 }
 
 .project-item--invite {
@@ -185,23 +219,31 @@ function formatRelativeDate(date?: Date): string {
   flex-direction: column;
   gap: var(--ui-space-1, 0.25rem);
   min-width: 0;
+  flex: 1;
 }
 
 .project-item__header {
   display: flex;
   align-items: center;
   gap: var(--ui-space-3, 0.75rem);
+  flex-wrap: wrap;
 }
 
 .project-item__name {
   margin: 0;
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text, #0b2e33);
+  min-width: 80px;
 }
 
 .project-item__activity {
   margin: 0;
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text-muted, #64748b);
+}
+
+.project-item--recent .project-item__activity {
+  color: var(--ui-brand-600, #4f7c82);
+  font-weight: var(--ui-font-medium, 500);
 }
 </style>

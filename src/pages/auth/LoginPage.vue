@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppButton from "@/components/ui/AppButton.vue";
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
 import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
@@ -126,10 +127,11 @@ function mapFirebaseError(error: unknown) {
         />
 
         <div class="form-assist">
-          <label class="remember">
-            <input v-model="rememberMe" type="checkbox" />
-            <span>ログイン状態を保持</span>
-          </label>
+          <AppCheckbox
+            v-model="rememberMe"
+            label="ログイン状態を保持"
+            size="sm"
+          />
           <RouterLink :to="{ name: ROUTE_NAMES.passwordReset }">
             パスワードを忘れた場合
           </RouterLink>
@@ -210,20 +212,6 @@ function mapFirebaseError(error: unknown) {
   font-size: var(--ui-text-sm, 0.875rem);
 }
 
-.remember {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  color: var(--ui-brand-600, #4f7c82);
-  cursor: pointer;
-}
-
-.remember input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--ui-brand-600, #4f7c82);
-}
-
 .form-assist a {
   color: var(--ui-brand-600, #4f7c82);
   text-decoration: none;
@@ -289,13 +277,23 @@ function mapFirebaseError(error: unknown) {
   margin-top: var(--ui-space-4, 1rem);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .login-hero {
+    padding: var(--ui-space-8, 2rem) var(--ui-space-5, 1.25rem);
+  }
+
   .login-card {
-    padding: var(--ui-space-8, 2rem);
+    padding: var(--ui-space-8, 2rem) var(--ui-space-6, 1.5rem);
+  }
+}
+
+@media (max-width: 600px) {
+  .login-card {
+    padding: var(--ui-space-6, 1.5rem) var(--ui-space-5, 1.25rem);
   }
 
   .login-hero {
-    padding: var(--ui-space-8, 2rem) var(--ui-space-5, 1.25rem);
+    padding: var(--ui-space-6, 1.5rem) var(--ui-space-4, 1rem);
   }
 }
 </style>

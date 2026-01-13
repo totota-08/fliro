@@ -5,9 +5,11 @@
  * プロジェクト一覧、タスク状況を表示
  * プロフィール編集はAccountSettingsPageに移動
  *
- * 2カラムレイアウト：
- * - 左: 参加プロジェクト（主）
- * - 右: 今週のタスク（従）
+ * 1カラムレイアウト：
+ * - プロフィール（トップ）
+ * - プロジェクト一覧
+ * - 今週のタスク
+ * - アカウント設定リンク
  */
 import ProfileSummaryCard from "@/components/mypage/ProfileSummaryCard.vue";
 import JoinedProjectsCard, {
@@ -17,8 +19,6 @@ import JoinedProjectsCard, {
 import WeeklyTasksCard, {
   type TaskDoc,
 } from "@/components/mypage/WeeklyTasksCard.vue";
-import SectionCard from "@/components/ui/SectionCard.vue";
-import AppButton from "@/components/ui/AppButton.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
@@ -32,7 +32,7 @@ import { signOutUser, useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { collection, getDocs, query } from "firebase/firestore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.account.MyPage");
 
@@ -214,46 +214,46 @@ onBeforeUnmount(() => {
         @sign-out="handleSignOut"
       />
 
-      <!-- Two Column Layout -->
-      <div class="mypage__columns">
-        <!-- Left Column: Projects (Primary) -->
-        <div class="mypage__column mypage__column--primary">
-          <JoinedProjectsCard
-            :projects="projects"
-            :pending-invites="pendingInvites"
-            :joining-invite-id="joiningInviteId"
-            @join-project="handleJoinProject"
-          />
-        </div>
+      <!-- Projects Section -->
+      <JoinedProjectsCard
+        :projects="projects"
+        :pending-invites="pendingInvites"
+        :joining-invite-id="joiningInviteId"
+        @join-project="handleJoinProject"
+      />
 
-        <!-- Right Column: Tasks (Secondary) -->
-        <div class="mypage__column mypage__column--secondary">
-          <WeeklyTasksCard
-            :loading="loading"
-            :tasks="taskList"
-            :upcoming-tasks="upcomingTasks"
-          />
-        </div>
-      </div>
+      <!-- Tasks Section -->
+      <WeeklyTasksCard
+        :loading="loading"
+        :tasks="taskList"
+        :upcoming-tasks="upcomingTasks"
+      />
 
-      <!-- Account Settings Link -->
-      <SectionCard size="sm">
-        <div class="settings-link">
-          <div class="settings-link__info">
-            <p class="settings-link__title">アカウント設定</p>
-            <p class="settings-link__description">
-              プロフィール編集やアカウントの削除などを行えます
-            </p>
-          </div>
-          <AppButton
-            variant="outline"
-            size="sm"
-            :to="{ name: ROUTE_NAMES.accountSettings }"
+      <!-- Account Settings Link (Inline) -->
+      <div class="mypage__settings-link">
+        <RouterLink
+          :to="{ name: ROUTE_NAMES.accountSettings }"
+          class="settings-link"
+        >
+          <span class="settings-link__text">アカウント設定</span>
+          <svg
+            class="settings-link__icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
           >
-            設定を開く
-          </AppButton>
-        </div>
-      </SectionCard>
+            <path
+              d="M9 18l6-6-6-6"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </RouterLink>
+      </div>
     </div>
   </AppShell>
 </template>
@@ -263,65 +263,45 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-6, 1.5rem);
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-/* Two Column Layout */
-.mypage__columns {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: var(--ui-space-6, 1.5rem);
-  align-items: start;
-}
-
-.mypage__column--primary {
-  min-width: 0; /* Prevent overflow */
-}
-
-.mypage__column--secondary {
-  min-width: 0;
-}
-
-/* Settings Link */
-.settings-link {
+/* Settings Link (Inline) */
+.mypage__settings-link {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  padding: var(--ui-space-2, 0.5rem) 0;
+}
+
+.settings-link {
+  display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-4, 1rem);
-}
-
-.settings-link__info {
-  flex: 1;
-}
-
-.settings-link__title {
-  margin: 0;
+  gap: var(--ui-space-1, 0.25rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
   font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.settings-link__description {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text-muted, #64748b);
+  text-decoration: none;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  transition: var(--ui-transition-all);
 }
 
-/* Responsive */
-@media (max-width: 960px) {
-  .mypage__columns {
-    grid-template-columns: 1fr;
-  }
-
-  .mypage__column--secondary {
-    order: -1; /* タスクを上に表示（モバイルではより重要） */
-  }
+.settings-link:hover {
+  color: var(--ui-brand-600, #4f7c82);
+  background: var(--ui-surface-muted, #f1f5f9);
 }
 
-@media (max-width: 768px) {
-  .settings-link {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
-  }
+.settings-link__text {
+  font-weight: var(--ui-font-medium, 500);
+}
+
+.settings-link__icon {
+  opacity: 0.6;
+  transition: var(--ui-transition-all);
+}
+
+.settings-link:hover .settings-link__icon {
+  opacity: 1;
+  transform: translateX(2px);
 }
 </style>
