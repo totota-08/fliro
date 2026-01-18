@@ -1,0 +1,32 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with gradient -->
+  <rect width="1200" height="630" fill="url(#bg_gradient)"/>
+
+  <!-- Logo icon (scaled from fliro-icon.svg) -->
+  <g transform="translate(440, 120) scale(0.35)">
+    <rect width="512" height="512" rx="128" fill="url(#logo_gradient)"/>
+    <path d="M196 96H156C133.909 96 116 113.909 116 136V376C116 398.091 133.909 416 156 416H196C218.091 416 236 398.091 236 376V136C236 113.909 218.091 96 196 96Z" fill="white"/>
+    <path d="M396 96H236V176H396C418.091 176 436 158.091 436 136C436 113.909 418.091 96 396 96Z" fill="white"/>
+    <path d="M346 216H236V296H346C368.091 296 386 278.091 386 256C386 233.909 368.091 216 346 216Z" fill="white"/>
+  </g>
+
+  <!-- App name -->
+  <text x="600" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white" text-anchor="middle">Fliro</text>
+
+  <!-- Tagline -->
+  <text x="600" y="490" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="rgba(255,255,255,0.85)" text-anchor="middle">チームの「今やるべきこと」を、シンプルに。</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="rgba(255,255,255,0.6)" text-anchor="middle">小規模チーム向けプロジェクト管理ツール</text>
+
+  <defs>
+    <linearGradient id="bg_gradient" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f2f33"/>
+      <stop offset="1" stop-color="#1A4A51"/>
+    </linearGradient>
+    <linearGradient id="logo_gradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A4A51"/>
+      <stop offset="1" stop-color="#4F7C82"/>
+    </linearGradient>
+  </defs>
+</svg>
