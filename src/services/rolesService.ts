@@ -9,10 +9,13 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 /**
@@ -199,8 +202,21 @@ export async function removeRole(
     return { success: false, error: "デフォルトロールは削除できません" };
   }
 
-  // TODO: このロールを持つメンバーがいないか確認
-  // 現時点ではメンバーのrole/rolesとの整合性チェックは行わない
+  // このロールを持つメンバーがいないか確認
+  const membersRef = collection(db, "projects", projectId, "members");
+  const q = query(
+    membersRef,
+    where("roles", "array-contains", roleKey),
+    limit(1),
+  );
+  const memberSnap = await getDocs(q);
+
+  if (!memberSnap.empty) {
+    return {
+      success: false,
+      error: "このロールは使用中のため削除できません",
+    };
+  }
 
   await deleteDoc(roleRef);
   return { success: true };
