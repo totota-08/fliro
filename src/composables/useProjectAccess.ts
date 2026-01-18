@@ -1,6 +1,6 @@
 import {
-  type ProjectPermissionKey,
   ROLE_DEFAULT_PERMISSIONS,
+  type ProjectPermissionKey,
 } from "@/constants/permissions";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
@@ -207,24 +207,25 @@ export interface ProjectAccessResult {
   /** ロールに紐づく権限配列（Firestoreから取得） */
   permissions: ProjectPermissionKey[];
   error?: ProjectAccessError;
+  /** プロジェクトがゲスト閲覧を許可しているか */
+  allowGuestView?: boolean;
+  /** 未認証ユーザーとしてゲストアクセスしているか */
+  isAnonymousGuest?: boolean;
 }
 
 /**
  * 権限を一度だけ取得する（非リアクティブ）
  * オーナーはメンバードキュメントが存在しなくてもアクセス可能
+ * userId が null の場合は未認証ユーザーとして処理
  */
 export async function fetchProjectAccess(
   projectId: string,
-  userId: string,
+  userId: string | null,
 ): Promise<ProjectAccessResult> {
   try {
-    const [projectSnap, memberSnap] = await Promise.all([
-      getDoc(doc(db, "projects", projectId)),
-      getDoc(doc(db, "projects", projectId, "members", userId)),
-    ]);
-
+    // 未認証ユーザーの場合はプロジェクト情報のみ取得
+    const projectSnap = await getDoc(doc(db, "projects", projectId));
     const project = projectSnap.exists() ? projectSnap.data() : null;
-    const member = memberSnap.exists() ? memberSnap.data() : null;
 
     // プロジェクトが存在しない場合
     if (!project) {
@@ -240,6 +241,44 @@ export async function fetchProjectAccess(
       };
     }
 
+    const allowGuestView = Boolean(project.settings?.allowGuestView);
+
+    // 未認証ユーザーの場合
+    if (!userId) {
+      // ゲスト閲覧が許可されていればアクセス可能
+      if (allowGuestView) {
+        return {
+          isOwner: false,
+          isAdmin: false,
+          isMember: false,
+          isGuest: true,
+          hasAccess: true,
+          role: "anonymous_guest",
+          permissions: ROLE_DEFAULT_PERMISSIONS.viewer || [],
+          allowGuestView: true,
+          isAnonymousGuest: true,
+        };
+      }
+
+      return {
+        isOwner: false,
+        isAdmin: false,
+        isMember: false,
+        isGuest: true,
+        hasAccess: false,
+        role: "",
+        permissions: [],
+        error: "permission",
+        allowGuestView: false,
+      };
+    }
+
+    // 認証済みユーザーの場合、メンバー情報も取得
+    const memberSnap = await getDoc(
+      doc(db, "projects", projectId, "members", userId),
+    );
+    const member = memberSnap.exists() ? memberSnap.data() : null;
+
     // オーナー判定を優先（メンバードキュメントがなくてもオーナーならアクセス可能）
     const isOwnerByProject = project.ownerUserId === userId;
 
@@ -254,6 +293,21 @@ export async function fetchProjectAccess(
           hasAccess: true,
           role: "owner",
           permissions: ROLE_DEFAULT_PERMISSIONS.owner || [],
+          allowGuestView,
+        };
+      }
+
+      // ゲスト閲覧が許可されていれば、認証済みだがメンバーでないユーザーもアクセス可能
+      if (allowGuestView) {
+        return {
+          isOwner: false,
+          isAdmin: false,
+          isMember: false,
+          isGuest: true,
+          hasAccess: true,
+          role: "guest",
+          permissions: ROLE_DEFAULT_PERMISSIONS.viewer || [],
+          allowGuestView: true,
         };
       }
 
@@ -266,6 +320,7 @@ export async function fetchProjectAccess(
         role: "",
         permissions: [],
         error: "permission",
+        allowGuestView: false,
       };
     }
 
@@ -285,6 +340,7 @@ export async function fetchProjectAccess(
         hasAccess: true,
         role,
         permissions: ROLE_DEFAULT_PERMISSIONS.owner || [],
+        allowGuestView,
       };
     }
 
@@ -314,6 +370,7 @@ export async function fetchProjectAccess(
       hasAccess: true,
       role,
       permissions,
+      allowGuestView,
     };
   } catch (error) {
     // ネットワークエラーやFirebaseエラーの場合

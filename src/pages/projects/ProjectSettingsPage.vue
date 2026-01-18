@@ -1,46 +1,47 @@
 <script setup lang="ts">
+import ZeldaPuzzleEffect from "@/components/effects/ZeldaPuzzleEffect.vue";
+import ConfirmGuestAccessModal from "@/components/modals/ConfirmGuestAccessModal.vue";
+import DangerZoneCard from "@/components/settings/DangerZoneCard.vue";
+import SettingsLinkList from "@/components/settings/SettingsLinkList.vue";
+import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
+import SettingsToggleRow from "@/components/settings/SettingsToggleRow.vue";
+import AppAlert from "@/components/ui/AppAlert.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
-import AppAlert from "@/components/ui/AppAlert.vue";
 import { usePageTitle } from "@/composables/usePageTitle";
-import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
-import SettingsToggleRow from "@/components/settings/SettingsToggleRow.vue";
-import SettingsLinkList from "@/components/settings/SettingsLinkList.vue";
-import DangerZoneCard from "@/components/settings/DangerZoneCard.vue";
-import ZeldaPuzzleEffect from "@/components/effects/ZeldaPuzzleEffect.vue";
+import { useProjectAccess } from "@/composables/useProjectAccess";
+import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { appName } from "@/constants/appMeta";
-import { ROUTE_NAMES } from "@/constants/routes";
 import {
   ProjectPermission,
   type ProjectPermissionKey,
 } from "@/constants/permissions";
-import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { useProjectAccess } from "@/composables/useProjectAccess";
-import { db } from "@/lib/firebase";
+import { ROUTE_NAMES } from "@/constants/routes";
 import {
   deleteProject,
   fetchProject,
   updateProjectMetadata,
 } from "@/firebase/projectService";
-import { updateProjectSettings } from "@/services/projectSettings";
-import { listenTasks, type TaskDoc } from "@/services/taskService";
+import { db } from "@/lib/firebase";
 import {
   getDashboardSettings,
+  getDefaultInsightCards,
   saveDashboardSettings,
   saveInsightCardSettings,
-  getDefaultInsightCards,
   type DashboardCardConfig,
   type InsightCardConfig,
 } from "@/services/dashboardSettingsService";
+import { updateProjectSettings } from "@/services/projectSettings";
 import {
-  listenProjectRoles,
-  updateRolePermissions,
   addRole,
+  listenProjectRoles,
   removeRole,
   updateRole,
+  updateRolePermissions,
   type ProjectRole,
 } from "@/services/rolesService";
+import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -272,6 +273,9 @@ const publicSettings = ref({
 });
 const initialPublicSettings = ref({ isPublic: false, allowGuestView: false });
 const publicSaving = ref(false);
+
+// ゲスト閲覧許可確認モーダル
+const isGuestAccessModalOpen = ref(false);
 
 // AI設定の初期値
 const initialAiSettings = ref({ enabled: false, key: "" });
@@ -608,6 +612,23 @@ async function handleSaveBasic() {
   } finally {
     saving.value = false;
   }
+}
+
+// ゲスト閲覧トグルのハンドラ（ONにする場合は確認モーダルを表示）
+function handleGuestViewToggle(value: boolean) {
+  if (value) {
+    // ONにする場合は確認モーダルを表示
+    isGuestAccessModalOpen.value = true;
+  } else {
+    // OFFにする場合は直接更新
+    publicSettings.value.allowGuestView = false;
+  }
+}
+
+// ゲスト閲覧許可確認後の処理
+function confirmEnableGuestAccess() {
+  publicSettings.value.allowGuestView = true;
+  isGuestAccessModalOpen.value = false;
 }
 
 // 公開設定を保存
@@ -1090,10 +1111,11 @@ watch(projectId, async (newId, oldId) => {
                   :disabled="!canEdit"
                 />
                 <SettingsToggleRow
-                  v-model="publicSettings.allowGuestView"
+                  :model-value="publicSettings.allowGuestView"
                   label="ゲスト閲覧を許可"
                   description="アカウントを持たないユーザーも閲覧可能にします"
                   :disabled="!canEdit"
+                  @update:model-value="handleGuestViewToggle"
                 />
               </div>
             </SettingsSectionCard>
@@ -1941,6 +1963,14 @@ watch(projectId, async (newId, oldId) => {
         </div>
       </div>
     </Teleport>
+
+    <!-- ゲスト閲覧許可確認モーダル -->
+    <ConfirmGuestAccessModal
+      :open="isGuestAccessModalOpen"
+      :loading="publicSaving"
+      @close="isGuestAccessModalOpen = false"
+      @confirm="confirmEnableGuestAccess"
+    />
   </div>
 </template>
 

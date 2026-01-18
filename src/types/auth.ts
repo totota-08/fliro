@@ -15,6 +15,8 @@ export interface UserProfile {
   betaAccess?: boolean;
   betaCodeUsed?: string;
   betaAccessAt?: string;
+  // 招待コード使用済みフラグ
+  hasUsedInviteCode: boolean;
 }
 
 export interface CredentialSignUpPayload {
