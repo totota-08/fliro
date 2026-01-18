@@ -320,6 +320,22 @@ type TaskEventType =
   | "task.due_changed"
   | "task.updated";
 
+/**
+ * タスクスレッドのアーカイブ状態を更新
+ */
+export async function updateTaskThreadArchived(
+  projectId: string,
+  taskId: string,
+  archived: boolean,
+) {
+  logger.debug`Updating task thread archived status: ${taskId} -> ${archived}`;
+  const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+  await updateDoc(taskRef, {
+    threadArchived: archived,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function deleteTask(
   projectId: string,
   taskId: string,
