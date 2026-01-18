@@ -68,10 +68,11 @@ const hasError = computed(() => props.error || Boolean(props.errorMessage));
   border-radius: var(--ui-radius-sm, 0.5rem);
   background: var(--ui-surface, #ffffff);
   color: var(--ui-text, #0b2e33);
-  font-size: var(--ui-text-base, 1rem);
+  font-size: max(var(--ui-text-base, 1rem), 16px); /* iOS zoom prevention */
   font-family: inherit;
   line-height: var(--ui-leading-normal, 1.5);
   transition: var(--ui-transition-all);
+  min-height: calc(var(--ui-touch-target-min, 44px) * 2); /* At least 2 lines */
 }
 
 .app-textarea::placeholder {

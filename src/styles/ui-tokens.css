@@ -220,6 +220,21 @@
   --ui-card-width-lg: 600px;
 
   /* ========================================
+   * 8.1 Mobile Layout
+   * ======================================== */
+
+  /* Touch Target (iOS: 44pt, Android: 48dp) */
+  --ui-touch-target-min: 44px;
+  --ui-touch-target-comfortable: 48px;
+
+  /* Mobile Spacing */
+  --ui-mobile-padding: var(--ui-space-4);
+  --ui-mobile-padding-sm: var(--ui-space-3);
+
+  /* Bottom Navigation */
+  --ui-bottom-nav-height: 56px;
+
+  /* ========================================
    * 9. Sidebar Colors (Dark background用)
    * ======================================== */
 

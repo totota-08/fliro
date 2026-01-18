@@ -77,16 +77,19 @@ const classes = computed(() => [
   padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
   font-size: var(--ui-text-sm, 0.875rem);
   border-radius: var(--ui-radius-sm, 0.5rem);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .app-button--md {
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-5, 1.25rem);
   font-size: var(--ui-text-base, 1rem);
+  min-height: var(--ui-touch-target-comfortable, 48px);
 }
 
 .app-button--lg {
   padding: var(--ui-space-4, 1rem) var(--ui-space-6, 1.5rem);
   font-size: var(--ui-text-lg, 1.125rem);
+  min-height: 52px;
 }
 
 /* Primary */
@@ -229,6 +232,14 @@ const classes = computed(() => [
 @keyframes app-button-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Touch device active state */
+@media (hover: none) and (pointer: coarse) {
+  .app-button:not(:disabled):active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
   }
 }
 </style>

@@ -6,6 +6,7 @@
  * ページ遷移時の再描画を防ぐ
  */
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav.vue";
 import TaskCreateModal, {
   type TaskFormData,
 } from "@/components/tasks/TaskCreateModal.vue";
@@ -50,6 +51,34 @@ const normalizedProfile = computed<DashboardProfileInfo>(() => ({
   email: profileInfo.value.email ?? "",
   avatar: profileInfo.value.avatar,
 }));
+
+// Mobile bottom nav items
+const mobileNavItems = computed(() => [
+  {
+    name: "dashboard",
+    label: "ホーム",
+    icon: "home",
+    to: { name: "project-dashboard", params: { projectId: projectId.value } },
+  },
+  {
+    name: "tasks",
+    label: "タスク",
+    icon: "tasks",
+    to: { name: "my-tasks" },
+  },
+  {
+    name: "team",
+    label: "チーム",
+    icon: "users",
+    to: { name: "project-members", params: { projectId: projectId.value } },
+  },
+  {
+    name: "settings",
+    label: "設定",
+    icon: "settings",
+    to: { name: "project-settings", params: { projectId: projectId.value } },
+  },
+]);
 
 // Task create modal
 const { isTaskModalOpen, openTaskModal, closeTaskModal } = useTaskCreateModal({
