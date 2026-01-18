@@ -1,16 +1,16 @@
 import ErrorPage from "@/components/errorPage/ErrorPage.vue";
+import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger("app.router");
 
 // 初回アクセスで必要なページのみ静的インポート
+import ProjectLayout from "@/layouts/ProjectLayout.vue";
 import HomePage from "@/pages/HomePage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
-import ProjectLayout from "@/layouts/ProjectLayout.vue";
 
 import { useAuthStore, waitForAuthReady } from "@/store/auth";
 import { createRouter, createWebHistory } from "vue-router";
@@ -128,7 +128,7 @@ export const router = createRouter({
     {
       path: "/projects/:projectId",
       component: ProjectLayout,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, allowGuestAccess: true },
       children: [
         {
           path: "dashboard",
@@ -288,6 +288,9 @@ router.beforeEach(async (to) => {
   const requiresAuth = to.matched.some(
     (record) => record.meta.requiresAuth === true,
   );
+  const allowGuestAccess = to.matched.some(
+    (record) => record.meta.allowGuestAccess === true,
+  );
   const authRestricted = [
     String(ROUTE_NAMES.login),
     String(ROUTE_NAMES.signup),
@@ -306,7 +309,60 @@ router.beforeEach(async (to) => {
     user = await getCurrentUser();
   } catch (error) {
     logger.error`Auth check failed: ${error}`;
-    return { name: ROUTE_NAMES.login };
+    // ゲストアクセス可能なルートの場合はログインにリダイレクトしない
+    if (!allowGuestAccess) {
+      return { name: ROUTE_NAMES.login };
+    }
+  }
+
+  // プロジェクト関連のルートでゲストアクセスが許可されている場合
+  const projectId = to.params.projectId as string | undefined;
+  const routeName = to.name as
+    | (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES]
+    | undefined;
+
+  // 未認証ユーザーでプロジェクトIDがあり、ゲストアクセスが許可されている場合
+  if (requiresAuth && !user && allowGuestAccess && projectId) {
+    // プロジェクトのゲスト閲覧設定を確認
+    const access = await fetchProjectAccess(projectId, null);
+
+    // ネットワークエラーの場合
+    if (access.error === "network") {
+      logger.error`Network error during guest access check for project ${projectId}`;
+      return {
+        name: ROUTE_NAMES.error,
+        query: {
+          projectId,
+          errorType: "network",
+          reason: "サーバーとの通信中にエラーが発生しました。",
+        },
+      };
+    }
+
+    // プロジェクトが存在しない場合
+    if (access.error === "not_found") {
+      logger.warn`Project not found: ${projectId}`;
+      return {
+        name: ROUTE_NAMES.error,
+        query: {
+          projectId,
+          errorType: "not_found",
+          reason: "指定されたプロジェクトは存在しません。",
+        },
+      };
+    }
+
+    // ゲスト閲覧が許可されている場合はアクセスを許可
+    if (access.allowGuestView && access.hasAccess) {
+      logger.info`Guest access granted for project ${projectId}`;
+      return true;
+    }
+
+    // ゲスト閲覧が許可されていない場合はログインページへ
+    return {
+      name: ROUTE_NAMES.login,
+      query: { redirect: to.fullPath },
+    };
   }
 
   if (requiresAuth && !user) {
@@ -330,12 +386,7 @@ router.beforeEach(async (to) => {
     return { name: ROUTE_NAMES.myPage };
   }
 
-  // プロジェクト権限チェック
-  const projectId = to.params.projectId as string | undefined;
-  const routeName = to.name as
-    | (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES]
-    | undefined;
-
+  // プロジェクト権限チェック（認証済みユーザー）
   if (projectId && routeName && user) {
     const requiredPermission = ROUTE_REQUIRED_PERMISSIONS[routeName];
 

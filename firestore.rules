@@ -180,7 +180,8 @@ service cloud.firestore {
                       && request.resource.data.userId == request.auth.uid
                       && request.resource.data.createdAt is timestamp;
         allow read: if isProjectMember(projectId)
-                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
       }
 
       match /events/{eventId} {
@@ -193,7 +194,8 @@ service cloud.firestore {
                       && request.resource.data.payload is map
                       && request.resource.data.createdAt is timestamp;
         allow read: if isProjectMember(projectId)
-                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
       }
 
       match /tasks/{taskId} {
@@ -204,7 +206,8 @@ service cloud.firestore {
                       && request.resource.data.createdAt is timestamp
                       && request.resource.data.updatedAt is timestamp;
         allow read: if isProjectMember(projectId)
-                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
         // Owner/Adminはフル編集可能、Memberは自分担当タスクの進捗のみ更新可能
         allow update: if canManageTasks(projectId) || canUpdateOwnTaskProgress(projectId);
         // タスク削除はOwner/Admin/Manager、または作成者のみ
@@ -213,7 +216,8 @@ service cloud.firestore {
 
         match /messages/{messageId} {
           allow read: if isProjectMember(projectId)
-                      || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+                      || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true
+                      || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
           allow create: if isProjectMember(projectId)
                         && request.resource.data.text is string
                         && request.resource.data.senderId == request.auth.uid
@@ -233,7 +237,8 @@ service cloud.firestore {
       // プロジェクトチャットメッセージ
       match /messages/{messageId} {
         allow read: if isProjectMember(projectId)
-                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
         allow create: if isProjectMember(projectId)
                       && request.resource.data.text is string
                       && request.resource.data.senderId == request.auth.uid
@@ -260,7 +265,8 @@ service cloud.firestore {
                       && (request.resource.data.allowedUserIds == null || request.resource.data.allowedUserIds is list);
 
         allow read: if isProjectMember(projectId)
-                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true;
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.isPublic == true
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
 
         allow update: if isProjectMember(projectId)
                       && request.auth.uid == resource.data.createdBy
@@ -276,13 +282,15 @@ service cloud.firestore {
       }
 
       match /categories/{categoryId} {
-        allow read: if isProjectMember(projectId);
+        allow read: if isProjectMember(projectId)
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
         allow create, update, delete: if isProjectOwner(projectId)
                                       || canManageSettings(projectId);
       }
 
       match /roles/{roleId} {
-        allow read: if isProjectMember(projectId);
+        allow read: if isProjectMember(projectId)
+                    || get(/databases/$(database)/documents/projects/$(projectId)).data.settings.allowGuestView == true;
         allow create, update, delete: if isProjectOwner(projectId)
                                       || canManageSettings(projectId);
       }

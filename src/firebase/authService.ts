@@ -1,26 +1,4 @@
 import {
-  type AuthProvider,
-  applyActionCode,
-  confirmPasswordReset,
-  createUserWithEmailAndPassword,
-  deleteUser,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  reload,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  updateProfile,
-  type User,
-} from "firebase/auth";
-import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
-import {
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytes,
-} from "firebase/storage";
-import {
   auth,
   db,
   githubProvider,
@@ -35,6 +13,28 @@ import type {
   SocialProvider,
   UserProfile,
 } from "@/types/auth";
+import {
+  applyActionCode,
+  confirmPasswordReset,
+  createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  reload,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  updateProfile,
+  type AuthProvider,
+  type User,
+} from "firebase/auth";
+import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  getDownloadURL,
+  ref as storageRef,
+  uploadBytes,
+} from "firebase/storage";
 
 const providerMap: Record<SocialProvider, AuthProvider> = {
   google: googleProvider,
@@ -202,10 +202,20 @@ async function persistProfile(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
     setUp: overrides.setUp ?? existing?.setUp ?? false,
+    hasUsedInviteCode:
+      overrides.hasUsedInviteCode ?? existing?.hasUsedInviteCode ?? false,
   };
 
   await setDoc(ref, profile, { merge: true });
   return profile;
+}
+
+/**
+ * 招待コード使用済みフラグをtrueに更新する
+ */
+export async function markInviteCodeAsUsed() {
+  const user = await requireCurrentUser();
+  return persistProfile(user, { hasUsedInviteCode: true });
 }
 
 async function requireCurrentUser() {
