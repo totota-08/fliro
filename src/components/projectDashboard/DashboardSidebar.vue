@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SidebarUserProfile from "@/components/common/SidebarUserProfile.vue";
+import BrandLogo from "@/components/common/BrandLogo.vue";
 import { useNavigationState } from "@/composables/useNavigationState";
 import { appName } from "@/constants/appMeta";
 import type {
@@ -142,7 +143,10 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
         :class="{ 'sidebar__brand--clickable': props.dashboardTo }"
         @click="props.dashboardTo ? handleNavigate() : undefined"
       >
-        <div class="sidebar__logo">{{ appName }}</div>
+        <div class="sidebar__logo">
+          <BrandLogo class="sidebar__logo-icon" />
+          <span>{{ appName }}</span>
+        </div>
         <p class="sidebar__subtitle">{{ props.brandSubtitle }}</p>
       </component>
       <button type="button" class="sidebar__toggle" @click="handleClose">

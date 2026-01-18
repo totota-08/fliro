@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SidebarUserProfile from "@/components/common/SidebarUserProfile.vue";
+import BrandLogo from "@/components/common/BrandLogo.vue";
 import { appName } from "@/constants/appMeta";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
@@ -92,7 +93,10 @@ const handleNavigate = () => {
   <aside :class="rootClasses">
     <div class="sidebar__header">
       <div class="sidebar__brand">
-        <div class="sidebar__logo">{{ appName }}</div>
+        <div class="sidebar__logo">
+          <BrandLogo class="sidebar__logo-icon" />
+          <span>{{ appName }}</span>
+        </div>
         <p class="sidebar__subtitle">デモ体験</p>
       </div>
       <button type="button" class="sidebar__toggle" @click="handleClose">
