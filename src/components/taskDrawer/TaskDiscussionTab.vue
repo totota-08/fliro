@@ -138,57 +138,57 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-right: 4px;
-  padding-bottom: 12px;
+  gap: var(--ui-space-2);
+  padding-right: var(--ui-space-1);
+  padding-bottom: var(--ui-space-3);
 }
 
 .empty-state {
   text-align: center;
-  color: var(--text-muted);
-  padding: 20px;
-  font-size: 14px;
+  color: var(--ui-text-muted);
+  padding: var(--ui-space-5);
+  font-size: var(--ui-text-sm);
 }
 
 .msg {
-  border: 1px solid var(--border-light);
-  border-radius: 16px;
-  padding: 12px;
-  background: var(--surface);
+  border: 1px solid var(--ui-border-light);
+  border-radius: var(--ui-radius-lg);
+  padding: var(--ui-space-3);
+  background: var(--ui-surface);
 }
 
 .msg.decision {
-  background: var(--color-success-bg);
-  border-color: rgba(22, 163, 74, 0.2);
+  background: var(--ui-success-light);
+  border-color: var(--ui-success-200);
 }
 
 .meta {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  color: var(--text-muted);
-  font-weight: 750;
-  font-size: 12px;
-  margin-bottom: 6px;
+  gap: var(--ui-space-2);
+  color: var(--ui-text-muted);
+  font-weight: var(--ui-font-bold);
+  font-size: var(--ui-text-xs);
+  margin-bottom: var(--ui-space-1);
 }
 
 .sender {
-  font-weight: 800;
-  color: var(--text-strong);
+  font-weight: var(--ui-font-bold);
+  color: var(--ui-text-strong);
 }
 
 .text {
-  line-height: 1.55;
+  line-height: var(--ui-leading-relaxed);
   white-space: pre-wrap;
-  color: var(--text);
-  font-size: 14px;
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
 }
 
 .composer {
   display: flex;
-  gap: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+  gap: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+  padding-top: var(--ui-space-3);
   align-items: flex-start;
   margin-top: auto;
 }
@@ -197,41 +197,41 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--ui-space-1);
 }
 
 input {
   width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  padding: var(--ui-space-3);
   outline: none;
-  font-size: 14px;
-  background: var(--surface);
-  transition: border-color 0.2s;
+  font-size: var(--ui-text-sm);
+  background: var(--ui-surface);
+  transition: border-color var(--ui-duration-base) var(--ui-ease-standard);
 }
 
 input:focus {
-  border-color: var(--brand);
+  border-color: var(--ui-brand-600);
 }
 
 .hint {
   margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-bold);
 }
 
 .send-btn {
   border: none;
   cursor: pointer;
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-weight: 900;
-  background: var(--brand);
-  color: var(--text-inverse);
-  transition: opacity 0.2s;
-  height: 44px;
+  border-radius: var(--ui-radius-md);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  font-weight: var(--ui-font-bold);
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse);
+  transition: opacity var(--ui-duration-base) var(--ui-ease-standard);
+  height: var(--ui-touch-target-min);
 }
 
 .send-btn:disabled {

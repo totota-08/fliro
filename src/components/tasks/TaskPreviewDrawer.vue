@@ -50,7 +50,7 @@ function formatDueDate(task: TaskDoc) {
         <p class="label">ステータス</p>
         <div class="readonly-value">
           <TaskStatusBadge :status="task.status" />
-          <span class="muted" style="margin-left: 8px"
+          <span class="muted" :style="{ marginLeft: 'var(--ui-space-2)' }"
             >{{ task.progress }}%</span
           >
         </div>
@@ -175,11 +175,11 @@ function formatDueDate(task: TaskDoc) {
   line-height: var(--ui-leading-relaxed);
   max-height: 100px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ui-surface-glass-70);
   padding: var(--ui-space-3);
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-light);
-  transition: max-height 0.3s ease;
+  transition: max-height var(--ui-duration-slow) var(--ui-ease-standard);
 }
 
 .description-preview.is-expanded {
@@ -220,6 +220,6 @@ function formatDueDate(task: TaskDoc) {
 }
 
 .cta-button:hover {
-  background: rgba(79, 124, 130, 0.08);
+  background: var(--ui-notify-info-bg);
 }
 </style>

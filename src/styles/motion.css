@@ -83,8 +83,8 @@
 
 /* Skeleton Utilities */
 .skeleton {
-  background-color: var(--border-light, #e2e8f0); /* Fallback color */
-  border-radius: 4px;
+  background-color: var(--ui-border-light, #e2e8f0); /* Fallback color */
+  border-radius: var(--ui-radius-sm);
   position: relative;
   overflow: hidden;
 }
@@ -123,33 +123,33 @@
 }
 
 .skeleton--avatar {
-  width: 40px;
-  height: 40px;
+  width: var(--ui-space-10);
+  height: var(--ui-space-10);
   border-radius: 50%;
 }
 
 .skeleton--card {
   width: 100%;
   height: 200px;
-  border-radius: 8px;
+  border-radius: var(--ui-radius-md);
 }
 
 .skeleton--row {
   width: 100%;
-  height: 48px;
-  margin-bottom: 8px;
+  height: var(--ui-space-12);
+  margin-bottom: var(--ui-space-2);
 }
 
 /* Button Loading Dots */
 .loading-dots {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--ui-space-1);
 }
 
 .loading-dots span {
-  width: 4px;
-  height: 4px;
+  width: var(--ui-space-1);
+  height: var(--ui-space-1);
   background-color: currentColor;
   border-radius: 50%;
   animation: loading-dot 1.4s infinite ease-in-out both;

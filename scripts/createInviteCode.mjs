@@ -29,7 +29,9 @@ function loadProjectIdFromEnv() {
 
   try {
     const envContent = readFileSync(envPath, "utf-8");
-    const match = envContent.match(/VITE_FIREBASE_PROJECT_ID=['"']?([^'"\n]+)['"']?/);
+    const match = envContent.match(
+      /VITE_FIREBASE_PROJECT_ID=['"']?([^'"\n]+)['"']?/,
+    );
     if (match) {
       return match[1];
     }
@@ -102,7 +104,7 @@ function generateCode() {
   const segment = () =>
     Array.from(
       { length: 4 },
-      () => chars[Math.floor(Math.random() * chars.length)]
+      () => chars[Math.floor(Math.random() * chars.length)],
     ).join("");
   return `${segment()}-${segment()}-${segment()}`;
 }
@@ -152,9 +154,7 @@ async function main() {
     });
   } catch (error) {
     console.error("Firebase初期化エラー:");
-    console.error(
-      "gcloud auth application-default login を実行してください"
-    );
+    console.error("gcloud auth application-default login を実行してください");
     process.exit(1);
   }
 
@@ -166,7 +166,7 @@ async function main() {
   console.log(`生成数: ${options.count}`);
   console.log(`使用回数上限: ${options.maxUses ?? "無制限"}`);
   console.log(
-    `有効期限: ${expiresAt ? expiresAt.toDate().toLocaleString("ja-JP") : "無期限"}`
+    `有効期限: ${expiresAt ? expiresAt.toDate().toLocaleString("ja-JP") : "無期限"}`,
   );
   console.log("");
 

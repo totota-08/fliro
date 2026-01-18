@@ -83,18 +83,18 @@ function positionPercent(date: Date) {
 
 <style scoped>
 .timeline {
-  border: 1px solid rgba(11, 46, 51, 0.08);
-  border-radius: 1.25rem;
-  padding: 1rem 1.25rem;
-  background: #fff;
-  box-shadow: 0 12px 20px rgba(11, 46, 51, 0.08);
+  border: 1px solid var(--ui-border-light);
+  border-radius: var(--ui-radius-xl);
+  padding: var(--ui-space-4) var(--ui-space-5);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg);
   display: grid;
-  gap: 0.75rem;
+  gap: var(--ui-space-3);
 }
 
 .timeline__bar {
   position: relative;
-  height: 48px;
+  height: var(--ui-space-12);
 }
 
 .timeline__track {
@@ -102,68 +102,68 @@ function positionPercent(date: Date) {
   top: 22px;
   left: 0;
   right: 0;
-  height: 4px;
-  background: #e5e7eb;
-  border-radius: 999px;
+  height: var(--ui-space-1);
+  background: var(--ui-chart-gray-light);
+  border-radius: var(--ui-radius-full);
 }
 
 .timeline__progress {
   position: absolute;
   top: 22px;
   left: 0;
-  height: 4px;
-  background: #0b2e33;
-  border-radius: 999px;
-  transition: width 0.2s ease;
+  height: var(--ui-space-1);
+  background: var(--ui-brand-900);
+  border-radius: var(--ui-radius-full);
+  transition: width var(--ui-duration-base) var(--ui-ease-standard);
 }
 
 .timeline__now {
   position: absolute;
   top: 6px;
   transform: translateX(-50%);
-  background: #0b2e33;
-  color: #fff;
-  padding: 0.15rem 0.55rem;
-  border-radius: 0.7rem;
-  font-size: 0.85rem;
+  background: var(--ui-brand-900);
+  color: var(--ui-text-inverse);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-sm);
 }
 
 .timeline__point {
   position: absolute;
-  top: 8px;
+  top: var(--ui-space-2);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--ui-space-1);
   max-width: 120px;
 }
 
 .dot {
-  width: 12px;
-  height: 12px;
+  width: var(--ui-space-3);
+  height: var(--ui-space-3);
   border-radius: 50%;
-  background: #0b2e33;
-  border: 2px solid #fff;
-  box-shadow: 0 4px 10px rgba(11, 46, 51, 0.2);
+  background: var(--ui-brand-900);
+  border: 2px solid var(--ui-surface);
+  box-shadow: var(--ui-shadow-md);
 }
 
 .dot--end {
-  background: #4f7c82;
+  background: var(--ui-brand-600);
 }
 
 .label {
   margin: 0;
-  font-size: 0.9rem;
-  color: #0b2e33;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-brand-900);
   text-align: center;
-  line-height: 1.2;
+  line-height: var(--ui-leading-tight);
 }
 
 .timeline__meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.9rem;
-  color: #4b5563;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-gray-600);
 }
 </style>

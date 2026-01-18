@@ -241,7 +241,7 @@ async function handleLogout() {
   padding: var(--ui-space-4, 1rem);
   background: var(--ui-info-light, #e0f2fe);
   border-radius: var(--ui-radius-md, 0.75rem);
-  color: #0c4a6e;
+  color: var(--ui-info, #0284c7);
   font-size: var(--ui-text-sm, 0.875rem);
   line-height: var(--ui-leading-relaxed, 1.625);
 }

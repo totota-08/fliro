@@ -324,9 +324,7 @@ const pricingPlans = [
                 :key="idx"
                 :class="`release-card__change--${change.type}`"
               >
-                <span class="release-card__change-type">{{
-                  change.type === "feat" ? "新機能" : "修正"
-                }}</span>
+                <span class="release-card__change-indicator" />
                 {{ change.text }}
               </li>
             </ul>
@@ -761,22 +759,20 @@ const pricingPlans = [
   line-height: var(--ui-leading-relaxed);
 }
 
-.release-card__change-type {
+.release-card__change-indicator {
   flex-shrink: 0;
-  padding: var(--ui-space-0-5) var(--ui-space-2);
-  border-radius: var(--ui-radius-sm);
-  font-size: var(--ui-text-xs);
-  font-weight: var(--ui-font-semibold);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--ui-radius-full);
+  margin-top: 0.5em;
 }
 
-.release-card__change--feat .release-card__change-type {
-  background: var(--ui-brand-200);
-  color: var(--ui-brand-800);
+.release-card__change--feat .release-card__change-indicator {
+  background: var(--ui-brand-600);
 }
 
-.release-card__change--fix .release-card__change-type {
-  background: var(--ui-warning-100, #fef3c7);
-  color: var(--ui-warning-800, #92400e);
+.release-card__change--fix .release-card__change-indicator {
+  background: var(--ui-warning-500, #f59e0b);
 }
 
 .cta {
