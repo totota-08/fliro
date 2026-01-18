@@ -22,6 +22,12 @@ export interface ReactionSummary {
   count: number;
 }
 
+export interface ReactionDetail {
+  emoji: string;
+  userIds: string[];
+  count: number;
+}
+
 export interface ChatMessage {
   id: string;
   text: string;
@@ -33,6 +39,7 @@ export interface ChatMessage {
   linkedTaskId?: string;
   createdAt?: number;
   reactionSummary?: ReactionSummary[];
+  reactionDetails?: ReactionDetail[];
   replyToId?: string;
   mentions?: string[];
   isBot?: boolean;
@@ -53,16 +60,31 @@ function resolveTimestamp(value: any): number | undefined {
   return undefined;
 }
 
-function summarizeReactions(reactions: any): ReactionSummary[] {
-  if (!reactions || typeof reactions !== "object") return [];
-  const counts: Record<string, number> = {};
+function summarizeReactions(reactions: any): {
+  summary: ReactionSummary[];
+  details: ReactionDetail[];
+} {
+  if (!reactions || typeof reactions !== "object") {
+    return { summary: [], details: [] };
+  }
+  const grouped: Record<string, string[]> = {};
   Object.values(reactions).forEach((entry: any) => {
     if (!entry || typeof entry !== "object") return;
     const emoji = typeof entry.emoji === "string" ? entry.emoji : "";
+    const userId = typeof entry.userId === "string" ? entry.userId : "";
     if (!emoji) return;
-    counts[emoji] = (counts[emoji] || 0) + 1;
+    if (!grouped[emoji]) grouped[emoji] = [];
+    if (userId && !grouped[emoji].includes(userId)) {
+      grouped[emoji].push(userId);
+    }
   });
-  return Object.entries(counts).map(([emoji, count]) => ({ emoji, count }));
+  const details = Object.entries(grouped).map(([emoji, userIds]) => ({
+    emoji,
+    userIds,
+    count: userIds.length,
+  }));
+  const summary = details.map(({ emoji, count }) => ({ emoji, count }));
+  return { summary, details };
 }
 
 const memberSyncCache = new Map<string, Promise<void>>();
@@ -125,6 +147,7 @@ export function listenProjectChat(
       const items: ChatMessage[] = [];
       snapshot.forEach((child) => {
         const data = child.val() as any;
+        const reactions = summarizeReactions(data?.reactions);
         items.push({
           id: child.key || "",
           text: data?.text ?? "",
@@ -136,7 +159,8 @@ export function listenProjectChat(
             typeof data?.channelId === "string" ? data.channelId : "general",
           linkedTaskId: data?.linkedTaskId,
           createdAt: resolveTimestamp(data?.createdAt),
-          reactionSummary: summarizeReactions(data?.reactions),
+          reactionSummary: reactions.summary,
+          reactionDetails: reactions.details,
           replyToId: data?.replyToId,
           mentions: Array.isArray(data?.mentions) ? data.mentions : [],
           isBot: Boolean(data?.isBot),
@@ -217,6 +241,81 @@ export async function addMessageReaction(
       createdAt: serverTimestamp(),
     },
   );
+}
+
+/**
+ * 指定したユーザーの指定した絵文字リアクションを削除する
+ */
+export async function removeMessageReaction(
+  projectId: string,
+  messageId: string,
+  emoji: string,
+  userId: string,
+) {
+  if (!emoji || !userId) return;
+  const reactionsRef = dbRef(
+    database,
+    `projects/${projectId}/realtimeChat/${messageId}/reactions`,
+  );
+  const snapshot = await getValue(reactionsRef);
+  if (!snapshot.exists()) return;
+
+  // 該当するリアクションを探して削除
+  snapshot.forEach((child) => {
+    const data = child.val();
+    if (data?.emoji === emoji && data?.userId === userId) {
+      remove(
+        dbRef(
+          database,
+          `projects/${projectId}/realtimeChat/${messageId}/reactions/${child.key}`,
+        ),
+      );
+    }
+  });
+}
+
+/**
+ * リアクションをトグル（未リアクションなら追加、リアクション済みなら削除）
+ */
+export async function toggleMessageReaction(
+  projectId: string,
+  messageId: string,
+  emoji: string,
+  userId: string,
+): Promise<boolean> {
+  if (!emoji || !userId) return false;
+
+  const reactionsRef = dbRef(
+    database,
+    `projects/${projectId}/realtimeChat/${messageId}/reactions`,
+  );
+  const snapshot = await getValue(reactionsRef);
+
+  // 既存のリアクションをチェック
+  let existingKey: string | null = null;
+  if (snapshot.exists()) {
+    snapshot.forEach((child) => {
+      const data = child.val();
+      if (data?.emoji === emoji && data?.userId === userId) {
+        existingKey = child.key;
+      }
+    });
+  }
+
+  if (existingKey) {
+    // 既にリアクション済み → 削除
+    await remove(
+      dbRef(
+        database,
+        `projects/${projectId}/realtimeChat/${messageId}/reactions/${existingKey}`,
+      ),
+    );
+    return false; // 削除した（リアクションなし状態に）
+  } else {
+    // 未リアクション → 追加
+    await addMessageReaction(projectId, messageId, emoji, userId);
+    return true; // 追加した（リアクションあり状態に）
+  }
 }
 
 export async function updateProjectMessage(
