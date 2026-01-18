@@ -12,12 +12,33 @@
  *   --count <number>     生成するコード数（デフォルト: 1）
  *
  * 前提条件:
- *   1. Firebase CLIでログイン済み: firebase login
- *   2. gcloud認証済み: gcloud auth application-default login
+ *   1. gcloud認証済み: gcloud auth application-default login
+ *   2. .envファイルにVITE_FIREBASE_PROJECT_IDが設定されていること
  */
 
 import { initializeApp, applicationDefault } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+// .envファイルからプロジェクトIDを読み込む
+function loadProjectIdFromEnv() {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const envPath = resolve(__dirname, "../.env");
+
+  try {
+    const envContent = readFileSync(envPath, "utf-8");
+    const match = envContent.match(/VITE_FIREBASE_PROJECT_ID=['"']?([^'"\n]+)['"']?/);
+    if (match) {
+      return match[1];
+    }
+  } catch {
+    // .envファイルが存在しない場合は無視
+  }
+
+  return null;
+}
 
 // コマンドライン引数をパース
 function parseArgs() {
@@ -65,7 +86,7 @@ function printHelp() {
 
 前提条件:
   1. gcloud認証: gcloud auth application-default login
-  2. 正しいプロジェクトを設定: gcloud config set project <project-id>
+  2. .envファイルにVITE_FIREBASE_PROJECT_IDが設定されていること
 
 例:
   npm run create-invite-code                           # 無制限の招待コードを1つ作成
@@ -113,12 +134,21 @@ function parseExpires(expires) {
 async function main() {
   const options = parseArgs();
 
-  console.log("Firebase初期化中...");
+  // .envからプロジェクトIDを読み込む
+  const projectId = loadProjectIdFromEnv();
+  if (!projectId) {
+    console.error("エラー: プロジェクトIDが見つかりません");
+    console.error(".envファイルにVITE_FIREBASE_PROJECT_IDを設定してください");
+    process.exit(1);
+  }
+
+  console.log(`Firebase初期化中... (プロジェクト: ${projectId})`);
 
   try {
     // Application Default Credentialsを使用
     initializeApp({
       credential: applicationDefault(),
+      projectId: projectId,
     });
   } catch (error) {
     console.error("Firebase初期化エラー:");

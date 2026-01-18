@@ -351,6 +351,10 @@ const pricingPlans = [
   flex-wrap: wrap;
 }
 
+.landing__links .app-button {
+  min-width: max-content;
+}
+
 .landing__links a {
   text-decoration: none;
   color: var(--ui-brand-600);
@@ -640,10 +644,20 @@ const pricingPlans = [
 @media (max-width: 768px) {
   .landing__nav {
     flex-direction: column;
+    gap: var(--ui-space-3);
   }
 
   .landing__links {
     justify-content: center;
+    width: 100%;
+  }
+
+  .landing__links a:not(.app-button) {
+    padding: var(--ui-space-2) var(--ui-space-3);
+  }
+
+  .hero {
+    padding-top: var(--ui-space-8);
   }
 
   .hero__actions {
