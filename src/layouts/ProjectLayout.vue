@@ -222,6 +222,12 @@ async function handleTaskSubmit(data: TaskFormData) {
       </svg>
     </button>
 
+    <!-- Mobile Bottom Navigation -->
+    <MobileBottomNav
+      :items="mobileNavItems"
+      class="project-layout__bottom-nav"
+    />
+
     <!-- Task Create Modal -->
     <Teleport to="body">
       <TaskCreateModal
@@ -476,9 +482,30 @@ async function handleTaskSubmit(data: TaskFormData) {
     padding: var(--ui-space-2, 0.5rem);
   }
 
-  /* Show FAB on mobile */
+  /* Show FAB on mobile - position above bottom nav */
   .project-layout__fab {
     display: flex;
+    bottom: calc(
+      var(--ui-bottom-nav-height, 56px) + env(safe-area-inset-bottom) +
+        var(--ui-space-4, 1rem)
+    );
   }
+
+  /* Show bottom nav on mobile */
+  .project-layout__bottom-nav {
+    display: grid;
+  }
+
+  /* Add padding for bottom nav */
+  .project-layout__body {
+    padding-bottom: calc(
+      var(--ui-bottom-nav-height, 56px) + env(safe-area-inset-bottom)
+    );
+  }
+}
+
+/* Hide bottom nav on desktop */
+.project-layout__bottom-nav {
+  display: none;
 }
 </style>

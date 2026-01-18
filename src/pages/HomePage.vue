@@ -1,11 +1,67 @@
 <script setup lang="ts">
+import { ref, onMounted } from "vue";
 import { RouterLink } from "vue-router";
 import AppButton from "@/components/ui/AppButton.vue";
 import BrandLogo from "@/components/common/BrandLogo.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { useAppMeta } from "@/composables/useAppMeta";
+import {
+  fetchReleaseNotes,
+  type ReleaseNote,
+} from "@/services/releaseNotesService";
 
 const { appName } = useAppMeta();
+
+// リリースノート（Firestoreから取得、フォールバック用のデフォルト値あり）
+const releaseNotes = ref<ReleaseNote[]>([]);
+const isLoadingReleases = ref(true);
+
+// デフォルトのリリースノート（Firestore未設定時のフォールバック）
+const defaultReleaseNotes: ReleaseNote[] = [
+  {
+    id: "alpha-0.2",
+    version: "alpha-0.2",
+    date: "2026年1月",
+    isLatest: true,
+    changes: [
+      { type: "feat", text: "ブランドロゴを刷新し、アプリ全体で統一" },
+      { type: "feat", text: "OGPメタタグを追加し、リンクプレビューを改善" },
+      { type: "feat", text: "招待コード作成CLIツールを追加" },
+      { type: "feat", text: "スレッド設定の編集権限機能を追加" },
+      { type: "feat", text: "チャットのリアクション機能を強化" },
+      { type: "fix", text: "ロール削除時の使用中チェックを追加" },
+      { type: "fix", text: "タスクスレッドのアーカイブ機能を修正" },
+    ],
+  },
+  {
+    id: "alpha-0.1",
+    version: "alpha-0.1",
+    date: "2025年12月",
+    isLatest: false,
+    changes: [
+      { type: "feat", text: "プロジェクトダッシュボードをリリース" },
+      {
+        type: "feat",
+        text: "タスク管理機能（作成・編集・削除・ステータス変更）",
+      },
+      { type: "feat", text: "リアルタイムチャット機能" },
+      { type: "feat", text: "メンバー招待・ロール管理機能" },
+      { type: "feat", text: "アクティビティログ機能" },
+      { type: "feat", text: "スコア・成績表機能" },
+    ],
+  },
+];
+
+onMounted(async () => {
+  const notes = await fetchReleaseNotes(10);
+  if (notes.length > 0) {
+    releaseNotes.value = notes;
+  } else {
+    // Firestoreにデータがない場合はデフォルト値を使用
+    releaseNotes.value = defaultReleaseNotes;
+  }
+  isLoadingReleases.value = false;
+});
 
 const featureCards = [
   {
@@ -44,38 +100,23 @@ const featureCards = [
       "タスク完了数や貢献度をスコアで可視化。チームメンバーの活躍を見える化します。",
     icon: "spark",
   },
-];
-
-const releaseNotes = [
   {
-    version: "alpha-0.2",
-    date: "2026年1月",
-    isLatest: true,
-    changes: [
-      { type: "feat", text: "ブランドロゴを刷新し、アプリ全体で統一" },
-      { type: "feat", text: "OGPメタタグを追加し、リンクプレビューを改善" },
-      { type: "feat", text: "招待コード作成CLIツールを追加" },
-      { type: "feat", text: "スレッド設定の編集権限機能を追加" },
-      { type: "feat", text: "チャットのリアクション機能を強化" },
-      { type: "fix", text: "ロール削除時の使用中チェックを追加" },
-      { type: "fix", text: "タスクスレッドのアーカイブ機能を修正" },
-    ],
+    title: "通知機能",
+    description:
+      "タスクの期限や更新、メンションなどの重要な情報をリアルタイムで通知。見逃しを防ぎます。",
+    icon: "bell",
   },
   {
-    version: "alpha-0.1",
-    date: "2025年12月",
-    isLatest: false,
-    changes: [
-      { type: "feat", text: "プロジェクトダッシュボードをリリース" },
-      {
-        type: "feat",
-        text: "タスク管理機能（作成・編集・削除・ステータス変更）",
-      },
-      { type: "feat", text: "リアルタイムチャット機能" },
-      { type: "feat", text: "メンバー招待・ロール管理機能" },
-      { type: "feat", text: "アクティビティログ機能" },
-      { type: "feat", text: "スコア・成績表機能" },
-    ],
+    title: "マイタスク",
+    description:
+      "自分に割り当てられたタスクを一覧で確認。優先度や期限でソートして効率的に作業を進められます。",
+    icon: "check-circle",
+  },
+  {
+    title: "カテゴリ管理",
+    description:
+      "タスクをカテゴリで整理し、プロジェクトの構造を明確に。カスタムカテゴリで柔軟に管理できます。",
+    icon: "folder",
   },
 ];
 
@@ -433,10 +474,17 @@ const pricingPlans = [
   text-decoration: none;
   color: var(--ui-brand-600);
   font-weight: var(--ui-font-semibold);
+  min-height: var(--ui-touch-target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  transition: var(--ui-transition-colors);
 }
 
 .landing__link:hover {
   color: var(--ui-brand-900);
+  background: var(--ui-brand-100, #e5f6f8);
 }
 
 .hero {
@@ -798,10 +846,18 @@ const pricingPlans = [
 .landing__footer-grid a {
   color: inherit;
   text-decoration: none;
+  min-height: var(--ui-touch-target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  margin-left: calc(-1 * var(--ui-space-2, 0.5rem));
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  transition: var(--ui-transition-colors);
 }
 
 .landing__footer-grid a:hover {
   color: var(--ui-text-inverse);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .landing__copyright {
@@ -822,10 +878,6 @@ const pricingPlans = [
     width: 100%;
   }
 
-  .landing__link {
-    padding: var(--ui-space-2) var(--ui-space-3);
-  }
-
   .landing__buttons :deep(.app-button) {
     padding: var(--ui-space-2) var(--ui-space-4);
     font-size: var(--ui-text-sm);
@@ -842,6 +894,29 @@ const pricingPlans = [
   .hero__actions :deep(.app-button) {
     padding: var(--ui-space-2) var(--ui-space-4);
     font-size: var(--ui-text-sm);
+  }
+
+  .landing__footer-grid {
+    gap: var(--ui-space-6);
+  }
+}
+
+/* Touch device feedback */
+@media (hover: none) and (pointer: coarse) {
+  .landing__link:active,
+  .landing__footer-grid a:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+
+  .feature-card:hover {
+    box-shadow: none;
+    transform: none;
+  }
+
+  .feature-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
   }
 }
 </style>

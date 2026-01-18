@@ -216,10 +216,18 @@ function mapFirebaseError(error: unknown) {
   color: var(--ui-brand-600, #4f7c82);
   text-decoration: none;
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  margin: calc(-1 * var(--ui-space-1, 0.25rem))
+    calc(-1 * var(--ui-space-2, 0.5rem));
+  border-radius: var(--ui-radius-sm, 0.5rem);
 }
 
 .form-assist a:hover {
   color: var(--ui-brand-900, #0b2e33);
+  background: var(--ui-brand-100, #e5f6f8);
 }
 
 .form-error {
@@ -267,10 +275,16 @@ function mapFirebaseError(error: unknown) {
   color: var(--ui-brand-600, #4f7c82);
   text-decoration: none;
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  border-radius: var(--ui-radius-sm, 0.5rem);
 }
 
 .login-helper a:hover {
   color: var(--ui-brand-900, #0b2e33);
+  background: var(--ui-brand-100, #e5f6f8);
 }
 
 .provider-section {

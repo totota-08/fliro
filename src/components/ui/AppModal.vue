@@ -222,11 +222,28 @@ watch(
 @media (max-width: 640px) {
   .app-modal__overlay {
     padding: var(--ui-space-4, 1rem);
+    padding-bottom: 0;
     align-items: flex-end;
   }
 
   .app-modal__panel {
     border-radius: var(--ui-radius-xl, 1.25rem) var(--ui-radius-xl, 1.25rem) 0 0;
+    max-height: 85vh;
+    max-height: 85dvh;
+  }
+
+  .app-modal__body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-modal__footer {
+    padding-bottom: calc(var(--ui-space-4, 1rem) + env(safe-area-inset-bottom));
+  }
+
+  .app-modal__close {
+    width: var(--ui-touch-target-min, 44px);
+    height: var(--ui-touch-target-min, 44px);
   }
 }
 </style>

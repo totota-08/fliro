@@ -209,4 +209,31 @@ watch(
 .app-drawer-leave-to .app-drawer__panel {
   transform: translateX(100%);
 }
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .app-drawer__panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .app-drawer__close {
+    width: var(--ui-touch-target-min, 44px);
+    height: var(--ui-touch-target-min, 44px);
+  }
+
+  .app-drawer__header {
+    padding: var(--ui-space-4, 1rem) var(--ui-space-4, 1rem);
+  }
+
+  .app-drawer__body {
+    padding: var(--ui-space-4, 1rem);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-drawer__footer {
+    padding: var(--ui-space-4, 1rem);
+    padding-bottom: calc(var(--ui-space-4, 1rem) + env(safe-area-inset-bottom));
+  }
+}
 </style>

@@ -628,6 +628,7 @@ function mapFirebaseError(error: unknown) {
   color: var(--ui-brand-600, #4f7c82);
   cursor: pointer;
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .avatar-field__upload:hover {
@@ -691,10 +692,16 @@ function mapFirebaseError(error: unknown) {
   color: var(--ui-brand-600, #4f7c82);
   text-decoration: none;
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  border-radius: var(--ui-radius-sm, 0.5rem);
 }
 
 .signup-footer a:hover {
   color: var(--ui-brand-900, #0b2e33);
+  background: var(--ui-brand-100, #e5f6f8);
 }
 
 .slide-fade-enter-active,

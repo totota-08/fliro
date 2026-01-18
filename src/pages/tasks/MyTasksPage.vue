@@ -947,6 +947,7 @@ onBeforeUnmount(() => {
   font-weight: var(--ui-font-semibold, 600);
   font-size: var(--ui-text-sm, 0.875rem);
   transition: var(--ui-transition-all);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .tasks-page__filter:hover {
@@ -1023,8 +1024,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: var(--ui-touch-target-min, 44px);
+  height: var(--ui-touch-target-min, 44px);
   padding: 0;
   border: none;
   background: transparent;
@@ -1076,6 +1077,7 @@ onBeforeUnmount(() => {
   border-radius: var(--ui-radius-md, 0.75rem);
   cursor: pointer;
   transition: var(--ui-transition-all);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .filter-popover__option:hover {
@@ -1187,6 +1189,7 @@ onBeforeUnmount(() => {
   color: var(--ui-text-muted, #64748b);
   cursor: pointer;
   transition: var(--ui-transition-all);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .tasks-tabs__trigger.is-active {
