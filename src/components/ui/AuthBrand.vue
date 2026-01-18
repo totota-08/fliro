@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
+import BrandLogo from "@/components/common/BrandLogo.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -18,9 +19,7 @@ const props = withDefaults(
   <header class="auth-brand">
     <div class="auth-brand__badge">
       <span class="auth-brand__icon">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
+        <BrandLogo class="auth-brand__logo" />
       </span>
       <span class="auth-brand__name">{{ props.brandName }}</span>
     </div>
@@ -49,21 +48,14 @@ const props = withDefaults(
 .auth-brand__icon {
   width: 42px;
   height: 42px;
-  border-radius: 0.85rem;
-  background: #4f7c82;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.auth-brand__icon svg {
-  width: 26px;
-  height: 26px;
-  fill: none;
-  stroke: #fff;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.auth-brand__logo {
+  width: 100%;
+  height: 100%;
 }
 
 .auth-brand__name {

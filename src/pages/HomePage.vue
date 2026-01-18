@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
 import AppButton from "@/components/ui/AppButton.vue";
+import BrandLogo from "@/components/common/BrandLogo.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { useAppMeta } from "@/composables/useAppMeta";
 
@@ -96,11 +97,7 @@ const pricingPlans = [
       <nav class="landing__nav">
         <div class="landing__brand">
           <span class="landing__logo">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-              />
-            </svg>
+            <BrandLogo class="landing__logo-icon" />
           </span>
           <span class="landing__title">{{ appName }}</span>
         </div>
@@ -258,11 +255,7 @@ const pricingPlans = [
         <div>
           <div class="landing__brand landing__brand--footer">
             <span class="landing__logo">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-                />
-              </svg>
+              <BrandLogo class="landing__logo-icon" />
             </span>
             <span class="landing__title">{{ appName }}</span>
           </div>
@@ -336,21 +329,14 @@ const pricingPlans = [
 .landing__logo {
   width: 40px;
   height: 40px;
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-brand-600);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.landing__logo svg {
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: var(--ui-text-inverse);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.landing__logo-icon {
+  width: 100%;
+  height: 100%;
 }
 
 .landing__title {

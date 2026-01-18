@@ -63,6 +63,15 @@
   font-weight: var(--ui-font-bold);
   font-size: var(--ui-text-xl);
   letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+}
+
+.sidebar__logo-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 .sidebar__subtitle {
