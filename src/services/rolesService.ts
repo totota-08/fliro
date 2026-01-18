@@ -204,14 +204,31 @@ export async function removeRole(
 
   // このロールを持つメンバーがいないか確認
   const membersRef = collection(db, "projects", projectId, "members");
-  const q = query(
+
+  // roles配列でのチェック
+  const rolesArrayQuery = query(
     membersRef,
     where("roles", "array-contains", roleKey),
     limit(1),
   );
-  const memberSnap = await getDocs(q);
+  const rolesArraySnap = await getDocs(rolesArrayQuery);
 
-  if (!memberSnap.empty) {
+  if (!rolesArraySnap.empty) {
+    return {
+      success: false,
+      error: "このロールは使用中のため削除できません",
+    };
+  }
+
+  // レガシーのroleフィールド（単一値）でのチェック
+  const legacyRoleQuery = query(
+    membersRef,
+    where("role", "==", roleKey),
+    limit(1),
+  );
+  const legacyRoleSnap = await getDocs(legacyRoleQuery);
+
+  if (!legacyRoleSnap.empty) {
     return {
       success: false,
       error: "このロールは使用中のため削除できません",
