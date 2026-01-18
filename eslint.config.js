@@ -3,7 +3,14 @@ import pluginJs from "@eslint/js";
 
 export default tseslint.config(
   {
-    ignores: ["dist", "node_modules", "**/*.vue"],
+    ignores: [
+      "dist",
+      "node_modules",
+      "**/*.vue",
+      "functions/lib",
+      "functions/node_modules",
+      "scripts",
+    ],
   },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
