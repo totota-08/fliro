@@ -355,13 +355,13 @@ const pricingPlans = [
   min-width: max-content;
 }
 
-.landing__links a {
+.landing__links a:not(.app-button) {
   text-decoration: none;
   color: var(--ui-brand-600);
   font-weight: var(--ui-font-semibold);
 }
 
-.landing__links a:hover {
+.landing__links a:not(.app-button):hover {
   color: var(--ui-brand-900);
 }
 
