@@ -106,7 +106,7 @@ function handleLeave() {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   align-items: flex-end;
-  gap: 6px;
+  gap: var(--ui-space-1);
   height: 82px;
   position: relative;
 }
@@ -128,20 +128,28 @@ function handleLeave() {
   left: 0;
   right: 0;
   height: 100%;
-  border-radius: 6px;
-  background: rgba(11, 46, 51, 0.08);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-border-light);
 }
 
 .sparkline__fill {
   position: relative;
   width: 100%;
-  background: linear-gradient(180deg, #2d6cdf, #1f6feb);
-  border-radius: 6px;
+  background: linear-gradient(
+    180deg,
+    var(--ui-chart-blue),
+    var(--ui-chart-blue-light)
+  );
+  border-radius: var(--ui-radius-sm);
   min-height: 0;
 }
 
 .sparkline__bar.is-today .sparkline__fill {
-  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  background: linear-gradient(
+    180deg,
+    var(--ui-chart-blue-light),
+    var(--ui-chart-blue-dark)
+  );
 }
 
 .sparkline__fill.is-empty {
@@ -152,41 +160,41 @@ function handleLeave() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
-  color: #475467;
-  gap: 0.5rem;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-chart-gray);
+  gap: var(--ui-space-2);
 }
 
 .sparkline__empty {
   margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
 }
 
 .sparkline__tooltip {
   position: absolute;
   bottom: 90px;
   transform: translateX(-50%);
-  background: #0b2e33;
-  color: #fff;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
+  background: var(--ui-brand-900);
+  color: var(--ui-text-inverse);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--ui-text-xs);
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--ui-shadow-md);
 }
 
 .sparkline__tooltip strong {
-  margin-left: 6px;
-  font-weight: 700;
+  margin-left: var(--ui-space-1);
+  font-weight: var(--ui-font-bold);
 }
 
 .sparkline__badge {
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #e8eef5;
-  color: #0b2e33;
-  font-size: 11px;
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border-radius: var(--ui-radius-full);
+  background: var(--ui-chart-gray-bg);
+  color: var(--ui-brand-900);
+  font-size: 0.6875rem;
 }
 </style>

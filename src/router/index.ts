@@ -6,37 +6,52 @@ import { getCurrentUser } from "@/lib/getCurrentUser";
 import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger("app.router");
+
+// 初回アクセスで必要なページのみ静的インポート
 import HomePage from "@/pages/HomePage.vue";
-import MyPage from "@/pages/account/MyPage.vue";
-import AccountSettingsPage from "@/pages/account/AccountSettingsPage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
-import ResetPasswordConfirmPage from "@/pages/auth/ResetPasswordConfirmPage.vue";
-import ResetPasswordPage from "@/pages/auth/ResetPasswordPage.vue";
-import SignUpPage from "@/pages/auth/SignUpPage.vue";
-import VerifyEmailPage from "@/pages/auth/VerifyEmailPage.vue";
-import AuthDebugPage from "@/pages/debug/AuthDebugPage.vue";
-import ProjectDebugPage from "@/pages/debug/ProjectDebugPage.vue";
-import DashboardDemoPage from "@/pages/demo/DashboardDemoPage.vue";
-import DemoMyTasksPage from "@/pages/demo/MyTasksPage.vue";
-import TeamPage from "@/pages/demo/TeamPage.vue";
-import InviteAcceptPage from "@/pages/invite/InviteAcceptPage.vue";
-import CreateProjectPage from "@/pages/projects/CreateProjectPage.vue";
-import ProjectActivityLogPage from "@/pages/projects/ProjectActivityLogPage.vue";
-import ProjectCategoriesPage from "@/pages/projects/ProjectCategoriesPage.vue";
-import ProjectChatPage from "@/pages/projects/ProjectChatPage.vue";
-import ProjectDashboardPage from "@/pages/projects/ProjectDashboardPage.vue";
-import ProjectInvitesPage from "@/pages/projects/ProjectInvitesPage.vue";
-import ProjectMembersPage from "@/pages/projects/ProjectMembersPage.vue";
-import ProjectNotificationsPage from "@/pages/projects/ProjectNotificationsPage.vue";
-import ProjectRolesPage from "@/pages/projects/ProjectRolesPage.vue";
-import ProjectSettingsPage from "@/pages/projects/ProjectSettingsPage.vue";
-import SecretAccessPage from "@/pages/secret/SecretAccessPage.vue";
-import SecretChatPage from "@/pages/secret/SecretChatPage.vue";
-import MyTasksPage from "@/pages/tasks/MyTasksPage.vue";
-import TaskProgressPage from "@/pages/tasks/TaskProgressPage.vue";
 import ProjectLayout from "@/layouts/ProjectLayout.vue";
+
 import { useAuthStore, waitForAuthReady } from "@/store/auth";
 import { createRouter, createWebHistory } from "vue-router";
+
+// 動的インポート関数（コード分割用）
+const MyPage = () => import("@/pages/account/MyPage.vue");
+const AccountSettingsPage = () =>
+  import("@/pages/account/AccountSettingsPage.vue");
+const ResetPasswordConfirmPage = () =>
+  import("@/pages/auth/ResetPasswordConfirmPage.vue");
+const ResetPasswordPage = () => import("@/pages/auth/ResetPasswordPage.vue");
+const SignUpPage = () => import("@/pages/auth/SignUpPage.vue");
+const VerifyEmailPage = () => import("@/pages/auth/VerifyEmailPage.vue");
+const AuthDebugPage = () => import("@/pages/debug/AuthDebugPage.vue");
+const ProjectDebugPage = () => import("@/pages/debug/ProjectDebugPage.vue");
+const DashboardDemoPage = () => import("@/pages/demo/DashboardDemoPage.vue");
+const DemoMyTasksPage = () => import("@/pages/demo/MyTasksPage.vue");
+const TeamPage = () => import("@/pages/demo/TeamPage.vue");
+const InviteAcceptPage = () => import("@/pages/invite/InviteAcceptPage.vue");
+const CreateProjectPage = () =>
+  import("@/pages/projects/CreateProjectPage.vue");
+const ProjectActivityLogPage = () =>
+  import("@/pages/projects/ProjectActivityLogPage.vue");
+const ProjectCategoriesPage = () =>
+  import("@/pages/projects/ProjectCategoriesPage.vue");
+const ProjectChatPage = () => import("@/pages/projects/ProjectChatPage.vue");
+const ProjectDashboardPage = () =>
+  import("@/pages/projects/ProjectDashboardPage.vue");
+const ProjectInvitesPage = () =>
+  import("@/pages/projects/ProjectInvitesPage.vue");
+const ProjectMembersPage = () =>
+  import("@/pages/projects/ProjectMembersPage.vue");
+const ProjectNotificationsPage = () =>
+  import("@/pages/projects/ProjectNotificationsPage.vue");
+const ProjectRolesPage = () => import("@/pages/projects/ProjectRolesPage.vue");
+const ProjectSettingsPage = () =>
+  import("@/pages/projects/ProjectSettingsPage.vue");
+const SecretAccessPage = () => import("@/pages/secret/SecretAccessPage.vue");
+const SecretChatPage = () => import("@/pages/secret/SecretChatPage.vue");
+const MyTasksPage = () => import("@/pages/tasks/MyTasksPage.vue");
+const TaskProgressPage = () => import("@/pages/tasks/TaskProgressPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),

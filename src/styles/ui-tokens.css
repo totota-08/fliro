@@ -55,6 +55,20 @@
   --ui-notify-critical-bg: rgba(220, 38, 38, 0.15);
   --ui-notify-critical-label: rgba(220, 38, 38, 0.25);
 
+  /* Chart Colors (for sparklines and visualizations) */
+  --ui-chart-blue: #2d6cdf;
+  --ui-chart-blue-dark: #1d4ed8;
+  --ui-chart-blue-light: #1f6feb;
+  --ui-chart-gray: #475467;
+  --ui-chart-gray-light: #e5e7eb;
+  --ui-chart-gray-bg: #e8eef5;
+
+  /* Additional Grays */
+  --ui-gray-600: #4b5563;
+  --ui-gray-700: #374151;
+  --ui-gray-800: #1f2937;
+  --ui-gray-900: #0f172a;
+
   /* Text Colors */
   --ui-text: #0b2e33;
   --ui-text-strong: #0f172a;

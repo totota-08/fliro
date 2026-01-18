@@ -69,8 +69,8 @@
 }
 
 .sidebar__logo-icon {
-  width: 32px;
-  height: 32px;
+  width: var(--ui-space-8);
+  height: var(--ui-space-8);
   flex-shrink: 0;
 }
 
@@ -224,7 +224,7 @@
 }
 
 .sidebar__projects ul::-webkit-scrollbar {
-  width: 6px;
+  width: var(--ui-space-1);
 }
 
 .sidebar__projects ul::-webkit-scrollbar-track {
@@ -233,7 +233,7 @@
 
 .sidebar__projects ul::-webkit-scrollbar-thumb {
   background: var(--ui-sidebar-border);
-  border-radius: 3px;
+  border-radius: var(--ui-radius-full);
 }
 
 .sidebar__projects ul::-webkit-scrollbar-thumb:hover {

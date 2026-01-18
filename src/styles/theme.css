@@ -38,7 +38,7 @@
   --surface-elevated: var(--ui-surface-elevated);
   --surface-muted: var(--ui-surface-muted);
   --surface-panel: var(--ui-surface-muted);
-  --surface-hover: rgba(11, 46, 51, 0.04);
+  --surface-hover: var(--ui-surface-hover);
 
   /* ========================================
    * Text Colors
@@ -83,13 +83,13 @@
 
   /* Color-* パターン（一部ファイルで使用） */
   --color-danger: var(--ui-danger);
-  --color-danger-hover: #dc2626;
+  --color-danger-hover: var(--ui-danger-dark);
   --color-danger-bg: var(--ui-danger-light);
   --color-warning: var(--ui-warning);
   --color-warning-border: rgba(245, 158, 11, 0.27);
   --color-warning-bg: var(--ui-warning-light);
-  --color-warning-text: #b45309;
-  --color-warning-text-muted: #92400e;
+  --color-warning-text: var(--ui-warning-dark);
+  --color-warning-text-muted: var(--ui-warning-text);
   --color-success: var(--ui-success);
   --color-success-bg: var(--ui-success-light);
   --color-info: var(--ui-info);

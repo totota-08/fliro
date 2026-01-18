@@ -293,8 +293,8 @@ function prevStep() {
 
 .project-shell__inner {
   display: grid;
-  grid-template-columns: minmax(300px, 420px) minmax(0, 520px);
-  max-width: var(--ui-content-max-width, 1200px);
+  grid-template-columns: 1fr 1.2fr;
+  max-width: 960px;
   width: 100%;
 }
 

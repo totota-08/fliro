@@ -63,18 +63,18 @@ const profileInfo = computed(() => {
 <style scoped>
 .user-profile {
   margin-top: auto;
-  padding: 15px 20px;
+  padding: var(--ui-space-4) var(--ui-space-5);
   display: flex;
   align-items: center;
-  gap: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: var(--ui-space-3);
+  border-top: 1px solid var(--ui-surface-glass-12);
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.2s ease;
+  transition: background var(--ui-duration-base) var(--ui-ease-standard);
 }
 
 .user-profile:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--ui-surface-glass-08);
 }
 
 .user-avatar-container {
@@ -89,17 +89,17 @@ const profileInfo = computed(() => {
 }
 
 .user-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-semibold);
+  color: var(--ui-text-inverse);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .user-email {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.6875rem;
+  color: var(--ui-sidebar-text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

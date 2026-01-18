@@ -66,19 +66,19 @@ function barHeight(total: number) {
 }
 
 .chart__bar {
-  fill: #2d6cdf;
+  fill: var(--ui-chart-blue);
   opacity: 0.85;
 }
 
 .chart__value {
   font-size: 10px;
-  fill: #0f172a;
+  fill: var(--ui-gray-900);
   text-anchor: middle;
 }
 
 .chart__label {
   font-size: 11px;
-  fill: #475467;
+  fill: var(--ui-chart-gray);
   text-anchor: middle;
 }
 </style>

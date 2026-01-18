@@ -27,7 +27,7 @@ function loadProjectIdFromEnv() {
   try {
     const envContent = readFileSync(envPath, "utf-8");
     const match = envContent.match(
-      /VITE_FIREBASE_PROJECT_ID=['"']?([^'"\n]+)['"']?/
+      /VITE_FIREBASE_PROJECT_ID=['"']?([^'"\n]+)['"']?/,
     );
     if (match) {
       return match[1];
@@ -47,8 +47,7 @@ function createPrompt() {
   });
 
   return {
-    question: (query) =>
-      new Promise((resolve) => rl.question(query, resolve)),
+    question: (query) => new Promise((resolve) => rl.question(query, resolve)),
     close: () => rl.close(),
   };
 }
@@ -64,7 +63,7 @@ async function listReleaseNotes(db) {
 
   if (snapshot.empty) {
     console.log("リリースノートがありません。");
-    console.log('初期データを投入するには: npm run release-notes init\n');
+    console.log("初期データを投入するには: npm run release-notes init\n");
     return;
   }
 
@@ -203,7 +202,12 @@ function printHelp() {
 async function main() {
   const command = process.argv[2];
 
-  if (!command || command === "help" || command === "--help" || command === "-h") {
+  if (
+    !command ||
+    command === "help" ||
+    command === "--help" ||
+    command === "-h"
+  ) {
     printHelp();
     process.exit(0);
   }

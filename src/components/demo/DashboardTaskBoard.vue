@@ -231,6 +231,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* ===========================================
+ * DashboardTaskBoard.vue - Scoped Styles
+ * Design System: Fliro UI Tokens (--ui-* prefix)
+ * =========================================== */
+
 .board {
   display: flex;
   flex-direction: column;
@@ -238,6 +243,9 @@ onBeforeUnmount(() => {
   overflow-x: hidden;
 }
 
+/* ===========================================
+ * Board Header
+ * =========================================== */
 .board__header {
   display: flex;
   align-items: center;
@@ -246,6 +254,7 @@ onBeforeUnmount(() => {
 }
 
 .board__header h2 {
+  margin: 0;
   font-size: var(--ui-text-xl, 1.25rem);
   font-weight: var(--ui-font-bold, 700);
   color: var(--ui-text-strong, #0f172a);
@@ -255,23 +264,38 @@ onBeforeUnmount(() => {
   border: none;
   border-radius: var(--ui-radius-md, 0.75rem);
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-5, 1.25rem);
+  font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   background: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-text-inverse, #fff);
+  color: var(--ui-text-inverse, #ffffff);
   cursor: pointer;
   box-shadow: var(
     --ui-shadow-btn-primary,
     0 12px 28px rgba(79, 124, 130, 0.35)
   );
-  transition: var(--ui-transition-all, all 180ms ease);
+  transition:
+    transform var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    background-color var(--ui-duration-fast, 120ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    box-shadow var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
 }
 
 .board__new:hover {
   transform: translateY(-1px);
-  background: var(--ui-brand-700, #3d6166);
-  box-shadow: var(--ui-shadow-btn-hover, 0 16px 32px rgba(79, 124, 130, 0.4));
+  background: var(--ui-brand-700, #1a4a51);
+  box-shadow: var(--ui-shadow-btn-hover, 0 16px 32px rgba(11, 46, 51, 0.2));
 }
 
+.board__new:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.25));
+}
+
+/* ===========================================
+ * Board Columns
+ * =========================================== */
 .board__columns {
   display: grid;
   gap: var(--ui-space-5, 1.25rem);
@@ -280,12 +304,12 @@ onBeforeUnmount(() => {
 }
 
 .board-column {
-  background: var(--ui-surface-elevated, #fff);
+  background: var(--ui-surface-elevated, #ffffff);
   border-radius: var(--ui-radius-xl, 1.25rem);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   padding: var(--ui-space-5, 1.25rem);
   min-height: 320px;
-  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.1));
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4, 1rem);
@@ -313,7 +337,7 @@ onBeforeUnmount(() => {
   min-width: 1.8rem;
   height: 1.8rem;
   border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-100, rgba(79, 124, 130, 0.18));
+  background: var(--ui-brand-100, #e5f6f8);
   color: var(--ui-brand-900, #0b2e33);
   font-weight: var(--ui-font-semibold, 600);
   font-size: var(--ui-text-sm, 0.875rem);
@@ -323,6 +347,7 @@ onBeforeUnmount(() => {
   margin: 0;
   color: var(--ui-text-muted, #64748b);
   font-size: var(--ui-text-sm, 0.875rem);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
 .board-column__tasks {
@@ -330,18 +355,34 @@ onBeforeUnmount(() => {
   gap: var(--ui-space-4, 1rem);
 }
 
+/* ===========================================
+ * Task Card
+ * =========================================== */
 .task-card {
   border-radius: var(--ui-radius-lg, 1rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.1));
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   padding: var(--ui-space-4, 1rem);
-  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.2));
+  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.35));
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-3, 0.75rem);
   cursor: pointer;
-  transition: var(--ui-transition-all, all 180ms ease);
   width: 100%;
   box-sizing: border-box;
+  transition:
+    transform var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    border-color var(--ui-duration-fast, 120ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    box-shadow var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    background-color var(--ui-duration-fast, 120ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.task-card:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.25));
 }
 
 .task-card__head {
@@ -356,12 +397,14 @@ onBeforeUnmount(() => {
   font-size: var(--ui-text-base, 1rem);
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text-strong, #0f172a);
+  line-height: var(--ui-leading-tight, 1.25);
 }
 
 .task-card__description {
   margin: 0;
   color: var(--ui-text-muted, #64748b);
   font-size: var(--ui-text-sm, 0.875rem);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
 .task-card__meta {
@@ -387,19 +430,23 @@ onBeforeUnmount(() => {
 .task-card__meta dd {
   margin: var(--ui-space-1, 0.25rem) 0 0;
   font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
   color: var(--ui-text, #0b2e33);
 }
 
+/* Priority Badge */
 .priority {
+  flex-shrink: 0;
   border-radius: var(--ui-radius-full, 9999px);
   padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
   font-size: var(--ui-text-xs, 0.75rem);
   font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text-inverse, #fff);
+  color: var(--ui-text-inverse, #ffffff);
+  line-height: var(--ui-leading-tight, 1.25);
 }
 
 .priority--高 {
-  background: var(--ui-brand-900, #0b2e33);
+  background: var(--ui-danger, #d64545);
 }
 
 .priority--中 {
@@ -407,19 +454,20 @@ onBeforeUnmount(() => {
 }
 
 .priority--低 {
-  background: var(--ui-brand-400, #93b1b5);
+  background: var(--ui-brand-400, #8cb8be);
 }
 
+/* Task Card States */
 .task-card:hover {
   transform: translateY(-2px);
-  border-color: var(--ui-brand-400, rgba(79, 124, 130, 0.4));
-  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.12));
+  border-color: var(--ui-brand-400, #8cb8be);
+  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.1));
 }
 
 .task-card.is-selected {
-  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.3));
-  box-shadow: var(--ui-shadow-xl, 0 20px 40px rgba(11, 46, 51, 0.15));
-  background: var(--ui-surface-accent-strong, rgba(184, 227, 233, 0.35));
+  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
+  box-shadow: var(--ui-shadow-xl, 0 20px 40px rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.35));
 }
 
 .task-card.is-highlight {
@@ -435,21 +483,13 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .task-card {
-    transition: none;
-  }
-  .task-card.is-highlight {
-    animation: none;
-  }
-  .board__new {
-    transition: none;
-  }
-}
-
+/* ===========================================
+ * Task Detail Panel
+ * =========================================== */
 .task-detail-enter-active,
 .task-detail-leave-active {
-  transition: opacity 200ms ease;
+  transition: opacity var(--ui-duration-base, 180ms)
+    var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
 }
 
 .task-detail-enter-from,
@@ -460,8 +500,8 @@ onBeforeUnmount(() => {
 .task-detail {
   margin-top: var(--ui-space-2, 0.5rem);
   border-radius: var(--ui-radius-2xl, 1.5rem);
-  background: var(--ui-surface-elevated, #fff);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface-elevated, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   padding: var(--ui-space-6, 1.5rem);
   box-shadow: var(--ui-shadow-xl, 0 20px 40px rgba(11, 46, 51, 0.12));
   display: grid;
@@ -486,21 +526,34 @@ onBeforeUnmount(() => {
   border: none;
   width: 2rem;
   height: 2rem;
+  min-width: var(--ui-touch-target-min, 44px);
+  min-height: var(--ui-touch-target-min, 44px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-100, rgba(79, 124, 130, 0.18));
+  background: var(--ui-brand-100, #e5f6f8);
   color: var(--ui-brand-900, #0b2e33);
+  font-size: var(--ui-text-lg, 1.125rem);
   cursor: pointer;
-  transition: var(--ui-transition-colors, background 180ms ease);
+  transition: background-color var(--ui-duration-fast, 120ms)
+    var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
 }
 
 .task-detail__close:hover {
-  background: var(--ui-brand-200, rgba(79, 124, 130, 0.25));
+  background: var(--ui-brand-200, #d4f1f5);
+}
+
+.task-detail__close:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.25));
 }
 
 .task-detail__description {
   margin: 0;
   color: var(--ui-text-muted, #64748b);
-  line-height: var(--ui-leading-relaxed, 1.7);
+  font-size: var(--ui-text-base, 1rem);
+  line-height: var(--ui-leading-relaxed, 1.625);
 }
 
 .task-detail__grid {
@@ -519,6 +572,7 @@ onBeforeUnmount(() => {
 
 .task-detail__grid dd {
   margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text-strong, #0f172a);
 }
@@ -527,14 +581,110 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   border-radius: var(--ui-radius-md, 0.75rem);
-  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.3));
+  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.35));
   color: var(--ui-text-muted, #64748b);
   font-size: var(--ui-text-sm, 0.875rem);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
+/* ===========================================
+ * Reduced Motion Support
+ * =========================================== */
+@media (prefers-reduced-motion: reduce) {
+  .task-card {
+    transition: none;
+  }
+
+  .task-card:hover {
+    transform: none;
+  }
+
+  .task-card.is-highlight {
+    animation: none;
+  }
+
+  .board__new {
+    transition: none;
+  }
+
+  .board__new:hover {
+    transform: none;
+  }
+
+  .task-detail__close {
+    transition: none;
+  }
+
+  .task-detail-enter-active,
+  .task-detail-leave-active {
+    transition: none;
+  }
+}
+
+/* ===========================================
+ * Responsive: Tablet (max-width: 960px)
+ * =========================================== */
 @media (max-width: 960px) {
   .board__columns {
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+}
+
+/* ===========================================
+ * Responsive: Mobile (max-width: 768px)
+ * =========================================== */
+@media (max-width: 768px) {
+  .board {
+    gap: var(--ui-space-4, 1rem);
+  }
+
+  .board__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--ui-space-3, 0.75rem);
+  }
+
+  .board__new {
+    width: 100%;
+    text-align: center;
+    padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  }
+
+  .board__columns {
+    grid-template-columns: 1fr;
+    gap: var(--ui-space-4, 1rem);
+  }
+
+  .board-column {
+    min-height: auto;
+    padding: var(--ui-space-4, 1rem);
+  }
+
+  .task-detail {
+    padding: var(--ui-space-4, 1rem);
+    border-radius: var(--ui-radius-xl, 1.25rem);
+  }
+
+  .task-detail__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===========================================
+ * Responsive: Small Mobile (max-width: 480px)
+ * =========================================== */
+@media (max-width: 480px) {
+  .task-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card__meta {
+    flex-direction: column;
+    gap: var(--ui-space-2, 0.5rem);
+  }
+
+  .task-card__meta div {
+    min-width: 0;
   }
 }
 </style>

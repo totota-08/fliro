@@ -97,6 +97,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* ===========================================
+ * DashboardSummaryCards.vue - Scoped Styles
+ * Design System: Fliro UI Tokens (--ui-* prefix)
+ * =========================================== */
+
 .summary {
   display: flex;
   flex-direction: column;
@@ -110,7 +115,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: var(--ui-space-6, 1.5rem) var(--ui-space-8, 2rem);
   border-radius: var(--ui-radius-2xl, 1.5rem);
-  background: var(--ui-surface-elevated, #fff);
+  background: var(--ui-surface-elevated, #ffffff);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.1));
 }
@@ -124,7 +129,9 @@ onBeforeUnmount(() => {
 
 .summary__header p {
   margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-base, 1rem);
   color: var(--ui-text-muted, #64748b);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
 .summary__note {
@@ -133,6 +140,7 @@ onBeforeUnmount(() => {
   background: var(--ui-surface-accent, rgba(184, 227, 233, 0.35));
   padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
   border-radius: var(--ui-radius-md, 0.75rem);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
 .summary__grid {
@@ -142,7 +150,7 @@ onBeforeUnmount(() => {
 }
 
 .summary-card {
-  background: var(--ui-surface-elevated, #fff);
+  background: var(--ui-surface-elevated, #ffffff);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   border-radius: var(--ui-radius-xl, 1.25rem);
   padding: var(--ui-space-3, 0.75rem);
@@ -150,7 +158,13 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-1, 0.25rem);
-  transition: var(--ui-transition-all, all 180ms ease);
+  transition:
+    transform var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    border-color var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    box-shadow var(--ui-duration-base, 180ms)
+      var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
 }
 
 .summary-card__content {
@@ -178,7 +192,10 @@ onBeforeUnmount(() => {
 .summary-card__label {
   margin: 0;
   font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-medium, 500);
   color: var(--ui-text-muted, #64748b);
+  transition: color var(--ui-duration-fast, 120ms)
+    var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
 }
 
 .summary-card__value {
@@ -194,17 +211,20 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text-muted, #64748b);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
+/* Alert state - for items requiring attention */
 .summary-card.is-alert {
   border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
   box-shadow: var(--ui-shadow-xl, 0 20px 40px rgba(11, 46, 51, 0.12));
 }
 
 .summary-card.is-alert .summary-card__value {
-  color: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-danger, #d64545);
 }
 
+/* Active/highlighted state */
 .summary-card.is-active {
   transform: translateY(-4px);
   border-color: var(--ui-brand-400, #8cb8be);
@@ -215,12 +235,13 @@ onBeforeUnmount(() => {
   color: var(--ui-brand-600, #4f7c82);
 }
 
+/* Progress bar */
 .summary-card__bar {
   position: relative;
   height: 0.32rem;
   width: 100%;
   border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-200, rgba(79, 124, 130, 0.18));
+  background: var(--ui-brand-100, #e5f6f8);
   overflow: hidden;
   margin-top: var(--ui-space-1, 0.25rem);
 }
@@ -233,22 +254,61 @@ onBeforeUnmount(() => {
     var(--ui-brand-600, #4f7c82),
     var(--ui-brand-900, #0b2e33)
   );
-  transition: width 400ms var(--ui-ease-standard, ease);
+  border-radius: var(--ui-radius-full, 9999px);
+  transition: width var(--ui-duration-slow, 280ms)
+    var(--ui-ease-standard, cubic-bezier(0.2, 0, 0, 1));
 }
 
+/* ===========================================
+ * Reduced Motion Support
+ * =========================================== */
 @media (prefers-reduced-motion: reduce) {
   .summary-card {
     transition: none;
   }
+
+  .summary-card__label {
+    transition: none;
+  }
+
   .summary-card__bar-fill {
     transition: none;
   }
+
+  .summary-card.is-active {
+    transform: none;
+  }
 }
 
+/* ===========================================
+ * Responsive: Mobile (max-width: 768px)
+ * =========================================== */
 @media (max-width: 768px) {
   .summary__header {
     flex-direction: column;
     gap: var(--ui-space-4, 1rem);
+    padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
+  }
+
+  .summary__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-card {
+    padding: var(--ui-space-3, 0.75rem);
+  }
+
+  .summary-card__value {
+    font-size: var(--ui-text-2xl, 1.5rem);
+  }
+}
+
+/* ===========================================
+ * Responsive: Small Mobile (max-width: 480px)
+ * =========================================== */
+@media (max-width: 480px) {
+  .summary__grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

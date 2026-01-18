@@ -382,13 +382,21 @@ const formatFullName = (member: TeamMember) =>
 <style scoped>
 @import "@/pages/demo/styles/demo-shell.css";
 
+/* ==========================================================================
+   Team Page - Design System Token Variables
+   ========================================================================== */
+
 .demo__content--condensed {
-  padding: var(--ui-space-8, 2rem);
+  padding: var(--ui-space-8, 32px);
 }
+
+/* ==========================================================================
+   Team Page Layout
+   ========================================================================== */
 
 .team-page {
   display: grid;
-  gap: var(--ui-space-8, 2rem);
+  gap: var(--ui-space-8, 32px);
 }
 
 .team-page__header {
@@ -396,33 +404,40 @@ const formatFullName = (member: TeamMember) =>
   align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-4, 16px);
 }
 
 .team-page__header h2 {
   margin: 0;
-  font-size: clamp(1.6rem, 3vw, var(--ui-text-4xl, 2rem));
-  font-weight: var(--ui-font-bold, 700);
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  font-weight: 700;
   color: var(--ui-text-strong, #0f172a);
 }
 
 .team-page__header p {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
+  margin: var(--ui-space-1, 4px) 0 0;
   color: var(--ui-text-muted, #64748b);
 }
+
+/* ==========================================================================
+   Invite Button
+   ========================================================================== */
 
 .team-page__invite {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-5, 1.25rem);
+  gap: var(--ui-space-2, 8px);
+  padding: var(--ui-space-2, 8px) var(--ui-space-5, 20px);
   border-radius: var(--ui-radius-lg, 1rem);
-  border: 1px solid var(--ui-brand-400, rgba(79, 124, 130, 0.35));
+  border: 1px solid var(--ui-brand-600, #4f7c82);
   background: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-text-inverse, #f5fcff);
-  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-surface, #fff);
+  font-weight: 600;
   cursor: pointer;
-  transition: var(--ui-transition-all, all 180ms ease);
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .team-page__invite:hover {
@@ -431,42 +446,55 @@ const formatFullName = (member: TeamMember) =>
   box-shadow: var(--ui-shadow-xl, 0 16px 28px rgba(11, 46, 51, 0.2));
 }
 
+.team-page__invite:focus-visible {
+  outline: 2px solid var(--ui-brand-600, #4f7c82);
+  outline-offset: 2px;
+}
+
 .team-page__invite svg {
   width: 1.1rem;
   height: 1.1rem;
 }
 
+/* ==========================================================================
+   Team Stats Cards
+   ========================================================================== */
+
 .team-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-4, 16px);
 }
 
 .team-stats__card {
-  padding: var(--ui-space-5, 1.25rem) var(--ui-space-6, 1.5rem);
+  padding: var(--ui-space-5, 20px) var(--ui-space-6, 24px);
   border-radius: var(--ui-radius-xl, 1.25rem);
-  background: var(--ui-brand-50, rgba(245, 252, 255, 0.9));
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.1));
+  background: var(--ui-brand-50, #f5fcff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   box-shadow: var(--ui-shadow-lg, 0 16px 28px rgba(11, 46, 51, 0.12));
 }
 
 .team-stats__card p {
   margin: 0;
   color: var(--ui-text-muted, #64748b);
-  font-size: var(--ui-text-sm, 0.875rem);
+  font-size: 0.875rem;
 }
 
 .team-stats__card strong {
   display: block;
-  margin-top: var(--ui-space-2, 0.5rem);
-  font-size: var(--ui-text-4xl, 2rem);
-  font-weight: var(--ui-font-bold, 700);
+  margin-top: var(--ui-space-2, 8px);
+  font-size: 2rem;
+  font-weight: 700;
   color: var(--ui-text-strong, #0f172a);
 }
 
 .team-stats__card strong.tone-online {
-  color: var(--ui-success-dark, #1c8d72);
+  color: var(--ui-success, #16a34a);
 }
+
+/* ==========================================================================
+   Search Input
+   ========================================================================== */
 
 .team-page__search {
   width: 100%;
@@ -476,11 +504,11 @@ const formatFullName = (member: TeamMember) =>
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  gap: var(--ui-space-2, 8px);
+  padding: var(--ui-space-3, 12px) var(--ui-space-4, 16px);
   border-radius: var(--ui-radius-lg, 1rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.12));
-  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.8));
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #fff);
   box-shadow: var(--ui-shadow-md, 0 12px 22px rgba(11, 46, 51, 0.1));
 }
 
@@ -488,55 +516,73 @@ const formatFullName = (member: TeamMember) =>
   width: 1.1rem;
   height: 1.1rem;
   color: var(--ui-text-muted, #64748b);
+  flex-shrink: 0;
 }
 
 .team-page__search-input input {
   width: 100%;
   border: none;
   background: transparent;
-  font-size: var(--ui-text-base, 1rem);
+  font-size: 1rem;
   color: var(--ui-text, #0b2e33);
+}
+
+.team-page__search-input input::placeholder {
+  color: var(--ui-text-muted, #64748b);
 }
 
 .team-page__search-input input:focus {
   outline: none;
-  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.2));
 }
+
+.team-page__search-input:focus-within {
+  border-color: var(--ui-brand-600, #4f7c82);
+  box-shadow:
+    var(--ui-shadow-md, 0 12px 22px rgba(11, 46, 51, 0.1)),
+    0 0 0 3px rgba(79, 124, 130, 0.2);
+}
+
+/* ==========================================================================
+   Team Grid & Cards
+   ========================================================================== */
 
 .team-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--ui-space-5, 1.25rem);
+  gap: var(--ui-space-5, 20px);
 }
 
 .team-card {
   display: grid;
-  gap: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-6, 1.5rem);
+  gap: var(--ui-space-4, 16px);
+  padding: var(--ui-space-6, 24px);
   border-radius: var(--ui-radius-xl, 1.25rem);
-  background: var(--ui-brand-50, rgba(245, 252, 255, 0.95));
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.12));
-  box-shadow: var(--ui-shadow-xl, 0 18px 32px rgba(11, 46, 51, 0.14));
-  transition: var(--ui-transition-all, all 180ms ease);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-lg, 0 16px 28px rgba(11, 46, 51, 0.12));
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .team-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--ui-shadow-2xl, 0 22px 40px rgba(11, 46, 51, 0.18));
-  border-color: var(--ui-brand-400, rgba(79, 124, 130, 0.35));
+  box-shadow: var(--ui-shadow-xl, 0 20px 36px rgba(11, 46, 51, 0.16));
+  border-color: var(--ui-brand-600, #4f7c82);
 }
 
 .team-card__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-4, 16px);
 }
 
 .team-card__identity {
   display: flex;
   align-items: center;
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-4, 16px);
 }
 
 .team-card__avatar {
@@ -544,13 +590,18 @@ const formatFullName = (member: TeamMember) =>
   width: 3rem;
   height: 3rem;
   border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-200, rgba(184, 227, 233, 0.9));
+  background: var(--ui-brand-100, #e0f2f1);
   color: var(--ui-brand-900, #0b2e33);
-  font-weight: var(--ui-font-bold, 700);
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
+
+/* ==========================================================================
+   Status Indicators
+   ========================================================================== */
 
 .status-indicator {
   position: absolute;
@@ -559,33 +610,38 @@ const formatFullName = (member: TeamMember) =>
   width: 0.85rem;
   height: 0.85rem;
   border-radius: var(--ui-radius-full, 9999px);
-  border: 2px solid var(--ui-brand-50, rgba(245, 252, 255, 0.95));
+  border: 2px solid var(--ui-surface, #fff);
 }
 
 .status-online {
-  background: var(--ui-success, #2a9d8f);
+  background: var(--ui-success, #16a34a);
 }
 
 .status-away {
-  background: var(--ui-warning, #f4a261);
+  background: var(--ui-warning, #f59e0b);
 }
 
 .status-offline {
-  background: var(--ui-neutral, rgba(11, 46, 51, 0.3));
+  background: var(--ui-text-muted, #64748b);
 }
+
+/* ==========================================================================
+   Card Contact & Menu
+   ========================================================================== */
 
 .team-card__contact {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  margin-top: var(--ui-space-1, 0.25rem);
+  gap: var(--ui-space-1, 4px);
+  margin-top: var(--ui-space-1, 4px);
   color: var(--ui-text-muted, #64748b);
-  font-size: var(--ui-text-sm, 0.875rem);
+  font-size: 0.875rem;
 }
 
 .team-card__contact svg {
   width: 0.9rem;
   height: 0.9rem;
+  flex-shrink: 0;
 }
 
 .team-card__menu {
@@ -595,17 +651,25 @@ const formatFullName = (member: TeamMember) =>
   width: 2.2rem;
   height: 2.2rem;
   border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.14));
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   background: transparent;
   color: var(--ui-brand-900, #0b2e33);
   cursor: pointer;
-  transition: var(--ui-transition-all, all 180ms ease);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .team-card__menu:hover {
-  background: var(--ui-brand-100, rgba(184, 227, 233, 0.15));
-  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.22));
-  box-shadow: var(--ui-shadow-md, 0 10px 18px rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-color: var(--ui-border, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-sm, 0 4px 8px rgba(11, 46, 51, 0.08));
+}
+
+.team-card__menu:focus-visible {
+  outline: 2px solid var(--ui-brand-600, #4f7c82);
+  outline-offset: 2px;
 }
 
 .team-card__menu svg {
@@ -613,82 +677,98 @@ const formatFullName = (member: TeamMember) =>
   height: 1.1rem;
 }
 
+/* ==========================================================================
+   Badges
+   ========================================================================== */
+
 .team-card__badges {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
+  gap: var(--ui-space-2, 8px);
+  flex-wrap: wrap;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-1, 4px) var(--ui-space-3, 12px);
   border-radius: var(--ui-radius-full, 9999px);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .badge-muted {
-  background: var(--ui-neutral-bg, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-muted, #f1f5f9);
   color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.15));
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
+/* Role: Owner - Brand colors */
 .role-owner {
-  background: var(--ui-brand-100, rgba(79, 124, 130, 0.2));
+  background: var(--ui-brand-100, #e0f2f1);
   color: var(--ui-brand-900, #0b2e33);
-  border: 1px solid var(--ui-brand-400, rgba(79, 124, 130, 0.35));
+  border: 1px solid var(--ui-brand-600, #4f7c82);
 }
 
+/* Role: Admin - Info/Blue tones */
 .role-admin {
-  background: var(--ui-info-bg, rgba(86, 108, 141, 0.25));
-  color: var(--ui-info-dark, #2f4b66);
-  border: 1px solid var(--ui-info-border, rgba(86, 108, 141, 0.35));
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
+/* Role: Member - Neutral tones */
 .role-member {
-  background: var(--ui-neutral-bg, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-muted, #f1f5f9);
   color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.15));
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
+
+/* ==========================================================================
+   Card Stats
+   ========================================================================== */
 
 .team-card__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-space-4, 1rem);
-  padding-top: var(--ui-space-3, 0.75rem);
-  border-top: 1px dashed var(--ui-border, rgba(11, 46, 51, 0.14));
+  gap: var(--ui-space-4, 16px);
+  padding-top: var(--ui-space-3, 12px);
+  border-top: 1px dashed var(--ui-border, rgba(11, 46, 51, 0.12));
 }
 
 .team-card__stats p {
   margin: 0;
   color: var(--ui-text-muted, #64748b);
-  font-size: var(--ui-text-xs, 0.75rem);
+  font-size: 0.75rem;
 }
 
 .team-card__stats strong {
   display: block;
-  margin-top: var(--ui-space-1, 0.25rem);
-  font-size: var(--ui-text-xl, 1.25rem);
-  font-weight: var(--ui-font-bold, 700);
+  margin-top: var(--ui-space-1, 4px);
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--ui-text-strong, #0f172a);
 }
 
 .team-card__stats strong.tone-online {
-  color: var(--ui-success-dark, #1c8d72);
+  color: var(--ui-success, #16a34a);
 }
+
+/* ==========================================================================
+   Progress Bar
+   ========================================================================== */
 
 .team-card__progress {
   display: grid;
-  gap: var(--ui-space-2, 0.5rem);
+  gap: var(--ui-space-2, 8px);
 }
 
 .team-card__progress-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: var(--ui-text-xs, 0.75rem);
+  font-size: 0.75rem;
   color: var(--ui-text-muted, #64748b);
 }
 
@@ -696,7 +776,7 @@ const formatFullName = (member: TeamMember) =>
   width: 100%;
   height: 0.4rem;
   border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-100, rgba(11, 46, 51, 0.1));
+  background: var(--ui-surface-muted, #f1f5f9);
   overflow: hidden;
 }
 
@@ -705,26 +785,30 @@ const formatFullName = (member: TeamMember) =>
   border-radius: var(--ui-radius-full, 9999px);
   background: linear-gradient(
     90deg,
-    var(--ui-brand-600, #4f7c82),
-    var(--ui-brand-900, rgba(11, 46, 51, 0.9))
+    var(--ui-brand-600, #4f7c82) 0%,
+    var(--ui-brand-900, #0b2e33) 100%
   );
-  transition: width 300ms var(--ui-ease-standard, ease);
+  transition: width 300ms ease;
 }
+
+/* ==========================================================================
+   Team Table
+   ========================================================================== */
 
 .team-table {
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   border-radius: var(--ui-radius-xl, 1.25rem);
-  padding: var(--ui-space-6, 1.5rem);
-  background: var(--ui-surface-elevated, #fff);
+  padding: var(--ui-space-6, 24px);
+  background: var(--ui-surface, #fff);
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
+  gap: var(--ui-space-3, 12px);
 }
 
 .team-table h3 {
   margin: 0;
-  font-size: var(--ui-text-lg, 1.125rem);
-  font-weight: var(--ui-font-semibold, 600);
+  font-size: 1.125rem;
+  font-weight: 600;
   color: var(--ui-text-strong, #0f172a);
 }
 
@@ -744,37 +828,59 @@ const formatFullName = (member: TeamMember) =>
 
 .team-table th,
 .team-table td {
-  padding: var(--ui-space-2, 0.5rem);
+  padding: var(--ui-space-2, 8px);
   text-align: left;
   border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
 .team-table th {
-  font-weight: var(--ui-font-semibold, 600);
+  font-weight: 600;
   color: var(--ui-brand-900, #0b2e33);
-  background: var(--ui-surface-muted, rgba(11, 46, 51, 0.04));
+  background: var(--ui-surface-muted, #f1f5f9);
 }
 
 .team-table td {
   color: var(--ui-text, #0b2e33);
 }
 
+.team-table tbody tr:hover {
+  background: var(--ui-bg, #f5fcff);
+}
+
+/* ==========================================================================
+   Reduced Motion Support
+   ========================================================================== */
+
 @media (prefers-reduced-motion: reduce) {
   .team-page__invite,
   .team-card,
   .team-card__menu,
-  .team-card__progress-fill {
+  .team-card__progress-fill,
+  .team-page__search-input {
     transition: none;
+  }
+
+  .team-page__invite:hover,
+  .team-card:hover {
+    transform: none;
   }
 }
 
+/* ==========================================================================
+   Responsive Breakpoints
+   ========================================================================== */
+
 @media (max-width: 1200px) {
   .demo__content--condensed {
-    padding: var(--ui-space-7, 1.75rem);
+    padding: var(--ui-space-6, 24px);
   }
 }
 
 @media (max-width: 768px) {
+  .demo__content--condensed {
+    padding: var(--ui-space-4, 16px);
+  }
+
   .team-page__header {
     flex-direction: column;
     align-items: flex-start;
@@ -783,6 +889,14 @@ const formatFullName = (member: TeamMember) =>
   .team-page__invite {
     width: 100%;
     justify-content: center;
+  }
+
+  .team-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .team-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

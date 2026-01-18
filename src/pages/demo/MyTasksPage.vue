@@ -432,10 +432,18 @@ const stats = computed(() => ({
 <style scoped>
 @import "@/pages/demo/styles/demo-shell.css";
 
+/* ========================================
+ * Demo Content Layout
+ * ======================================== */
+
 .demo__content--condensed {
   padding: var(--ui-space-8, 2rem);
   gap: 0;
 }
+
+/* ========================================
+ * Tasks Page Layout
+ * ======================================== */
 
 .tasks-page {
   display: grid;
@@ -452,7 +460,7 @@ const stats = computed(() => ({
 
 .tasks-page__header h2 {
   margin: 0;
-  font-size: clamp(1.6rem, 3vw, var(--ui-text-4xl, 2rem));
+  font-size: clamp(1.6rem, 3vw, var(--ui-text-3xl, 1.875rem));
   font-weight: var(--ui-font-bold, 700);
   color: var(--ui-text-strong, #0f172a);
 }
@@ -460,6 +468,7 @@ const stats = computed(() => ({
 .tasks-page__header p {
   margin: var(--ui-space-1, 0.25rem) 0 0;
   color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .tasks-page__filter {
@@ -468,24 +477,34 @@ const stats = computed(() => ({
   gap: var(--ui-space-2, 0.5rem);
   padding: var(--ui-space-2, 0.5rem) var(--ui-space-5, 1.25rem);
   border-radius: var(--ui-radius-lg, 1rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.18));
-  background: var(--ui-brand-50, rgba(245, 252, 255, 0.6));
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-brand-50, #f5fcff);
   color: var(--ui-brand-900, #0b2e33);
   cursor: pointer;
+  font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   transition: var(--ui-transition-all, all 180ms ease);
 }
 
 .tasks-page__filter:hover {
-  background: var(--ui-brand-100, rgba(184, 227, 233, 0.2));
-  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.26));
-  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.15));
+  background: var(--ui-brand-100, #e5f6f8);
+  border-color: var(--ui-border-strong, rgba(11, 46, 51, 0.2));
+  box-shadow: var(--ui-shadow-md, 0 4px 12px rgba(11, 46, 51, 0.08));
+}
+
+.tasks-page__filter:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.25));
 }
 
 .tasks-page__filter svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }
+
+/* ========================================
+ * Stats Cards
+ * ======================================== */
 
 .tasks-stats {
   display: grid;
@@ -496,9 +515,9 @@ const stats = computed(() => ({
 .tasks-stats__card {
   padding: var(--ui-space-5, 1.25rem) var(--ui-space-6, 1.5rem);
   border-radius: var(--ui-radius-xl, 1.25rem);
-  background: var(--ui-brand-50, rgba(245, 252, 255, 0.9));
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.1));
-  box-shadow: var(--ui-shadow-lg, 0 16px 28px rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-md, 0 4px 12px rgba(11, 46, 51, 0.08));
 }
 
 .tasks-stats__card p {
@@ -510,7 +529,7 @@ const stats = computed(() => ({
 .tasks-stats__card strong {
   display: block;
   margin-top: var(--ui-space-2, 0.5rem);
-  font-size: var(--ui-text-4xl, 2rem);
+  font-size: var(--ui-text-3xl, 1.875rem);
   color: var(--ui-text-strong, #0f172a);
   font-weight: var(--ui-font-bold, 700);
 }
@@ -520,12 +539,16 @@ const stats = computed(() => ({
 }
 
 .tasks-stats__card strong.tone-review {
-  color: var(--ui-brand-700, #4c6b85);
+  color: var(--ui-brand-700, #1a4a51);
 }
 
 .tasks-stats__card strong.tone-done {
-  color: var(--ui-success-dark, #1c8d72);
+  color: var(--ui-success, #16a34a);
 }
+
+/* ========================================
+ * Tabs
+ * ======================================== */
 
 .tasks-tabs {
   display: grid;
@@ -536,7 +559,7 @@ const stats = computed(() => ({
   display: inline-flex;
   align-items: center;
   gap: var(--ui-space-3, 0.75rem);
-  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.65));
+  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.8));
   border-radius: var(--ui-radius-full, 9999px);
   padding: var(--ui-space-1, 0.25rem);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
@@ -547,16 +570,26 @@ const stats = computed(() => ({
   background: transparent;
   padding: var(--ui-space-2, 0.5rem) var(--ui-space-5, 1.25rem);
   border-radius: var(--ui-radius-full, 9999px);
+  font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text-muted, #64748b);
   cursor: pointer;
   transition: var(--ui-transition-all, all 180ms ease);
 }
 
+.tasks-tabs__trigger:hover {
+  color: var(--ui-text-strong, #0f172a);
+}
+
+.tasks-tabs__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.25));
+}
+
 .tasks-tabs__trigger.is-active {
-  background: var(--ui-brand-100, rgba(79, 124, 130, 0.15));
+  background: var(--ui-brand-100, #e5f6f8);
   color: var(--ui-brand-900, #0b2e33);
-  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-sm, 0 1px 2px rgba(11, 46, 51, 0.05));
 }
 
 .tasks-tabs__content {
@@ -564,30 +597,40 @@ const stats = computed(() => ({
   gap: var(--ui-space-5, 1.25rem);
 }
 
+/* ========================================
+ * Task Card
+ * ======================================== */
+
 .task-card {
   display: grid;
   gap: var(--ui-space-4, 1rem);
   padding: var(--ui-space-6, 1.5rem);
   border-radius: var(--ui-radius-xl, 1.25rem);
-  background: var(--ui-brand-50, rgba(245, 252, 255, 0.95));
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.12));
-  box-shadow: var(--ui-shadow-xl, 0 20px 34px rgba(11, 46, 51, 0.14));
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  box-shadow: var(--ui-shadow-md, 0 4px 12px rgba(11, 46, 51, 0.08));
   transition: var(--ui-transition-all, all 180ms ease);
 }
 
 .task-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--ui-shadow-2xl, 0 24px 40px rgba(11, 46, 51, 0.16));
-  border-color: var(--ui-brand-400, rgba(79, 124, 130, 0.4));
+  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.1));
+  border-color: var(--ui-brand-300, #b8e3e9);
 }
 
 .task-card.is-overdue {
-  border-color: var(--ui-danger-light, rgba(220, 53, 69, 0.35));
+  border-color: var(--ui-danger, #d64545);
+  border-left-width: 3px;
 }
 
 .task-card.is-completed {
-  opacity: 0.8;
-  box-shadow: none;
+  opacity: 0.75;
+  box-shadow: var(--ui-shadow-sm, 0 1px 2px rgba(11, 46, 51, 0.05));
+}
+
+.task-card.is-completed:hover {
+  transform: none;
+  box-shadow: var(--ui-shadow-sm, 0 1px 2px rgba(11, 46, 51, 0.05));
 }
 
 .task-card__headline {
@@ -622,7 +665,8 @@ const stats = computed(() => ({
 .task-card p {
   margin: 0;
   color: var(--ui-text-muted, #64748b);
-  line-height: var(--ui-leading-relaxed, 1.6);
+  font-size: var(--ui-text-sm, 0.875rem);
+  line-height: var(--ui-leading-relaxed, 1.625);
 }
 
 .task-card__meta {
@@ -640,9 +684,13 @@ const stats = computed(() => ({
 }
 
 .task-card__meta-item svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }
+
+/* ========================================
+ * Badges
+ * ======================================== */
 
 .badge {
   display: inline-flex;
@@ -652,55 +700,69 @@ const stats = computed(() => ({
   border-radius: var(--ui-radius-full, 9999px);
   font-size: var(--ui-text-xs, 0.75rem);
   font-weight: var(--ui-font-semibold, 600);
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
+/* Status: Done - Green */
 .status-done {
-  background: var(--ui-success-bg, rgba(42, 157, 143, 0.14));
-  color: var(--ui-success-dark, #1c8d72);
-  border: 1px solid var(--ui-success-border, rgba(42, 157, 143, 0.3));
+  background: var(--ui-success-light, #dcfce7);
+  color: var(--ui-success-text, #166534);
+  border: 1px solid var(--ui-success, #16a34a);
+  border-color: rgba(22, 163, 74, 0.3);
 }
 
+/* Status: In Progress - Brand */
 .status-progress {
-  background: var(--ui-brand-100, rgba(79, 124, 130, 0.16));
+  background: var(--ui-brand-100, #e5f6f8);
   color: var(--ui-brand-900, #0b2e33);
-  border: 1px solid var(--ui-brand-300, rgba(79, 124, 130, 0.25));
+  border: 1px solid var(--ui-brand-300, #b8e3e9);
 }
 
+/* Status: Review - Info */
 .status-review {
-  background: var(--ui-info-bg, rgba(86, 108, 141, 0.16));
-  color: var(--ui-info-dark, #425c7b);
-  border: 1px solid var(--ui-info-border, rgba(86, 108, 141, 0.25));
+  background: var(--ui-info-light, #e0f2fe);
+  color: var(--ui-info, #0284c7);
+  border: 1px solid rgba(2, 132, 199, 0.3);
 }
 
+/* Status: Todo - Neutral */
 .status-todo {
-  background: var(--ui-neutral-bg, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-muted, #f1f5f9);
   color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.15));
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
 }
 
+/* Priority: High - Danger/Red */
 .priority-high {
-  background: var(--ui-danger-bg, rgba(220, 53, 69, 0.15));
-  color: var(--ui-danger-dark, #b02232);
-  border: 1px solid var(--ui-danger-border, rgba(220, 53, 69, 0.25));
+  background: var(--ui-danger-light, #fee2e2);
+  color: var(--ui-danger-text, #991b1b);
+  border: 1px solid rgba(214, 69, 69, 0.3);
 }
 
+/* Priority: Medium - Warning/Orange */
 .priority-medium {
-  background: var(--ui-warning-bg, rgba(255, 193, 7, 0.18));
-  color: var(--ui-warning-dark, #9c6d04);
-  border: 1px solid var(--ui-warning-border, rgba(255, 193, 7, 0.35));
+  background: var(--ui-warning-light, #fef3c7);
+  color: var(--ui-warning-text, #7c4a00);
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+/* Priority: Low - Neutral */
 .priority-low {
-  background: var(--ui-neutral-bg, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-muted, #f1f5f9);
   color: var(--ui-text-muted, #64748b);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.15));
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
 }
+
+/* ========================================
+ * Task Project Dots
+ * ======================================== */
 
 .task-dot {
-  width: 0.65rem;
-  height: 0.65rem;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-400, rgba(79, 124, 130, 0.4));
+  background: var(--ui-brand-400, #8cb8be);
+  flex-shrink: 0;
 }
 
 .task-dot--primary {
@@ -708,22 +770,30 @@ const stats = computed(() => ({
 }
 
 .task-dot--secondary {
-  background: var(--ui-brand-400, #93b1b5);
+  background: var(--ui-brand-400, #8cb8be);
 }
 
 .task-dot--accent {
-  background: var(--ui-accent, #c0a46c);
+  background: var(--ui-warning, #f59e0b);
 }
 
+/* ========================================
+ * Due Date States
+ * ======================================== */
+
 .due-over {
-  color: var(--ui-danger, #c43838);
+  color: var(--ui-danger, #d64545);
   font-weight: var(--ui-font-semibold, 600);
 }
 
 .due-soon {
-  color: var(--ui-warning, #ad7a16);
+  color: var(--ui-warning-dark, #b45309);
   font-weight: var(--ui-font-semibold, 600);
 }
+
+/* ========================================
+ * Reduced Motion Support
+ * ======================================== */
 
 @media (prefers-reduced-motion: reduce) {
   .tasks-page__filter,
@@ -731,15 +801,27 @@ const stats = computed(() => ({
   .task-card {
     transition: none;
   }
+
+  .task-card:hover {
+    transform: none;
+  }
 }
+
+/* ========================================
+ * Responsive Styles
+ * ======================================== */
 
 @media (max-width: 1200px) {
   .demo__content--condensed {
-    padding: var(--ui-space-7, 1.75rem);
+    padding: var(--ui-space-6, 1.5rem);
   }
 }
 
 @media (max-width: 768px) {
+  .demo__content--condensed {
+    padding: var(--ui-space-4, 1rem);
+  }
+
   .tasks-page__header {
     flex-direction: column;
     align-items: flex-start;
@@ -750,8 +832,18 @@ const stats = computed(() => ({
     justify-content: space-between;
   }
 
+  .tasks-tabs__trigger {
+    flex: 1;
+    text-align: center;
+  }
+
   .task-card {
     padding: var(--ui-space-5, 1.25rem);
+  }
+
+  .task-card__headline {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
