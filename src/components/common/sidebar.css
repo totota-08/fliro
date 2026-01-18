@@ -83,14 +83,15 @@
   display: none;
   align-items: center;
   justify-content: center;
-  width: var(--ui-space-8);
-  height: var(--ui-space-8);
+  width: var(--ui-touch-target-min, 44px);
+  height: var(--ui-touch-target-min, 44px);
   border-radius: var(--ui-radius-sm);
   border: 1px solid var(--ui-sidebar-border);
   background: transparent;
   color: var(--ui-sidebar-text);
   cursor: pointer;
   transition: var(--ui-transition-colors);
+  flex-shrink: 0;
 }
 
 .sidebar__toggle:hover {
@@ -136,6 +137,7 @@
   cursor: pointer;
   transition: var(--ui-transition-colors);
   text-decoration: none;
+  min-height: var(--ui-touch-target-comfortable, 48px);
 }
 
 .sidebar__nav-button:hover {
@@ -269,11 +271,12 @@
   display: flex;
   align-items: center;
   gap: var(--ui-space-3);
-  padding: var(--ui-space-2) var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-3);
   border-radius: var(--ui-radius-md);
   font-size: var(--ui-text-sm);
   color: var(--ui-sidebar-text);
   transition: background var(--ui-duration-fast) var(--ui-ease-standard);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .sidebar__project-link {
@@ -344,5 +347,41 @@
 @media (max-width: 960px) {
   .sidebar {
     max-width: 240px;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .sidebar {
+    padding: var(--ui-space-6) var(--ui-space-4);
+    gap: var(--ui-space-6);
+  }
+
+  .sidebar__nav-button {
+    padding: var(--ui-space-4) var(--ui-space-3);
+    min-height: var(--ui-touch-target-comfortable, 48px);
+  }
+
+  .sidebar__projects li {
+    padding: var(--ui-space-3) var(--ui-space-3);
+    min-height: var(--ui-touch-target-min, 44px);
+  }
+
+  .sidebar__add {
+    width: var(--ui-touch-target-min, 44px);
+    height: var(--ui-touch-target-min, 44px);
+  }
+}
+
+/* Touch device feedback */
+@media (hover: none) and (pointer: coarse) {
+  .sidebar__nav-button:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+
+  .sidebar__projects li:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
   }
 }

@@ -106,7 +106,7 @@ const hasError = computed(() => props.error || Boolean(props.errorMessage));
   border-radius: var(--ui-radius-sm, 0.5rem);
   background: var(--ui-surface, #ffffff);
   color: var(--ui-text, #0b2e33);
-  font-size: var(--ui-text-base, 1rem);
+  font-size: max(var(--ui-text-base, 1rem), 16px); /* iOS zoom prevention */
   cursor: pointer;
   transition: var(--ui-transition-all);
   padding-right: var(--ui-space-10, 2.5rem);
@@ -127,16 +127,19 @@ const hasError = computed(() => props.error || Boolean(props.errorMessage));
 /* Sizes */
 .app-select--sm {
   padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
+  font-size: max(var(--ui-text-sm, 0.875rem), 16px); /* iOS zoom prevention */
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .app-select--md {
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .app-select--lg {
   padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
   font-size: var(--ui-text-lg, 1.125rem);
+  min-height: var(--ui-touch-target-comfortable, 48px);
 }
 
 /* Error State */

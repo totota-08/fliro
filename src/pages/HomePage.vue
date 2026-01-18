@@ -46,6 +46,39 @@ const featureCards = [
   },
 ];
 
+const releaseNotes = [
+  {
+    version: "alpha-0.2",
+    date: "2026年1月",
+    isLatest: true,
+    changes: [
+      { type: "feat", text: "ブランドロゴを刷新し、アプリ全体で統一" },
+      { type: "feat", text: "OGPメタタグを追加し、リンクプレビューを改善" },
+      { type: "feat", text: "招待コード作成CLIツールを追加" },
+      { type: "feat", text: "スレッド設定の編集権限機能を追加" },
+      { type: "feat", text: "チャットのリアクション機能を強化" },
+      { type: "fix", text: "ロール削除時の使用中チェックを追加" },
+      { type: "fix", text: "タスクスレッドのアーカイブ機能を修正" },
+    ],
+  },
+  {
+    version: "alpha-0.1",
+    date: "2025年12月",
+    isLatest: false,
+    changes: [
+      { type: "feat", text: "プロジェクトダッシュボードをリリース" },
+      {
+        type: "feat",
+        text: "タスク管理機能（作成・編集・削除・ステータス変更）",
+      },
+      { type: "feat", text: "リアルタイムチャット機能" },
+      { type: "feat", text: "メンバー招待・ロール管理機能" },
+      { type: "feat", text: "アクティビティログ機能" },
+      { type: "feat", text: "スコア・成績表機能" },
+    ],
+  },
+];
+
 const pricingPlans = [
   {
     name: "フリー",
@@ -234,6 +267,43 @@ const pricingPlans = [
             >
               {{ plan.cta }}
             </AppButton>
+          </article>
+        </div>
+      </section>
+
+      <section id="releases" class="releases">
+        <div class="section-heading">
+          <p>リリースノート</p>
+          <h2>最新のアップデート情報</h2>
+        </div>
+        <div class="releases__timeline">
+          <article
+            v-for="release in releaseNotes"
+            :key="release.version"
+            class="release-card"
+            :class="{ 'release-card--latest': release.isLatest }"
+          >
+            <header class="release-card__header">
+              <div class="release-card__version">
+                <span class="release-card__tag">{{ release.version }}</span>
+                <span v-if="release.isLatest" class="release-card__badge"
+                  >最新</span
+                >
+              </div>
+              <time class="release-card__date">{{ release.date }}</time>
+            </header>
+            <ul class="release-card__changes">
+              <li
+                v-for="(change, idx) in release.changes"
+                :key="idx"
+                :class="`release-card__change--${change.type}`"
+              >
+                <span class="release-card__change-type">{{
+                  change.type === "feat" ? "新機能" : "修正"
+                }}</span>
+                {{ change.text }}
+              </li>
+            </ul>
           </article>
         </div>
       </section>
@@ -578,6 +648,102 @@ const pricingPlans = [
   display: grid;
   gap: 0.65rem;
   color: var(--ui-brand-600);
+}
+
+.releases {
+  padding: var(--ui-space-16) var(--ui-space-6);
+  background: var(--ui-surface);
+}
+
+.releases__timeline {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-6);
+}
+
+.release-card {
+  background: var(--ui-brand-50);
+  border: 1px solid var(--ui-brand-300);
+  border-radius: var(--ui-radius-2xl);
+  padding: var(--ui-space-6);
+  transition: var(--ui-transition-all);
+}
+
+.release-card--latest {
+  border-color: var(--ui-brand-600);
+  box-shadow: var(--ui-shadow-lg);
+}
+
+.release-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ui-space-4);
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+
+.release-card__version {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.release-card__tag {
+  font-size: var(--ui-text-lg);
+  font-weight: var(--ui-font-bold);
+  color: var(--ui-brand-900);
+}
+
+.release-card__badge {
+  background: var(--ui-brand-600);
+  color: var(--ui-text-inverse);
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border-radius: var(--ui-radius-full);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-semibold);
+}
+
+.release-card__date {
+  color: var(--ui-brand-400);
+  font-size: var(--ui-text-sm);
+}
+
+.release-card__changes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.release-card__changes li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-2);
+  color: var(--ui-brand-700);
+  line-height: var(--ui-leading-relaxed);
+}
+
+.release-card__change-type {
+  flex-shrink: 0;
+  padding: var(--ui-space-0-5) var(--ui-space-2);
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-semibold);
+}
+
+.release-card__change--feat .release-card__change-type {
+  background: var(--ui-brand-200);
+  color: var(--ui-brand-800);
+}
+
+.release-card__change--fix .release-card__change-type {
+  background: var(--ui-warning-100, #fef3c7);
+  color: var(--ui-warning-800, #92400e);
 }
 
 .cta {

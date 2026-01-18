@@ -48,8 +48,8 @@
   min-height: var(--ui-topbar-height);
   padding: 0 var(--ui-space-6);
   border-bottom: 1px solid var(--ui-border-light);
-  background: rgba(245, 252, 255, 0.95);
-  backdrop-filter: blur(6px);
+  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.8));
+  backdrop-filter: blur(12px);
 }
 
 .demo__topbar-left {
