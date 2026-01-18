@@ -291,23 +291,27 @@ export async function toggleMessageReaction(
   );
   const snapshot = await getValue(reactionsRef);
 
-  // 既存のリアクションをチェック
-  let existingKey: string | null = null;
+  // 既存のリアクションをチェック（重複がある可能性があるため全て収集）
+  const existingKeys: string[] = [];
   if (snapshot.exists()) {
     snapshot.forEach((child) => {
       const data = child.val();
       if (data?.emoji === emoji && data?.userId === userId) {
-        existingKey = child.key;
+        if (child.key) existingKeys.push(child.key);
       }
     });
   }
 
-  if (existingKey) {
-    // 既にリアクション済み → 削除
-    await remove(
-      dbRef(
-        database,
-        `projects/${projectId}/realtimeChat/${messageId}/reactions/${existingKey}`,
+  if (existingKeys.length > 0) {
+    // 既にリアクション済み → 全ての重複エントリを削除
+    await Promise.all(
+      existingKeys.map((key) =>
+        remove(
+          dbRef(
+            database,
+            `projects/${projectId}/realtimeChat/${messageId}/reactions/${key}`,
+          ),
+        ),
       ),
     );
     return false; // 削除した（リアクションなし状態に）
