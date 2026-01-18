@@ -23,7 +23,14 @@ interface ValidateResponse {
 }
 
 export const validateInviteCode = onCall<ValidateRequest>(
-  { region: "asia-northeast1" },
+  {
+    region: "asia-northeast1",
+    cors: [
+      "https://fliro.work",
+      "https://fliro-cbai.vercel.app",
+      "http://localhost:5173",
+    ],
+  },
   async (request): Promise<ValidateResponse> => {
     const { auth, data } = request;
 
