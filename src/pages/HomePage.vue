@@ -19,25 +19,10 @@ const isLoadingReleases = ref(true);
 // デフォルトのリリースノート（Firestore未設定時のフォールバック）
 const defaultReleaseNotes: ReleaseNote[] = [
   {
-    id: "alpha-0.2",
-    version: "alpha-0.2",
-    date: "2026年1月",
-    isLatest: true,
-    changes: [
-      { type: "feat", text: "ブランドロゴを刷新し、アプリ全体で統一" },
-      { type: "feat", text: "OGPメタタグを追加し、リンクプレビューを改善" },
-      { type: "feat", text: "招待コード作成CLIツールを追加" },
-      { type: "feat", text: "スレッド設定の編集権限機能を追加" },
-      { type: "feat", text: "チャットのリアクション機能を強化" },
-      { type: "fix", text: "ロール削除時の使用中チェックを追加" },
-      { type: "fix", text: "タスクスレッドのアーカイブ機能を修正" },
-    ],
-  },
-  {
     id: "alpha-0.1",
     version: "alpha-0.1",
     date: "2025年12月",
-    isLatest: false,
+    isLatest: true,
     changes: [
       { type: "feat", text: "プロジェクトダッシュボードをリリース" },
       {
