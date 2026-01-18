@@ -13,6 +13,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 
 const logger = getLogger("app.services.task");
@@ -37,6 +38,7 @@ export interface TaskDoc {
   progress?: number;
   hasThread?: boolean;
   threadName?: string | null;
+  threadArchived?: boolean;
 }
 
 export interface CreateTaskPayload {
