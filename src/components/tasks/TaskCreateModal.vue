@@ -215,10 +215,11 @@ watch(
   border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-md, 0.75rem);
   padding: var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-base, 1rem);
+  font-size: max(var(--ui-text-base, 1rem), 16px); /* iOS zoom prevention */
   color: var(--ui-text, #0b2e33);
   background: var(--ui-surface, #ffffff);
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .form-input:focus,
@@ -264,6 +265,8 @@ watch(
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
+  min-width: var(--ui-touch-target-min, 44px);
 }
 
 .progress-pill:hover {
@@ -275,5 +278,13 @@ watch(
   border-color: var(--ui-brand-900, #0b2e33);
   background: var(--ui-brand-900, #0b2e33);
   color: var(--ui-surface, #ffffff);
+}
+
+/* Touch device feedback */
+@media (hover: none) and (pointer: coarse) {
+  .progress-pill:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
 }
 </style>

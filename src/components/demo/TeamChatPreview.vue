@@ -142,10 +142,10 @@ onBeforeUnmount(() => {
 .chat {
   display: flex;
   flex-direction: column;
-  border-radius: 1.5rem;
-  border: 1px solid var(--border-light);
-  background: var(--surface-elevated);
-  box-shadow: 0 18px 28px rgba(11, 46, 51, 0.12);
+  border-radius: var(--ui-radius-2xl, 1.5rem);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-elevated, #fff);
+  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.1));
   overflow: hidden;
 }
 
@@ -153,126 +153,141 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(11, 46, 51, 0.08);
+  padding: var(--ui-space-5, 1.25rem) var(--ui-space-6, 1.5rem);
+  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
 .chat__header h2 {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-strong);
+  font-size: var(--ui-text-lg, 1.125rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .chat__header p {
-  margin: 0.35rem 0 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .chat__close {
   border: none;
   width: 2rem;
   height: 2rem;
-  border-radius: 999px;
-  background: rgba(79, 124, 130, 0.15);
-  color: var(--primary-strong);
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-brand-100, rgba(79, 124, 130, 0.15));
+  color: var(--ui-brand-900, #0b2e33);
   cursor: pointer;
+  transition: var(--ui-transition-colors, background 180ms ease);
+}
+
+.chat__close:hover {
+  background: var(--ui-brand-200, rgba(79, 124, 130, 0.25));
 }
 
 .chat__messages {
   list-style: none;
   margin: 0;
-  padding: 1.5rem 1.5rem 0.75rem;
+  padding: var(--ui-space-6, 1.5rem) var(--ui-space-6, 1.5rem)
+    var(--ui-space-3, 0.75rem);
   display: grid;
-  gap: 1rem;
+  gap: var(--ui-space-4, 1rem);
   max-height: 320px;
   overflow-y: auto;
 }
 
 .chat__messages li {
-  padding: 1rem;
-  border-radius: 1rem;
-  background: rgba(184, 227, 233, 0.28);
+  padding: var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-lg, 1rem);
+  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.28));
   display: grid;
-  gap: 0.4rem;
-  transition:
-    background 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+  gap: var(--ui-space-2, 0.5rem);
+  transition: var(--ui-transition-all, all 180ms ease);
 }
 
 .chat__messages--update {
-  border: 1px solid rgba(79, 124, 130, 0.4);
-  background: rgba(184, 227, 233, 0.4);
+  border: 1px solid var(--ui-brand-400, rgba(79, 124, 130, 0.4));
+  background: var(--ui-surface-accent-strong, rgba(184, 227, 233, 0.4));
 }
 
 .chat__messages li.is-highlight {
-  background: rgba(184, 227, 233, 0.6);
-  box-shadow: 0 16px 28px rgba(11, 46, 51, 0.15);
+  background: var(--ui-brand-200, rgba(184, 227, 233, 0.6));
+  box-shadow: var(--ui-shadow-lg, 0 12px 24px rgba(11, 46, 51, 0.12));
   transform: translateY(-2px);
 }
 
 .chat__messages header {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .chat__author {
-  font-weight: 600;
-  color: var(--text-strong);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .chat__messages p {
   margin: 0;
-  color: var(--text);
-  line-height: 1.6;
+  color: var(--ui-text, #0b2e33);
+  line-height: var(--ui-leading-relaxed, 1.6);
 }
 
 .chat__footer {
   margin-top: auto;
   display: flex;
-  gap: 0.75rem;
-  padding: 1.5rem 1.5rem 1.5rem;
-  border-top: 1px solid rgba(11, 46, 51, 0.08);
-  background: rgba(184, 227, 233, 0.18);
+  gap: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-6, 1.5rem);
+  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  background: var(--ui-surface-accent, rgba(184, 227, 233, 0.18));
 }
 
 .chat__footer input {
   flex: 1;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(79, 124, 130, 0.3);
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  background: #fff;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-brand-300, rgba(79, 124, 130, 0.3));
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  background: var(--ui-surface, #fff);
+  color: var(--ui-text, #0b2e33);
+}
+
+.chat__footer input:focus {
+  outline: none;
+  border-color: var(--ui-brand-500, #4f7c82);
+  box-shadow: var(--ui-ring-focus, 0 0 0 3px rgba(79, 124, 130, 0.2));
 }
 
 .chat__footer button {
-  border-radius: 0.75rem;
+  border-radius: var(--ui-radius-md, 0.75rem);
   border: none;
-  padding: 0.75rem 1rem;
-  background: var(--primary);
-  color: var(--surface-elevated);
-  font-weight: 600;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-text-inverse, #fff);
+  font-weight: var(--ui-font-semibold, 600);
   cursor: pointer;
+  transition: var(--ui-transition-colors, background 180ms ease);
+}
+
+.chat__footer button:hover {
+  background: var(--ui-brand-700, #3d6166);
 }
 
 .chat__typing {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 1.5rem 0.75rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  gap: var(--ui-space-2, 0.5rem);
+  padding: 0 var(--ui-space-6, 1.5rem) var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .chat__typing-dot {
   width: 0.4rem;
   height: 0.4rem;
-  border-radius: 999px;
-  background: rgba(79, 124, 130, 0.75);
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-brand-600, rgba(79, 124, 130, 0.75));
   animation: typing 1.2s infinite ease-in-out;
 }
 
@@ -290,6 +305,15 @@ onBeforeUnmount(() => {
   }
   50% {
     transform: translateY(-0.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat__messages li {
+    transition: none;
+  }
+  .chat__typing-dot {
+    animation: none;
   }
 }
 

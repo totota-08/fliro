@@ -354,7 +354,7 @@ function handleNavigate(taskId: string) {
   border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-md, 0.75rem);
   background: var(--ui-surface, #ffffff);
-  font-size: var(--ui-text-sm, 0.875rem);
+  font-size: max(var(--ui-text-sm, 0.875rem), 16px); /* iOS zoom prevention */
   color: var(--ui-text, #0b2e33);
   cursor: pointer;
   appearance: none;
@@ -363,6 +363,7 @@ function handleNavigate(taskId: string) {
   background-position: right 0.75rem center;
   padding-right: 2.25rem;
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .task-filter-select:hover {
@@ -395,9 +396,10 @@ function handleNavigate(taskId: string) {
   border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-md, 0.75rem);
   background: var(--ui-surface, #ffffff);
-  font-size: var(--ui-text-sm, 0.875rem);
+  font-size: max(var(--ui-text-sm, 0.875rem), 16px); /* iOS zoom prevention */
   color: var(--ui-text, #0b2e33);
   transition: var(--ui-transition-colors);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .task-search-input::placeholder {
@@ -425,6 +427,8 @@ function handleNavigate(taskId: string) {
   color: var(--ui-text-muted, #64748b);
   cursor: pointer;
   transition: var(--ui-transition-all);
+  min-width: var(--ui-touch-target-min, 44px);
+  min-height: var(--ui-touch-target-min, 44px);
 }
 
 .filter-reset-btn svg {
@@ -457,6 +461,7 @@ function handleNavigate(taskId: string) {
   cursor: pointer;
   transition: var(--ui-transition-all);
   background: var(--ui-surface, #ffffff);
+  min-height: 56px;
 }
 
 .task-row:hover {
@@ -646,5 +651,52 @@ function handleNavigate(taskId: string) {
   margin-top: var(--ui-space-4, 1rem);
   padding-top: var(--ui-space-4, 1rem);
   border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .task-list {
+    padding: var(--ui-space-4, 1rem);
+  }
+
+  .task-list__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .task-list__filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .task-search-wrapper {
+    width: 100%;
+  }
+
+  .task-search-input {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .task-filter-select {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .filter-reset-btn {
+    align-self: flex-start;
+  }
+
+  .task-row {
+    padding: var(--ui-space-4, 1rem);
+  }
+}
+
+/* Touch device feedback */
+@media (hover: none) and (pointer: coarse) {
+  .task-row:active {
+    transform: scale(0.99);
+    transition: transform 0.1s ease;
+  }
 }
 </style>

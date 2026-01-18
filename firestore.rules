@@ -12,6 +12,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // リリースノート: 誰でも読み取り可能、書き込みは不可（Admin SDKのみ）
+    match /releaseNotes/{noteId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /profiles/{userId} {
       // betaAccess, betaCodeUsed, betaAccessAt はクライアントから直接設定不可（Cloud Functionsのみ）
       function isBetaFieldChange() {

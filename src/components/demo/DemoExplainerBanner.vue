@@ -32,45 +32,46 @@ import { appName } from "@/constants/appMeta";
 <style scoped>
 .banner {
   display: grid;
-  gap: 1.5rem;
+  gap: var(--ui-space-6, 1.5rem);
   grid-template-columns: 1.15fr 1fr;
   align-items: stretch;
-  border-radius: 1.5rem;
-  padding: 2rem;
+  border-radius: var(--ui-radius-2xl, 1.5rem);
+  padding: var(--ui-space-8, 2rem);
   background: linear-gradient(
     135deg,
-    rgba(184, 227, 233, 0.55),
-    rgba(245, 252, 255, 0.95)
+    var(--ui-brand-200, rgba(184, 227, 233, 0.55)),
+    var(--ui-brand-50, rgba(245, 252, 255, 0.95))
   );
-  color: #0b2e33;
-  border: 1px solid rgba(11, 46, 51, 0.12);
-  box-shadow: 0 20px 40px rgba(11, 46, 51, 0.12);
+  color: var(--ui-brand-900, #0b2e33);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.12));
+  box-shadow: var(--ui-shadow-xl, 0 20px 40px rgba(11, 46, 51, 0.12));
 }
 
 .banner__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(11, 46, 51, 0.08);
-  color: var(--primary-strong, #0b2e33);
-  font-weight: 600;
-  font-size: 0.75rem;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-brand-100, rgba(11, 46, 51, 0.08));
+  color: var(--ui-brand-900, #0b2e33);
+  font-weight: var(--ui-font-semibold, 600);
+  font-size: var(--ui-text-xs, 0.75rem);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .banner__content h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
+  margin: var(--ui-space-3, 0.75rem) 0 0;
+  font-size: var(--ui-text-2xl, 1.5rem);
+  font-weight: var(--ui-font-bold, 700);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .banner__content p {
-  margin: 1rem 0 0;
-  line-height: 1.8;
-  color: var(--text-muted);
+  margin: var(--ui-space-4, 1rem) 0 0;
+  line-height: var(--ui-leading-relaxed, 1.8);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .banner__highlights {
@@ -78,19 +79,20 @@ import { appName } from "@/constants/appMeta";
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.75rem;
+  gap: var(--ui-space-3, 0.75rem);
 }
 
 .banner__highlights li {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(11, 46, 51, 0.08);
+  gap: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-lg, 1rem);
+  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.55));
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   backdrop-filter: blur(10px);
-  font-weight: 600;
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
 }
 
 .banner__icon {
@@ -99,11 +101,11 @@ import { appName } from "@/constants/appMeta";
   justify-content: center;
   min-width: 2.25rem;
   height: 2.25rem;
-  border-radius: 0.75rem;
-  background: rgba(11, 46, 51, 0.85);
-  color: #f5fcff;
-  font-size: 0.85rem;
-  font-weight: 700;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-brand-900, #0b2e33);
+  color: var(--ui-brand-50, #f5fcff);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-bold, 700);
   letter-spacing: 0.05em;
 }
 
