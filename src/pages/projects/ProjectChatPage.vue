@@ -1,27 +1,41 @@
 <script setup lang="ts">
 import { commands, executeCommand } from "@/commands";
-import UserAvatar from "@/components/common/UserAvatar.vue";
+import {
+  ChatMessageEditor,
+  ChatMessageItem,
+  ChatReplyIndicator,
+} from "@/components/chat";
+import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AppDrawer from "@/components/ui/AppDrawer.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppInput from "@/components/ui/AppInput.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import { usePageTitle } from "@/composables/usePageTitle";
-import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import { fetchProject } from "@/firebase/projectService";
 import { db } from "@/lib/firebase";
 import {
+  deleteProjectMessage,
   listenProjectChat,
   sendProjectMessage,
+  toggleMessageReaction,
+  updateProjectMessage,
   type ChatMessage,
 } from "@/services/projectChat";
 import {
   listenProjectMembers,
   type ProjectMember,
 } from "@/services/projectMembers";
-import { listenTasks, type TaskDoc } from "@/services/taskService";
+import { listenProjectRoles, type ProjectRole } from "@/services/rolesService";
+import {
+  listenTasks,
+  updateTaskThreadArchived,
+  type TaskDoc,
+} from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -34,6 +48,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import {
   computed,
@@ -43,7 +58,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.ProjectChat");
 
@@ -57,6 +72,9 @@ type ChatChannel = {
   createdBy?: string;
   isPublic?: boolean;
   allowedUserIds?: string[];
+  allowedRoles?: string[]; // 送信許可されたロールのリスト（空なら全員許可）
+  settingsAllowedRoles?: string[]; // 設定編集を許可されたロールのリスト（空なら admin/owner/作成者のみ）
+  archived?: boolean; // アーカイブフラグ
 };
 
 const defaultChannel: ChatChannel = {
@@ -81,6 +99,12 @@ const messages = ref<ChatMessage[]>([]);
 const input = ref("");
 const project = ref<ProjectDoc | null>(null);
 
+// 編集・返信状態管理
+const editingMessageId = ref<string | null>(null);
+const editingText = ref("");
+const replyingToId = ref<string | null>(null);
+const copiedMessageId = ref<string | null>(null); // コピー成功時のフィードバック用
+
 // ページタイトル設定
 const { setTitle } = usePageTitle("スレッド", "チームのディスカッション");
 watch(
@@ -93,9 +117,21 @@ watch(
 const projectMembers = ref<ProjectMember[]>([]);
 const tasks = ref<TaskDoc[]>([]);
 const customChannels = ref<ChatChannel[]>([]);
+const projectRoles = ref<ProjectRole[]>([]);
 const chatContainer = ref<HTMLElement | null>(null);
 const composerInput = ref<HTMLInputElement | null>(null);
 const activeChannelId = ref("general");
+
+// カスタムスレッド設定モーダル
+const showThreadSettings = ref(false);
+const threadSettingsForm = ref({
+  name: "",
+  description: "",
+  allowedRoles: [] as string[],
+  settingsAllowedRoles: [] as string[],
+});
+const showArchiveConfirm = ref(false);
+const isSavingSettings = ref(false);
 
 // Command Autocomplete
 const showCommandSuggestions = ref(false);
@@ -155,41 +191,79 @@ function selectCommand(cmd: string) {
 }
 // UI state
 const customThreadFormOpen = ref(false);
-const customThreadForm = ref({ name: "", description: "" });
+const customThreadForm = ref({
+  name: "",
+  description: "",
+  allowedRoles: [] as string[],
+  settingsAllowedRoles: [] as string[],
+});
 const isCreateThreadDisabled = computed(
   () => !customThreadForm.value.name.trim(),
 );
 const showAllTaskChannels = ref(false); // タスク一覧の「すべて表示」フラグ
+const showArchivedTaskChannels = ref(false); // アーカイブ済みタスクの表示フラグ
 const showMobileThreads = ref(false); // モバイル用スレッドドロワー
 const MAX_VISIBLE_TASK_CHANNELS = 8;
 let unsubscribeChat: (() => void) | null = null;
 let unsubscribeMembers: (() => void) | null = null;
 let unsubscribeCustomChannels: (() => void) | null = null;
 let unsubscribeTasks: (() => void) | null = null;
+let unsubscribeRoles: (() => void) | null = null;
+
+// アーカイブ済みカスタムスレッド表示フラグ
+const showArchivedCustomChannels = ref(false);
+
+// アクティブなカスタムスレッド（アーカイブされていないもの）
+const activeCustomChannels = computed<ChatChannel[]>(() =>
+  customChannels.value.filter((ch) => !ch.archived),
+);
+
+// アーカイブされたカスタムスレッド
+const archivedCustomChannels = computed<ChatChannel[]>(() =>
+  customChannels.value.filter((ch) => ch.archived),
+);
 
 // Channel Logic
-const taskChannels = computed<ChatChannel[]>(() =>
+// 全タスクチャンネル（アーカイブフラグを含む）
+const allTaskChannels = computed<ChatChannel[]>(() =>
   tasks.value
     .filter((task) => task.hasThread !== false)
     .map((task) => ({
       id: task.id,
       name: task.threadName || task.title || "無題のタスク",
       description: task.status,
-      type: "task",
+      type: "task" as const,
+      archived: task.threadArchived === true || task.status === "done",
     })),
 );
 
-// 表示するタスクチャンネル（最大8件、またはすべて）
-const visibleTaskChannels = computed(() => {
+// アクティブなタスクチャンネル（アーカイブされていないもの）
+const activeTaskChannels = computed<ChatChannel[]>(() =>
+  allTaskChannels.value.filter((ch) => !ch.archived),
+);
+
+// アーカイブされたタスクチャンネル
+const archivedTaskChannels = computed<ChatChannel[]>(() =>
+  allTaskChannels.value.filter((ch) => ch.archived),
+);
+
+// 表示用（後方互換性のため taskChannels を維持）
+const taskChannels = computed<ChatChannel[]>(() => allTaskChannels.value);
+
+// 表示するアクティブタスクチャンネル（最大8件、またはすべて）
+const visibleActiveTaskChannels = computed(() => {
   if (showAllTaskChannels.value) {
-    return taskChannels.value;
+    return activeTaskChannels.value;
   }
-  return taskChannels.value.slice(0, MAX_VISIBLE_TASK_CHANNELS);
+  return activeTaskChannels.value.slice(0, MAX_VISIBLE_TASK_CHANNELS);
 });
 
-// 隠れているタスクの数
-const hiddenTaskCount = computed(() => {
-  return Math.max(0, taskChannels.value.length - MAX_VISIBLE_TASK_CHANNELS);
+// 隠れているアクティブタスクの数
+const hiddenActiveTaskCount = computed(() => {
+  return Math.max(
+    0,
+    activeTaskChannels.value.length - MAX_VISIBLE_TASK_CHANNELS,
+  );
 });
 
 const channels = computed<ChatChannel[]>(() => {
@@ -267,9 +341,20 @@ function watchCustomChannels() {
         type: "custom",
         createdBy: data.createdBy,
         isPublic: data.isPublic !== false,
+        allowedRoles: data.allowedRoles || [],
+        settingsAllowedRoles: data.settingsAllowedRoles || [],
+        archived: data.archived === true,
       });
     });
     customChannels.value = list;
+  });
+}
+
+function watchRoles() {
+  unsubscribeRoles?.();
+  if (!projectId.value) return;
+  unsubscribeRoles = listenProjectRoles(projectId.value, (list) => {
+    projectRoles.value = list;
   });
 }
 
@@ -278,10 +363,12 @@ function stopWatchers() {
   unsubscribeMembers?.();
   unsubscribeCustomChannels?.();
   unsubscribeTasks?.();
+  unsubscribeRoles?.();
   unsubscribeChat = null;
   unsubscribeMembers = null;
   unsubscribeCustomChannels = null;
   unsubscribeTasks = null;
+  unsubscribeRoles = null;
 }
 
 async function refreshProjectContext() {
@@ -305,6 +392,7 @@ async function refreshProjectContext() {
   watchMembers();
   watchTasks();
   watchCustomChannels();
+  watchRoles();
 }
 
 // Actions
@@ -356,10 +444,11 @@ async function handleSend() {
       profile.value?.nickname || profile.value?.fullName || "ユーザー",
       text,
       activeChannelId.value, // Explicitly set channelId
-      undefined,
+      replyingToId.value ?? undefined, // 返信先ID
       activeTaskId ? { linkedTaskId: activeTaskId, isTask: true } : undefined,
     );
     input.value = "";
+    replyingToId.value = null; // 返信状態をリセット
     scrollToBottom();
   } catch (e) {
     logger.error`Failed to send message: ${e}`;
@@ -369,6 +458,33 @@ async function handleSend() {
 // タスクをドロワーで開く（openTaskは composable から取得済み）
 function handleOpenTask(taskId: string) {
   openTask(taskId);
+}
+
+// タスクスレッドのアーカイブ状態を切り替える
+async function toggleTaskArchive(taskId: string, currentArchived: boolean) {
+  try {
+    await updateTaskThreadArchived(projectId.value, taskId, !currentArchived);
+    logger.debug`Task ${taskId} archive status toggled to ${!currentArchived}`;
+  } catch (e) {
+    logger.error`Failed to toggle task archive status: ${e}`;
+  }
+}
+
+// 現在のチャンネルがアーカイブされているかどうか
+const isCurrentChannelArchived = computed(() => {
+  if (currentChannel.value.type !== "task") return false;
+  const task = tasks.value.find((t) => t.id === currentChannel.value.id);
+  return task?.threadArchived === true || task?.status === "done";
+});
+
+function closeThreadModal() {
+  customThreadFormOpen.value = false;
+  customThreadForm.value = {
+    name: "",
+    description: "",
+    allowedRoles: [],
+    settingsAllowedRoles: [],
+  };
 }
 
 async function createCustomThread() {
@@ -386,13 +502,34 @@ async function createCustomThread() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         isPublic: true,
+        allowedRoles: customThreadForm.value.allowedRoles,
+        settingsAllowedRoles: customThreadForm.value.settingsAllowedRoles,
       },
     );
     activeChannelId.value = docRef.id;
-    customThreadFormOpen.value = false;
-    customThreadForm.value = { name: "", description: "" };
+    closeThreadModal();
   } catch (e) {
     logger.error`Failed to create thread: ${e}`;
+  }
+}
+
+// スレッド作成フォームの送信権限ロール切り替え
+function toggleCreateFormRole(roleId: string) {
+  const idx = customThreadForm.value.allowedRoles.indexOf(roleId);
+  if (idx === -1) {
+    customThreadForm.value.allowedRoles.push(roleId);
+  } else {
+    customThreadForm.value.allowedRoles.splice(idx, 1);
+  }
+}
+
+// スレッド作成フォームの設定編集権限ロール切り替え
+function toggleCreateFormSettingsRole(roleId: string) {
+  const idx = customThreadForm.value.settingsAllowedRoles.indexOf(roleId);
+  if (idx === -1) {
+    customThreadForm.value.settingsAllowedRoles.push(roleId);
+  } else {
+    customThreadForm.value.settingsAllowedRoles.splice(idx, 1);
   }
 }
 
@@ -419,19 +556,90 @@ function scrollToBottom() {
   });
 }
 
-function formatTime(createdAt: ChatMessage["createdAt"]) {
-  if (!createdAt) return "";
-  let date: Date;
-  if (typeof createdAt === "number" || typeof createdAt === "string") {
-    date = new Date(createdAt);
-  } else if ((createdAt as any) instanceof Date) {
-    date = createdAt;
-  } else if ((createdAt as any).toDate) {
-    date = (createdAt as any).toDate();
-  } else {
-    return "";
+// メッセージへスクロール
+function scrollToMessage(messageId: string) {
+  nextTick(() => {
+    const element = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      // ハイライト効果
+      element.classList.add("highlight");
+      setTimeout(() => element.classList.remove("highlight"), 2000);
+    }
+  });
+}
+
+// === メッセージアクションハンドラ ===
+
+// リアクション
+async function handleReact(payload: { messageId: string; emoji: string }) {
+  if (!user.value?.uid) return;
+  try {
+    await toggleMessageReaction(
+      projectId.value,
+      payload.messageId,
+      payload.emoji,
+      user.value.uid,
+    );
+  } catch (e) {
+    logger.error`Failed to toggle reaction: ${e}`;
   }
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// 返信開始
+function handleStartReply(messageId: string) {
+  replyingToId.value = messageId;
+  composerInput.value?.focus();
+}
+
+// 返信キャンセル
+function handleCancelReply() {
+  replyingToId.value = null;
+}
+
+// 編集開始
+function handleStartEdit(messageId: string) {
+  const message = messagesById.value.get(messageId);
+  if (!message) return;
+  editingMessageId.value = messageId;
+  editingText.value = message.text;
+}
+
+// 編集保存
+async function handleSaveEdit(text: string) {
+  if (!editingMessageId.value) return;
+  try {
+    await updateProjectMessage(projectId.value, editingMessageId.value, text);
+    editingMessageId.value = null;
+    editingText.value = "";
+  } catch (e) {
+    logger.error`Failed to update message: ${e}`;
+  }
+}
+
+// 編集キャンセル
+function handleCancelEdit() {
+  editingMessageId.value = null;
+  editingText.value = "";
+}
+
+// コピー
+function handleCopy(text: string) {
+  // 一時的なフィードバック（必要に応じてトースト通知に置き換え）
+  copiedMessageId.value = text;
+  setTimeout(() => {
+    copiedMessageId.value = null;
+  }, 2000);
+}
+
+// 削除
+async function handleDelete(messageId: string) {
+  if (!confirm("このメッセージを削除しますか？")) return;
+  try {
+    await deleteProjectMessage(projectId.value, messageId);
+  } catch (e) {
+    logger.error`Failed to delete message: ${e}`;
+  }
 }
 
 function taskStatusLabel(status?: string) {
@@ -441,25 +649,178 @@ function taskStatusLabel(status?: string) {
   return "未設定";
 }
 
-function formatMessage(text: string) {
-  if (!text) return "";
-  // 1. Escape HTML
-  let formatted = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  // 2. Parse Markdown Links [Text](URL)
-  formatted = formatted.replace(
-    /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>',
-  );
-
-  // 3. New lines to <br>
-  formatted = formatted.replace(/\n/g, "<br>");
-
-  return formatted;
+// カスタムスレッド設定関連
+function openThreadSettings() {
+  if (currentChannel.value.type !== "custom") return;
+  threadSettingsForm.value = {
+    name: currentChannel.value.name,
+    description: currentChannel.value.description || "",
+    allowedRoles: [...(currentChannel.value.allowedRoles || [])],
+    settingsAllowedRoles: [
+      ...(currentChannel.value.settingsAllowedRoles || []),
+    ],
+  };
+  showThreadSettings.value = true;
 }
+
+function closeThreadSettings() {
+  showThreadSettings.value = false;
+  showArchiveConfirm.value = false;
+}
+
+async function saveThreadSettings() {
+  if (!currentChannel.value || currentChannel.value.type !== "custom") return;
+  isSavingSettings.value = true;
+  try {
+    const threadRef = doc(
+      db,
+      "projects",
+      projectId.value,
+      "threads",
+      currentChannel.value.id,
+    );
+    await updateDoc(threadRef, {
+      name: threadSettingsForm.value.name.trim() || "未命名スレッド",
+      description: threadSettingsForm.value.description.trim(),
+      allowedRoles: threadSettingsForm.value.allowedRoles,
+      settingsAllowedRoles: threadSettingsForm.value.settingsAllowedRoles,
+      updatedAt: serverTimestamp(),
+    });
+    closeThreadSettings();
+  } catch (e) {
+    logger.error`Failed to save thread settings: ${e}`;
+  } finally {
+    isSavingSettings.value = false;
+  }
+}
+
+async function archiveThread() {
+  if (!currentChannel.value || currentChannel.value.type !== "custom") return;
+  isSavingSettings.value = true;
+  try {
+    const threadRef = doc(
+      db,
+      "projects",
+      projectId.value,
+      "threads",
+      currentChannel.value.id,
+    );
+    await updateDoc(threadRef, {
+      archived: true,
+      updatedAt: serverTimestamp(),
+    });
+    closeThreadSettings();
+    activeChannelId.value = "general";
+  } catch (e) {
+    logger.error`Failed to archive thread: ${e}`;
+  } finally {
+    isSavingSettings.value = false;
+  }
+}
+
+async function unarchiveThread(threadId: string) {
+  isSavingSettings.value = true;
+  try {
+    const threadRef = doc(db, "projects", projectId.value, "threads", threadId);
+    await updateDoc(threadRef, {
+      archived: false,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (e) {
+    logger.error`Failed to unarchive thread: ${e}`;
+  } finally {
+    isSavingSettings.value = false;
+  }
+}
+
+function toggleAllowedRole(roleId: string) {
+  const idx = threadSettingsForm.value.allowedRoles.indexOf(roleId);
+  if (idx === -1) {
+    threadSettingsForm.value.allowedRoles.push(roleId);
+  } else {
+    threadSettingsForm.value.allowedRoles.splice(idx, 1);
+  }
+}
+
+function toggleSettingsAllowedRole(roleId: string) {
+  const idx = threadSettingsForm.value.settingsAllowedRoles.indexOf(roleId);
+  if (idx === -1) {
+    threadSettingsForm.value.settingsAllowedRoles.push(roleId);
+  } else {
+    threadSettingsForm.value.settingsAllowedRoles.splice(idx, 1);
+  }
+}
+
+// メッセージをIDで高速検索
+const messagesById = computed(() => {
+  const map = new Map<string, ChatMessage>();
+  messages.value.forEach((m) => map.set(m.id, m));
+  return map;
+});
+
+// 返信先メッセージ
+const replyingToMessage = computed(() => {
+  if (!replyingToId.value) return null;
+  return messagesById.value.get(replyingToId.value) ?? null;
+});
+
+// 現在のユーザーがOwner/Adminか
+const isCurrentUserAdmin = computed(() => {
+  if (!user.value?.uid) return false;
+  const member = projectMembers.value.find((m) => m.userId === user.value?.uid);
+  if (!member) return false;
+  return member.role === "owner" || member.role === "admin";
+});
+
+// 現在のユーザーがスレッド設定を編集できるか（Admin/Owner、作成者、または許可されたカスタムロール）
+const canEditThreadSettings = computed(() => {
+  if (currentChannel.value.type !== "custom") return false;
+  if (!user.value?.uid) return false;
+  // Admin/Ownerは常に編集可能
+  if (isCurrentUserAdmin.value) return true;
+  // 作成者は常に編集可能
+  if (currentChannel.value.createdBy === user.value.uid) return true;
+  // settingsAllowedRolesが設定されている場合、そのロールを持つユーザーも編集可能
+  const settingsAllowedRoles = currentChannel.value.settingsAllowedRoles || [];
+  if (settingsAllowedRoles.length === 0) return false;
+  const userMember = projectMembers.value.find(
+    (m) => m.userId === user.value?.uid,
+  );
+  if (!userMember) return false;
+  const memberRoles = userMember.roles || [];
+  return settingsAllowedRoles.some((roleId) => memberRoles.includes(roleId));
+});
+
+// メッセージの返信先情報を取得
+function getReplyToInfo(message: ChatMessage) {
+  if (!message.replyToId) return { text: undefined, sender: undefined };
+  const replyTo = messagesById.value.get(message.replyToId);
+  if (!replyTo) return { text: undefined, sender: undefined };
+  return {
+    text:
+      replyTo.text?.slice(0, 100) + (replyTo.text?.length > 100 ? "..." : ""),
+    sender: replyTo.senderName,
+  };
+}
+
+// 現在のユーザーがメッセージを送信可能かどうか
+const canSendMessage = computed(() => {
+  // generalチャンネルは全員送信可能
+  if (currentChannel.value.type === "general") return true;
+  // タスクチャンネルは全員送信可能
+  if (currentChannel.value.type === "task") return true;
+  // カスタムチャンネルはallowedRolesをチェック
+  const allowedRoles = currentChannel.value.allowedRoles || [];
+  if (allowedRoles.length === 0) return true; // 空の場合は全員許可
+  // ユーザーのロールを取得
+  const userMember = projectMembers.value.find(
+    (m) => m.userId === user.value?.uid,
+  );
+  if (!userMember) return false;
+  // ユーザーのロール配列でチェック
+  const memberRoles = userMember.roles || [];
+  return allowedRoles.some((roleId) => memberRoles.includes(roleId));
+});
 
 // Lifecycle
 onMounted(() => {
@@ -508,11 +869,12 @@ watch(channels, (list) => {
           <div class="panel-section">
             <div class="section-header">
               <h3 class="section-title">タスク</h3>
-              <span class="section-count">{{ taskChannels.length }}</span>
+              <span class="section-count">{{ activeTaskChannels.length }}</span>
             </div>
+            <!-- アクティブなタスクチャンネル -->
             <div class="thread-list thread-list--scrollable">
               <button
-                v-for="taskChannel in visibleTaskChannels"
+                v-for="taskChannel in visibleActiveTaskChannels"
                 :key="taskChannel.id"
                 class="channel-item"
                 :class="{ active: activeChannelId === taskChannel.id }"
@@ -525,17 +887,17 @@ watch(channels, (list) => {
               </button>
               <!-- 「すべて表示」ボタン -->
               <button
-                v-if="hiddenTaskCount > 0 && !showAllTaskChannels"
+                v-if="hiddenActiveTaskCount > 0 && !showAllTaskChannels"
                 type="button"
                 class="show-all-btn"
                 @click="showAllTaskChannels = true"
               >
-                他 {{ hiddenTaskCount }} 件を表示...
+                他 {{ hiddenActiveTaskCount }} 件を表示...
               </button>
               <button
                 v-if="
                   showAllTaskChannels &&
-                  taskChannels.length > MAX_VISIBLE_TASK_CHANNELS
+                  activeTaskChannels.length > MAX_VISIBLE_TASK_CHANNELS
                 "
                 type="button"
                 class="show-all-btn"
@@ -544,9 +906,47 @@ watch(channels, (list) => {
                 折りたたむ
               </button>
             </div>
-            <p v-if="!taskChannels.length" class="empty-text">
-              タスクのスレッドがありません。
+            <p v-if="!activeTaskChannels.length" class="empty-text">
+              アクティブなタスクスレッドがありません。
             </p>
+
+            <!-- アーカイブ済みタスクチャンネル -->
+            <div
+              v-if="archivedTaskChannels.length > 0"
+              class="archived-section"
+            >
+              <button
+                type="button"
+                class="archived-toggle-btn"
+                @click="showArchivedTaskChannels = !showArchivedTaskChannels"
+              >
+                <svg
+                  class="archived-toggle-icon"
+                  :class="{ 'is-open': showArchivedTaskChannels }"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  width="14"
+                  height="14"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+                <span>アーカイブ済み ({{ archivedTaskChannels.length }})</span>
+              </button>
+              <div v-if="showArchivedTaskChannels" class="thread-list">
+                <button
+                  v-for="taskChannel in archivedTaskChannels"
+                  :key="taskChannel.id"
+                  class="channel-item channel-item--archived"
+                  :class="{ active: activeChannelId === taskChannel.id }"
+                  @click="selectChannel(taskChannel.id)"
+                >
+                  <span class="channel-name"># {{ taskChannel.name }}</span>
+                  <span class="task-status task-status--archived">完了</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="panel-section">
@@ -560,39 +960,10 @@ watch(channels, (list) => {
                 +
               </button>
             </div>
-            <div v-if="customThreadFormOpen" class="thread-form">
-              <AppInput
-                v-model="customThreadForm.name"
-                placeholder="スレッド名（必須）"
-                size="sm"
-              />
-              <AppTextarea
-                v-model="customThreadForm.description"
-                placeholder="説明（任意）"
-                :rows="2"
-                resize="none"
-              />
-              <div class="form-actions">
-                <AppButton
-                  variant="ghost"
-                  size="sm"
-                  @click="customThreadFormOpen = false"
-                >
-                  キャンセル
-                </AppButton>
-                <AppButton
-                  variant="primary"
-                  size="sm"
-                  :disabled="isCreateThreadDisabled"
-                  @click="createCustomThread"
-                >
-                  作成
-                </AppButton>
-              </div>
-            </div>
+            <!-- アクティブなカスタムスレッド -->
             <div class="thread-list">
               <div
-                v-for="th in customChannels"
+                v-for="th in activeCustomChannels"
                 :key="th.id"
                 class="channel-item"
                 :class="{ active: activeChannelId === th.id }"
@@ -609,16 +980,166 @@ watch(channels, (list) => {
                 </button>
               </div>
             </div>
+            <p v-if="!activeCustomChannels.length" class="empty-text">
+              スレッドがありません
+            </p>
+
+            <!-- アーカイブ済みカスタムスレッド -->
+            <div
+              v-if="archivedCustomChannels.length > 0"
+              class="archived-section"
+            >
+              <button
+                type="button"
+                class="archived-toggle-btn"
+                @click="
+                  showArchivedCustomChannels = !showArchivedCustomChannels
+                "
+              >
+                <svg
+                  class="archived-toggle-icon"
+                  :class="{ 'is-open': showArchivedCustomChannels }"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  width="14"
+                  height="14"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+                <span
+                  >アーカイブ済み ({{ archivedCustomChannels.length }})</span
+                >
+              </button>
+              <div v-if="showArchivedCustomChannels" class="thread-list">
+                <div
+                  v-for="th in archivedCustomChannels"
+                  :key="th.id"
+                  class="channel-item channel-item--archived"
+                  :class="{ active: activeChannelId === th.id }"
+                  @click="selectChannel(th.id)"
+                >
+                  <span class="channel-name"># {{ th.name }}</span>
+                  <button
+                    class="unarchive-btn"
+                    @click.stop="unarchiveThread(th.id)"
+                    title="アーカイブ解除"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      width="14"
+                      height="14"
+                    >
+                      <path
+                        d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"
+                      />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </aside>
 
         <!-- Chat Area -->
         <main class="chat-main">
           <header class="chat-header">
-            <h3># {{ currentChannel.name }}</h3>
-            <p v-if="currentChannel.description" class="desc">
-              {{ currentChannel.description }}
-            </p>
+            <div class="chat-header__main">
+              <div class="chat-header__title-row">
+                <h3># {{ currentChannel.name }}</h3>
+                <span
+                  v-if="isCurrentChannelArchived"
+                  class="archived-badge"
+                  title="このスレッドはアーカイブされています"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    width="12"
+                    height="12"
+                  >
+                    <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" />
+                  </svg>
+                  アーカイブ
+                </span>
+              </div>
+              <p v-if="currentChannel.description" class="desc">
+                {{ currentChannel.description }}
+              </p>
+            </div>
+            <div class="chat-header__actions">
+              <!-- カスタムスレッド設定ボタン（Admin/Owner または作成者のみ） -->
+              <button
+                v-if="canEditThreadSettings"
+                class="chat-header__settings-btn"
+                @click="openThreadSettings"
+                title="スレッド設定"
+                aria-label="スレッド設定を開く"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  width="18"
+                  height="18"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+                  />
+                </svg>
+              </button>
+              <!-- タスクスレッド復元ボタン -->
+              <button
+                v-if="
+                  currentChannel.type === 'task' && isCurrentChannelArchived
+                "
+                class="chat-header__restore-btn"
+                @click="toggleTaskArchive(currentChannel.id, true)"
+                title="アーカイブを解除"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  width="16"
+                  height="16"
+                >
+                  <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                復元
+              </button>
+              <!-- タスクを開くボタン -->
+              <button
+                v-if="currentChannel.type === 'task'"
+                class="chat-header__task-btn"
+                @click="handleOpenTask(currentChannel.id)"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  width="16"
+                  height="16"
+                >
+                  <path
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
+                </svg>
+                タスクを開く
+              </button>
+            </div>
           </header>
 
           <div class="msg-list" ref="chatContainer">
@@ -631,68 +1152,92 @@ watch(channels, (list) => {
             <div
               v-for="msg in currentChannelMessages"
               :key="msg.id"
-              class="msg-row"
-              :class="{ 'is-bot': msg.isBot }"
+              :data-message-id="msg.id"
             >
-              <UserAvatar
-                v-if="!msg.isBot"
-                :url="null"
-                :name="msg.senderName || 'ゲスト'"
-                class="avatar"
-              />
-              <div v-else class="bot-avatar">🤖</div>
-
-              <div class="msg-content">
-                <div class="msg-meta">
-                  <span class="sender">{{ msg.senderName }}</span>
-                  <span class="time">{{ formatTime(msg.createdAt) }}</span>
-                </div>
-                <div class="msg-text" v-html="formatMessage(msg.text)"></div>
-                <button
-                  v-if="msg.linkedTaskId"
-                  class="open-task-btn"
-                  @click="handleOpenTask(msg.linkedTaskId)"
-                >
-                  タスクを開く
-                </button>
+              <!-- 編集モード -->
+              <div v-if="editingMessageId === msg.id" class="msg-editing">
+                <ChatMessageEditor
+                  :initial-text="editingText"
+                  :is-editing="true"
+                  @save="handleSaveEdit"
+                  @cancel="handleCancelEdit"
+                />
               </div>
+              <!-- 通常表示 -->
+              <ChatMessageItem
+                v-else
+                :message="msg"
+                :current-user-id="user?.uid"
+                :is-admin="isCurrentUserAdmin"
+                :reply-to-text="getReplyToInfo(msg).text"
+                :reply-to-sender="getReplyToInfo(msg).sender"
+                @react="handleReact"
+                @reply="handleStartReply"
+                @edit="handleStartEdit"
+                @copy="handleCopy"
+                @delete="handleDelete"
+                @scroll-to-reply="scrollToMessage"
+              />
             </div>
           </div>
 
-          <div class="composer">
-            <div
-              v-if="showCommandSuggestions && filteredCommands.length > 0"
-              class="suggestions-list"
-            >
-              <button
-                v-for="cmd in filteredCommands"
-                :key="cmd.label"
-                class="suggestion-item"
-                @click="selectCommand(cmd.label)"
-              >
-                <div class="cmd-row">
-                  <span class="cmd-label">{{ cmd.label }}</span>
-                  <span class="cmd-desc">{{ cmd.description }}</span>
-                </div>
-                <div v-if="cmd.example" class="cmd-example">
-                  例: {{ cmd.example }}
-                </div>
-              </button>
+          <div
+            class="composer"
+            :class="{ 'composer--disabled': !canSendMessage }"
+          >
+            <div v-if="!canSendMessage" class="composer-restriction-notice">
+              このスレッドへの投稿は特定のロールに制限されています
             </div>
-            <input
-              ref="composerInput"
-              v-model="input"
-              @keydown.enter="handleSend"
-              placeholder="メッセージを送信..."
-              class="composer-input"
-            />
-            <button
-              @click="handleSend"
-              class="send-btn"
-              :disabled="!input.trim()"
-            >
-              送信
-            </button>
+            <template v-else>
+              <!-- 返信先表示 -->
+              <ChatReplyIndicator
+                v-if="replyingToMessage"
+                :sender-name="replyingToMessage.senderName || '不明'"
+                :message-text="
+                  replyingToMessage.text?.slice(0, 100) +
+                  (replyingToMessage.text?.length > 100 ? '...' : '')
+                "
+                @cancel="handleCancelReply"
+                @click="scrollToMessage(replyingToId!)"
+              />
+              <div class="composer-row">
+                <div
+                  v-if="showCommandSuggestions && filteredCommands.length > 0"
+                  class="suggestions-list"
+                >
+                  <button
+                    v-for="cmd in filteredCommands"
+                    :key="cmd.label"
+                    class="suggestion-item"
+                    @click="selectCommand(cmd.label)"
+                  >
+                    <div class="cmd-row">
+                      <span class="cmd-label">{{ cmd.label }}</span>
+                      <span class="cmd-desc">{{ cmd.description }}</span>
+                    </div>
+                    <div v-if="cmd.example" class="cmd-example">
+                      例: {{ cmd.example }}
+                    </div>
+                  </button>
+                </div>
+                <input
+                  ref="composerInput"
+                  v-model="input"
+                  @keydown.enter="handleSend"
+                  :placeholder="
+                    replyingToMessage ? '返信を入力...' : 'メッセージを送信...'
+                  "
+                  class="composer-input"
+                />
+                <button
+                  @click="handleSend"
+                  class="send-btn"
+                  :disabled="!input.trim()"
+                >
+                  送信
+                </button>
+              </div>
+            </template>
           </div>
         </main>
       </div>
@@ -740,11 +1285,12 @@ watch(channels, (list) => {
         <div class="panel-section">
           <div class="section-header">
             <h3 class="section-title">タスク</h3>
-            <span class="section-count">{{ taskChannels.length }}</span>
+            <span class="section-count">{{ activeTaskChannels.length }}</span>
           </div>
+          <!-- アクティブなタスクチャンネル -->
           <div class="thread-list thread-list--scrollable">
             <button
-              v-for="taskChannel in visibleTaskChannels"
+              v-for="taskChannel in visibleActiveTaskChannels"
               :key="taskChannel.id"
               class="channel-item"
               :class="{ active: activeChannelId === taskChannel.id }"
@@ -756,17 +1302,17 @@ watch(channels, (list) => {
               }}</span>
             </button>
             <button
-              v-if="hiddenTaskCount > 0 && !showAllTaskChannels"
+              v-if="hiddenActiveTaskCount > 0 && !showAllTaskChannels"
               type="button"
               class="show-all-btn"
               @click="showAllTaskChannels = true"
             >
-              他 {{ hiddenTaskCount }} 件を表示...
+              他 {{ hiddenActiveTaskCount }} 件を表示...
             </button>
             <button
               v-if="
                 showAllTaskChannels &&
-                taskChannels.length > MAX_VISIBLE_TASK_CHANNELS
+                activeTaskChannels.length > MAX_VISIBLE_TASK_CHANNELS
               "
               type="button"
               class="show-all-btn"
@@ -775,9 +1321,44 @@ watch(channels, (list) => {
               折りたたむ
             </button>
           </div>
-          <p v-if="!taskChannels.length" class="empty-text">
-            タスクのスレッドがありません。
+          <p v-if="!activeTaskChannels.length" class="empty-text">
+            アクティブなタスクスレッドがありません。
           </p>
+
+          <!-- アーカイブ済みタスクチャンネル（モバイル） -->
+          <div v-if="archivedTaskChannels.length > 0" class="archived-section">
+            <button
+              type="button"
+              class="archived-toggle-btn"
+              @click="showArchivedTaskChannels = !showArchivedTaskChannels"
+            >
+              <svg
+                class="archived-toggle-icon"
+                :class="{ 'is-open': showArchivedTaskChannels }"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                width="14"
+                height="14"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+              <span>アーカイブ済み ({{ archivedTaskChannels.length }})</span>
+            </button>
+            <div v-if="showArchivedTaskChannels" class="thread-list">
+              <button
+                v-for="taskChannel in archivedTaskChannels"
+                :key="taskChannel.id"
+                class="channel-item channel-item--archived"
+                :class="{ active: activeChannelId === taskChannel.id }"
+                @click="selectChannelWithClose(taskChannel.id)"
+              >
+                <span class="channel-name"># {{ taskChannel.name }}</span>
+                <span class="task-status task-status--archived">完了</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- カスタムスレッド -->
@@ -791,36 +1372,6 @@ watch(channels, (list) => {
             >
               +
             </button>
-          </div>
-          <div v-if="customThreadFormOpen" class="thread-form">
-            <AppInput
-              v-model="customThreadForm.name"
-              placeholder="スレッド名（必須）"
-              size="sm"
-            />
-            <AppTextarea
-              v-model="customThreadForm.description"
-              placeholder="説明（任意）"
-              :rows="2"
-              resize="none"
-            />
-            <div class="form-actions">
-              <AppButton
-                variant="ghost"
-                size="sm"
-                @click="customThreadFormOpen = false"
-              >
-                キャンセル
-              </AppButton>
-              <AppButton
-                variant="primary"
-                size="sm"
-                :disabled="isCreateThreadDisabled"
-                @click="createCustomThread"
-              >
-                作成
-              </AppButton>
-            </div>
           </div>
           <div class="thread-list">
             <button
@@ -846,6 +1397,232 @@ watch(channels, (list) => {
         @close="closeTask"
       />
     </Teleport>
+
+    <!-- スレッド作成モーダル -->
+    <AppModal
+      :open="customThreadFormOpen"
+      title="新規スレッドを作成"
+      size="md"
+      @close="closeThreadModal"
+    >
+      <div class="thread-modal-form">
+        <div class="form-field">
+          <label class="form-label"
+            >スレッド名 <span class="required">*</span></label
+          >
+          <AppInput
+            v-model="customThreadForm.name"
+            placeholder="スレッド名を入力"
+          />
+        </div>
+        <div class="form-field">
+          <label class="form-label">説明</label>
+          <AppTextarea
+            v-model="customThreadForm.description"
+            placeholder="スレッドの説明（任意）"
+            :rows="3"
+            resize="none"
+          />
+        </div>
+        <!-- ロールベースの送信権限 -->
+        <div class="form-field">
+          <label class="form-label">送信権限（任意）</label>
+          <p class="form-hint">
+            特定のロールのメンバーのみがメッセージを送信できるように制限できます。
+            何も選択しない場合は全員が送信可能です。
+          </p>
+          <div class="role-checkboxes">
+            <div
+              v-for="role in projectRoles"
+              :key="role.id"
+              class="role-checkbox-item"
+            >
+              <AppCheckbox
+                :model-value="customThreadForm.allowedRoles.includes(role.id)"
+                :label="role.name"
+                @update:model-value="toggleCreateFormRole(role.id)"
+              />
+            </div>
+            <p v-if="!projectRoles.length" class="empty-text">
+              ロールが設定されていません
+            </p>
+          </div>
+        </div>
+        <!-- ロールベースの設定編集権限 -->
+        <div class="form-field">
+          <label class="form-label">設定編集権限（任意）</label>
+          <p class="form-hint">
+            特定のロールのメンバーにスレッド設定の編集を許可できます。
+            Admin・オーナー・作成者は常に編集可能です。
+          </p>
+          <div class="role-checkboxes">
+            <div
+              v-for="role in projectRoles"
+              :key="role.id"
+              class="role-checkbox-item"
+            >
+              <AppCheckbox
+                :model-value="
+                  customThreadForm.settingsAllowedRoles.includes(role.id)
+                "
+                :label="role.name"
+                @update:model-value="toggleCreateFormSettingsRole(role.id)"
+              />
+            </div>
+            <p v-if="!projectRoles.length" class="empty-text">
+              ロールが設定されていません
+            </p>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeThreadModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :disabled="isCreateThreadDisabled"
+          @click="createCustomThread"
+        >
+          作成
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <!-- スレッド設定モーダル -->
+    <AppModal
+      :open="showThreadSettings"
+      title="スレッド設定"
+      size="md"
+      @close="closeThreadSettings"
+    >
+      <div class="thread-settings-form">
+        <!-- スレッド名 -->
+        <div class="form-field">
+          <label class="form-label">スレッド名</label>
+          <AppInput
+            v-model="threadSettingsForm.name"
+            placeholder="スレッド名を入力"
+          />
+        </div>
+
+        <!-- 説明 -->
+        <div class="form-field">
+          <label class="form-label">説明</label>
+          <AppTextarea
+            v-model="threadSettingsForm.description"
+            placeholder="スレッドの説明（任意）"
+            :rows="3"
+            resize="none"
+          />
+        </div>
+
+        <!-- ロールベースの送信権限 -->
+        <div class="form-field">
+          <label class="form-label">送信権限</label>
+          <p class="form-hint">
+            特定のロールのメンバーのみがメッセージを送信できるように制限できます。
+            何も選択しない場合は全員が送信可能です。
+          </p>
+          <div class="role-checkboxes">
+            <div
+              v-for="role in projectRoles"
+              :key="role.id"
+              class="role-checkbox-item"
+            >
+              <AppCheckbox
+                :model-value="threadSettingsForm.allowedRoles.includes(role.id)"
+                :label="role.name"
+                @update:model-value="toggleAllowedRole(role.id)"
+              />
+            </div>
+            <p v-if="!projectRoles.length" class="empty-text">
+              ロールが設定されていません
+            </p>
+          </div>
+        </div>
+
+        <!-- ロールベースの設定編集権限 -->
+        <div class="form-field">
+          <label class="form-label">設定編集権限</label>
+          <p class="form-hint">
+            特定のロールのメンバーにスレッド設定の編集を許可できます。
+            Admin・オーナー・作成者は常に編集可能です。
+          </p>
+          <div class="role-checkboxes">
+            <div
+              v-for="role in projectRoles"
+              :key="role.id"
+              class="role-checkbox-item"
+            >
+              <AppCheckbox
+                :model-value="
+                  threadSettingsForm.settingsAllowedRoles.includes(role.id)
+                "
+                :label="role.name"
+                @update:model-value="toggleSettingsAllowedRole(role.id)"
+              />
+            </div>
+            <p v-if="!projectRoles.length" class="empty-text">
+              ロールが設定されていません
+            </p>
+          </div>
+        </div>
+
+        <!-- アーカイブセクション -->
+        <div class="form-field form-field--danger">
+          <label class="form-label">アーカイブ</label>
+          <p class="form-hint">
+            アーカイブすると、このスレッドは一覧から非表示になります。
+            後からアーカイブを解除できます。
+          </p>
+          <div v-if="!showArchiveConfirm">
+            <AppButton
+              variant="outline"
+              size="sm"
+              @click="showArchiveConfirm = true"
+            >
+              スレッドをアーカイブ
+            </AppButton>
+          </div>
+          <div v-else class="archive-confirm">
+            <p class="archive-confirm-text">
+              本当にこのスレッドをアーカイブしますか？
+            </p>
+            <div class="archive-confirm-actions">
+              <AppButton
+                variant="ghost"
+                size="sm"
+                @click="showArchiveConfirm = false"
+              >
+                キャンセル
+              </AppButton>
+              <AppButton
+                variant="danger"
+                size="sm"
+                :disabled="isSavingSettings"
+                @click="archiveThread"
+              >
+                アーカイブする
+              </AppButton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="ghost" @click="closeThreadSettings">
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :disabled="isSavingSettings || !threadSettingsForm.name.trim()"
+          @click="saveThreadSettings"
+        >
+          保存
+        </AppButton>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -989,6 +1766,67 @@ watch(channels, (list) => {
   color: var(--ui-text-muted);
 }
 
+/* アーカイブ済みタスクのステータス */
+.task-status--archived {
+  color: var(--ui-text-subtle);
+}
+
+/* アーカイブされたチャンネルアイテム */
+.channel-item--archived {
+  opacity: 0.7;
+  color: var(--ui-text-muted);
+}
+
+.channel-item--archived .channel-name {
+  color: var(--ui-text-muted);
+}
+
+.channel-item--archived:hover {
+  opacity: 0.85;
+}
+
+.channel-item--archived.active {
+  opacity: 1;
+  background: var(--ui-surface-muted);
+}
+
+/* アーカイブセクション */
+.archived-section {
+  margin-top: var(--ui-space-3);
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border-light);
+}
+
+.archived-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  width: 100%;
+  padding: var(--ui-space-2) var(--ui-space-2);
+  border: none;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--ui-transition-colors);
+}
+
+.archived-toggle-btn:hover {
+  color: var(--ui-text);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.archived-toggle-icon {
+  flex-shrink: 0;
+  transition: transform var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.archived-toggle-icon.is-open {
+  transform: rotate(90deg);
+}
+
 .empty-text {
   font-size: var(--ui-text-xs);
   color: var(--ui-text-subtle);
@@ -1035,12 +1873,22 @@ watch(channels, (list) => {
 
 .chat-header {
   flex-shrink: 0;
-  height: 60px;
+  min-height: 60px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-5);
+  border-bottom: 1px solid var(--ui-border-light);
+}
+
+.chat-header__main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 var(--ui-space-5);
-  border-bottom: 1px solid var(--ui-border-light);
+  min-width: 0;
+  flex: 1;
 }
 
 .chat-header h3 {
@@ -1054,6 +1902,89 @@ watch(channels, (list) => {
   margin: 0;
   font-size: var(--ui-text-xs);
   color: var(--ui-text-muted);
+}
+
+.chat-header__task-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-brand-100);
+  color: var(--ui-brand-700);
+  border: 1px solid var(--ui-brand-300);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--ui-transition-colors);
+}
+
+.chat-header__task-btn:hover {
+  background: var(--ui-brand-200);
+  border-color: var(--ui-brand-400);
+}
+
+.chat-header__task-btn svg {
+  flex-shrink: 0;
+}
+
+/* チャットヘッダーのタイトル行 */
+.chat-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+/* チャットヘッダーのアクションボタン群 */
+.chat-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+/* アーカイブバッジ */
+.archived-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  padding: 2px var(--ui-space-2);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-full);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-medium);
+  color: var(--ui-text-muted);
+}
+
+.archived-badge svg {
+  flex-shrink: 0;
+}
+
+/* 復元ボタン */
+.chat-header__restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-success-light);
+  color: var(--ui-success-text);
+  border: 1px solid var(--ui-success-200);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--ui-transition-colors);
+}
+
+.chat-header__restore-btn:hover {
+  background: var(--ui-success-200);
+  border-color: var(--ui-success);
+}
+
+.chat-header__restore-btn svg {
+  flex-shrink: 0;
 }
 
 .msg-list {
@@ -1427,5 +2358,212 @@ watch(channels, (list) => {
 
 .msg-text :deep(.chat-link:hover) {
   color: var(--ui-brand-600, #4f7c82);
+}
+
+/* Thread Create Modal Form */
+.thread-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.form-label {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-medium);
+  color: var(--ui-text-strong);
+}
+
+.form-label .required {
+  color: var(--ui-danger);
+}
+
+/* Thread Settings Modal */
+.thread-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+}
+
+.form-hint {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+  margin: 0;
+}
+
+.role-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  margin-top: var(--ui-space-2);
+}
+
+.role-checkbox-item {
+  display: flex;
+  align-items: center;
+}
+
+.form-field--danger {
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-border-light);
+}
+
+.archive-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.archive-confirm-text {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+  margin: 0;
+}
+
+.archive-confirm-actions {
+  display: flex;
+  gap: var(--ui-space-2);
+}
+
+/* Settings button in header */
+.chat-header__settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  color: var(--ui-text-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.chat-header__settings-btn:hover {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  border-color: var(--ui-border-light);
+}
+
+/* Archived channel styles */
+.channel-item--archived {
+  opacity: 0.6;
+}
+
+.archived-section {
+  margin-top: var(--ui-space-3);
+  padding-top: var(--ui-space-2);
+}
+
+.archived-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  width: 100%;
+  padding: var(--ui-space-2);
+  background: transparent;
+  border: none;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-font-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--ui-transition-colors);
+}
+
+.archived-toggle-btn:hover {
+  color: var(--ui-text);
+}
+
+.archived-toggle-icon {
+  transition: transform 0.2s ease;
+}
+
+.archived-toggle-icon.is-open {
+  transform: rotate(90deg);
+}
+
+.task-status--archived {
+  color: var(--ui-text-subtle);
+}
+
+.unarchive-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ui-text-subtle);
+  cursor: pointer;
+  border-radius: var(--ui-radius-sm);
+  transition: var(--ui-transition-colors);
+}
+
+.unarchive-btn:hover {
+  background: var(--ui-surface-muted);
+  color: var(--ui-brand-600);
+}
+
+/* Composer restriction notice */
+.composer--disabled {
+  justify-content: center;
+}
+
+.composer-restriction-notice {
+  padding: var(--ui-space-3) var(--ui-space-4);
+  background: var(--ui-warning-50);
+  border: 1px solid var(--ui-warning-200);
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-warning-700);
+  font-size: var(--ui-text-sm);
+  text-align: center;
+}
+
+/* メッセージ編集モード */
+.msg-editing {
+  padding: var(--ui-space-3);
+  margin: var(--ui-space-2) 0;
+  background: var(--ui-surface-muted);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-brand-200);
+}
+
+/* メッセージハイライト（返信先スクロール時） */
+[data-message-id].highlight {
+  animation: message-highlight 2s ease-out;
+}
+
+@keyframes message-highlight {
+  0% {
+    background: var(--ui-brand-100);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* Composer 返信表示時のレイアウト調整 */
+.composer {
+  flex-direction: column;
+}
+
+.composer > :deep(.reply-indicator) {
+  margin-bottom: var(--ui-space-2);
+}
+
+.composer-row {
+  display: flex;
+  gap: var(--ui-space-3);
+  align-items: center;
 }
 </style>
