@@ -9,6 +9,7 @@ lerna-debug.log*
 
 
 node_modules
+scripts/node_modules
 dist
 dist-ssr
 *.local
@@ -36,3 +37,8 @@ firestore.rules
 
 # Firebase Cloud Functions build output
 functions/lib/
+
+# Firebase Service Account Keys (NEVER commit these)
+**/serviceAccountKey*.json
+**/service-account*.json
+**/*-firebase-adminsdk-*.json
