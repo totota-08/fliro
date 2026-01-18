@@ -14,6 +14,7 @@
     "format": "prettier --write .",
     "typecheck": "vue-tsc --noEmit",
     "test:rules": "firebase emulators:exec --project test-project --only firestore \"node --test --test-concurrency=1 tests/*.test.mjs\"",
+    "create-invite-code": "node scripts/createInviteCode.mjs",
     "prepare": "husky"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "firebase-admin": "^13.0.2",
     "@firebase/rules-unit-testing": "^5.0.0",
     "@types/node": "^25.0.3",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
