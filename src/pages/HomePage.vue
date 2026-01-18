@@ -102,23 +102,25 @@ const pricingPlans = [
           <span class="landing__title">{{ appName }}</span>
         </div>
         <div class="landing__links">
-          <a href="#features">機能</a>
-          <a href="#pricing">料金</a>
+          <a href="#features" class="landing__link">機能</a>
+          <a href="#pricing" class="landing__link">料金</a>
           <RouterLink
             class="landing__link"
             :to="{ name: ROUTE_NAMES.demoDashboard }"
             >デモ</RouterLink
           >
-          <AppButton
-            :to="{ name: ROUTE_NAMES.login }"
-            variant="secondary"
-            class="landing__login"
-          >
-            ログイン
-          </AppButton>
-          <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
-            >新規登録</AppButton
-          >
+          <div class="landing__buttons">
+            <AppButton
+              :to="{ name: ROUTE_NAMES.login }"
+              variant="secondary"
+              class="landing__login"
+            >
+              ログイン
+            </AppButton>
+            <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
+              >新規登録</AppButton
+            >
+          </div>
         </div>
       </nav>
     </header>
@@ -351,17 +353,19 @@ const pricingPlans = [
   flex-wrap: wrap;
 }
 
-.landing__links .app-button {
-  min-width: max-content;
+.landing__buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
 }
 
-.landing__links a:not(.app-button) {
+.landing__link {
   text-decoration: none;
   color: var(--ui-brand-600);
   font-weight: var(--ui-font-semibold);
 }
 
-.landing__links a:not(.app-button):hover {
+.landing__link:hover {
   color: var(--ui-brand-900);
 }
 
@@ -652,8 +656,13 @@ const pricingPlans = [
     width: 100%;
   }
 
-  .landing__links a:not(.app-button) {
+  .landing__link {
     padding: var(--ui-space-2) var(--ui-space-3);
+  }
+
+  .landing__buttons :deep(.app-button) {
+    padding: var(--ui-space-2) var(--ui-space-4);
+    font-size: var(--ui-text-sm);
   }
 
   .hero {
@@ -662,6 +671,11 @@ const pricingPlans = [
 
   .hero__actions {
     justify-content: center;
+  }
+
+  .hero__actions :deep(.app-button) {
+    padding: var(--ui-space-2) var(--ui-space-4);
+    font-size: var(--ui-text-sm);
   }
 }
 </style>
