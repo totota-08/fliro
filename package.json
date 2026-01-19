@@ -1,7 +1,7 @@
 {
   "name": "fliro",
   "private": true,
-  "version": "alpha-0.2.19",
+  "version": "alpha-0.2.20",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
