@@ -14,10 +14,15 @@ import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { appName } from "@/constants/appMeta";
 import {
+  DEFAULT_GUEST_ALLOWED_PAGES,
+  GUEST_CONFIGURABLE_PAGES,
+} from "@/constants/guestPages";
+import {
   ProjectPermission,
   type ProjectPermissionKey,
 } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
+import type { GuestAllowedPage } from "@/types/project";
 import {
   deleteProject,
   fetchProject,
@@ -267,15 +272,21 @@ const form = ref({
 const initialForm = ref({ name: "", description: "" });
 
 // 公開設定フォーム
-const publicSettings = ref({
+const publicSettings = ref<{
+  isPublic: boolean;
+  guestAllowedPages: GuestAllowedPage[];
+}>({
   isPublic: false,
-  allowGuestView: false,
+  guestAllowedPages: [...DEFAULT_GUEST_ALLOWED_PAGES],
 });
-const initialPublicSettings = ref({ isPublic: false, allowGuestView: false });
+const initialPublicSettings = ref({
+  isPublic: false,
+  guestAllowedPages: [...DEFAULT_GUEST_ALLOWED_PAGES],
+});
 const publicSaving = ref(false);
 
-// ゲスト閲覧許可確認モーダル
-const isGuestAccessModalOpen = ref(false);
+// 公開設定確認モーダル
+const isPublicConfirmModalOpen = ref(false);
 
 // AI設定の初期値
 const initialAiSettings = ref({ enabled: false, key: "" });
@@ -299,8 +310,8 @@ const isBasicDirty = computed(
 const isPublicDirty = computed(
   () =>
     publicSettings.value.isPublic !== initialPublicSettings.value.isPublic ||
-    publicSettings.value.allowGuestView !==
-      initialPublicSettings.value.allowGuestView,
+    JSON.stringify(publicSettings.value.guestAllowedPages.sort()) !==
+      JSON.stringify(initialPublicSettings.value.guestAllowedPages.sort()),
 );
 
 const isCardConfigDirty = computed(
@@ -564,9 +575,14 @@ async function loadProject() {
     initialForm.value = { ...form.value };
     publicSettings.value = {
       isPublic: Boolean(fetched.settings?.isPublic),
-      allowGuestView: Boolean(fetched.settings?.allowGuestView),
+      guestAllowedPages: fetched.settings?.guestAllowedPages ?? [
+        ...DEFAULT_GUEST_ALLOWED_PAGES,
+      ],
     };
-    initialPublicSettings.value = { ...publicSettings.value };
+    initialPublicSettings.value = {
+      ...publicSettings.value,
+      guestAllowedPages: [...publicSettings.value.guestAllowedPages],
+    };
     aiEnabled.value = Boolean(fetched.settings?.aiChatEnabled);
     aiKey.value = fetched.settings?.aiApiKey ?? "";
     initialAiSettings.value = { enabled: aiEnabled.value, key: aiKey.value };
@@ -614,21 +630,21 @@ async function handleSaveBasic() {
   }
 }
 
-// ゲスト閲覧トグルのハンドラ（ONにする場合は確認モーダルを表示）
-function handleGuestViewToggle(value: boolean) {
+// 公開プロジェクトトグルのハンドラ（ONにする場合は確認モーダルを表示）
+function handlePublicToggle(value: boolean) {
   if (value) {
     // ONにする場合は確認モーダルを表示
-    isGuestAccessModalOpen.value = true;
+    isPublicConfirmModalOpen.value = true;
   } else {
     // OFFにする場合は直接更新
-    publicSettings.value.allowGuestView = false;
+    publicSettings.value.isPublic = false;
   }
 }
 
-// ゲスト閲覧許可確認後の処理
-function confirmEnableGuestAccess() {
-  publicSettings.value.allowGuestView = true;
-  isGuestAccessModalOpen.value = false;
+// 公開設定確認後の処理
+function confirmEnablePublic() {
+  publicSettings.value.isPublic = true;
+  isPublicConfirmModalOpen.value = false;
 }
 
 // 公開設定を保存
@@ -639,14 +655,31 @@ async function handleSavePublic() {
   try {
     await updateProjectMetadata(projectId.value, {
       isPublic: publicSettings.value.isPublic,
-      allowGuestView: publicSettings.value.allowGuestView,
+      guestAllowedPages: publicSettings.value.guestAllowedPages,
     });
-    initialPublicSettings.value = { ...publicSettings.value };
+    initialPublicSettings.value = {
+      ...publicSettings.value,
+      guestAllowedPages: [...publicSettings.value.guestAllowedPages],
+    };
   } catch (error) {
     logger.error`Failed to save public settings: ${error}`;
     errorMessage.value = "公開設定の保存に失敗しました。";
   } finally {
     publicSaving.value = false;
+  }
+}
+
+// ゲスト閲覧許可ページの切り替え
+function toggleGuestPage(pageKey: GuestAllowedPage) {
+  const pages = publicSettings.value.guestAllowedPages;
+  const index = pages.indexOf(pageKey);
+  if (index === -1) {
+    pages.push(pageKey);
+  } else {
+    // 最低1つは許可ページが必要
+    if (pages.length > 1) {
+      pages.splice(index, 1);
+    }
   }
 }
 
@@ -1105,19 +1138,55 @@ watch(projectId, async (newId, oldId) => {
               </template>
               <div class="toggle-list">
                 <SettingsToggleRow
-                  v-model="publicSettings.isPublic"
+                  :model-value="publicSettings.isPublic"
                   label="公開プロジェクト"
-                  description="誰でもこのプロジェクトを閲覧できるようになります"
+                  description="リンクを知っている人なら誰でも閲覧可能になります（ログイン不要）"
                   :disabled="!canEdit"
-                />
-                <SettingsToggleRow
-                  :model-value="publicSettings.allowGuestView"
-                  label="ゲスト閲覧を許可"
-                  description="アカウントを持たないユーザーも閲覧可能にします"
-                  :disabled="!canEdit"
-                  @update:model-value="handleGuestViewToggle"
+                  @update:model-value="handlePublicToggle"
                 />
               </div>
+
+              <!-- 公開ページ設定 -->
+              <Transition name="fade">
+                <div v-if="publicSettings.isPublic" class="guest-pages-config">
+                  <h4 class="guest-pages-title">閲覧可能なページ</h4>
+                  <p class="guest-pages-description">
+                    ゲストがアクセスできるページを選択してください
+                  </p>
+                  <div class="guest-pages-list">
+                    <label
+                      v-for="page in GUEST_CONFIGURABLE_PAGES"
+                      :key="page.key"
+                      class="guest-page-item"
+                      :class="{
+                        'guest-page-item--checked':
+                          publicSettings.guestAllowedPages.includes(page.key),
+                        'guest-page-item--disabled': !canEdit,
+                      }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="
+                          publicSettings.guestAllowedPages.includes(page.key)
+                        "
+                        :disabled="
+                          !canEdit ||
+                          (publicSettings.guestAllowedPages.length === 1 &&
+                            publicSettings.guestAllowedPages.includes(page.key))
+                        "
+                        class="guest-page-checkbox"
+                        @change="toggleGuestPage(page.key)"
+                      />
+                      <div class="guest-page-content">
+                        <span class="guest-page-label">{{ page.label }}</span>
+                        <span class="guest-page-desc">{{
+                          page.description
+                        }}</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </Transition>
             </SettingsSectionCard>
 
             <!-- 3. ダッシュボードカード設定 -->
@@ -1964,12 +2033,12 @@ watch(projectId, async (newId, oldId) => {
       </div>
     </Teleport>
 
-    <!-- ゲスト閲覧許可確認モーダル -->
+    <!-- 公開プロジェクト確認モーダル -->
     <ConfirmGuestAccessModal
-      :open="isGuestAccessModalOpen"
+      :open="isPublicConfirmModalOpen"
       :loading="publicSaving"
-      @close="isGuestAccessModalOpen = false"
-      @confirm="confirmEnableGuestAccess"
+      @close="isPublicConfirmModalOpen = false"
+      @confirm="confirmEnablePublic"
     />
   </div>
 </template>
@@ -1981,19 +2050,19 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .settings-alert {
-  max-width: 800px;
+  max-width: var(--ui-container-sm, 800px);
   margin: 0 auto var(--ui-space-4, 1rem);
 }
 
 .settings-container {
-  max-width: 1100px;
+  max-width: var(--ui-container-lg, 1100px);
   margin: 0 auto;
   padding: var(--ui-space-5, 1.25rem);
 }
 
 .settings-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr var(--ui-sidebar-width, 340px);
   gap: var(--ui-space-6, 1.5rem);
   align-items: start;
 }
@@ -2069,7 +2138,7 @@ watch(projectId, async (newId, oldId) => {
 .info-card h3 {
   font-size: var(--ui-text-xs, 0.75rem);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--ui-tracking-widest, 0.1em);
   color: var(--ui-text-muted, #64748b);
   margin: 0 0 var(--ui-space-4, 1rem) 0;
   font-weight: var(--ui-font-semibold, 600);
@@ -2096,7 +2165,7 @@ watch(projectId, async (newId, oldId) => {
 .info-item dd {
   font-weight: var(--ui-font-medium, 500);
   color: var(--ui-text-strong, #0f172a);
-  max-width: 160px;
+  max-width: var(--ui-space-40, 10rem);
 }
 
 .truncate {
@@ -2131,8 +2200,8 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .card-config-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: var(--ui-checkbox-size, 18px);
+  height: var(--ui-checkbox-size, 18px);
   accent-color: var(--ui-brand-600, #4f7c82);
   cursor: pointer;
 }
@@ -2152,8 +2221,8 @@ watch(projectId, async (newId, oldId) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--ui-space-8, 2rem);
+  height: var(--ui-space-8, 2rem);
   border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.15));
   border-radius: var(--ui-radius-sm, 0.5rem);
   background: var(--ui-surface, #ffffff);
@@ -2191,7 +2260,8 @@ watch(projectId, async (newId, oldId) => {
   border-radius: var(--ui-radius-sm, 0.5rem);
   color: var(--ui-danger-text, #991b1b);
   font-size: var(--ui-text-sm, 0.875rem);
-  border-left: 3px solid var(--ui-danger, #d64545);
+  border-left: var(--ui-border-accent-width, 3px) solid
+    var(--ui-danger, #d64545);
 }
 
 .danger-warning p {
@@ -2258,9 +2328,10 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  width: var(--ui-space-10, 2.5rem);
+  height: var(--ui-space-10, 2.5rem);
+  border: var(--ui-border-accent-width, 3px) solid
+    var(--ui-border-light, rgba(11, 46, 51, 0.08));
   border-top-color: var(--ui-brand-600, #4f7c82);
   border-radius: var(--ui-radius-full, 9999px);
   animation: spin 1s linear infinite;
@@ -2327,8 +2398,8 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .role-list__color {
-  width: 16px;
-  height: 16px;
+  width: var(--ui-space-4, 1rem);
+  height: var(--ui-space-4, 1rem);
   border-radius: var(--ui-radius-sm, 0.5rem);
   flex-shrink: 0;
 }
@@ -2348,7 +2419,7 @@ watch(projectId, async (newId, oldId) => {
   font-weight: var(--ui-font-medium, 500);
   background: var(--ui-surface, #ffffff);
   color: var(--ui-text-muted, #64748b);
-  padding: 2px 8px;
+  padding: var(--ui-space-0-5, 0.125rem) var(--ui-space-2, 0.5rem);
   border-radius: var(--ui-radius-full, 9999px);
 }
 
@@ -2356,7 +2427,7 @@ watch(projectId, async (newId, oldId) => {
   margin: 0 0 var(--ui-space-3, 0.75rem);
   font-size: var(--ui-text-sm, 0.875rem);
   color: var(--ui-text-muted, #64748b);
-  line-height: 1.5;
+  line-height: var(--ui-leading-normal, 1.5);
 }
 
 .role-list__edit-btn {
@@ -2383,26 +2454,26 @@ watch(projectId, async (newId, oldId) => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--ui-overlay-bg, rgba(0, 0, 0, 0.5));
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--ui-space-4, 1rem);
-  z-index: 100;
+  z-index: var(--ui-z-modal, 100);
 }
 
 .modal {
   background: var(--ui-surface, #ffffff);
   border-radius: var(--ui-radius-xl, 1.25rem);
   width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
+  max-width: var(--ui-modal-width-md, 480px);
+  max-height: var(--ui-modal-max-height, 90vh);
   overflow-y: auto;
   box-shadow: var(--ui-shadow-lg);
 }
 
 .modal--lg {
-  max-width: 640px;
+  max-width: var(--ui-modal-width-lg, 640px);
 }
 
 .modal__header {
@@ -2423,7 +2494,7 @@ watch(projectId, async (newId, oldId) => {
 .modal__close {
   background: transparent;
   border: none;
-  font-size: 1.5rem;
+  font-size: var(--ui-text-2xl, 1.5rem);
   color: var(--ui-text-muted, #64748b);
   cursor: pointer;
   padding: 0;
@@ -2448,7 +2519,7 @@ watch(projectId, async (newId, oldId) => {
 
 /* Permission Modal */
 .permission-modal-body {
-  max-height: 60vh;
+  max-height: var(--ui-modal-body-max-height, 60vh);
   overflow-y: auto;
 }
 
@@ -2500,7 +2571,7 @@ watch(projectId, async (newId, oldId) => {
   padding: var(--ui-space-2, 0.5rem);
   background: var(--ui-surface, #ffffff);
   border-radius: var(--ui-radius-sm, 0.5rem);
-  transition: background-color 0.15s ease;
+  transition: var(--ui-transition-colors, background-color 0.15s ease);
 }
 
 .permission-checkbox:hover {
@@ -2508,8 +2579,8 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .permission-checkbox input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: var(--ui-space-4, 1rem);
+  height: var(--ui-space-4, 1rem);
   accent-color: var(--ui-brand-600, #4f7c82);
   cursor: pointer;
 }
@@ -2530,13 +2601,13 @@ watch(projectId, async (newId, oldId) => {
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-semibold, 600);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--ui-transition-colors, all 0.15s ease);
   border: none;
 }
 
 .btn--primary {
   background: var(--ui-brand-600, #4f7c82);
-  color: white;
+  color: var(--ui-text-on-primary, white);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -2560,7 +2631,7 @@ watch(projectId, async (newId, oldId) => {
 
 .btn--danger {
   background: var(--ui-danger, #d64545);
-  color: white;
+  color: var(--ui-text-on-danger, white);
 }
 
 .btn--danger:hover:not(:disabled) {
@@ -2578,7 +2649,8 @@ watch(projectId, async (newId, oldId) => {
   padding: var(--ui-space-3, 0.75rem);
   background: var(--ui-brand-100, #e5f6f8);
   border-radius: var(--ui-radius-md, 0.75rem);
-  border-left: 3px solid var(--ui-brand-600, #4f7c82);
+  border-left: var(--ui-border-accent-width, 3px) solid
+    var(--ui-brand-600, #4f7c82);
 }
 
 .role-section__subtitle {
@@ -2682,7 +2754,7 @@ watch(projectId, async (newId, oldId) => {
   border-radius: var(--ui-radius-md, 0.75rem);
   font-size: var(--ui-text-sm, 0.875rem);
   background: var(--ui-surface, #ffffff);
-  transition: border-color 0.15s ease;
+  transition: var(--ui-transition-colors, border-color 0.15s ease);
 }
 
 .form-input:focus {
@@ -2704,14 +2776,12 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .color-preset {
-  width: 32px;
-  height: 32px;
+  width: var(--ui-space-8, 2rem);
+  height: var(--ui-space-8, 2rem);
   border-radius: var(--ui-radius-md, 0.75rem);
   border: 2px solid transparent;
   cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    border-color 0.15s ease;
+  transition: var(--ui-transition-all, all 0.15s ease);
 }
 
 .color-preset:hover {
@@ -2739,8 +2809,8 @@ watch(projectId, async (newId, oldId) => {
 }
 
 .color-custom-input {
-  width: 40px;
-  height: 32px;
+  width: var(--ui-space-10, 2.5rem);
+  height: var(--ui-space-8, 2rem);
   padding: 0;
   border: none;
   border-radius: var(--ui-radius-sm, 0.5rem);
@@ -2749,7 +2819,7 @@ watch(projectId, async (newId, oldId) => {
 
 /* Modal Small */
 .modal--sm {
-  max-width: 400px;
+  max-width: var(--ui-modal-width-sm, 400px);
 }
 
 .modal__warning {
@@ -2770,5 +2840,97 @@ watch(projectId, async (newId, oldId) => {
 
 .error-alert p {
   margin: 0;
+}
+
+/* ゲスト閲覧ページ設定 */
+.guest-pages-config {
+  margin-top: var(--ui-space-4, 1rem);
+  padding-top: var(--ui-space-4, 1rem);
+  border-top: 1px solid var(--ui-border, #e2e8f0);
+}
+
+.guest-pages-title {
+  margin: 0 0 var(--ui-space-1, 0.25rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text, #1e293b);
+}
+
+.guest-pages-description {
+  margin: 0 0 var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.guest-pages-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.guest-page-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
+  border: 1px solid var(--ui-border, #e2e8f0);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface, #ffffff);
+  cursor: pointer;
+  transition: var(--ui-transition-colors, all 0.2s ease);
+}
+
+.guest-page-item:hover:not(.guest-page-item--disabled) {
+  border-color: var(--ui-brand-300, #99d1d9);
+  background: var(--ui-brand-50, #e5f6f8);
+}
+
+.guest-page-item--checked {
+  border-color: var(--ui-brand-500, #4f7c82);
+  background: var(--ui-brand-50, #e5f6f8);
+}
+
+.guest-page-item--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.guest-page-checkbox {
+  width: var(--ui-checkbox-size, 18px);
+  height: var(--ui-checkbox-size, 18px);
+  margin: 0;
+  margin-top: var(--ui-space-0-5, 0.125rem);
+  accent-color: var(--ui-brand-600, #4f7c82);
+  cursor: inherit;
+}
+
+.guest-page-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
+  flex: 1;
+}
+
+.guest-page-label {
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #1e293b);
+}
+
+.guest-page-desc {
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+/* fade transition for guest pages config */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--ui-duration-base, 180ms)
+    var(--ui-ease-standard, ease);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

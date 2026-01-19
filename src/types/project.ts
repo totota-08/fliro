@@ -1,8 +1,18 @@
 export type ProjectStatus = "active" | "archived" | "completed";
 
+/** ゲストがアクセス可能なページの種類 */
+export type GuestAllowedPage =
+  | "dashboard"
+  | "tasks"
+  | "threads"
+  | "activity"
+  | "members";
+
 export interface ProjectSettings {
   isPublic: boolean;
   allowGuestView: boolean;
+  /** ゲストがアクセス可能なページ一覧（allowGuestView が true の場合に有効） */
+  guestAllowedPages?: GuestAllowedPage[];
   defaultTaskStatus: string;
   aiChatEnabled?: boolean;
   aiApiKey?: string;

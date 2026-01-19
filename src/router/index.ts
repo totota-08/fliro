@@ -1,5 +1,6 @@
 import ErrorPage from "@/components/errorPage/ErrorPage.vue";
 import { fetchProjectAccess } from "@/composables/useProjectAccess";
+import { ROUTE_TO_GUEST_PAGE } from "@/constants/guestPages";
 import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { getCurrentUser } from "@/lib/getCurrentUser";
@@ -29,6 +30,7 @@ const ProjectDebugPage = () => import("@/pages/debug/ProjectDebugPage.vue");
 const DashboardDemoPage = () => import("@/pages/demo/DashboardDemoPage.vue");
 const DemoMyTasksPage = () => import("@/pages/demo/MyTasksPage.vue");
 const TeamPage = () => import("@/pages/demo/TeamPage.vue");
+const ChatDemoPage = () => import("@/pages/demo/ChatDemoPage.vue");
 const InviteAcceptPage = () => import("@/pages/invite/InviteAcceptPage.vue");
 const CreateProjectPage = () =>
   import("@/pages/projects/CreateProjectPage.vue");
@@ -259,6 +261,11 @@ export const router = createRouter({
       component: TeamPage,
     },
     {
+      path: "/demo/chat",
+      name: "demo.chat",
+      component: ChatDemoPage,
+    },
+    {
       path: "/error",
       name: ROUTE_NAMES.error,
       component: ErrorPage,
@@ -352,8 +359,41 @@ router.beforeEach(async (to) => {
       };
     }
 
-    // ゲスト閲覧が許可されている場合はアクセスを許可
+    // ゲスト閲覧が許可されている場合
     if (access.allowGuestView && access.hasAccess) {
+      // アクセスしようとしているページがゲストに許可されているかチェック
+      const guestPageKey = routeName
+        ? ROUTE_TO_GUEST_PAGE[routeName]
+        : undefined;
+
+      // ゲスト設定対象外のページ（設定など）へのアクセスは禁止
+      if (guestPageKey === null) {
+        logger.warn`Guest access denied to restricted page: ${String(routeName)}`;
+        return {
+          name: ROUTE_NAMES.error,
+          query: {
+            projectId,
+            errorType: "forbidden",
+            reason: "このページはゲストには公開されていません。",
+          },
+        };
+      }
+
+      // ページが許可リストに含まれているかチェック
+      if (guestPageKey && access.guestAllowedPages) {
+        if (!access.guestAllowedPages.includes(guestPageKey)) {
+          logger.warn`Guest access denied to page not in allowed list: ${guestPageKey}`;
+          return {
+            name: ROUTE_NAMES.error,
+            query: {
+              projectId,
+              errorType: "forbidden",
+              reason: "このページはゲストには公開されていません。",
+            },
+          };
+        }
+      }
+
       logger.info`Guest access granted for project ${projectId}`;
       return true;
     }
