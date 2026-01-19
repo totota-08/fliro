@@ -822,6 +822,42 @@ const canSendMessage = computed(() => {
   return allowedRoles.some((roleId) => memberRoles.includes(roleId));
 });
 
+// スワイプ検出用の状態
+const touchStartX = ref(0);
+const touchStartY = ref(0);
+const SWIPE_THRESHOLD = 50;
+const SWIPE_ANGLE_THRESHOLD = 30; // 角度制限（度）
+
+function handleTouchStart(e: TouchEvent) {
+  const touch = e.touches[0];
+  if (!touch) return;
+  touchStartX.value = touch.clientX;
+  touchStartY.value = touch.clientY;
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const touch = e.changedTouches[0];
+  if (!touch) return;
+  const touchEndX = touch.clientX;
+  const touchEndY = touch.clientY;
+  const diffX = touchStartX.value - touchEndX;
+  const diffY = touchStartY.value - touchEndY;
+
+  // 角度をチェック（水平方向のスワイプのみ検出）
+  const angle = Math.abs(Math.atan2(diffY, diffX) * (180 / Math.PI));
+  const isHorizontalSwipe =
+    angle < SWIPE_ANGLE_THRESHOLD || angle > 180 - SWIPE_ANGLE_THRESHOLD;
+
+  // 右から左へのスワイプ（画面右端から開始）
+  if (
+    diffX > SWIPE_THRESHOLD &&
+    isHorizontalSwipe &&
+    touchStartX.value > window.innerWidth * 0.7
+  ) {
+    showMobileThreads.value = true;
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   if (projectId.value) {
@@ -1047,7 +1083,11 @@ watch(channels, (list) => {
         </aside>
 
         <!-- Chat Area -->
-        <main class="chat-main">
+        <main
+          class="chat-main"
+          @touchstart="handleTouchStart"
+          @touchend="handleTouchEnd"
+        >
           <header class="chat-header">
             <div class="chat-header__main">
               <div class="chat-header__title-row">
@@ -1075,6 +1115,27 @@ watch(channels, (list) => {
               </p>
             </div>
             <div class="chat-header__actions">
+              <!-- モバイル用スレッド一覧ボタン -->
+              <button
+                type="button"
+                class="chat-header__threads-btn"
+                aria-label="スレッド一覧を開く"
+                @click="toggleMobileThreads"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  width="20"
+                  height="20"
+                >
+                  <path
+                    d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                  />
+                  <line x1="9" y1="10" x2="15" y2="10" />
+                </svg>
+              </button>
               <!-- カスタムスレッド設定ボタン（Admin/Owner または作成者のみ） -->
               <button
                 v-if="canEditThreadSettings"
@@ -1243,32 +1304,12 @@ watch(channels, (list) => {
       </div>
     </div>
 
-    <!-- モバイル用スレッド切替FABボタン -->
-    <button
-      type="button"
-      class="mobile-threads-fab"
-      aria-label="スレッド一覧を開く"
-      @click="toggleMobileThreads"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <!-- チャット/スレッドアイコン -->
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-        <line x1="9" y1="10" x2="15" y2="10" />
-      </svg>
-      <span class="mobile-threads-fab__label">スレッド</span>
-    </button>
-
-    <!-- モバイル用スレッドドロワー -->
+    <!-- モバイル用スレッドドロワー（右からスライド） -->
     <AppDrawer
       :open="showMobileThreads"
       title="スレッド"
       width="280px"
-      class="mobile-threads-drawer"
+      class="mobile-threads-drawer-right"
       @close="showMobileThreads = false"
     >
       <div class="mobile-threads-content">
@@ -2295,52 +2336,37 @@ watch(channels, (list) => {
   margin-top: 2px;
 }
 
-/* Mobile Threads FAB */
-.mobile-threads-fab {
+/* モバイル用スレッド一覧ボタン（chat-header内） */
+.chat-header__threads-btn {
   display: none;
-  position: fixed;
-  bottom: calc(
-    var(--ui-bottom-nav-height, 56px) + env(safe-area-inset-bottom) +
-      var(--ui-space-4)
-  );
-  right: var(--ui-space-4);
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-3) var(--ui-space-4);
-  border-radius: var(--ui-radius-full);
-  background: var(--ui-brand-600);
-  color: var(--ui-text-inverse);
-  border: none;
-  box-shadow: var(--ui-shadow-lg);
-  cursor: pointer;
-  z-index: var(--ui-z-sticky);
   align-items: center;
   justify-content: center;
-  transition: var(--ui-transition-all);
-  font-weight: var(--ui-font-semibold);
-  font-size: var(--ui-text-sm);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--ui-brand-100);
+  color: var(--ui-brand-700);
+  border: 1px solid var(--ui-brand-300);
+  border-radius: var(--ui-radius-md);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
 }
 
-.mobile-threads-fab svg {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+.chat-header__threads-btn:hover {
+  background: var(--ui-brand-200);
+  border-color: var(--ui-brand-400);
 }
 
-.mobile-threads-fab__label {
-  white-space: nowrap;
-}
-
-.mobile-threads-fab:hover {
-  background: var(--ui-brand-700);
-  transform: scale(1.05);
-}
-
-.mobile-threads-fab:active {
+.chat-header__threads-btn:active {
   transform: scale(0.95);
 }
 
+.chat-header__threads-btn svg {
+  flex-shrink: 0;
+}
+
 @media (max-width: 768px) {
-  .mobile-threads-fab {
+  .chat-header__threads-btn {
     display: flex;
   }
 }
@@ -2384,23 +2410,13 @@ watch(channels, (list) => {
   padding: var(--ui-space-2);
 }
 
-/* Mobile Drawer を左からスライドさせる */
-.mobile-threads-drawer :deep(.app-drawer__overlay) {
-  justify-content: flex-start;
+/* Mobile Drawer を右からスライドさせる */
+.mobile-threads-drawer-right :deep(.app-drawer__overlay) {
+  justify-content: flex-end;
 }
 
-.mobile-threads-drawer :deep(.app-drawer__panel) {
-  border-radius: 0 var(--ui-radius-lg) var(--ui-radius-lg) 0;
-}
-
-.mobile-threads-drawer :deep(.app-drawer-enter-from .app-drawer__panel),
-.mobile-threads-drawer :deep(.app-drawer-leave-to .app-drawer__panel) {
-  transform: translateX(-100%);
-}
-
-.mobile-threads-drawer :deep(.app-drawer-enter-to .app-drawer__panel),
-.mobile-threads-drawer :deep(.app-drawer-leave-from .app-drawer__panel) {
-  transform: translateX(0);
+.mobile-threads-drawer-right :deep(.app-drawer__panel) {
+  border-radius: var(--ui-radius-lg) 0 0 var(--ui-radius-lg);
 }
 
 /* Chat link styles (for v-html content) */

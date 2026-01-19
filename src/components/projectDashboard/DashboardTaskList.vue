@@ -35,6 +35,23 @@ const filters = computed({
   set: (value: TaskFilters) => emit("update:modelValue", value),
 });
 
+// モバイル用フィルター展開状態
+const filtersExpanded = ref(false);
+
+function toggleFilters() {
+  filtersExpanded.value = !filtersExpanded.value;
+}
+
+// アクティブなフィルター数をカウント
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (props.modelValue.status !== "all") count++;
+  if (props.modelValue.assignee !== "all") count++;
+  if (props.modelValue.due !== "all") count++;
+  if (props.modelValue.category !== "all") count++;
+  return count;
+});
+
 // 「さらに表示」機能
 const INITIAL_DISPLAY_COUNT = 10;
 const LOAD_MORE_COUNT = 10;
@@ -138,6 +155,7 @@ function handleNavigate(taskId: string) {
         <p>{{ tasks.length }}件のタスク</p>
       </div>
       <div class="task-list__filters">
+        <!-- 検索バー（常に表示） -->
         <div class="task-search-wrapper">
           <svg
             class="task-search-icon"
@@ -164,64 +182,14 @@ function handleNavigate(taskId: string) {
             "
           />
         </div>
-        <select
-          :value="filters.status"
-          class="task-filter-select"
-          @change="
-            updateFilter('status', ($event.target as HTMLSelectElement).value)
-          "
-        >
-          <option value="all">全て</option>
-          <option value="todo">未着手</option>
-          <option value="in-progress">進行中</option>
-          <option value="done">完了</option>
-        </select>
-        <select
-          :value="filters.assignee"
-          class="task-filter-select"
-          @change="
-            updateFilter('assignee', ($event.target as HTMLSelectElement).value)
-          "
-        >
-          <option value="all">担当者</option>
-          <option v-for="member in members" :key="member.id" :value="member.id">
-            {{ member.name }}
-          </option>
-        </select>
-        <select
-          :value="filters.due"
-          class="task-filter-select"
-          @change="
-            updateFilter('due', ($event.target as HTMLSelectElement).value)
-          "
-        >
-          <option value="all">期限</option>
-          <option value="today">今日</option>
-          <option value="week">今週</option>
-          <option value="overdue">期限切れ</option>
-        </select>
-        <select
-          :value="filters.category"
-          class="task-filter-select"
-          @change="
-            updateFilter('category', ($event.target as HTMLSelectElement).value)
-          "
-        >
-          <option value="all">カテゴリ</option>
-          <option value="none">未分類</option>
-          <option
-            v-for="category in categories"
-            :key="category.id"
-            :value="category.id"
-          >
-            {{ category.name }}
-          </option>
-        </select>
+
+        <!-- モバイル用フィルタートグルボタン -->
         <button
           type="button"
-          class="filter-reset-btn"
-          title="フィルターをリセット"
-          @click="resetFilters"
+          class="filter-toggle-btn"
+          :class="{ 'has-active': activeFilterCount > 0 }"
+          :aria-expanded="filtersExpanded"
+          @click="toggleFilters"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -234,14 +202,111 @@ function handleNavigate(taskId: string) {
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-            <path d="M21 3v5h-5"></path>
-            <path
-              d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
-            ></path>
-            <path d="M3 21v-5h5"></path>
+            <polygon
+              points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+            ></polygon>
           </svg>
+          <span v-if="activeFilterCount > 0" class="filter-badge">{{
+            activeFilterCount
+          }}</span>
         </button>
+
+        <!-- フィルターセレクト（モバイルでは折りたたみ可能） -->
+        <div
+          class="task-list__filter-selects"
+          :class="{ 'is-expanded': filtersExpanded }"
+        >
+          <select
+            :value="filters.status"
+            class="task-filter-select"
+            @change="
+              updateFilter('status', ($event.target as HTMLSelectElement).value)
+            "
+          >
+            <option value="all">全て</option>
+            <option value="todo">未着手</option>
+            <option value="in-progress">進行中</option>
+            <option value="done">完了</option>
+          </select>
+          <select
+            :value="filters.assignee"
+            class="task-filter-select"
+            @change="
+              updateFilter(
+                'assignee',
+                ($event.target as HTMLSelectElement).value,
+              )
+            "
+          >
+            <option value="all">担当者</option>
+            <option
+              v-for="member in members"
+              :key="member.id"
+              :value="member.id"
+            >
+              {{ member.name }}
+            </option>
+          </select>
+          <select
+            :value="filters.due"
+            class="task-filter-select"
+            @change="
+              updateFilter('due', ($event.target as HTMLSelectElement).value)
+            "
+          >
+            <option value="all">期限</option>
+            <option value="today">今日</option>
+            <option value="week">今週</option>
+            <option value="overdue">期限切れ</option>
+          </select>
+          <select
+            :value="filters.category"
+            class="task-filter-select"
+            @change="
+              updateFilter(
+                'category',
+                ($event.target as HTMLSelectElement).value,
+              )
+            "
+          >
+            <option value="all">カテゴリ</option>
+            <option value="none">未分類</option>
+            <option
+              v-for="category in categories"
+              :key="category.id"
+              :value="category.id"
+            >
+              {{ category.name }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="filter-reset-btn"
+            title="フィルターをリセット"
+            @click="resetFilters"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+              ></path>
+              <path d="M21 3v5h-5"></path>
+              <path
+                d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+              ></path>
+              <path d="M3 21v-5h5"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
     <ul class="task-list__items">
@@ -346,6 +411,55 @@ function handleNavigate(taskId: string) {
   flex-wrap: wrap;
   gap: var(--ui-space-2, 0.5rem);
   align-items: center;
+}
+
+.task-list__filter-selects {
+  display: contents;
+}
+
+/* モバイル用フィルタートグルボタン - デスクトップでは非表示 */
+.filter-toggle-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: var(--ui-space-2, 0.5rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text-muted, #64748b);
+  cursor: pointer;
+  transition: var(--ui-transition-all);
+  min-width: var(--ui-touch-target-min, 44px);
+  min-height: var(--ui-touch-target-min, 44px);
+}
+
+.filter-toggle-btn:hover {
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-brand-700, #1a4a51);
+  border-color: var(--ui-brand-600, #4f7c82);
+}
+
+.filter-toggle-btn.has-active {
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-700, #1a4a51);
+}
+
+.filter-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-brand-600, #4f7c82);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: var(--ui-font-bold, 700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .task-filter-select {
@@ -665,17 +779,47 @@ function handleNavigate(taskId: string) {
   }
 
   .task-list__filters {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
   }
 
   .task-search-wrapper {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
   }
 
   .task-search-input {
     width: 100%;
     min-width: unset;
+  }
+
+  /* フィルタートグルボタンを表示 */
+  .filter-toggle-btn {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /* フィルターセレクトのコンテナ - 折りたたみ可能 */
+  .task-list__filter-selects {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2, 0.5rem);
+    width: 100%;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      max-height 0.3s ease,
+      opacity 0.2s ease,
+      margin 0.3s ease;
+    margin-top: 0;
+  }
+
+  .task-list__filter-selects.is-expanded {
+    max-height: 400px;
+    opacity: 1;
+    margin-top: var(--ui-space-3, 0.75rem);
   }
 
   .task-filter-select {
