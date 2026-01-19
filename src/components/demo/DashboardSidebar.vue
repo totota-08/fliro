@@ -6,10 +6,10 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 
 type BaseNavItem = {
-  key: "dashboard" | "tasks" | "team" | "settings";
+  key: "dashboard" | "tasks" | "team" | "chat" | "settings";
   label: string;
   to?: string;
-  icon: "dashboard" | "tasks" | "team" | "settings";
+  icon: "dashboard" | "tasks" | "team" | "chat" | "settings";
   disabled?: boolean;
 };
 
@@ -40,6 +40,7 @@ const baseNavItems: BaseNavItem[] = [
   },
   { key: "tasks", label: "マイタスク", to: "/demo/tasks", icon: "tasks" },
   { key: "team", label: "チーム", to: "/demo/team", icon: "team" },
+  { key: "chat", label: "スレッド", to: "/demo/chat", icon: "chat" },
   { key: "settings", label: "設定", icon: "settings", disabled: true },
 ];
 
@@ -151,6 +152,19 @@ const handleNavigate = () => {
               >
                 <path
                   d="M7 17c0-2.21 1.79-4 4-4h2c2.21 0 4 1.79 4 4M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.8"
+                />
+              </svg>
+              <svg
+                v-else-if="item.icon === 'chat'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="1.8"

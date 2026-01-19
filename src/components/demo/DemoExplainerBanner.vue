@@ -1,29 +1,82 @@
 <script setup lang="ts">
 import { appName } from "@/constants/appMeta";
+
+export type DemoPageType = "dashboard" | "tasks" | "team" | "chat";
+
+interface Props {
+  page?: DemoPageType;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  page: "dashboard",
+});
+
+const pageContent: Record<
+  DemoPageType,
+  {
+    title: string;
+    description: string;
+    highlights: string[];
+  }
+> = {
+  dashboard: {
+    title: "ダッシュボード",
+    description:
+      "プロジェクトの全体像をひと目で把握できるダッシュボードです。期限が迫っているタスクや進行中の作業をすぐに確認し、チーム全体の進捗を管理できます。",
+    highlights: [
+      "期限切れ・直近期限のタスクを優先表示",
+      "タスクの進行状況をリアルタイムに確認",
+      "フィルター機能で必要な情報にすぐアクセス",
+    ],
+  },
+  tasks: {
+    title: "マイタスク",
+    description:
+      "あなたに割り当てられたタスクを一覧で管理できます。ステータス、優先度、期限でフィルタリングして、今やるべきことに集中できます。",
+    highlights: [
+      "進行中・完了タスクをタブで切り替え",
+      "優先度と期限で自動的にソート",
+      "期限超過タスクは警告表示でお知らせ",
+    ],
+  },
+  team: {
+    title: "チーム",
+    description:
+      "プロジェクトメンバーの一覧と権限管理ができます。メンバーの活動状況やタスク進捗を確認し、チームの生産性を可視化します。",
+    highlights: [
+      "メンバーのオンライン状況をリアルタイム表示",
+      "ロール別の権限管理で安全な運用",
+      "招待リンクで簡単にメンバーを追加",
+    ],
+  },
+  chat: {
+    title: "スレッド",
+    description:
+      "チームメンバーとリアルタイムでコミュニケーションできます。タスクごとのスレッドで議論を整理し、重要な決定を見逃しません。",
+    highlights: [
+      "タスクに紐づいたスレッドで議論を集約",
+      "カスタムスレッドで自由なトピック作成",
+      "メンションやリアクションでスムーズな連携",
+    ],
+  },
+};
+
+const content = pageContent[props.page];
 </script>
 
 <template>
   <section class="banner">
     <div class="banner__content">
       <span class="banner__badge">{{ appName }} デモ</span>
-      <h2>{{ appName }} デモダッシュボード</h2>
-      <p>
-        少人数チームが毎日の働き方をどう最適化しているのかを、ハイライトに沿って体験しましょう。サイドバーで主要機能へ
-        ナビゲートし、中央ではタスクの流れ、右側ではチームの気配をリアルタイムに確認できます。
-      </p>
+      <h2>{{ content.title }}</h2>
+      <p>{{ content.description }}</p>
     </div>
     <ul class="banner__highlights">
-      <li>
-        <span class="banner__icon" aria-hidden="true">01</span>
-        進捗カードでプロジェクト全体を手軽に管理
-      </li>
-      <li>
-        <span class="banner__icon" aria-hidden="true">02</span>
-        リアルタイムの会話や更新通知で最新情報をチェック
-      </li>
-      <li>
-        <span class="banner__icon" aria-hidden="true">03</span>
-        チームチャットとタスクが連動する情報ハブを活用
+      <li v-for="(highlight, index) in content.highlights" :key="index">
+        <span class="banner__icon" aria-hidden="true">{{
+          String(index + 1).padStart(2, "0")
+        }}</span>
+        {{ highlight }}
       </li>
     </ul>
   </section>
@@ -57,7 +110,7 @@ import { appName } from "@/constants/appMeta";
   color: var(--ui-brand-900, #0b2e33);
   font-weight: var(--ui-font-semibold, 600);
   font-size: var(--ui-text-xs, 0.75rem);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ui-tracking-wider, 0.08em);
   text-transform: uppercase;
 }
 
@@ -113,7 +166,7 @@ import { appName } from "@/constants/appMeta";
   color: var(--ui-brand-50, #f5fcff);
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-bold, 700);
-  letter-spacing: 0.05em;
+  letter-spacing: var(--ui-tracking-wide, 0.05em);
 }
 
 /* prefers-reduced-motion 対応 */
