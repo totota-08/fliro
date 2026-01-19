@@ -1,16 +1,117 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { RouterLink } from "vue-router";
+import { ref, computed, onMounted } from "vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import BrandLogo from "@/components/common/BrandLogo.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { useAppMeta } from "@/composables/useAppMeta";
+import { APP_CONFIG } from "@/config/appConfig";
+import { useScrollAnimation } from "@/composables/useScrollAnimation";
 import {
   fetchReleaseNotes,
   type ReleaseNote,
 } from "@/services/releaseNotesService";
+import { fetchLandingPageStats } from "@/services/statsService";
+import { getLogger } from "@logtape/logtape";
 
+const logger = getLogger("app.pages.HomePage");
 const { appName } = useAppMeta();
+
+// スクロールアニメーション用のref
+const { elementRef: heroRef, isVisible: heroVisible } = useScrollAnimation({
+  threshold: 0.1,
+});
+const { elementRef: featuresRef, isVisible: featuresVisible } =
+  useScrollAnimation({ threshold: 0.1 });
+const { elementRef: statsRef, isVisible: statsVisible } = useScrollAnimation({
+  threshold: 0.2,
+});
+const { elementRef: pricingRef, isVisible: pricingVisible } =
+  useScrollAnimation({ threshold: 0.1 });
+const { elementRef: releasesRef, isVisible: releasesVisible } =
+  useScrollAnimation({ threshold: 0.1 });
+const { elementRef: ctaRef, isVisible: ctaVisible } = useScrollAnimation({
+  threshold: 0.2,
+});
+
+// カウントアップアニメーション用の状態
+const countUpStarted = ref(false);
+const isLoadingStats = ref(true);
+const stats = ref([
+  { label: "タスク完了", value: 0, target: 0, suffix: "+" },
+  { label: "アクティブチーム", value: 0, target: 0, suffix: "+" },
+]);
+
+// Firestoreから統計データを取得
+async function loadStats() {
+  try {
+    const data = await fetchLandingPageStats();
+    const tasksStat = stats.value.find((s) => s.label === "タスク完了");
+    const projectsStat = stats.value.find(
+      (s) => s.label === "アクティブチーム",
+    );
+    if (tasksStat) tasksStat.target = data.completedTasks;
+    if (projectsStat) projectsStat.target = data.activeProjects;
+  } catch (error) {
+    logger.error`Failed to fetch landing page stats: ${error}`;
+    // フォールバック値を設定
+    const tasksStat = stats.value.find((s) => s.label === "タスク完了");
+    const projectsStat = stats.value.find(
+      (s) => s.label === "アクティブチーム",
+    );
+    if (tasksStat) tasksStat.target = 100;
+    if (projectsStat) projectsStat.target = 10;
+  } finally {
+    isLoadingStats.value = false;
+  }
+}
+
+// statsが見えたらカウントアップ開始
+const startCountUp = () => {
+  if (countUpStarted.value || isLoadingStats.value) return;
+  countUpStarted.value = true;
+
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  if (prefersReducedMotion) {
+    stats.value.forEach((stat) => {
+      stat.value = stat.target;
+    });
+    return;
+  }
+
+  const duration = 2000;
+  const startTime = performance.now();
+
+  const animate = (currentTime: number) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 4);
+
+    stats.value.forEach((stat) => {
+      stat.value = Math.floor(stat.target * eased);
+    });
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      stats.value.forEach((stat) => {
+        stat.value = stat.target;
+      });
+    }
+  };
+
+  requestAnimationFrame(animate);
+};
+
+// statsVisibleの変化を監視
+const checkStatsVisibility = computed(() => {
+  if (statsVisible.value && !countUpStarted.value && !isLoadingStats.value) {
+    startCountUp();
+  }
+  return statsVisible.value;
+});
 
 // リリースノート（Firestoreから取得、フォールバック用のデフォルト値あり）
 const releaseNotes = ref<ReleaseNote[]>([]);
@@ -19,10 +120,24 @@ const isLoadingReleases = ref(true);
 // デフォルトのリリースノート（Firestore未設定時のフォールバック）
 const defaultReleaseNotes: ReleaseNote[] = [
   {
+    id: "alpha-0.2",
+    version: "alpha-0.2",
+    date: "2026年1月",
+    isLatest: true,
+    changes: [
+      { type: "feat", text: "ゲスト閲覧機能をリリース - 外部共有が可能に" },
+      {
+        type: "feat",
+        text: "モバイルUI改善 - スワイプ操作・プルトゥリフレッシュ対応",
+      },
+      { type: "feat", text: "ダッシュボードカスタマイズ機能" },
+    ],
+  },
+  {
     id: "alpha-0.1",
     version: "alpha-0.1",
     date: "2025年12月",
-    isLatest: true,
+    isLatest: false,
     changes: [
       { type: "feat", text: "プロジェクトダッシュボードをリリース" },
       {
@@ -38,14 +153,30 @@ const defaultReleaseNotes: ReleaseNote[] = [
 ];
 
 onMounted(async () => {
-  const notes = await fetchReleaseNotes(10);
-  if (notes.length > 0) {
-    releaseNotes.value = notes;
-  } else {
-    // Firestoreにデータがない場合はデフォルト値を使用
-    releaseNotes.value = defaultReleaseNotes;
-  }
-  isLoadingReleases.value = false;
+  // 統計データとリリースノートを並行取得
+  await Promise.all([
+    loadStats(),
+    (async () => {
+      const notes = await fetchReleaseNotes(10);
+      if (notes.length > 0) {
+        releaseNotes.value = notes;
+      } else {
+        // Firestoreにデータがない場合はデフォルト値を使用
+        releaseNotes.value = defaultReleaseNotes;
+      }
+      isLoadingReleases.value = false;
+    })(),
+  ]);
+});
+
+// テンプレートで使用するrefを公開（vue-tscの未使用変数警告を回避）
+defineExpose({
+  heroRef,
+  featuresRef,
+  statsRef,
+  pricingRef,
+  releasesRef,
+  ctaRef,
 });
 
 const featureCards = [
@@ -64,7 +195,7 @@ const featureCards = [
   {
     title: "リアルタイムチャット",
     description:
-      "プロジェクトごとのチャットルームで、チームメンバーとリアルタイムにコミュニケーション。",
+      "スレッド機能、リアクション、メンションを搭載。プロジェクトごとのチャットで効率的にコミュニケーション。",
     icon: "chat",
   },
   {
@@ -74,21 +205,21 @@ const featureCards = [
     icon: "team",
   },
   {
-    title: "アクティビティログ",
+    title: "ゲスト閲覧機能",
     description:
-      "プロジェクト内の操作履歴を自動記録。誰が何をしたかを追跡し、透明性のあるチーム運営を実現。",
-    icon: "settings",
+      "プロジェクトを外部に共有可能。クライアントやステークホルダーに進捗をリアルタイムで共有できます。",
+    icon: "eye",
   },
   {
-    title: "スコア＆成績表",
+    title: "モバイル最適化",
     description:
-      "タスク完了数や貢献度をスコアで可視化。チームメンバーの活躍を見える化します。",
-    icon: "spark",
+      "スマートフォンでも快適に操作。スワイプ操作やプルトゥリフレッシュで直感的にタスク管理ができます。",
+    icon: "mobile",
   },
   {
-    title: "通知機能",
+    title: "通知＆メンション",
     description:
-      "タスクの期限や更新、メンションなどの重要な情報をリアルタイムで通知。見逃しを防ぎます。",
+      "タスクの期限や更新、@メンションをリアルタイムで通知。重要な情報を見逃しません。",
     icon: "bell",
   },
   {
@@ -98,10 +229,10 @@ const featureCards = [
     icon: "check-circle",
   },
   {
-    title: "カテゴリ管理",
+    title: "アクティビティログ",
     description:
-      "タスクをカテゴリで整理し、プロジェクトの構造を明確に。カスタムカテゴリで柔軟に管理できます。",
-    icon: "folder",
+      "プロジェクト内の操作履歴を自動記録。誰が何をしたかを追跡し、透明性のあるチーム運営を実現。",
+    icon: "activity",
   },
 ];
 
@@ -163,11 +294,6 @@ const pricingPlans = [
         <div class="landing__links">
           <a href="#features" class="landing__link">機能</a>
           <a href="#pricing" class="landing__link">料金</a>
-          <RouterLink
-            class="landing__link"
-            :to="{ name: ROUTE_NAMES.demoDashboard }"
-            >デモ</RouterLink
-          >
           <div class="landing__buttons">
             <AppButton
               :to="{ name: ROUTE_NAMES.login }"
@@ -185,55 +311,87 @@ const pricingPlans = [
     </header>
 
     <main>
-      <section class="hero" id="demo">
+      <section
+        ref="heroRef"
+        class="hero"
+        id="demo"
+        :class="{ 'is-visible': heroVisible }"
+      >
         <div class="hero__content">
-          <p class="hero__eyebrow">小〜中規模チームのためのプロジェクト管理</p>
-          <h1>「今やるべきこと」が一目でわかる</h1>
-          <p>
+          <p class="hero__eyebrow animate-fade-up" style="--delay: 0ms">
+            小〜中規模チームのためのプロジェクト管理
+          </p>
+          <h1 class="animate-fade-up" style="--delay: 100ms">
+            「今やるべきこと」が<br class="hero__br" />一目でわかる
+          </h1>
+          <p class="animate-fade-up" style="--delay: 200ms">
             {{
               appName
             }}は、タスク管理・チャット・進捗可視化を統合したプロジェクト管理ツールです。
             管理のための管理ではなく、チームの意思決定と実行を加速します。
           </p>
-          <div class="hero__actions">
+          <div class="hero__actions animate-fade-up" style="--delay: 300ms">
             <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
               >無料で始める</AppButton
             >
             <AppButton
-              :to="{ name: ROUTE_NAMES.demoDashboard }"
-              variant="outline"
-              >デモを見る</AppButton
+              :to="`/projects/${APP_CONFIG.sampleProjectId}/dashboard`"
+              variant="secondary"
+              >サンプルを見る</AppButton
             >
           </div>
-          <p class="hero__note">フリープランは永久無料 • 3名まで利用可能</p>
+          <p class="hero__note animate-fade-up" style="--delay: 400ms">
+            フリープランは永久無料 • 3名まで利用可能
+          </p>
         </div>
-        <div class="hero__visual">
+        <div class="hero__visual animate-fade-up" style="--delay: 200ms">
           <div class="hero-card">
             <header>
-              <span />
-              <span />
-              <span />
+              <span class="hero-card__dot hero-card__dot--red" />
+              <span class="hero-card__dot hero-card__dot--yellow" />
+              <span class="hero-card__dot hero-card__dot--green" />
             </header>
             <div class="hero-card__body">
-              <div>
-                <p>Backlog</p>
+              <div
+                class="hero-card__column animate-slide-up"
+                style="--delay: 400ms"
+              >
+                <p class="hero-card__status hero-card__status--backlog">
+                  Backlog
+                </p>
                 <ul>
-                  <li>オンボーディング資料の更新</li>
-                  <li>初回ユーザー調査の準備</li>
+                  <li class="hero-card__task">オンボーディング資料の更新</li>
+                  <li class="hero-card__task">初回ユーザー調査の準備</li>
                 </ul>
               </div>
-              <div>
-                <p>In Progress</p>
+              <div
+                class="hero-card__column animate-slide-up"
+                style="--delay: 500ms"
+              >
+                <p class="hero-card__status hero-card__status--progress">
+                  In Progress
+                </p>
                 <ul>
-                  <li>チームダッシュボードの実装</li>
-                  <li>デイリースタンドアップの自動化</li>
+                  <li class="hero-card__task hero-card__task--active">
+                    チームダッシュボードの実装
+                  </li>
+                  <li class="hero-card__task">
+                    デイリースタンドアップの自動化
+                  </li>
                 </ul>
               </div>
-              <div>
-                <p>Done</p>
+              <div
+                class="hero-card__column animate-slide-up"
+                style="--delay: 600ms"
+              >
+                <p class="hero-card__status hero-card__status--done">Done</p>
                 <ul>
-                  <li>Firebase 認証のセットアップ</li>
-                  <li>UI コンポーネントの設計</li>
+                  <li class="hero-card__task hero-card__task--done">
+                    Firebase 認証のセットアップ
+                  </li>
+                  <li class="hero-card__task hero-card__task--done">
+                    UI コンポーネントの設計
+                  </li>
                 </ul>
               </div>
             </div>
@@ -241,16 +399,43 @@ const pricingPlans = [
         </div>
       </section>
 
-      <section id="features" class="features">
-        <div class="section-heading">
+      <!-- 統計セクション -->
+      <section
+        ref="statsRef"
+        class="stats"
+        :class="{ 'is-visible': checkStatsVisibility }"
+      >
+        <div class="stats__grid">
+          <div
+            v-for="(stat, index) in stats"
+            :key="stat.label"
+            class="stat-card animate-fade-up"
+            :style="{ '--delay': `${index * 100}ms` }"
+          >
+            <span class="stat-card__value"
+              >{{ stat.value }}{{ stat.suffix }}</span
+            >
+            <span class="stat-card__label">{{ stat.label }}</span>
+          </div>
+        </div>
+      </section>
+
+      <section
+        ref="featuresRef"
+        id="features"
+        class="features"
+        :class="{ 'is-visible': featuresVisible }"
+      >
+        <div class="section-heading animate-fade-up" style="--delay: 0ms">
           <p>主な機能</p>
           <h2>チームの生産性を高める機能が揃っています</h2>
         </div>
         <div class="features__grid">
           <article
-            v-for="card in featureCards"
+            v-for="(card, index) in featureCards"
             :key="card.title"
-            class="feature-card"
+            class="feature-card animate-fade-up"
+            :style="{ '--delay': `${(index % 3) * 100 + 100}ms` }"
           >
             <div class="feature-card__icon" :data-icon="card.icon" />
             <h3>{{ card.title }}</h3>
@@ -259,17 +444,23 @@ const pricingPlans = [
         </div>
       </section>
 
-      <section id="pricing" class="pricing">
-        <div class="section-heading">
+      <section
+        ref="pricingRef"
+        id="pricing"
+        class="pricing"
+        :class="{ 'is-visible': pricingVisible }"
+      >
+        <div class="section-heading animate-fade-up" style="--delay: 0ms">
           <p>シンプルな料金プラン</p>
           <h2>チームの規模に合わせて選べるプラン</h2>
         </div>
         <div class="pricing__grid">
           <article
-            v-for="plan in pricingPlans"
+            v-for="(plan, index) in pricingPlans"
             :key="plan.name"
-            class="pricing-card"
+            class="pricing-card animate-fade-up"
             :class="{ 'pricing-card--highlight': plan.highlight }"
+            :style="{ '--delay': `${index * 100 + 100}ms` }"
           >
             <div v-if="plan.ribbon" class="pricing-card__ribbon">
               {{ plan.ribbon }}
@@ -297,17 +488,23 @@ const pricingPlans = [
         </div>
       </section>
 
-      <section id="releases" class="releases">
-        <div class="section-heading">
+      <section
+        ref="releasesRef"
+        id="releases"
+        class="releases"
+        :class="{ 'is-visible': releasesVisible }"
+      >
+        <div class="section-heading animate-fade-up" style="--delay: 0ms">
           <p>リリースノート</p>
           <h2>最新のアップデート情報</h2>
         </div>
         <div class="releases__timeline">
           <article
-            v-for="release in releaseNotes"
+            v-for="(release, index) in releaseNotes"
             :key="release.version"
-            class="release-card"
+            class="release-card animate-fade-up"
             :class="{ 'release-card--latest': release.isLatest }"
+            :style="{ '--delay': `${index * 150 + 100}ms` }"
           >
             <header class="release-card__header">
               <div class="release-card__version">
@@ -332,16 +529,20 @@ const pricingPlans = [
         </div>
       </section>
 
-      <section class="cta">
+      <section ref="ctaRef" class="cta" :class="{ 'is-visible': ctaVisible }">
         <div class="cta__inner">
-          <h2>今すぐ{{ appName }}を始めましょう</h2>
-          <p>
+          <h2 class="animate-fade-up" style="--delay: 0ms">
+            今すぐ{{ appName }}を始めましょう
+          </h2>
+          <p class="animate-fade-up" style="--delay: 100ms">
             フリープランで今すぐ始められます。
             チームの「今やるべきこと」を明確にし、プロジェクトを前に進めましょう。
           </p>
-          <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="secondary"
-            >無料で始める</AppButton
-          >
+          <div class="animate-fade-up" style="--delay: 200ms">
+            <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="secondary"
+              >無料で始める</AppButton
+            >
+          </div>
         </div>
       </section>
     </main>
@@ -384,6 +585,77 @@ const pricingPlans = [
 </template>
 
 <style scoped>
+/* アニメーション定義 */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* アニメーションユーティリティ */
+.animate-fade-up {
+  opacity: 0;
+}
+
+.animate-slide-up {
+  opacity: 0;
+}
+
+.is-visible .animate-fade-up {
+  animation: fadeUp 0.6s ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+.is-visible .animate-slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* prefers-reduced-motion対応 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-slide-up {
+    opacity: 1;
+    animation: none !important;
+  }
+}
+
 .landing {
   min-height: 100vh;
   background: linear-gradient(
@@ -532,11 +804,22 @@ const pricingPlans = [
   border-bottom: 1px solid var(--ui-border-light);
 }
 
-.hero-card header span {
+.hero-card__dot {
   width: 0.75rem;
   height: 0.75rem;
   border-radius: var(--ui-radius-full);
-  background: var(--ui-brand-400);
+}
+
+.hero-card__dot--red {
+  background: #ff5f57;
+}
+
+.hero-card__dot--yellow {
+  background: #ffbd2e;
+}
+
+.hero-card__dot--green {
+  background: #28ca41;
 }
 
 .hero-card__body {
@@ -545,21 +828,93 @@ const pricingPlans = [
   gap: var(--ui-space-4);
 }
 
-.hero-card__body div {
+.hero-card__column {
   padding: var(--ui-space-4);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-surface-accent);
+  transition: var(--ui-transition-all);
 }
 
-.hero-card__body p {
-  margin: 0 0 var(--ui-space-1);
+.hero-card__column:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ui-shadow-md);
+}
+
+.hero-card__status {
+  margin: 0 0 var(--ui-space-2);
   font-weight: var(--ui-font-semibold);
+  font-size: var(--ui-text-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.hero-card__status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--ui-radius-full);
+}
+
+.hero-card__status--backlog::before {
+  background: var(--ui-brand-400);
+}
+
+.hero-card__status--progress::before {
+  background: var(--ui-warning-500, #f59e0b);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.hero-card__status--done::before {
+  background: var(--ui-success-500, #22c55e);
 }
 
 .hero-card__body ul {
   margin: 0;
-  padding-left: var(--ui-space-4);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.hero-card__task {
   color: var(--ui-brand-600);
+  font-size: var(--ui-text-sm);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border-light);
+  transition: var(--ui-transition-all);
+}
+
+.hero-card__task:hover {
+  border-color: var(--ui-brand-400);
+}
+
+.hero-card__task--active {
+  border-color: var(--ui-warning-500, #f59e0b);
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.05),
+    var(--ui-surface)
+  );
+}
+
+.hero-card__task--done {
+  text-decoration: line-through;
+  color: var(--ui-brand-400);
+}
+
+/* Hero break point */
+.hero__br {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .hero__br {
+    display: inline;
+  }
 }
 
 .section-heading {
@@ -579,6 +934,39 @@ const pricingPlans = [
 .section-heading h2 {
   margin: var(--ui-space-2) 0 0;
   font-size: clamp(2rem, 4vw, 3rem);
+}
+
+/* 統計セクション */
+.stats {
+  padding: var(--ui-space-12) var(--ui-space-6);
+  background: var(--ui-brand-600);
+}
+
+.stats__grid {
+  max-width: 1140px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ui-space-8);
+  text-align: center;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.stat-card__value {
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: var(--ui-font-bold);
+  color: var(--ui-text-inverse);
+  line-height: 1;
+}
+
+.stat-card__label {
+  font-size: var(--ui-text-lg);
+  color: var(--ui-brand-200);
 }
 
 .features,

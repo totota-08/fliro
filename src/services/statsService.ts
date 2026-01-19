@@ -3,6 +3,8 @@ import {
   collectionGroup,
   getCountFromServer,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { TaskDoc } from "@/services/taskService";
@@ -24,6 +26,30 @@ export async function fetchScaleStats(): Promise<ScaleStats> {
     users: userSnap.data().count,
     projects: projectSnap.data().count,
     tasks: taskSnap.data().count,
+  };
+}
+
+export interface LandingPageStats {
+  completedTasks: number;
+  activeProjects: number;
+}
+
+/**
+ * LP用の統計データを取得
+ * - completedTasks: 完了したタスクの数
+ * - activeProjects: アクティブなプロジェクトの数
+ */
+export async function fetchLandingPageStats(): Promise<LandingPageStats> {
+  const [projectSnap, completedTaskSnap] = await Promise.all([
+    getCountFromServer(collection(db, "projects")),
+    getCountFromServer(
+      query(collectionGroup(db, "tasks"), where("status", "==", "done")),
+    ),
+  ]);
+
+  return {
+    activeProjects: projectSnap.data().count,
+    completedTasks: completedTaskSnap.data().count,
   };
 }
 
