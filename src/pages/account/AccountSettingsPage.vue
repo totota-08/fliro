@@ -6,6 +6,7 @@
  */
 import DangerZone from "@/components/ui/DangerZone.vue";
 import ConfirmDangerModal from "@/components/modals/ConfirmDangerModal.vue";
+import MFAEnrollmentModal from "@/components/modals/MFAEnrollmentModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
@@ -16,6 +17,13 @@ import {
   updateAccountAvatar,
   updateProfile,
 } from "@/services/accountActions";
+import {
+  enrollTOTP,
+  generateTOTPSecret,
+  getMFAEnrollmentStatus,
+  startMFAEnrollment,
+  unenrollMFA,
+} from "@/firebase/authService";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -54,6 +62,23 @@ const avatarMessage = ref("");
 const showDeleteModal = ref(false);
 const deleteLoading = ref(false);
 const deleteError = ref("");
+
+// MFA state
+const mfaEnrolled = ref(false);
+const mfaFactors = ref<
+  Array<{
+    uid: string;
+    displayName: string | null;
+    factorId: string;
+    enrollmentTime: string;
+  }>
+>([]);
+const mfaLoading = ref(false);
+const showMFAEnrollmentModal = ref(false);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const totpSecret = ref<any>(null);
+const qrCodeUrl = ref("");
+const mfaError = ref("");
 
 // Konami code tracking
 const konamiIndex = ref(0);
@@ -162,6 +187,95 @@ async function handleDeleteAccount(password: string) {
   }
 }
 
+// MFA functions
+async function loadMFAStatus() {
+  mfaLoading.value = true;
+  mfaError.value = "";
+  try {
+    const status = await getMFAEnrollmentStatus();
+    mfaEnrolled.value = status.enrolled;
+    mfaFactors.value = status.factors;
+  } catch (error) {
+    logger.error`Failed to load MFA status: ${error}`;
+    mfaError.value = "MFA設定の読み込みに失敗しました。";
+  } finally {
+    mfaLoading.value = false;
+  }
+}
+
+async function startMFASetup() {
+  mfaLoading.value = true;
+  mfaError.value = "";
+  try {
+    const session = await startMFAEnrollment();
+    const secret = await generateTOTPSecret(session);
+    totpSecret.value = secret;
+
+    // Generate QR code URL
+    const issuer = "Fliro";
+    const accountName = user.value?.email || "user";
+    const otpauthUrl = secret.generateQrCodeUrl(accountName, issuer);
+    qrCodeUrl.value = otpauthUrl;
+
+    showMFAEnrollmentModal.value = true;
+  } catch (error) {
+    logger.error`Failed to start MFA enrollment: ${error}`;
+    mfaError.value = "MFA設定の開始に失敗しました。";
+  } finally {
+    mfaLoading.value = false;
+  }
+}
+
+async function completeMFAEnrollment(
+  verificationCode: string,
+  displayName: string,
+) {
+  if (!totpSecret.value) {
+    mfaError.value = "TOTP秘密鍵が見つかりません。";
+    return;
+  }
+
+  mfaLoading.value = true;
+  mfaError.value = "";
+  try {
+    await enrollTOTP(totpSecret.value, verificationCode, displayName);
+    showMFAEnrollmentModal.value = false;
+    totpSecret.value = null;
+    qrCodeUrl.value = "";
+    await loadMFAStatus();
+  } catch (error) {
+    logger.error`Failed to complete MFA enrollment: ${error}`;
+    mfaError.value = "認証コードが正しくありません。もう一度お試しください。";
+  } finally {
+    mfaLoading.value = false;
+  }
+}
+
+function closeMFAEnrollmentModal() {
+  showMFAEnrollmentModal.value = false;
+  totpSecret.value = null;
+  qrCodeUrl.value = "";
+  mfaError.value = "";
+}
+
+async function removeMFA(factorUid: string) {
+  if (!confirm("二段階認証を解除してもよろしいですか？")) {
+    return;
+  }
+
+  mfaLoading.value = true;
+  mfaError.value = "";
+  try {
+    await unenrollMFA(factorUid);
+    await loadMFAStatus();
+  } catch (error) {
+    logger.error`Failed to unenroll MFA: ${error}`;
+    mfaError.value = "二段階認証の解除に失敗しました。";
+  } finally {
+    mfaLoading.value = false;
+  }
+}
+
 // Konami code handler
 function handleKeyDown(event: KeyboardEvent) {
   const expectedKey = KONAMI_CODE[konamiIndex.value];
@@ -180,6 +294,7 @@ function handleKeyDown(event: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
+  loadMFAStatus();
 });
 
 onBeforeUnmount(() => {
@@ -330,6 +445,83 @@ onBeforeUnmount(() => {
         </div>
       </SectionCard>
 
+      <!-- Security Section - MFA -->
+      <SectionCard
+        title="セキュリティ"
+        subtitle="二段階認証を設定してアカウントを保護"
+      >
+        <div class="security-section">
+          <div class="security-section__info">
+            <div class="security-section__header">
+              <h3 class="security-section__title">二段階認証（2FA）</h3>
+              <span
+                v-if="mfaEnrolled"
+                class="security-section__badge security-section__badge--enabled"
+              >
+                有効
+              </span>
+              <span v-else class="security-section__badge">無効</span>
+            </div>
+            <p class="security-section__description">
+              二段階認証を有効にすると、ログイン時にパスワードに加えて認証アプリから生成される6桁のコードが必要になります。
+            </p>
+
+            <div v-if="mfaFactors.length > 0" class="mfa-factors">
+              <h4 class="mfa-factors__title">登録済みの認証方法</h4>
+              <div
+                v-for="factor in mfaFactors"
+                :key="factor.uid"
+                class="mfa-factor"
+              >
+                <div class="mfa-factor__info">
+                  <span class="mfa-factor__name">
+                    {{ factor.displayName || "認証アプリ" }}
+                  </span>
+                  <span class="mfa-factor__type">
+                    {{
+                      factor.factorId === "totp"
+                        ? "TOTP（認証アプリ）"
+                        : factor.factorId
+                    }}
+                  </span>
+                </div>
+                <AppButton
+                  variant="danger"
+                  size="sm"
+                  :disabled="mfaLoading"
+                  @click="removeMFA(factor.uid)"
+                >
+                  解除
+                </AppButton>
+              </div>
+            </div>
+
+            <p v-if="mfaError" class="security-section__error">
+              {{ mfaError }}
+            </p>
+          </div>
+
+          <div class="security-section__actions">
+            <AppButton
+              v-if="!mfaEnrolled"
+              variant="primary"
+              :loading="mfaLoading"
+              @click="startMFASetup"
+            >
+              二段階認証を設定
+            </AppButton>
+            <AppButton
+              v-else
+              variant="secondary"
+              :loading="mfaLoading"
+              @click="startMFASetup"
+            >
+              新しい認証方法を追加
+            </AppButton>
+          </div>
+        </div>
+      </SectionCard>
+
       <!-- Danger Zone - Account Deletion -->
       <DangerZone
         title="危険な操作"
@@ -363,6 +555,15 @@ onBeforeUnmount(() => {
       :error="deleteError"
       @close="closeDeleteModal"
       @confirm="handleDeleteAccount"
+    />
+
+    <!-- MFA Enrollment Modal -->
+    <MFAEnrollmentModal
+      :open="showMFAEnrollmentModal"
+      :totp-secret="totpSecret"
+      :qr-code-url="qrCodeUrl"
+      @close="closeMFAEnrollmentModal"
+      @confirm="completeMFAEnrollment"
     />
   </AppShell>
 </template>
@@ -545,6 +746,115 @@ onBeforeUnmount(() => {
   color: var(--ui-text-muted, #64748b);
 }
 
+/* Security Section */
+.security-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.security-section__info {
+  flex: 1;
+}
+
+.security-section__header {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  margin-bottom: var(--ui-space-2, 0.5rem);
+}
+
+.security-section__title {
+  margin: 0;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
+}
+
+.security-section__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-medium, 500);
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-surface-secondary, #f8f9fa);
+  color: var(--ui-text-muted, #64748b);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+}
+
+.security-section__badge--enabled {
+  background: var(--ui-success-light, #dcfce7);
+  color: var(--ui-success, #16a34a);
+  border-color: var(--ui-success, #16a34a);
+}
+
+.security-section__description {
+  margin: 0 0 var(--ui-space-3, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
+  line-height: 1.5;
+}
+
+.security-section__error {
+  margin: var(--ui-space-2, 0.5rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-danger, #d64545);
+}
+
+.security-section__actions {
+  display: flex;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+/* MFA Factors */
+.mfa-factors {
+  margin-top: var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-surface-secondary, #f8f9fa);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+}
+
+.mfa-factors__title {
+  margin: 0 0 var(--ui-space-2, 0.5rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.mfa-factor {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  padding: var(--ui-space-2, 0.5rem);
+  background: var(--ui-surface, #fff);
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+}
+
+.mfa-factor + .mfa-factor {
+  margin-top: var(--ui-space-2, 0.5rem);
+}
+
+.mfa-factor__info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
+}
+
+.mfa-factor__name {
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #0b2e33);
+}
+
+.mfa-factor__type {
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .profile-section {
@@ -574,6 +884,15 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: stretch;
     text-align: center;
+  }
+
+  .security-section__actions {
+    flex-direction: column;
+  }
+
+  .mfa-factor {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
