@@ -1256,8 +1256,11 @@ watch(channels, (list) => {
         stroke="currentColor"
         stroke-width="2"
       >
-        <path d="M4 6h16M4 12h16M4 18h16" />
+        <!-- チャット/スレッドアイコン -->
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+        <line x1="9" y1="10" x2="15" y2="10" />
       </svg>
+      <span class="mobile-threads-fab__label">スレッド</span>
     </button>
 
     <!-- モバイル用スレッドドロワー -->
@@ -1363,16 +1366,7 @@ watch(channels, (list) => {
 
         <!-- カスタムスレッド -->
         <div class="panel-section">
-          <div class="section-header">
-            <h3 class="section-title">カスタムスレッド</h3>
-            <button
-              class="add-btn"
-              @click="customThreadFormOpen = true"
-              title="新規スレッド"
-            >
-              +
-            </button>
-          </div>
+          <h3 class="section-title">カスタムスレッド</h3>
           <div class="thread-list">
             <button
               v-for="th in customChannels"
@@ -1384,6 +1378,24 @@ watch(channels, (list) => {
               <span class="channel-name"># {{ th.name }}</span>
             </button>
           </div>
+          <!-- モバイル用スレッド作成ボタン -->
+          <button
+            class="mobile-add-thread-btn"
+            @click="customThreadFormOpen = true"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              width="16"
+              height="16"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            新しいスレッドを作成
+          </button>
         </div>
       </div>
     </AppDrawer>
@@ -2287,10 +2299,13 @@ watch(channels, (list) => {
 .mobile-threads-fab {
   display: none;
   position: fixed;
-  bottom: var(--ui-space-6);
-  left: var(--ui-space-4);
-  width: 56px;
-  height: 56px;
+  bottom: calc(
+    var(--ui-bottom-nav-height, 56px) + env(safe-area-inset-bottom) +
+      var(--ui-space-4)
+  );
+  right: var(--ui-space-4);
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
   border-radius: var(--ui-radius-full);
   background: var(--ui-brand-600);
   color: var(--ui-text-inverse);
@@ -2301,11 +2316,18 @@ watch(channels, (list) => {
   align-items: center;
   justify-content: center;
   transition: var(--ui-transition-all);
+  font-weight: var(--ui-font-semibold);
+  font-size: var(--ui-text-sm);
 }
 
 .mobile-threads-fab svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.mobile-threads-fab__label {
+  white-space: nowrap;
 }
 
 .mobile-threads-fab:hover {
@@ -2321,6 +2343,37 @@ watch(channels, (list) => {
   .mobile-threads-fab {
     display: flex;
   }
+}
+
+/* モバイル用スレッド作成ボタン */
+.mobile-add-thread-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  width: 100%;
+  margin-top: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px dashed var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: transparent;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-font-medium);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+  min-height: 44px;
+}
+
+.mobile-add-thread-btn:hover {
+  border-color: var(--ui-brand-500);
+  color: var(--ui-brand-600);
+  background: var(--ui-brand-50);
+}
+
+.mobile-add-thread-btn:active {
+  background: var(--ui-brand-100);
+  transform: scale(0.98);
 }
 
 /* Mobile Drawer Content */

@@ -200,28 +200,6 @@ async function handleTaskSubmit(data: TaskFormData) {
       </div>
     </main>
 
-    <!-- Mobile FAB -->
-    <button
-      type="button"
-      class="project-layout__fab"
-      aria-label="新規タスクを作成"
-      @click="openTaskModal"
-    >
-      <svg
-        aria-hidden="true"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2.5"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M12 4v16m8-8H4"
-        />
-      </svg>
-    </button>
-
     <!-- Mobile Bottom Navigation -->
     <MobileBottomNav
       :items="mobileNavItems"
@@ -411,42 +389,6 @@ async function handleTaskSubmit(data: TaskFormData) {
   height: 1rem;
 }
 
-/* Mobile FAB */
-.project-layout__fab {
-  display: none;
-  position: fixed;
-  bottom: var(--ui-space-6, 1.5rem);
-  right: var(--ui-space-6, 1.5rem);
-  z-index: var(--ui-z-sticky, 20);
-  width: 56px;
-  height: 56px;
-  border: none;
-  border-radius: var(--ui-radius-full, 9999px);
-  background: var(--ui-brand-900, #0b2e33);
-  color: var(--ui-surface, #ffffff);
-  cursor: pointer;
-  box-shadow: var(--ui-shadow-lg);
-  transition: var(--ui-transition-all);
-  align-items: center;
-  justify-content: center;
-}
-
-.project-layout__fab:hover {
-  background: var(--ui-brand-800, #134e4a);
-  box-shadow: var(--ui-shadow-xl);
-  transform: scale(1.05);
-}
-
-.project-layout__fab:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-ring-focus);
-}
-
-.project-layout__fab svg {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
 /* Responsive */
 @media (max-width: 1200px) {
   .project-layout {
@@ -473,22 +415,20 @@ async function handleTaskSubmit(data: TaskFormData) {
 }
 
 @media (max-width: 768px) {
-  /* Hide topbar button label on mobile */
+  /* モバイルでもラベルを表示（アイコンのみだと混乱するため） */
   .project-layout__add-task-label {
-    display: none;
+    display: inline;
+    font-size: var(--ui-text-xs, 0.75rem);
   }
 
   .project-layout__add-task-btn {
-    padding: var(--ui-space-2, 0.5rem);
+    padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+    gap: var(--ui-space-1, 0.25rem);
   }
 
-  /* Show FAB on mobile - position above bottom nav */
-  .project-layout__fab {
-    display: flex;
-    bottom: calc(
-      var(--ui-bottom-nav-height, 56px) + env(safe-area-inset-bottom) +
-        var(--ui-space-4, 1rem)
-    );
+  .project-layout__add-task-btn svg {
+    width: 0.875rem;
+    height: 0.875rem;
   }
 
   /* Show bottom nav on mobile */

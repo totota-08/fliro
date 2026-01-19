@@ -5,7 +5,7 @@
  * ホバー時にアクションバーを表示
  * リアクション、返信、編集、コピー、削除に対応
  */
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import ChatMessageActions from "./ChatMessageActions.vue";
 import ChatEmojiPicker from "./ChatEmojiPicker.vue";
@@ -33,9 +33,61 @@ const emit = defineEmits<{
 }>();
 
 const isHovered = ref(false);
+const isTapped = ref(false);
 const showEmojiPicker = ref(false);
 const emojiPickerPosition = ref({ top: 0, left: 0 });
 const actionBarRef = ref<HTMLElement | null>(null);
+const messageItemRef = ref<HTMLElement | null>(null);
+
+// アクションバー表示状態（ホバーまたはタップ）
+const showActions = computed(() => isHovered.value || isTapped.value);
+
+// モバイル判定
+const isMobile = ref(false);
+
+function checkMobile() {
+  isMobile.value = window.innerWidth <= 768;
+}
+
+// タップでアクションバーを表示
+function handleTap(event: Event) {
+  if (!isMobile.value) return;
+
+  // リアクションチップや返信インジケータをタップした場合は無視
+  const target = event.target as HTMLElement;
+  if (
+    target.closest(".reaction-chip") ||
+    target.closest(".reply-indicator") ||
+    target.closest(".actions-wrapper")
+  ) {
+    return;
+  }
+
+  isTapped.value = !isTapped.value;
+}
+
+// 外側タップで閉じる
+function handleOutsideClick(event: MouseEvent) {
+  if (!isTapped.value) return;
+  if (
+    messageItemRef.value &&
+    !messageItemRef.value.contains(event.target as Node)
+  ) {
+    isTapped.value = false;
+    showEmojiPicker.value = false;
+  }
+}
+
+onMounted(() => {
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
+  document.addEventListener("click", handleOutsideClick);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", checkMobile);
+  document.removeEventListener("click", handleOutsideClick);
+});
 
 // 自分のメッセージか
 const isOwnMessage = computed(() => {
@@ -146,14 +198,17 @@ function handleScrollToReply() {
 
 <template>
   <div
+    ref="messageItemRef"
     class="message-item"
     :class="{
       'is-bot': message.isBot,
       'is-hovered': isHovered,
+      'is-tapped': isTapped,
       'is-own': isOwnMessage,
     }"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
+    @click="handleTap"
   >
     <!-- 返信先表示 -->
     <button
@@ -212,9 +267,9 @@ function handleScrollToReply() {
         </div>
       </div>
 
-      <!-- アクションバー（ホバー時） -->
+      <!-- アクションバー（ホバー時/タップ時） -->
       <Transition name="actions-fade">
-        <div v-if="isHovered" ref="actionBarRef" class="actions-wrapper">
+        <div v-if="showActions" ref="actionBarRef" class="actions-wrapper">
           <ChatMessageActions
             :can-edit="canEdit"
             :can-delete="canDelete"
@@ -448,8 +503,24 @@ function handleScrollToReply() {
     margin-left: 44px;
   }
 
-  .actions-wrapper {
+  .message-item {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .message-item.is-tapped {
+    background: var(--ui-surface-muted);
+  }
+
+  /* モバイルではホバー表示しない（タップのみ） */
+  .message-item.is-hovered:not(.is-tapped) .actions-wrapper {
     display: none;
+  }
+
+  .actions-wrapper {
+    top: auto;
+    bottom: 0;
+    transform: translateY(50%);
   }
 }
 </style>

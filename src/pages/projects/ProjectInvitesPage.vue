@@ -903,4 +903,30 @@ onBeforeUnmount(() => {
     display: none;
   }
 }
+
+@media (max-width: 768px) {
+  /* テーブル内ボタンのタッチターゲット拡大 */
+  .invites-page__table td.actions {
+    flex-direction: column;
+    gap: var(--ui-space-2, 0.5rem);
+  }
+
+  .invites-page__table td.actions button {
+    min-height: 44px;
+    padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+    font-size: var(--ui-text-sm, 0.875rem);
+  }
+
+  .invites-page__table td.actions button:active {
+    background: var(--ui-brand-50, #e5f6f8);
+    border-color: var(--ui-brand-600, #4f7c82);
+  }
+
+  /* セル内の余白調整 */
+  .invites-page__table th,
+  .invites-page__table td {
+    padding: var(--ui-space-3, 0.75rem) var(--ui-space-2, 0.5rem);
+    font-size: var(--ui-text-sm, 0.875rem);
+  }
+}
 </style>

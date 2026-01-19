@@ -287,4 +287,37 @@ watch(
     transition: transform 0.1s ease;
   }
 }
+
+/* モバイル対応 */
+@media (max-width: 640px) {
+  .task-create-form {
+    gap: var(--ui-space-5, 1.25rem);
+  }
+
+  .form-field {
+    gap: var(--ui-space-2, 0.5rem);
+  }
+
+  .form-label {
+    font-size: var(--ui-text-base, 1rem);
+  }
+
+  .form-input,
+  .form-textarea {
+    padding: var(--ui-space-4, 1rem);
+  }
+
+  .progress-picker {
+    gap: var(--ui-space-3, 0.75rem);
+    justify-content: space-between;
+  }
+
+  .progress-pill {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+    padding: var(--ui-space-3, 0.75rem) var(--ui-space-2, 0.5rem);
+    min-width: 0;
+  }
+}
 </style>
