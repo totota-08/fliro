@@ -1,3 +1,7 @@
+// ロガーを最初に初期化（他のモジュールより先に）
+import { initLogger } from "@/utils/logger";
+await initLogger();
+
 import { appName, appVersion } from "@/constants/appMeta";
 import { initAuthListener } from "@/store/auth";
 import "@/styles/motion.css";
@@ -9,7 +13,6 @@ import "./assets/style.css";
 import router from "./router";
 
 import "@/lib/firebase";
-import { initLogger } from "@/utils/logger";
 
 import { getLogger } from "@logtape/logtape";
 
@@ -20,9 +23,6 @@ const app = createApp(App);
 if (typeof document !== "undefined") {
   document.title = appVersion ? `${appName} ${appVersion}` : appName;
 }
-
-// Initialize logger first before any code that might use it
-await initLogger();
 
 initAuthListener()
   .catch((error) => {

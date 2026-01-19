@@ -1,7 +1,11 @@
 import { db } from "@/lib/firebase";
 import { addProjectMember } from "@/services/projectMembers";
 import { ensureDefaultRoles } from "@/services/rolesService";
-import type { CreateProjectPayload, ProjectDoc } from "@/types/project";
+import type {
+  CreateProjectPayload,
+  GuestAllowedPage,
+  ProjectDoc,
+} from "@/types/project";
 import {
   addDoc,
   collection,
@@ -75,6 +79,7 @@ export interface UpdateProjectMetadataPayload {
   description?: string;
   isPublic?: boolean;
   allowGuestView?: boolean;
+  guestAllowedPages?: GuestAllowedPage[];
 }
 
 export async function updateProjectMetadata(
@@ -93,6 +98,9 @@ export async function updateProjectMetadata(
   }
   if (typeof payload.allowGuestView === "boolean") {
     updateData["settings.allowGuestView"] = payload.allowGuestView;
+  }
+  if (Array.isArray(payload.guestAllowedPages)) {
+    updateData["settings.guestAllowedPages"] = payload.guestAllowedPages;
   }
   await updateDoc(doc(db, "projects", projectId), updateData);
 }

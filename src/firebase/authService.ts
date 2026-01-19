@@ -6,6 +6,7 @@ import {
   storage,
 } from "@/lib/firebase";
 import { getCurrentUser } from "@/lib/getCurrentUser";
+import { getActionCodeSettings } from "@/config/appConfig";
 import type {
   CredentialSignUpPayload,
   LoginPayload,
@@ -47,13 +48,17 @@ export async function registerCredentials(payload: CredentialSignUpPayload) {
     payload.email,
     payload.password,
   );
-  await sendEmailVerification(credential.user);
+  // メール認証後のリダイレクト先を設定
+  const actionCodeSettings = getActionCodeSettings("/auth/verify-email");
+  await sendEmailVerification(credential.user, actionCodeSettings);
   return credential.user;
 }
 
 export async function resendVerificationEmail() {
   const user = await requireCurrentUser();
-  await sendEmailVerification(user);
+  // メール認証後のリダイレクト先を設定
+  const actionCodeSettings = getActionCodeSettings("/auth/verify-email");
+  await sendEmailVerification(user, actionCodeSettings);
 }
 
 export async function refreshCurrentUser() {
@@ -66,7 +71,11 @@ export async function refreshCurrentUser() {
 }
 
 export async function sendPasswordReset(email: string) {
-  await sendPasswordResetEmail(auth, email);
+  // パスワードリセット後のリダイレクト先を設定
+  const actionCodeSettings = getActionCodeSettings(
+    "/auth/reset-password/confirm",
+  );
+  await sendPasswordResetEmail(auth, email, actionCodeSettings);
 }
 
 export async function applyEmailVerificationCode(oobCode: string) {
@@ -204,6 +213,10 @@ async function persistProfile(
     setUp: overrides.setUp ?? existing?.setUp ?? false,
     hasUsedInviteCode:
       overrides.hasUsedInviteCode ?? existing?.hasUsedInviteCode ?? false,
+    // ベータアクセス関連フィールドを既存データから引き継ぐ
+    betaAccess: overrides.betaAccess ?? existing?.betaAccess,
+    betaCodeUsed: overrides.betaCodeUsed ?? existing?.betaCodeUsed,
+    betaAccessAt: overrides.betaAccessAt ?? existing?.betaAccessAt,
   };
 
   await setDoc(ref, profile, { merge: true });
