@@ -736,5 +736,25 @@ onBeforeUnmount(() => {
   .category-item__desc {
     max-width: 100%;
   }
+
+  /* カラーピッカーのタッチターゲット拡大 */
+  .color-picker__presets {
+    gap: var(--ui-space-2);
+  }
+
+  .color-preset {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--ui-radius-md);
+  }
+
+  .color-preset:active {
+    transform: scale(0.95);
+  }
+
+  .color-custom-input {
+    width: 48px;
+    height: 44px;
+  }
 }
 </style>

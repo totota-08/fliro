@@ -186,4 +186,22 @@ const emit = defineEmits<{
   background: var(--ui-danger-50);
   color: var(--ui-danger-600);
 }
+
+/* モバイル対応：タッチターゲットサイズを拡大 */
+@media (max-width: 768px) {
+  .message-actions {
+    gap: var(--ui-space-2);
+    padding: var(--ui-space-2);
+  }
+
+  .action-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .action-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
 </style>

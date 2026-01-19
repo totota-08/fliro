@@ -956,6 +956,12 @@ onBeforeUnmount(() => {
   box-shadow: var(--ui-shadow-md);
 }
 
+.tasks-page__filter:active {
+  background: var(--ui-brand-200, #cceef2);
+  border-color: var(--ui-brand-700, #3d6166);
+  transform: scale(0.98);
+}
+
 .tasks-page__filter svg {
   width: 1.1rem;
   height: 1.1rem;

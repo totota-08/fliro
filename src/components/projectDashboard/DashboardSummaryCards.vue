@@ -736,4 +736,79 @@ onBeforeUnmount(() => {
   background: linear-gradient(90deg, #4f7c82, rgba(11, 46, 51, 0.9));
   transition: width 400ms ease;
 }
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+  .summary__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .summary-card {
+    padding: 0.65rem 0.75rem;
+    border-radius: 1rem;
+  }
+
+  .summary-card__content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .summary-card__info {
+    width: 100%;
+  }
+
+  .summary-card__label {
+    font-size: 0.875rem;
+    line-height: 1.3;
+  }
+
+  .summary-card__caption {
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+
+  .summary-card__value-block {
+    width: 100%;
+    align-items: flex-start;
+    min-width: auto;
+  }
+
+  .summary-card__value {
+    font-size: 1.75rem;
+  }
+
+  .summary-card__bar {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .summary__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .summary-card {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .summary-card__icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .summary-card__label {
+    font-size: 0.8rem;
+  }
+
+  .summary-card__caption {
+    font-size: 0.65rem;
+  }
+
+  .summary-card__value {
+    font-size: 1.5rem;
+  }
+}
 </style>
