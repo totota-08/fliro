@@ -4,6 +4,7 @@
  *
  * プロジェクトの進捗、ステータス別タスク数、ヘルススコアを表示するチャート群。
  * カードの表示/非表示と並び順は cardConfig で制御可能。
+ * モバイルでは折りたたみ可能。
  */
 import type { InsightCardConfig } from "@/services/dashboardSettingsService";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
@@ -14,6 +15,8 @@ interface Props {
   tasks: TaskDoc[];
   /** カード設定（オプション） */
   cardConfig?: InsightCardConfig[];
+  /** 折りたたみ状態（v-model:collapsed） */
+  collapsed?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -22,7 +25,16 @@ const props = withDefaults(defineProps<Props>(), {
     { id: "status", type: "status", position: 1, visible: true },
     { id: "health", type: "health", position: 2, visible: true },
   ],
+  collapsed: false,
 });
+
+const emit = defineEmits<{
+  "update:collapsed": [value: boolean];
+}>();
+
+function toggleCollapsed() {
+  emit("update:collapsed", !props.collapsed);
+}
 
 // 表示するカードを並び順でソート（visible: true のみ）
 const visibleCards = computed(() =>
@@ -129,9 +141,40 @@ function isTaskOverdue(task: TaskDoc) {
   <section v-if="visibleCards.length > 0" class="dashboard-insights">
     <header class="dashboard-insights__header">
       <h3 class="dashboard-insights__title">インサイト</h3>
+      <!-- モバイル用折りたたみトグル -->
+      <button
+        type="button"
+        class="dashboard-insights__toggle"
+        :aria-expanded="!collapsed"
+        aria-controls="insights-content"
+        @click="toggleCollapsed"
+      >
+        <span class="dashboard-insights__toggle-label">
+          {{ collapsed ? "表示" : "非表示" }}
+        </span>
+        <svg
+          class="dashboard-insights__toggle-icon"
+          :class="{ 'is-collapsed': collapsed }"
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
     </header>
 
-    <div class="dashboard-insights__content">
+    <div
+      id="insights-content"
+      class="dashboard-insights__content"
+      :class="{ 'is-collapsed': collapsed }"
+    >
       <div class="dashboard-insights__charts">
         <template v-for="card in visibleCards" :key="card.id">
           <!-- 全体の進捗 -->
@@ -321,6 +364,38 @@ function isTaskOverdue(task: TaskDoc) {
   font-size: var(--ui-text-lg, 1.125rem);
   font-weight: var(--ui-font-bold, 700);
   color: var(--ui-brand-600, #0b2e33);
+}
+
+/* モバイル用折りたたみトグル - デスクトップでは非表示 */
+.dashboard-insights__toggle {
+  display: none;
+  align-items: center;
+  gap: var(--ui-space-1, 0.25rem);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.dashboard-insights__toggle:hover {
+  border-color: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-brand-700, #1a4a51);
+}
+
+.dashboard-insights__toggle-label {
+  font-weight: var(--ui-font-medium, 500);
+}
+
+.dashboard-insights__toggle-icon {
+  transition: transform 0.2s ease;
+}
+
+.dashboard-insights__toggle-icon.is-collapsed {
+  transform: rotate(-180deg);
 }
 
 .dashboard-insights__charts {
@@ -584,8 +659,32 @@ function isTaskOverdue(task: TaskDoc) {
   }
 }
 
-/* Responsive */
+/* Responsive - モバイル専用 */
 @media (max-width: 768px) {
+  .dashboard-insights__toggle {
+    display: flex;
+  }
+
+  .dashboard-insights__content {
+    max-height: 2000px;
+    overflow: hidden;
+    transition:
+      max-height 0.3s ease,
+      opacity 0.2s ease,
+      margin 0.3s ease;
+  }
+
+  .dashboard-insights__content.is-collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    margin-bottom: calc(-1 * var(--ui-space-4, 1rem));
+  }
+
+  .dashboard-insights__header {
+    margin-bottom: var(--ui-space-3, 0.75rem);
+  }
+
   .dashboard-insights__charts {
     grid-template-columns: 1fr;
   }
