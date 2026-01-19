@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
+import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
+import { appName } from "@/constants/appMeta";
 
 type TeamMember = {
   id: number;
@@ -207,13 +209,11 @@ const formatFullName = (member: TeamMember) =>
             <h1 class="demo__heading">Webサイトリニューアル</h1>
           </div>
         </div>
-        <div class="demo__toolbar">
-          <button type="button">共有</button>
-          <button type="button" class="is-primary">エクスポート</button>
-        </div>
       </header>
 
       <div class="demo__content demo__content--condensed">
+        <DemoExplainerBanner page="team" />
+
         <section class="team-page">
           <header class="team-page__header">
             <div>
@@ -373,6 +373,15 @@ const formatFullName = (member: TeamMember) =>
               </table>
             </div>
           </section>
+
+          <!-- デモ注意書き -->
+          <div class="demo-notice">
+            <p>
+              これはデモ画面です。実際の{{
+                appName
+              }}では、メンバーの招待・ロール変更・権限管理が可能です。
+            </p>
+          </div>
         </section>
       </div>
     </div>
@@ -845,6 +854,24 @@ const formatFullName = (member: TeamMember) =>
 
 .team-table tbody tr:hover {
   background: var(--ui-bg, #f5fcff);
+}
+
+/* ==========================================================================
+   Demo Notice
+   ========================================================================== */
+
+.demo-notice {
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-brand-50, #f5fcff);
+  border: 1px solid var(--ui-brand-200, #d4f1f5);
+  border-radius: var(--ui-radius-lg, 1rem);
+  text-align: center;
+}
+
+.demo-notice p {
+  margin: 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 /* ==========================================================================
