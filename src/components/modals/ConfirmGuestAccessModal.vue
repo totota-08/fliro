@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * ConfirmGuestAccessModal - ゲスト閲覧許可の確認モーダル
+ * ConfirmGuestAccessModal - 公開プロジェクト設定の確認モーダル
  *
- * ゲスト閲覧を有効にする際の警告と同意確認用。
+ * プロジェクトを公開する際の警告と同意確認用。
  */
 import AppAlert from "@/components/ui/AppAlert.vue";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -39,7 +39,7 @@ function handleClose() {
 <template>
   <AppModal
     :open="open"
-    title="ゲスト閲覧を有効にする"
+    title="プロジェクトを公開する"
     size="sm"
     @close="handleClose"
   >
@@ -47,7 +47,7 @@ function handleClose() {
       <!-- 警告メッセージ -->
       <AppAlert variant="warning" title="注意">
         <p>
-          ゲスト閲覧を有効にすると、プロジェクトのリンクを知っている人は誰でもプロジェクト内を閲覧できるようになります。
+          プロジェクトを公開すると、リンクを知っている人は誰でもログインなしで閲覧できるようになります。
         </p>
         <p class="confirm-guest-modal__caution">
           機密情報が含まれていないことを確認してください。
@@ -56,16 +56,16 @@ function handleClose() {
 
       <!-- 補足説明 -->
       <div class="confirm-guest-modal__info">
-        <h4>ゲストができること</h4>
+        <h4>ゲスト（未ログインユーザー）ができること</h4>
         <ul>
-          <li>プロジェクトのタスク一覧・詳細の閲覧</li>
-          <li>ダッシュボードの閲覧</li>
+          <li>公開設定で許可されたページの閲覧</li>
+          <li>タスクやスレッドの内容確認</li>
         </ul>
         <h4>ゲストができないこと</h4>
         <ul>
           <li>タスクの作成・編集・削除</li>
-          <li>コメントの投稿</li>
-          <li>メンバー情報の詳細閲覧</li>
+          <li>コメントやメッセージの投稿</li>
+          <li>プロジェクト設定の変更</li>
         </ul>
       </div>
 
@@ -75,7 +75,7 @@ function handleClose() {
           キャンセル
         </AppButton>
         <AppButton variant="primary" :loading="loading" @click="handleConfirm">
-          理解しました、有効にする
+          理解しました、公開する
         </AppButton>
       </div>
     </div>

@@ -2,9 +2,10 @@ import {
   ROLE_DEFAULT_PERMISSIONS,
   type ProjectPermissionKey,
 } from "@/constants/permissions";
+import { DEFAULT_GUEST_ALLOWED_PAGES } from "@/constants/guestPages";
 import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
-import type { ProjectDoc } from "@/types/project";
+import type { GuestAllowedPage, ProjectDoc } from "@/types/project";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
 
@@ -209,6 +210,8 @@ export interface ProjectAccessResult {
   error?: ProjectAccessError;
   /** プロジェクトがゲスト閲覧を許可しているか */
   allowGuestView?: boolean;
+  /** ゲストがアクセス可能なページ一覧 */
+  guestAllowedPages?: GuestAllowedPage[];
   /** 未認証ユーザーとしてゲストアクセスしているか */
   isAnonymousGuest?: boolean;
 }
@@ -241,12 +244,16 @@ export async function fetchProjectAccess(
       };
     }
 
-    const allowGuestView = Boolean(project.settings?.allowGuestView);
+    // 公開プロジェクト設定（isPublicがtrueならゲスト閲覧可能）
+    const isPublic = Boolean(project.settings?.isPublic);
+    // ゲスト許可ページ（設定がない場合はデフォルト値を使用）
+    const guestAllowedPages: GuestAllowedPage[] =
+      project.settings?.guestAllowedPages ?? DEFAULT_GUEST_ALLOWED_PAGES;
 
     // 未認証ユーザーの場合
     if (!userId) {
-      // ゲスト閲覧が許可されていればアクセス可能
-      if (allowGuestView) {
+      // 公開プロジェクトならアクセス可能
+      if (isPublic) {
         return {
           isOwner: false,
           isAdmin: false,
@@ -256,6 +263,7 @@ export async function fetchProjectAccess(
           role: "anonymous_guest",
           permissions: ROLE_DEFAULT_PERMISSIONS.viewer || [],
           allowGuestView: true,
+          guestAllowedPages,
           isAnonymousGuest: true,
         };
       }
@@ -293,12 +301,12 @@ export async function fetchProjectAccess(
           hasAccess: true,
           role: "owner",
           permissions: ROLE_DEFAULT_PERMISSIONS.owner || [],
-          allowGuestView,
+          allowGuestView: isPublic,
         };
       }
 
-      // ゲスト閲覧が許可されていれば、認証済みだがメンバーでないユーザーもアクセス可能
-      if (allowGuestView) {
+      // 公開プロジェクトなら、認証済みだがメンバーでないユーザーもアクセス可能
+      if (isPublic) {
         return {
           isOwner: false,
           isAdmin: false,
@@ -308,6 +316,7 @@ export async function fetchProjectAccess(
           role: "guest",
           permissions: ROLE_DEFAULT_PERMISSIONS.viewer || [],
           allowGuestView: true,
+          guestAllowedPages,
         };
       }
 
@@ -340,7 +349,7 @@ export async function fetchProjectAccess(
         hasAccess: true,
         role,
         permissions: ROLE_DEFAULT_PERMISSIONS.owner || [],
-        allowGuestView,
+        allowGuestView: isPublic,
       };
     }
 
@@ -370,7 +379,7 @@ export async function fetchProjectAccess(
       hasAccess: true,
       role,
       permissions,
-      allowGuestView,
+      allowGuestView: isPublic,
     };
   } catch (error) {
     // ネットワークエラーやFirebaseエラーの場合
