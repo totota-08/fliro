@@ -56,6 +56,7 @@ export async function removeAccountWithPassword(
 export async function updateProfile(payload: {
   nickname?: string;
   fullName?: string;
+  hideAvatarInProjects?: boolean;
 }) {
   const profile = await updateUserProfile(payload);
   setProfile(profile);

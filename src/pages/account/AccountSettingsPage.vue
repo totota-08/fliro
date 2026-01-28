@@ -4,9 +4,11 @@
  *
  * プロフィール編集、アバター変更、アカウント削除などを行うページ
  */
+import LinkedAccountsSection from "@/components/account/LinkedAccountsSection.vue";
 import DangerZone from "@/components/ui/DangerZone.vue";
 import ConfirmDangerModal from "@/components/modals/ConfirmDangerModal.vue";
 import MFAEnrollmentModal from "@/components/modals/MFAEnrollmentModal.vue";
+import AvatarCropperModal from "@/components/modals/AvatarCropperModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
@@ -57,6 +59,12 @@ const profileError = ref("");
 // Avatar upload state
 const avatarUploading = ref(false);
 const avatarMessage = ref("");
+const showCropperModal = ref(false);
+const selectedImageFile = ref<File | null>(null);
+
+// Project avatar visibility state
+const hideAvatarInProjects = ref(profile.value?.hideAvatarInProjects ?? false);
+const avatarSettingSaving = ref(false);
 
 // Account deletion state
 const showDeleteModal = ref(false);
@@ -120,13 +128,20 @@ async function saveProfile() {
   }
 }
 
-// Avatar upload
-async function handleAvatarChange(event: Event) {
+// Avatar upload - ファイル選択時にトリミングモーダルを開く
+function handleAvatarChange(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   avatarMessage.value = "";
 
   if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith("image/")) {
+    avatarMessage.value = "画像ファイルを選択してください。";
+    input.value = "";
+    return;
+  }
 
   // Validate file size (max 5MB)
   if (file.size > 5 * 1024 * 1024) {
@@ -135,16 +150,48 @@ async function handleAvatarChange(event: Event) {
     return;
   }
 
+  selectedImageFile.value = file;
+  showCropperModal.value = true;
+  input.value = "";
+}
+
+// トリミング完了後のアップロード処理
+async function handleAvatarCropConfirm(croppedFile: File) {
+  showCropperModal.value = false;
+  selectedImageFile.value = null;
   avatarUploading.value = true;
+  avatarMessage.value = "";
+
   try {
-    await updateAccountAvatar(file);
+    await updateAccountAvatar(croppedFile);
     avatarMessage.value = "アイコンを更新しました。";
   } catch (error) {
     logger.error`Avatar upload failed: ${error}`;
     avatarMessage.value = "アイコンのアップロードに失敗しました。";
   } finally {
     avatarUploading.value = false;
-    input.value = "";
+  }
+}
+
+// トリミングモーダルを閉じる
+function handleCropperClose() {
+  showCropperModal.value = false;
+  selectedImageFile.value = null;
+}
+
+// プロジェクトでのアバター表示設定を更新
+async function toggleHideAvatarInProjects() {
+  if (avatarSettingSaving.value) return;
+
+  avatarSettingSaving.value = true;
+  try {
+    const newValue = !hideAvatarInProjects.value;
+    await updateProfile({ hideAvatarInProjects: newValue });
+    hideAvatarInProjects.value = newValue;
+  } catch (error) {
+    logger.error`Failed to update avatar visibility setting: ${error}`;
+  } finally {
+    avatarSettingSaving.value = false;
   }
 }
 
@@ -206,6 +253,22 @@ async function loadMFAStatus() {
 async function startMFASetup() {
   mfaLoading.value = true;
   mfaError.value = "";
+
+  // メール認証チェック（ソーシャルログインの場合はスキップ）
+  // Google/GitHubログインの場合、プロバイダー側で既にメール認証済み
+  const isSocialLogin = user.value?.providerData?.some(
+    (provider) =>
+      provider.providerId === "google.com" ||
+      provider.providerId === "github.com",
+  );
+
+  if (!isSocialLogin && !user.value?.emailVerified) {
+    mfaError.value =
+      "二段階認証を設定するには、先にメールアドレスの認証を完了してください。";
+    mfaLoading.value = false;
+    return;
+  }
+
   try {
     const session = await startMFAEnrollment();
     const secret = await generateTOTPSecret(session);
@@ -220,7 +283,34 @@ async function startMFASetup() {
     showMFAEnrollmentModal.value = true;
   } catch (error) {
     logger.error`Failed to start MFA enrollment: ${error}`;
-    mfaError.value = "MFA設定の開始に失敗しました。";
+    const firebaseError = error as { code?: string; message?: string };
+
+    // デバッグ用：エラーの詳細をコンソールに出力
+    // eslint-disable-next-line no-console
+    console.error("MFA enrollment error details:", {
+      code: firebaseError?.code,
+      message: firebaseError?.message,
+      fullError: error,
+    });
+
+    if (firebaseError?.code === "auth/unsupported-first-factor") {
+      mfaError.value =
+        "二段階認証を設定するには、先にメールアドレスの認証を完了してください。";
+    } else if (
+      firebaseError?.message?.includes("ADMIN_ONLY_OPERATION") ||
+      firebaseError?.message?.includes("TOTP_MFA_ENROLLMENT_NOT_ENABLED")
+    ) {
+      mfaError.value =
+        "二段階認証（TOTP）がプロジェクトで有効化されていません。Firebase Consoleで設定してください。";
+    } else if (firebaseError?.code === "auth/requires-recent-login") {
+      mfaError.value =
+        "セキュリティのため、再度ログインしてからお試しください。";
+    } else if (firebaseError?.message?.includes("EMAIL_NOT_VERIFIED")) {
+      mfaError.value =
+        "二段階認証を設定するには、先にメールアドレスの認証を完了してください。";
+    } else {
+      mfaError.value = `MFA設定の開始に失敗しました: ${firebaseError?.message || "不明なエラー"}`;
+    }
   } finally {
     mfaLoading.value = false;
   }
@@ -331,7 +421,7 @@ onBeforeUnmount(() => {
           <div class="profile-section__avatar">
             <div class="profile-section__avatar-wrapper">
               <UserAvatar
-                :url="avatarUrl"
+                :src="avatarUrl"
                 :name="profile?.nickname || profile?.fullName"
                 :size="80"
               />
@@ -359,6 +449,22 @@ onBeforeUnmount(() => {
               :class="{ 'is-error': avatarMessage.includes('失敗') }"
             >
               {{ avatarMessage }}
+            </p>
+
+            <!-- プロジェクトでのアバター表示設定 -->
+            <label class="avatar-visibility-toggle">
+              <input
+                type="checkbox"
+                :checked="hideAvatarInProjects"
+                :disabled="avatarSettingSaving"
+                @change="toggleHideAvatarInProjects"
+              />
+              <span class="avatar-visibility-toggle__text">
+                プロジェクト内ではアイコンを非表示
+              </span>
+            </label>
+            <p class="avatar-visibility-hint">
+              オンにするとプロジェクト内でイニシャルが表示されます
             </p>
           </div>
 
@@ -522,6 +628,14 @@ onBeforeUnmount(() => {
         </div>
       </SectionCard>
 
+      <!-- Account Linking Section -->
+      <SectionCard
+        title="アカウント連携"
+        subtitle="SNSアカウントとの連携を管理"
+      >
+        <LinkedAccountsSection />
+      </SectionCard>
+
       <!-- Danger Zone - Account Deletion -->
       <DangerZone
         title="危険な操作"
@@ -564,6 +678,14 @@ onBeforeUnmount(() => {
       :qr-code-url="qrCodeUrl"
       @close="closeMFAEnrollmentModal"
       @confirm="completeMFAEnrollment"
+    />
+
+    <!-- Avatar Cropper Modal -->
+    <AvatarCropperModal
+      :open="showCropperModal"
+      :image-file="selectedImageFile"
+      @close="handleCropperClose"
+      @confirm="handleAvatarCropConfirm"
     />
   </AppShell>
 </template>
@@ -635,6 +757,33 @@ onBeforeUnmount(() => {
 
 .profile-section__avatar-message.is-error {
   color: var(--ui-danger, #d64545);
+}
+
+/* Avatar visibility toggle */
+.avatar-visibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  margin-top: var(--ui-space-3, 0.75rem);
+  cursor: pointer;
+}
+
+.avatar-visibility-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ui-brand-600, #4f7c82);
+  cursor: pointer;
+}
+
+.avatar-visibility-toggle__text {
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text, #0b2e33);
+}
+
+.avatar-visibility-hint {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
 }
 
 .profile-section__content {

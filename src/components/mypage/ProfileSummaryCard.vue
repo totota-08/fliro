@@ -48,7 +48,7 @@ const displayName = computed(
       <!-- 上段: アバター + 名前/メール + サインアウト -->
       <div class="profile__header">
         <UserAvatar
-          :url="profile?.avatarUrl || ''"
+          :src="profile?.avatarUrl || ''"
           :name="profile?.nickname || profile?.fullName"
           :size="56"
         />

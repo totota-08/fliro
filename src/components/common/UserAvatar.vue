@@ -6,6 +6,8 @@ interface Props {
   name?: string | null;
   size?: number | string;
   alt?: string;
+  /** trueの場合、srcがあってもイニシャルを表示する */
+  forceInitials?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -13,7 +15,11 @@ const props = withDefaults(defineProps<Props>(), {
   name: "",
   size: 32,
   alt: "User Avatar",
+  forceInitials: false,
 });
+
+/** 実際に画像を表示するかどうか */
+const showImage = computed(() => props.src && !props.forceInitials);
 
 const initials = computed(() => {
   return (props.name || "U").charAt(0).toUpperCase();
@@ -32,7 +38,7 @@ const style = computed(() => {
 
 <template>
   <div class="user-avatar" :style="style">
-    <img v-if="src" :src="src" :alt="alt" class="avatar-image" />
+    <img v-if="showImage" :src="src!" :alt="alt" class="avatar-image" />
     <span v-else class="avatar-initials">{{ initials }}</span>
   </div>
 </template>

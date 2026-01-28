@@ -9,25 +9,27 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vue-tsc -b && vite build",
+    "prod": "vite --host --mode production",
     "preview": "vite preview",
     "lint": "eslint . --ext .js,.ts --fix",
     "format": "prettier --write .",
     "typecheck": "vue-tsc --noEmit",
     "test:rules": "firebase emulators:exec --project test-project --only firestore \"node --test --test-concurrency=1 tests/*.test.mjs\"",
     "create-invite-code": "node scripts/createInviteCode.mjs",
+    "set-admin": "node scripts/setAdmin.mjs",
     "release-notes": "node scripts/manageReleaseNotes.mjs",
     "prepare": "husky"
   },
   "dependencies": {
     "@logtape/logtape": "^1.2.2",
     "axios": "^1.13.2",
+    "cropperjs": "^2.1.0",
     "firebase": "^12.7.0",
     "vue": "^3.5.25",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "firebase-admin": "^13.0.2",
     "@firebase/rules-unit-testing": "^5.0.0",
     "@types/node": "^25.0.3",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
@@ -36,6 +38,7 @@
     "@vue/tsconfig": "^0.8.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
+    "firebase-admin": "^13.0.2",
     "firebase-tools": "^15.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",

@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/getCurrentUser";
 import { getActionCodeSettings } from "@/config/appConfig";
 import type {
   CredentialSignUpPayload,
+  LinkedProvider,
   LoginPayload,
   ProfileSetupPayload,
   SocialProvider,
@@ -20,6 +21,7 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   EmailAuthProvider,
+  linkWithPopup,
   multiFactor,
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
@@ -32,11 +34,13 @@ import {
   signInWithPopup,
   TotpMultiFactorGenerator,
   TotpSecret,
+  unlink,
   updateProfile,
   type AuthProvider,
   type MultiFactorResolver,
   type MultiFactorSession,
   type User,
+  type UserInfo,
 } from "firebase/auth";
 import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import {
@@ -57,7 +61,7 @@ export async function registerCredentials(payload: CredentialSignUpPayload) {
     payload.password,
   );
   // メール認証後のリダイレクト先を設定
-  const actionCodeSettings = getActionCodeSettings("/auth/verify-email");
+  const actionCodeSettings = getActionCodeSettings("/auth/verify");
   await sendEmailVerification(credential.user, actionCodeSettings);
   return credential.user;
 }
@@ -65,7 +69,7 @@ export async function registerCredentials(payload: CredentialSignUpPayload) {
 export async function resendVerificationEmail() {
   const user = await requireCurrentUser();
   // メール認証後のリダイレクト先を設定
-  const actionCodeSettings = getActionCodeSettings("/auth/verify-email");
+  const actionCodeSettings = getActionCodeSettings("/auth/verify");
   await sendEmailVerification(user, actionCodeSettings);
 }
 
@@ -80,9 +84,7 @@ export async function refreshCurrentUser() {
 
 export async function sendPasswordReset(email: string) {
   // パスワードリセット後のリダイレクト先を設定
-  const actionCodeSettings = getActionCodeSettings(
-    "/auth/reset-password/confirm",
-  );
+  const actionCodeSettings = getActionCodeSettings("/auth/reset/confirm");
   await sendPasswordResetEmail(auth, email, actionCodeSettings);
 }
 
@@ -126,6 +128,14 @@ export async function loginWithEmail(payload: LoginPayload) {
 export async function loginWithProvider(provider: SocialProvider) {
   const credential = await signInWithPopup(auth, providerMap[provider]);
   return persistProfile(credential.user);
+}
+
+/**
+ * ソーシャルログイン後のプロファイル永続化
+ * Google Identity Services等で既にFirebase Authにログイン済みの場合に使用
+ */
+export async function persistProfileAfterSocialLogin(user: User) {
+  return persistProfile(user);
 }
 
 export async function fetchProfile(uid: string) {
@@ -175,6 +185,7 @@ export async function deleteAccountWithPassword(password: string) {
 export async function updateUserProfile(payload: {
   nickname?: string;
   fullName?: string;
+  hideAvatarInProjects?: boolean;
 }) {
   const user = await requireCurrentUser();
 
@@ -186,6 +197,7 @@ export async function updateUserProfile(payload: {
   return persistProfile(user, {
     nickname: payload.nickname,
     fullName: payload.fullName,
+    hideAvatarInProjects: payload.hideAvatarInProjects,
   });
 }
 
@@ -225,6 +237,9 @@ async function persistProfile(
     betaAccess: overrides.betaAccess ?? existing?.betaAccess,
     betaCodeUsed: overrides.betaCodeUsed ?? existing?.betaCodeUsed,
     betaAccessAt: overrides.betaAccessAt ?? existing?.betaAccessAt,
+    // プロジェクト内でのアバター表示設定
+    hideAvatarInProjects:
+      overrides.hideAvatarInProjects ?? existing?.hideAvatarInProjects ?? false,
   };
 
   await setDoc(ref, profile, { merge: true });
@@ -389,4 +404,95 @@ export async function verifyMFACode(
   }
 
   throw new Error("サポートされていないMFAタイプです。");
+}
+
+/**
+ * アカウント連携（Account Linking）関連の関数
+ */
+
+/**
+ * 現在のユーザーに連携されているプロバイダー一覧を取得
+ */
+export async function getLinkedProviders(): Promise<LinkedProvider[]> {
+  const user = await requireCurrentUser();
+
+  return user.providerData.map((provider: UserInfo) => ({
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    email: provider.email,
+    photoURL: provider.photoURL,
+    uid: provider.uid,
+  }));
+}
+
+/**
+ * 現在のアカウントに新しいプロバイダーを連携
+ * @param provider - 連携するプロバイダー（"google" | "github"）
+ * @throws auth/credential-already-in-use - 別アカウントで既に使用中
+ * @throws auth/provider-already-linked - 既に連携済み
+ */
+export async function linkProvider(
+  provider: SocialProvider,
+): Promise<LinkedProvider[]> {
+  const user = await requireCurrentUser();
+  const authProvider = providerMap[provider];
+
+  const result = await linkWithPopup(user, authProvider);
+  return result.user.providerData.map((p: UserInfo) => ({
+    providerId: p.providerId,
+    displayName: p.displayName,
+    email: p.email,
+    photoURL: p.photoURL,
+    uid: p.uid,
+  }));
+}
+
+/**
+ * プロバイダーの連携を解除
+ * @param providerId - 解除するプロバイダーID（例: "google.com", "github.com"）
+ * @throws Error - 最後の認証方法を解除しようとした場合
+ */
+export async function unlinkProvider(
+  providerId: string,
+): Promise<LinkedProvider[]> {
+  const user = await requireCurrentUser();
+
+  // 最低1つの認証方法が残るかチェック
+  if (user.providerData.length <= 1) {
+    throw new Error("最低1つの認証方法が必要です。");
+  }
+
+  // パスワード認証のみ残っている状態でメールが設定されていない場合を防ぐ
+  const remainingProviders = user.providerData.filter(
+    (p) => p.providerId !== providerId,
+  );
+
+  if (
+    remainingProviders.length === 1 &&
+    remainingProviders[0]?.providerId === "password" &&
+    !user.email
+  ) {
+    throw new Error(
+      "メールアドレスが設定されていないため、連携を解除できません。",
+    );
+  }
+
+  const result = await unlink(user, providerId);
+  return result.providerData.map((p: UserInfo) => ({
+    providerId: p.providerId,
+    displayName: p.displayName,
+    email: p.email,
+    photoURL: p.photoURL,
+    uid: p.uid,
+  }));
+}
+
+/**
+ * 特定のプロバイダーが連携済みかチェック
+ */
+export function isProviderLinked(
+  providerData: LinkedProvider[],
+  providerId: string,
+): boolean {
+  return providerData.some((p) => p.providerId === providerId);
 }
