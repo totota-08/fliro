@@ -25,7 +25,7 @@
     "axios": "^1.13.2",
     "canvas-confetti": "^1.9.4",
     "cropperjs": "^2.1.0",
-    "firebase": "^12.7.0",
+    "firebase": "^12.8.0",
     "vue": "^3.5.25",
     "vue-router": "^4.6.4"
   },
