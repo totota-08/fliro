@@ -429,12 +429,6 @@ function handleComplete(task: TaskDoc, event: MouseEvent) {
             >
               {{ getPriorityLabel(task.priority) }}
             </span>
-            <span
-              class="task-row__priority"
-              :class="getPriorityClass(task.priority)"
-            >
-              {{ getPriorityLabel(task.priority) }}
-            </span>
           </div>
           <div class="task-row__metric task-row__metric--progress">
             <span class="task-row__metric-label">進捗</span>
@@ -918,9 +912,6 @@ function handleComplete(task: TaskDoc, event: MouseEvent) {
 
 .task-row.is-overdue:hover {
   border-color: rgba(239, 68, 68, 0.4);
-  background-color: rgba(239, 68, 68, 0.08);
-}
-
   background-color: rgba(239, 68, 68, 0.08);
 }
 
