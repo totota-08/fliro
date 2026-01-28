@@ -25,6 +25,8 @@ export interface ProjectMember {
   avatarUrl?: string;
   displayName?: string; // Computed property for display
   permissions?: ReturnType<typeof buildPermissionsFromRoles>;
+  /** プロジェクト内でアバターを非表示にする設定 */
+  hideAvatarInProjects?: boolean;
 }
 
 interface AddProjectMemberOptions {
@@ -40,6 +42,7 @@ interface AddProjectMemberOptions {
     fullName?: string;
     email?: string;
     avatarUrl?: string;
+    hideAvatarInProjects?: boolean;
   };
   actorName?: string;
 }
@@ -83,6 +86,7 @@ export function listenProjectMembers(
         avatarUrl: data.avatarUrl,
         permissions,
         displayName: data.nickname || data.fullName || "Unknown User",
+        hideAvatarInProjects: data.hideAvatarInProjects ?? false,
       });
     });
     callback(members);
@@ -116,6 +120,7 @@ export async function addProjectMember({
       fullName: profileData.fullName ?? null,
       email: profileData.email ?? null,
       avatarUrl: profileData.avatarUrl ?? null,
+      hideAvatarInProjects: profileData.hideAvatarInProjects ?? false,
       permissions,
       joinedAt: timestamp,
       lastAccessedAt: timestamp,
@@ -134,11 +139,16 @@ export async function addProjectMember({
   );
 
   // Sync to Realtime Database for chat rules
-  const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
-  await set(rtdbRef, {
-    role,
-    joinedAt: Date.now(),
-  });
+  // 失敗してもプロジェクト作成は続行する（チャット画面アクセス時に再同期される）
+  try {
+    const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
+    await set(rtdbRef, {
+      role,
+      joinedAt: Date.now(),
+    });
+  } catch (error) {
+    logger.warn`Failed to sync member to Realtime Database: ${error}`;
+  }
 
   try {
     await addProjectEvent(projectId, {
@@ -182,8 +192,13 @@ export async function removeProjectMember(
   }
 
   // Remove from Realtime Database
-  const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
-  await remove(rtdbRef);
+  // 失敗してもFirestoreの削除は完了しているので続行
+  try {
+    const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
+    await remove(rtdbRef);
+  } catch (error) {
+    logger.warn`Failed to remove member from Realtime Database: ${error}`;
+  }
 
   try {
     await addProjectEvent(projectId, {

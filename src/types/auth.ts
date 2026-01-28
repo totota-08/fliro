@@ -17,6 +17,10 @@ export interface UserProfile {
   betaAccessAt?: string;
   // 招待コード使用済みフラグ
   hasUsedInviteCode: boolean;
+  // 管理者権限（Firebase Custom Claimsから取得）
+  isAdmin?: boolean;
+  // プロジェクト内でアバター画像を非表示にする（trueの場合はイニシャルを表示）
+  hideAvatarInProjects?: boolean;
 }
 
 export interface CredentialSignUpPayload {
@@ -38,3 +42,25 @@ export interface LoginPayload {
 }
 
 export type SocialProvider = "google" | "github";
+
+/**
+ * 連携済みプロバイダー情報
+ */
+export interface LinkedProvider {
+  providerId: string;
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+  uid: string;
+}
+
+/**
+ * プロバイダーID定数（FirebaseのproviderIdに対応）
+ */
+export const PROVIDER_IDS = {
+  GOOGLE: "google.com",
+  GITHUB: "github.com",
+  PASSWORD: "password",
+} as const;
+
+export type ProviderIdType = (typeof PROVIDER_IDS)[keyof typeof PROVIDER_IDS];
