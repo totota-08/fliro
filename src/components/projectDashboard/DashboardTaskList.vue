@@ -2,16 +2,17 @@
 import AppButton from "@/components/ui/AppButton.vue";
 import type { TaskCategory } from "@/services/taskCategoryService";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
+import confetti from "canvas-confetti";
 import { computed, ref } from "vue";
 
 interface MemberOption {
   id: string;
   name: string;
 }
-
-interface TaskFilters {
+export interface TaskFilters {
   search: string;
   status: string;
+  priority: string;
   assignee: string;
   due: string;
   category: string;
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   "update:modelValue": [value: TaskFilters];
   select: [taskId: string];
   navigate: [taskId: string];
+  complete: [task: TaskDoc];
 }>();
 
 const filters = computed({
@@ -46,6 +48,7 @@ function toggleFilters() {
 const activeFilterCount = computed(() => {
   let count = 0;
   if (props.modelValue.status !== "all") count++;
+  if (props.modelValue.priority !== "all") count++;
   if (props.modelValue.assignee !== "all") count++;
   if (props.modelValue.due !== "all") count++;
   if (props.modelValue.category !== "all") count++;
@@ -84,6 +87,7 @@ function resetFilters() {
   emit("update:modelValue", {
     search: "",
     status: "all",
+    priority: "all",
     assignee: "all",
     due: "all",
     category: "all",
@@ -138,12 +142,43 @@ function displayAssignee(task: TaskDoc) {
   return member?.name || "不明なユーザー";
 }
 
+function getPriorityLabel(priority?: string | null) {
+  if (priority === "high") return "高";
+  if (priority === "low") return "低";
+  return "中";
+}
+
+function getPriorityClass(priority?: string | null) {
+  const p = priority || "medium";
+  return `priority--${p}`;
+}
+
 function handleSelect(taskId: string) {
   emit("select", taskId);
 }
 
 function handleNavigate(taskId: string) {
   emit("navigate", taskId);
+}
+
+function handleComplete(task: TaskDoc, event: MouseEvent) {
+  event.stopPropagation();
+  if (task.status === "done") return;
+
+  // Confetti effect
+  const rect = (event.target as HTMLElement).getBoundingClientRect();
+  const x = (rect.left + rect.width / 2) / window.innerWidth;
+  const y = (rect.top + rect.height / 2) / window.innerHeight;
+
+  confetti({
+    origin: { x, y },
+    particleCount: 60,
+    spread: 70,
+    colors: ["#16a34a", "#4f7c82", "#ffffff"],
+    disableForReducedMotion: true,
+  });
+
+  emit("complete", task);
 }
 </script>
 
@@ -227,6 +262,22 @@ function handleNavigate(taskId: string) {
             <option value="todo">未着手</option>
             <option value="in-progress">進行中</option>
             <option value="done">完了</option>
+          </select>
+
+          <select
+            :value="filters.priority"
+            class="task-filter-select"
+            @change="
+              updateFilter(
+                'priority',
+                ($event.target as HTMLSelectElement).value,
+              )
+            "
+          >
+            <option value="all">優先度</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
           </select>
           <select
             :value="filters.assignee"
@@ -320,7 +371,49 @@ function handleNavigate(taskId: string) {
       >
         <div class="task-row__content">
           <div class="task-row__main">
-            <p class="task-row__title">{{ task.title }}</p>
+            <div class="task-row__title-wrapper">
+              <button
+                v-if="task.status !== 'done'"
+                class="task-row__check-btn"
+                title="完了にする"
+                @click="handleComplete(task, $event)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+              <div v-else class="task-row__done-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <p
+                class="task-row__title"
+                :class="{ 'is-done': task.status === 'done' }"
+              >
+                {{ task.title }}
+              </p>
+            </div>
             <span class="task-row__category">{{
               getCategoryName(task.categoryId)
             }}</span>
@@ -329,6 +422,18 @@ function handleNavigate(taskId: string) {
             <span class="task-row__assignee">{{ displayAssignee(task) }}</span>
             <span class="task-row__status" :class="taskStatusClass(task)">
               {{ taskStatusLabel(task.status) }}
+            </span>
+            <span
+              class="task-row__priority"
+              :class="getPriorityClass(task.priority)"
+            >
+              {{ getPriorityLabel(task.priority) }}
+            </span>
+            <span
+              class="task-row__priority"
+              :class="getPriorityClass(task.priority)"
+            >
+              {{ getPriorityLabel(task.priority) }}
             </span>
           </div>
           <div class="task-row__metric task-row__metric--progress">
@@ -649,6 +754,63 @@ function handleNavigate(taskId: string) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+
+.task-row__title.is-done {
+  color: var(--ui-text-muted, #94a3b8);
+  text-decoration: line-through;
+}
+
+.task-row__title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  flex: 1;
+  min-width: 0;
+}
+
+.task-row__check-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--ui-border, rgba(11, 46, 51, 0.2));
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.task-row__check-btn:hover {
+  border-color: var(--ui-success, #16a34a);
+  color: var(--ui-success-light, #dcfce7);
+}
+
+.task-row__check-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.task-row__done-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ui-success, #16a34a);
+  color: white;
+  flex-shrink: 0;
+}
+
+.task-row__done-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .task-row__assignee {
@@ -757,6 +919,32 @@ function handleNavigate(taskId: string) {
 .task-row.is-overdue:hover {
   border-color: rgba(239, 68, 68, 0.4);
   background-color: rgba(239, 68, 68, 0.08);
+}
+
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.task-row__priority {
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  padding: var(--ui-space-1, 0.25rem) var(--ui-space-2, 0.5rem);
+  border-radius: var(--ui-radius-full, 9999px);
+  white-space: nowrap;
+}
+
+.priority--high {
+  background: var(--ui-danger-light, #fee2e2);
+  color: var(--ui-danger, #ef4444);
+}
+
+.priority--medium {
+  background: var(--ui-warning-light, #fef3c7);
+  color: var(--ui-warning, #f59e0b);
+}
+
+.priority--low {
+  background: var(--ui-info-light, #e0f2fe);
+  color: var(--ui-info, #0ea5e9);
 }
 
 .task-list__load-more {

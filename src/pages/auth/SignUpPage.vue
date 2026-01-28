@@ -5,8 +5,8 @@ import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthCredentialFields from "@/components/ui/AuthCredentialFields.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
 import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
-import { ROUTE_NAMES } from "@/constants/routes";
 import { useAuth } from "@/composables/useAuth";
+import { ROUTE_NAMES } from "@/constants/routes";
 import {
   fetchProfile,
   refreshCurrentUser,
@@ -100,6 +100,8 @@ const jobOptions = [
   { value: "marketing", label: "マーケター" },
   { value: "sales", label: "営業" },
   { value: "cs", label: "カスタマーサクセス" },
+  { value: "student", label: "学生" },
+  { value: "researcher", label: "研究者" },
   { value: "other", label: "その他" },
 ];
 
@@ -117,11 +119,7 @@ const credentialValid = computed(() => {
 });
 
 const profileValid = computed(() => {
-  return (
-    profileForm.fullName.trim().length > 1 &&
-    Boolean(profileForm.birthday) &&
-    Boolean(profileForm.jobRole)
-  );
+  return profileForm.fullName.trim().length > 1 && Boolean(profileForm.jobRole);
 });
 
 const redirectPath = computed(() => {
@@ -421,9 +419,8 @@ function mapFirebaseError(error: unknown) {
 
             <AuthFormField
               v-model="profileForm.birthday"
-              label="生年月日"
+              label="生年月日 (任意)"
               type="date"
-              required
             />
 
             <div class="form-field">

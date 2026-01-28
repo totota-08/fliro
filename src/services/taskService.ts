@@ -20,11 +20,14 @@ const logger = getLogger("app.services.task");
 
 export type TaskStatus = "todo" | "in-progress" | "done";
 
+export type TaskPriority = "high" | "medium" | "low";
+
 export interface TaskDoc {
   id: string;
   title: string;
   description?: string;
   status: TaskStatus;
+  priority?: TaskPriority | null;
   categoryId?: string | null;
   categoryName?: string | null;
   dueDate?: { seconds: number; nanoseconds: number };
@@ -45,6 +48,7 @@ export interface CreateTaskPayload {
   title: string;
   description?: string;
   status?: TaskStatus;
+  priority?: TaskPriority | null;
   dueDate?: Date | null;
   categoryId?: string | null;
   assigneeId?: string | null;
@@ -107,6 +111,7 @@ export async function createTask(
         title: payload.title,
         description: payload.description ?? "",
         status: payload.status ?? "todo",
+        priority: payload.priority ?? "medium",
         dueDate: payload.dueDate ?? null,
         categoryId: payload.categoryId ?? null,
         assigneeId: payload.assigneeId ?? null,
@@ -134,6 +139,7 @@ export async function createTask(
           assigneeName: payload.assigneeName ?? null,
           dueDate: payload.dueDate ?? null,
           status: payload.status ?? "todo",
+          priority: payload.priority ?? "medium",
           categoryId: payload.categoryId ?? null,
           progress: payload.progress ?? 0,
         },
