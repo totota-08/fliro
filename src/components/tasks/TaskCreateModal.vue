@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import AppModal from "@/components/ui/AppModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import AppSelect, { type SelectOption } from "@/components/ui/AppSelect.vue";
 import type { TaskCategory } from "@/services/taskCategoryService";
-import { reactive, ref, watch, computed } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 
 export interface TaskFormData {
   title: string;
@@ -11,6 +11,7 @@ export interface TaskFormData {
   dueDate: string;
   assigneeId: string;
   categoryId: string;
+  priority: "high" | "medium" | "low";
   progress: number;
 }
 
@@ -32,12 +33,19 @@ const emit = defineEmits<{
 
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
 
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "高", color: "danger" },
+  { value: "medium", label: "中", color: "warning" },
+  { value: "low", label: "低", color: "info" },
+] as const;
+
 const form = reactive<TaskFormData>({
   title: "",
   description: "",
   dueDate: "",
   assigneeId: "",
   categoryId: "",
+  priority: "medium",
   progress: 0,
 });
 
@@ -68,6 +76,7 @@ function resetForm() {
   form.dueDate = "";
   form.assigneeId = "";
   form.categoryId = "";
+  form.priority = "medium";
   form.progress = 0;
   titleError.value = "";
 }
@@ -155,6 +164,25 @@ watch(
           :options="memberOptions"
           :placeholder="undefined"
         />
+      </div>
+
+      <div class="form-field">
+        <label class="form-label">優先度</label>
+        <div class="priority-picker">
+          <button
+            v-for="option in PRIORITY_OPTIONS"
+            :key="option.value"
+            type="button"
+            :class="[
+              'priority-pill',
+              `priority-${option.value}`,
+              { 'is-active': form.priority === option.value },
+            ]"
+            @click="form.priority = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
 
       <div class="form-field">
@@ -247,6 +275,45 @@ watch(
 .progress-hint {
   font-size: var(--ui-text-sm, 0.875rem);
   color: var(--ui-text-muted, #64748b);
+}
+
+.priority-picker {
+  display: flex;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.priority-pill {
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0b2e33);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-full, 9999px);
+  cursor: pointer;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  transition: var(--ui-transition-colors);
+}
+
+.priority-pill:hover {
+  background: var(--ui-surface-hover, #f8fafc);
+}
+
+.priority-pill.is-active.priority-high {
+  background: var(--ui-danger-light, #fee2e2);
+  color: var(--ui-danger, #ef4444);
+  border-color: var(--ui-danger, #ef4444);
+}
+
+.priority-pill.is-active.priority-medium {
+  background: var(--ui-warning-light, #fef3c7);
+  color: var(--ui-warning, #f59e0b);
+  border-color: var(--ui-warning, #f59e0b);
+}
+
+.priority-pill.is-active.priority-low {
+  background: var(--ui-info-light, #e0f2fe);
+  color: var(--ui-info, #0ea5e9);
+  border-color: var(--ui-info, #0ea5e9);
 }
 
 .progress-picker {

@@ -3,13 +3,22 @@ import DashboardInsights from "@/components/projectDashboard/DashboardInsights.v
 import DashboardSummaryCards, {
   type SummaryCard,
 } from "@/components/projectDashboard/DashboardSummaryCards.vue";
-import DashboardTaskList from "@/components/projectDashboard/DashboardTaskList.vue";
+import DashboardTaskList, {
+  type TaskFilters,
+} from "@/components/projectDashboard/DashboardTaskList.vue";
 import NotificationBar from "@/components/projectDashboard/NotificationBar.vue";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
-import { usePageTitle } from "@/composables/usePageTitle";
 import { useNotificationCenter } from "@/composables/useNotificationCenter";
+import { usePageTitle } from "@/composables/usePageTitle";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
 import { db } from "@/lib/firebase";
+import {
+  getDashboardSettings,
+  getDefaultInsightCards,
+  saveDashboardSettings,
+  type DashboardCardConfig,
+  type InsightCardConfig,
+} from "@/services/dashboardSettingsService";
 import {
   // addMessageReaction,
   // deleteProjectMessage,
@@ -23,14 +32,7 @@ import {
   listenTaskCategories,
   type TaskCategory,
 } from "@/services/taskCategoryService";
-import { listenTasks, type TaskDoc } from "@/services/taskService";
-import {
-  getDashboardSettings,
-  saveDashboardSettings,
-  getDefaultInsightCards,
-  type DashboardCardConfig,
-  type InsightCardConfig,
-} from "@/services/dashboardSettingsService";
+import { listenTasks, updateTask, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -49,7 +51,7 @@ const logger = getLogger("app.pages.projects.ProjectDashboard");
 
 const route = useRoute();
 const router = useRouter();
-const { user } = useAuthStore();
+const { user, profile } = useAuthStore();
 const projectId = ref(String(route.params.projectId || ""));
 
 // TaskDrawer のURL同期
@@ -103,6 +105,7 @@ const categoriesById = computed(() => {
 const filters = reactive({
   search: "",
   status: "all",
+  priority: "all",
   assignee: "all",
   due: "all",
   category: "all",
@@ -127,6 +130,11 @@ const filteredTasks = computed(() => {
   }
   if (filters.status !== "all") {
     list = list.filter((task) => task.status === filters.status);
+  }
+  if (filters.priority !== "all") {
+    list = list.filter(
+      (task) => (task.priority || "medium") === filters.priority,
+    );
   }
   if (filters.assignee !== "all") {
     list = list.filter((task) => (task.assigneeId || "") === filters.assignee);
@@ -387,6 +395,24 @@ function navigateToTaskDetail(taskId: string) {
   openTask(taskId);
 }
 
+async function handleTaskComplete(task: TaskDoc) {
+  if (!user.value) return;
+  try {
+    await updateTask(
+      projectId.value,
+      task.id,
+      { status: "done" },
+      {
+        userId: user.value.uid,
+        actorName: profile.value?.nickname || profile.value?.fullName || "User",
+        origin: "ui",
+      },
+    );
+  } catch (error) {
+    logger.error`Failed to complete task: ${error}`;
+  }
+}
+
 // async function sendChatMessage(text: string) {
 //   if (!user.value) return
 //   await sendProjectMessage(
@@ -501,12 +527,13 @@ onBeforeUnmount(() => {
 
       <DashboardTaskList
         :model-value="filters"
-        @update:model-value="(val) => Object.assign(filters, val)"
+        @update:model-value="(val: TaskFilters) => Object.assign(filters, val)"
         :tasks="filteredTasks"
         :members="members"
         :categories="categories"
         @select="selectTaskById"
         @navigate="navigateToTaskDetail"
+        @complete="handleTaskComplete"
       />
     </div>
 
