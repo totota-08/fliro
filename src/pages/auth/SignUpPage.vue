@@ -163,10 +163,15 @@ const handleProviderSelect = async (provider: SocialProvider) => {
   profileError.value = "";
 
   try {
-    await authenticateWithProvider(provider);
-    const currentUser = user.value ?? (await getCurrentUser());
-    hydrateProfileFromUser(currentUser);
-    currentStep.value = "profile";
+    const result = await authenticateWithProvider(provider);
+    // モバイルではリダイレクト認証のため、resultがnullの場合がある
+    // その場合はリダイレクト後に自動的にログイン状態になる
+    if (result) {
+      const currentUser = user.value ?? (await getCurrentUser());
+      hydrateProfileFromUser(currentUser);
+      currentStep.value = "profile";
+    }
+    // resultがnullの場合（モバイルリダイレクト）は、ページがリダイレクトされるので何もしない
   } catch (error) {
     logger.error`Provider auth failed: ${error}`;
     credentialError.value = mapFirebaseError(error);

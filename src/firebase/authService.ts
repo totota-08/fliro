@@ -32,6 +32,8 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   TotpMultiFactorGenerator,
   TotpSecret,
   unlink,
@@ -53,6 +55,16 @@ const providerMap: Record<SocialProvider, AuthProvider> = {
   google: googleProvider,
   github: githubProvider,
 };
+
+/**
+ * モバイルデバイスかどうかを判定
+ */
+function isMobileDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  );
+}
 
 export async function registerCredentials(payload: CredentialSignUpPayload) {
   const credential = await createUserWithEmailAndPassword(
@@ -126,8 +138,31 @@ export async function loginWithEmail(payload: LoginPayload) {
 }
 
 export async function loginWithProvider(provider: SocialProvider) {
-  const credential = await signInWithPopup(auth, providerMap[provider]);
+  const authProvider = providerMap[provider];
+
+  // モバイルではリダイレクト認証を使用（ポップアップがブロックされることが多いため）
+  if (isMobileDevice()) {
+    await signInWithRedirect(auth, authProvider);
+    // リダイレクト後は getRedirectResult で結果を取得する必要がある
+    // この関数は戻り値なしで終了し、リダイレクト後に handleRedirectResult が呼ばれる
+    return null;
+  }
+
+  // デスクトップではポップアップ認証を使用
+  const credential = await signInWithPopup(auth, authProvider);
   return persistProfile(credential.user);
+}
+
+/**
+ * リダイレクト認証の結果を処理
+ * アプリ起動時に呼び出す必要がある
+ */
+export async function handleRedirectResult() {
+  const result = await getRedirectResult(auth);
+  if (result?.user) {
+    return persistProfile(result.user);
+  }
+  return null;
 }
 
 /**
