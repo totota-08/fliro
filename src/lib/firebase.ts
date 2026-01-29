@@ -65,13 +65,8 @@ configureFirebaseLogLevel();
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // App Check の初期化
-// 開発環境で VITE_APP_CHECK_ENABLED=false の場合はスキップ
-const appCheckEnabled =
-  import.meta.env.VITE_APP_CHECK_ENABLED !== "false" &&
-  typeof window !== "undefined" &&
-  import.meta.env.VITE_APP_CHECK_KEY;
-
-if (appCheckEnabled) {
+// VITE_APP_CHECK_KEY が設定されている場合のみ有効化
+if (typeof window !== "undefined" && import.meta.env.VITE_APP_CHECK_KEY) {
   // デバッグモード: VITE_APP_CHECK_DEBUG=true の場合、デバッグトークンを出力
   // 出力されたトークンをFirebaseコンソール > App Check > アプリ > デバッグトークンを管理 で登録する
   if (import.meta.env.VITE_APP_CHECK_DEBUG === "true") {
