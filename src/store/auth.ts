@@ -1,4 +1,4 @@
-import { fetchProfile, handleRedirectResult } from "@/firebase/authService";
+import { fetchProfile } from "@/firebase/authService";
 import { auth } from "@/lib/firebase";
 import type { UserProfile } from "@/types/auth";
 import type { User } from "firebase/auth";
@@ -36,11 +36,6 @@ export async function initAuthListener() {
   }
 
   initPromise = new Promise((resolve) => {
-    // リダイレクト認証の結果を処理（モバイルでのソーシャルログイン後）
-    handleRedirectResult().catch((error) => {
-      logger.warn`Redirect result handling failed: ${error}`;
-    });
-
     onAuthStateChanged(auth, async (user) => {
       currentUser.value = user;
 

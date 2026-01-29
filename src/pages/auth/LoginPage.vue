@@ -75,13 +75,8 @@ const handleProvider = async (provider: SocialProvider) => {
   errorMessage.value = "";
 
   try {
-    const result = await authenticateWithProvider(provider);
-    // モバイルではリダイレクト認証のため、resultがnullの場合がある
-    // その場合はリダイレクト後に自動的にログイン状態になる
-    if (result) {
-      await checksetUp();
-    }
-    // resultがnullの場合（モバイルリダイレクト）は、ページがリダイレクトされるので何もしない
+    await authenticateWithProvider(provider);
+    await checksetUp();
   } catch (error) {
     logger.error`Provider login failed: ${error}`;
     errorMessage.value = mapFirebaseError(error);
