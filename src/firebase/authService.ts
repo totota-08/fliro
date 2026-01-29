@@ -126,7 +126,8 @@ export async function loginWithEmail(payload: LoginPayload) {
 }
 
 export async function loginWithProvider(provider: SocialProvider) {
-  const credential = await signInWithPopup(auth, providerMap[provider]);
+  const authProvider = providerMap[provider];
+  const credential = await signInWithPopup(auth, authProvider);
   return persistProfile(credential.user);
 }
 
