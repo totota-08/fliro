@@ -17,6 +17,29 @@ const errorMessage = ref("");
 
 const isValid = computed(() => email.value.includes("@"));
 
+function mapFirebaseError(error: unknown): string {
+  if (typeof error === "object" && error && "code" in error) {
+    const code = String((error as { code?: string }).code);
+
+    if (code === "auth/user-not-found")
+      return "このメールアドレスは登録されていません。";
+    if (code === "auth/invalid-email")
+      return "メールアドレスの形式が正しくありません。";
+    if (code === "auth/too-many-requests")
+      return "リクエストが多すぎます。しばらく時間を置いてから再度お試しください。";
+    if (code === "auth/network-request-failed")
+      return "ネットワーク接続に問題があります。インターネット接続を確認してください。";
+
+    if (code.startsWith("auth/")) {
+      logger.warn`Unknown auth error code: ${code}`;
+      return `エラーが発生しました（${code}）。時間を置いて再度お試しください。`;
+    }
+  }
+
+  logger.warn`Unexpected password reset error: ${error}`;
+  return "メールを送信できませんでした。時間を置いて再度お試しください。";
+}
+
 const handleSubmit = async () => {
   if (!isValid.value || loading.value) return;
 
@@ -30,8 +53,7 @@ const handleSubmit = async () => {
       "パスワード再設定用のメールを送信しました。受信ボックスをご確認ください。";
   } catch (error) {
     logger.error`Password reset request failed: ${error}`;
-    errorMessage.value =
-      "メールを送信できませんでした。時間を置いて再度お試しください。";
+    errorMessage.value = mapFirebaseError(error);
   } finally {
     loading.value = false;
   }

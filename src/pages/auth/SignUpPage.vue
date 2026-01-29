@@ -279,16 +279,50 @@ function extractInitial(value: string) {
   return value.trim().charAt(0).toUpperCase() || "U";
 }
 
-function mapFirebaseError(error: unknown) {
+function mapFirebaseError(error: unknown): string {
   if (typeof error === "object" && error && "code" in error) {
     const code = String((error as { code?: string }).code);
+
+    // メール・パスワード関連
     if (code === "auth/email-already-in-use")
-      return "このメールアドレスは既に登録されています。";
+      return "このメールアドレスは既に登録されています。ログインをお試しください。";
     if (code === "auth/invalid-email")
-      return "メールアドレスの形式を確認してください。";
+      return "メールアドレスの形式が正しくありません。";
     if (code === "auth/weak-password")
-      return "パスワードは 8 文字以上で設定してください。";
+      return "パスワードは8文字以上で、より強力なものを設定してください。";
+    if (code === "auth/operation-not-allowed")
+      return "この認証方法は現在利用できません。";
+
+    // ソーシャルログイン関連
+    if (code === "auth/account-exists-with-different-credential")
+      return "このメールアドレスは別の方法（Google/GitHubなど）で登録されています。そちらでログインしてください。";
+    if (code === "auth/popup-closed-by-user")
+      return "登録がキャンセルされました。もう一度お試しください。";
+    if (code === "auth/cancelled-popup-request")
+      return "登録がキャンセルされました。";
+    if (code === "auth/popup-blocked")
+      return "ポップアップがブロックされました。ブラウザの設定を確認してください。";
+
+    // ネットワークエラー
+    if (code === "auth/network-request-failed")
+      return "ネットワーク接続に問題があります。インターネット接続を確認してください。";
+
+    // 制限エラー
+    if (code === "auth/too-many-requests")
+      return "リクエストが多すぎます。しばらく時間を置いてから再度お試しください。";
+
+    // App Check / セキュリティエラー
+    if (code === "auth/app-check-token-error" || code.includes("appCheck"))
+      return "セキュリティ検証に失敗しました。ページを再読み込みしてください。";
+
+    // 未知のauth/エラー
+    if (code.startsWith("auth/")) {
+      logger.warn`Unknown auth error code: ${code}`;
+      return `登録エラーが発生しました（${code}）。時間を置いて再度お試しください。`;
+    }
   }
+
+  logger.warn`Unexpected signup error: ${error}`;
   return "リクエストを処理できませんでした。時間を置いて再度お試しください。";
 }
 </script>

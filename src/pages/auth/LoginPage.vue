@@ -85,16 +85,66 @@ const handleProvider = async (provider: SocialProvider) => {
   }
 };
 
-function mapFirebaseError(error: unknown) {
+function mapFirebaseError(error: unknown): string {
   if (typeof error === "object" && error && "code" in error) {
     const code = String((error as { code?: string }).code);
+
+    // 認証情報エラー
     if (code === "auth/invalid-credential")
       return "メールアドレスまたはパスワードが正しくありません。";
+    if (code === "auth/invalid-email")
+      return "メールアドレスの形式が正しくありません。";
+    if (code === "auth/user-not-found")
+      return "このメールアドレスは登録されていません。新規登録をお試しください。";
+    if (code === "auth/wrong-password") return "パスワードが正しくありません。";
+
+    // アカウント状態エラー
     if (code === "auth/user-disabled")
-      return "このアカウントは無効化されています。";
+      return "このアカウントは無効化されています。サポートにお問い合わせください。";
+    if (code === "auth/account-exists-with-different-credential")
+      return "このメールアドレスは別の方法（Google/GitHubなど）で登録されています。そちらでログインしてください。";
+
+    // 制限エラー
     if (code === "auth/too-many-requests")
-      return "試行回数が多すぎます。しばらく待ってから再度お試しください。";
+      return "ログイン試行回数が上限に達しました。しばらく時間を置いてから再度お試しください。";
+    if (code === "auth/operation-not-allowed")
+      return "この認証方法は現在利用できません。";
+
+    // ネットワーク・接続エラー
+    if (code === "auth/network-request-failed")
+      return "ネットワーク接続に問題があります。インターネット接続を確認してください。";
+
+    // ソーシャルログインエラー
+    if (code === "auth/popup-closed-by-user")
+      return "ログインがキャンセルされました。もう一度お試しください。";
+    if (code === "auth/cancelled-popup-request")
+      return "ログインがキャンセルされました。";
+    if (code === "auth/popup-blocked")
+      return "ポップアップがブロックされました。ブラウザの設定を確認してください。";
+
+    // App Check / セキュリティエラー
+    if (code === "auth/app-check-token-error" || code.includes("appCheck"))
+      return "セキュリティ検証に失敗しました。ページを再読み込みしてください。";
+
+    // MFAエラー
+    if (code === "auth/multi-factor-auth-required")
+      return "二段階認証が必要です。";
+
+    // その他の認証エラー
+    if (code === "auth/requires-recent-login")
+      return "セキュリティのため再ログインが必要です。";
+    if (code === "auth/invalid-action-code")
+      return "リンクが無効または期限切れです。";
+
+    // 未知のauth/エラー
+    if (code.startsWith("auth/")) {
+      logger.warn`Unknown auth error code: ${code}`;
+      return `認証エラーが発生しました（${code}）。時間を置いて再度お試しください。`;
+    }
   }
+
+  // エラーオブジェクトでない場合やコードがない場合
+  logger.warn`Unexpected login error: ${error}`;
   return "ログインできませんでした。時間を置いて再度お試しください。";
 }
 </script>

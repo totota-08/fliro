@@ -33,6 +33,32 @@ const isValid = computed(() => {
   return form.password.length >= 6 && form.password === form.confirmPassword;
 });
 
+function mapFirebaseError(error: unknown): string {
+  if (typeof error === "object" && error && "code" in error) {
+    const code = String((error as { code?: string }).code);
+
+    if (code === "auth/expired-action-code")
+      return "リンクの有効期限が切れています。再度パスワード再設定メールを送信してください。";
+    if (code === "auth/invalid-action-code")
+      return "リンクが無効です。再度パスワード再設定メールを送信してください。";
+    if (code === "auth/user-disabled")
+      return "このアカウントは無効化されています。";
+    if (code === "auth/user-not-found") return "アカウントが見つかりません。";
+    if (code === "auth/weak-password")
+      return "パスワードが弱すぎます。8文字以上で、より強力なものを設定してください。";
+    if (code === "auth/network-request-failed")
+      return "ネットワーク接続に問題があります。インターネット接続を確認してください。";
+
+    if (code.startsWith("auth/")) {
+      logger.warn`Unknown auth error code: ${code}`;
+      return `エラーが発生しました（${code}）。時間を置いて再度お試しください。`;
+    }
+  }
+
+  logger.warn`Unexpected password confirm error: ${error}`;
+  return "再設定に失敗しました。リンクの有効期限が切れている可能性があります。";
+}
+
 const handleSubmit = async () => {
   if (!isValid.value || loading.value) return;
   if (!oobCode.value || mode.value !== "resetPassword") {
@@ -48,8 +74,7 @@ const handleSubmit = async () => {
     success.value = true;
   } catch (error) {
     logger.error`Password reset failed: ${error}`;
-    errorMessage.value =
-      "再設定に失敗しました。リンクの有効期限が切れている可能性があります。";
+    errorMessage.value = mapFirebaseError(error);
   } finally {
     loading.value = false;
   }
