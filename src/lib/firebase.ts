@@ -67,9 +67,9 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 // App Check の初期化
 // VITE_APP_CHECK_KEY が設定されている場合のみ有効化
 if (typeof window !== "undefined" && import.meta.env.VITE_APP_CHECK_KEY) {
-  // デバッグモード: VITE_APP_CHECK_DEBUG=true の場合、デバッグトークンを出力
+  // デバッグモード: VITE_DEBUG_MODE=true の場合、デバッグトークンを出力
   // 出力されたトークンをFirebaseコンソール > App Check > アプリ > デバッグトークンを管理 で登録する
-  if (import.meta.env.VITE_APP_CHECK_DEBUG === "true") {
+  if (import.meta.env.VITE_DEBUG_MODE === "true") {
     // @ts-expect-error Firebase App Check debug token
     self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
