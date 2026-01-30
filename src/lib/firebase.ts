@@ -10,7 +10,10 @@ import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectDatabaseEmulator, getDatabase } from "firebase/database";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from "firebase/app-check";
 
 /**
  * 環境変数からFirebaseのログレベルを設定
@@ -75,7 +78,9 @@ if (typeof window !== "undefined" && import.meta.env.VITE_APP_CHECK_KEY) {
   }
 
   initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(import.meta.env.VITE_APP_CHECK_KEY),
+    provider: new ReCaptchaEnterpriseProvider(
+      import.meta.env.VITE_APP_CHECK_KEY,
+    ),
     isTokenAutoRefreshEnabled: true,
   });
 }
