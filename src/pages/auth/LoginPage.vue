@@ -41,19 +41,30 @@ const providers: { id: SocialProvider; label: string; icon: string }[] = [
   { id: "github", label: "GitHub でログイン", icon: "github" },
 ];
 const checksetUp = async (profile?: { setUp?: boolean } | null) => {
+  // eslint-disable-next-line no-console
+  console.log("[checksetUp] Called with profile:", profile);
+
   // 渡されたプロファイルがあればそれを使用（ソーシャルログイン時）
   if (profile && profile.setUp === false) {
+    // eslint-disable-next-line no-console
+    console.log("[checksetUp] setUp is false, redirecting to signup");
     await router.push({ name: ROUTE_NAMES.signup, query: { setup: "false" } });
     return;
   }
 
   // プロファイルが渡されていない場合はFirestoreから取得（メールログイン時）
   if (!profile) {
+    // eslint-disable-next-line no-console
+    console.log("[checksetUp] No profile passed, fetching from Firestore");
     const user = await getCurrentUser();
     if (!user) return;
 
     const fetchedProfile = await fetchProfile(user.uid);
+    // eslint-disable-next-line no-console
+    console.log("[checksetUp] Fetched profile:", fetchedProfile);
     if (fetchedProfile && fetchedProfile.setUp === false) {
+      // eslint-disable-next-line no-console
+      console.log("[checksetUp] Fetched profile setUp is false, redirecting");
       await router.push({
         name: ROUTE_NAMES.signup,
         query: { setup: "false" },
@@ -62,6 +73,8 @@ const checksetUp = async (profile?: { setUp?: boolean } | null) => {
     }
   }
 
+  // eslint-disable-next-line no-console
+  console.log("[checksetUp] Redirecting to:", redirectTarget.value);
   await router.push(redirectTarget.value);
 };
 const handleSubmit = async () => {
@@ -88,9 +101,19 @@ const handleProvider = async (provider: SocialProvider) => {
   errorMessage.value = "";
 
   try {
+    // eslint-disable-next-line no-console
+    console.log("[LoginPage] Starting provider auth:", provider);
     const profile = await authenticateWithProvider(provider);
+    // eslint-disable-next-line no-console
+    console.log("[LoginPage] Auth complete, profile:", profile);
+    // eslint-disable-next-line no-console
+    console.log("[LoginPage] setUp value:", profile?.setUp);
     await checksetUp(profile);
+    // eslint-disable-next-line no-console
+    console.log("[LoginPage] checksetUp complete");
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[LoginPage] Provider login error:", error);
     logger.error`Provider login failed: ${error}`;
     errorMessage.value = mapFirebaseError(error);
   } finally {
