@@ -28,6 +28,7 @@ export const validateInviteCode = onCall<ValidateRequest>(
     cors: [
       "https://fliro.work",
       "https://fliro-cbai.vercel.app",
+      "https://fliro-livid.vercel.app",
       "http://localhost:5173",
     ],
   },
