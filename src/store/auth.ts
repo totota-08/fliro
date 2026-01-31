@@ -40,9 +40,10 @@ export async function initAuthListener() {
       currentUser.value = user;
 
       if (user) {
-        // Firestoreの認証トークンが確立されるまで少し待つ
+        // Firestoreの認証トークンが確立されるまで待つ
         // signInWithPopup直後はFirestoreの認証が遅延することがある
-        await new Promise((r) => setTimeout(r, 500));
+        // また、loginWithProviderのpersistProfile(1000ms後)より後に実行されるよう2000ms待機
+        await new Promise((r) => setTimeout(r, 2000));
 
         try {
           profile.value = await fetchProfile(user.uid);
