@@ -40,15 +40,28 @@ const providers: { id: SocialProvider; label: string; icon: string }[] = [
   { id: "google", label: "Google でログイン", icon: "google" },
   { id: "github", label: "GitHub でログイン", icon: "github" },
 ];
-const checksetUp = async () => {
-  const user = await getCurrentUser();
-  if (!user) return;
-
-  const profile = await fetchProfile(user.uid);
+const checksetUp = async (profile?: { setUp?: boolean } | null) => {
+  // 渡されたプロファイルがあればそれを使用（ソーシャルログイン時）
   if (profile && profile.setUp === false) {
     await router.push({ name: ROUTE_NAMES.signup, query: { setup: "false" } });
     return;
   }
+
+  // プロファイルが渡されていない場合はFirestoreから取得（メールログイン時）
+  if (!profile) {
+    const user = await getCurrentUser();
+    if (!user) return;
+
+    const fetchedProfile = await fetchProfile(user.uid);
+    if (fetchedProfile && fetchedProfile.setUp === false) {
+      await router.push({
+        name: ROUTE_NAMES.signup,
+        query: { setup: "false" },
+      });
+      return;
+    }
+  }
+
   await router.push(redirectTarget.value);
 };
 const handleSubmit = async () => {
@@ -58,8 +71,8 @@ const handleSubmit = async () => {
   errorMessage.value = "";
 
   try {
-    await authenticateWithEmail({ ...form });
-    await checksetUp();
+    const profile = await authenticateWithEmail({ ...form });
+    await checksetUp(profile);
   } catch (error) {
     logger.error`Login failed: ${error}`;
     errorMessage.value = mapFirebaseError(error);
@@ -75,8 +88,8 @@ const handleProvider = async (provider: SocialProvider) => {
   errorMessage.value = "";
 
   try {
-    await authenticateWithProvider(provider);
-    await checksetUp();
+    const profile = await authenticateWithProvider(provider);
+    await checksetUp(profile);
   } catch (error) {
     logger.error`Provider login failed: ${error}`;
     errorMessage.value = mapFirebaseError(error);
