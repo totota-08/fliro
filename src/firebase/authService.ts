@@ -122,17 +122,16 @@ export async function loginWithEmail(payload: LoginPayload) {
     payload.email,
     payload.password,
   );
-  // Firestoreの認証トークンが確立されるまで待つ
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  // Cloud Functions (onUserSignedIn) がプロファイルを作成するため、
+  // ここでは既存プロファイルの更新のみ行う
   return persistProfile(credential.user);
 }
 
 export async function loginWithProvider(provider: SocialProvider) {
   const authProvider = providerMap[provider];
   const credential = await signInWithPopup(auth, authProvider);
-  // Firestoreの認証トークンが確立されるまで待つ
-  // signInWithPopup直後はFirestoreのAuth tokenが伝播していない場合がある
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Cloud Functions (onUserSignedIn) がプロファイルを作成するため、
+  // ここでは既存プロファイルの更新のみ行う
   return persistProfile(credential.user);
 }
 
