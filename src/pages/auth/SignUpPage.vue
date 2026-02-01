@@ -15,8 +15,8 @@ import {
 } from "@/firebase/authService";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 import {
-  authenticateWithProvider,
   completeProfileSetup,
+  registerAccountWithProvider,
   updateAccountAvatar,
 } from "@/services/accountActions";
 import type { SocialProvider } from "@/types/auth";
@@ -163,7 +163,7 @@ const handleProviderSelect = async (provider: SocialProvider) => {
   profileError.value = "";
 
   try {
-    await authenticateWithProvider(provider);
+    await registerAccountWithProvider(provider);
     const currentUser = user.value ?? (await getCurrentUser());
     hydrateProfileFromUser(currentUser);
     currentStep.value = "profile";
@@ -295,7 +295,7 @@ function mapFirebaseError(error: unknown): string {
 
     // ソーシャルログイン関連
     if (code === "auth/account-exists-with-different-credential")
-      return "このメールアドレスは別の方法（Google/GitHubなど）で登録されています。そちらでログインしてください。";
+      return "すでにアカウントが存在します。ログインしてください。";
     if (code === "auth/popup-closed-by-user")
       return "登録がキャンセルされました。もう一度お試しください。";
     if (code === "auth/cancelled-popup-request")

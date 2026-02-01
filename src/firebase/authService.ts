@@ -1,3 +1,4 @@
+import { getActionCodeSettings } from "@/config/appConfig";
 import {
   auth,
   db,
@@ -6,7 +7,6 @@ import {
   storage,
 } from "@/lib/firebase";
 import { getCurrentUser } from "@/lib/getCurrentUser";
-import { getActionCodeSettings } from "@/config/appConfig";
 import type {
   CredentialSignUpPayload,
   LinkedProvider,
@@ -25,8 +25,8 @@ import {
   multiFactor,
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
-  RecaptchaVerifier,
   reauthenticateWithCredential,
+  RecaptchaVerifier,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -127,11 +127,49 @@ export async function loginWithEmail(payload: LoginPayload) {
   return persistProfile(credential.user);
 }
 
+/**
+ * ソーシャルプロバイダーでログイン（既存ユーザーのみ）
+ * プロファイルが存在しない場合は即座にサインアウトしてエラーをスロー
+ */
 export async function loginWithProvider(provider: SocialProvider) {
   const authProvider = providerMap[provider];
   const credential = await signInWithPopup(auth, authProvider);
-  // Cloud Functions (onUserSignedIn) がプロファイルを作成するため、
-  // ここでは既存プロファイルの更新のみ行う
+
+  // プロファイルの存在を確認
+  const existingProfile = await fetchProfile(credential.user.uid);
+
+  if (!existingProfile) {
+    // プロファイルが存在しない場合は即座にサインアウト
+    await auth.signOut();
+    const error = new Error("User not registered");
+    (error as Error & { code: string }).code = "auth/user-not-found";
+    throw error;
+  }
+
+  // 既存プロファイルの更新（プロバイダー情報の同期など）
+  return persistProfile(credential.user);
+}
+
+/**
+ * ソーシャルプロバイダーで新規登録
+ * 既にプロファイルが存在する場合はエラーをスロー
+ */
+export async function registerWithProvider(provider: SocialProvider) {
+  const authProvider = providerMap[provider];
+  const credential = await signInWithPopup(auth, authProvider);
+
+  // プロファイルの存在を確認
+  const existingProfile = await fetchProfile(credential.user.uid);
+
+  if (existingProfile) {
+    // 既にプロファイルが存在する場合はエラー
+    const error = new Error("User already registered");
+    (error as Error & { code: string }).code =
+      "auth/account-exists-with-different-credential";
+    throw error;
+  }
+
+  // 新規プロファイルを作成
   return persistProfile(credential.user);
 }
 

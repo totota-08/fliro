@@ -131,7 +131,7 @@ function mapFirebaseError(error: unknown): string {
     if (code === "auth/invalid-email")
       return "メールアドレスの形式が正しくありません。";
     if (code === "auth/user-not-found")
-      return "このメールアドレスは登録されていません。新規登録をお試しください。";
+      return "アカウントが見つかりません。新規登録を行ってください。";
     if (code === "auth/wrong-password") return "パスワードが正しくありません。";
 
     // アカウント状態エラー

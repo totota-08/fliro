@@ -5,6 +5,7 @@ import {
   deleteCurrentAccount,
   loginWithEmail,
   loginWithProvider,
+  registerWithProvider,
   saveProfileDetails,
   sendPasswordReset,
   updateUserProfile,
@@ -25,6 +26,12 @@ export async function authenticateWithEmail(payload: LoginPayload) {
 
 export async function authenticateWithProvider(provider: SocialProvider) {
   const profile = await loginWithProvider(provider);
+  setProfile(profile);
+  return profile;
+}
+
+export async function registerAccountWithProvider(provider: SocialProvider) {
+  const profile = await registerWithProvider(provider);
   setProfile(profile);
   return profile;
 }
