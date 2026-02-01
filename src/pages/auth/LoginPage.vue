@@ -101,20 +101,25 @@ const handleProvider = async (provider: SocialProvider) => {
   errorMessage.value = "";
 
   try {
-    // eslint-disable-next-line no-console
-    console.log("[LoginPage] Starting provider auth:", provider);
     const profile = await authenticateWithProvider(provider);
-    // eslint-disable-next-line no-console
-    console.log("[LoginPage] Auth complete, profile:", profile);
-    // eslint-disable-next-line no-console
-    console.log("[LoginPage] setUp value:", profile?.setUp);
     await checksetUp(profile);
-    // eslint-disable-next-line no-console
-    console.log("[LoginPage] checksetUp complete");
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("[LoginPage] Provider login error:", error);
     logger.error`Provider login failed: ${error}`;
+
+    // 未登録のSNSアカウントでログインしようとした場合はエラーページへリダイレクト
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "auth/user-not-found"
+    ) {
+      await router.push({
+        name: ROUTE_NAMES.error,
+        query: { errorType: "account_not_found" },
+      });
+      return;
+    }
+
     errorMessage.value = mapFirebaseError(error);
   } finally {
     providerLoading.value = null;

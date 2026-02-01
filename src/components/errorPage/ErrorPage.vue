@@ -8,6 +8,7 @@ export type ErrorType =
   | "not_found"
   | "path_not_found"
   | "network"
+  | "account_not_found"
   | "unknown";
 
 interface ErrorConfig {
@@ -61,6 +62,14 @@ const errorConfigs: Record<ErrorType, ErrorConfig> = {
     hint: "インターネット接続を確認し、再度お試しください。問題が続く場合は、しばらく時間をおいてからアクセスしてください。",
     color: "brand",
     canRetry: true,
+  },
+  account_not_found: {
+    code: "未登録",
+    title: "アカウントが見つかりません",
+    message: "このSNSアカウントはまだ登録されていません。",
+    hint: "新規登録ページからアカウントを作成してください。既にアカウントをお持ちの場合は、登録時に使用した方法でログインしてください。",
+    color: "warning",
+    canRetry: false,
   },
   unknown: {
     code: "エラー",
@@ -158,6 +167,23 @@ function retry() {
           <path d="m2 2 20 20"></path>
         </svg>
         <svg
+          v-else-if="errorType === 'account_not_found'"
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="8" r="5"></circle>
+          <path d="M20 21a8 8 0 0 0-16 0"></path>
+          <path d="m14.5 11 5 5"></path>
+          <path d="m19.5 11-5 5"></path>
+        </svg>
+        <svg
           v-else
           xmlns="http://www.w3.org/2000/svg"
           width="32"
@@ -191,6 +217,13 @@ function retry() {
         <button v-if="config.canRetry" class="error-page__cta" @click="retry">
           再試行
         </button>
+        <RouterLink
+          v-else-if="errorType === 'account_not_found'"
+          :to="{ name: ROUTE_NAMES.signup }"
+          class="error-page__cta"
+        >
+          新規登録へ
+        </RouterLink>
         <button
           v-else-if="errorType === 'path_not_found'"
           class="error-page__cta"
@@ -199,7 +232,18 @@ function retry() {
           トップページへ
         </button>
         <button v-else class="error-page__cta" @click="goBack">戻る</button>
-        <RouterLink :to="{ name: ROUTE_NAMES.myPage }" class="error-page__link">
+        <RouterLink
+          v-if="errorType === 'account_not_found'"
+          :to="{ name: ROUTE_NAMES.login }"
+          class="error-page__link"
+        >
+          ログインへ戻る
+        </RouterLink>
+        <RouterLink
+          v-else
+          :to="{ name: ROUTE_NAMES.myPage }"
+          class="error-page__link"
+        >
           マイページへ
         </RouterLink>
       </div>
