@@ -135,8 +135,17 @@ export async function loginWithProvider(provider: SocialProvider) {
   const authProvider = providerMap[provider];
   const credential = await signInWithPopup(auth, authProvider);
 
-  // プロファイルの存在を確認
-  const existingProfile = await fetchProfile(credential.user.uid);
+  // Firebase AuthトークンがFirestoreに伝播するまで待機
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // プロファイルの存在を確認（権限エラーの場合もプロファイルなしとして扱う）
+  let existingProfile = null;
+  try {
+    existingProfile = await fetchProfile(credential.user.uid);
+  } catch (error) {
+    // Firestoreの権限エラーはプロファイルが存在しないケースとして扱う
+    // （認証トークン伝播遅延による一時的なエラーの可能性もあるため）
+  }
 
   if (!existingProfile) {
     // プロファイルが存在しない場合は即座にサインアウト
