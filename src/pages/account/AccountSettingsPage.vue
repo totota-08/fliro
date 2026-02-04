@@ -443,11 +443,6 @@ async function startMFASetup() {
   logger.info`[MFA] Email verified: ${user.value?.emailVerified}`;
   logger.info`[MFA] Provider data: ${JSON.stringify(user.value?.providerData?.map((p) => ({ providerId: p.providerId, email: p.email })))}`;
 
-  // eslint-disable-next-line no-console
-  console.log("[MFA] User object:", user.value);
-  // eslint-disable-next-line no-console
-  console.log("[MFA] User providerData:", user.value?.providerData);
-
   // メール認証チェック（ソーシャルログインの場合はスキップ）
   // Google/GitHubログインの場合、プロバイダー側で既にメール認証済み
   const isSocialLogin = user.value?.providerData?.some(
@@ -469,8 +464,6 @@ async function startMFASetup() {
     logger.info`[MFA] Calling startMFAEnrollment...`;
     const session = await startMFAEnrollment();
     logger.info`[MFA] MFA session obtained successfully`;
-    // eslint-disable-next-line no-console
-    console.log("[MFA] Session object:", session);
 
     logger.info`[MFA] Calling generateTOTPSecret...`;
     const secret = await generateTOTPSecret(session);
@@ -504,25 +497,6 @@ async function startMFASetup() {
       customData?: unknown;
       serverResponse?: unknown;
     };
-
-    // デバッグ用：エラーの詳細をコンソールに出力
-    // eslint-disable-next-line no-console
-    console.error("[MFA] Error details:", {
-      code: firebaseError?.code,
-      message: firebaseError?.message,
-      customData: firebaseError?.customData,
-      serverResponse: firebaseError?.serverResponse,
-      fullError: error,
-    });
-
-    // エラーオブジェクト全体をJSON形式でログ出力
-    try {
-      // eslint-disable-next-line no-console
-      console.error("[MFA] Full error JSON:", JSON.stringify(error, null, 2));
-    } catch {
-      // eslint-disable-next-line no-console
-      console.error("[MFA] Error not serializable");
-    }
 
     if (firebaseError?.code === "auth/unsupported-first-factor") {
       mfaError.value =

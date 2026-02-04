@@ -438,8 +438,6 @@ export async function generateTOTPSecret(
   logger.info`[MFA] generateTOTPSecret called`;
   logger.info`[MFA] Session type: ${typeof session}`;
 
-  console.log("[MFA] Session object in generateTOTPSecret:", session);
-
   try {
     logger.info`[MFA] Calling TotpMultiFactorGenerator.generateSecret...`;
     const secret = await TotpMultiFactorGenerator.generateSecret(session);
@@ -447,8 +445,6 @@ export async function generateTOTPSecret(
     return secret;
   } catch (error) {
     logger.error`[MFA] TotpMultiFactorGenerator.generateSecret failed: ${error}`;
-
-    console.error("[MFA] generateSecret error:", error);
     throw error;
   }
 }
@@ -484,31 +480,17 @@ export async function startMFAEnrollment(): Promise<MultiFactorSession> {
   logger.info`[MFA] Email verified: ${user.emailVerified}`;
   logger.info`[MFA] Provider IDs: ${user.providerData.map((p) => p.providerId).join(", ")}`;
 
-  console.log("[MFA] User object in startMFAEnrollment:", {
-    uid: user.uid,
-    email: user.email,
-    emailVerified: user.emailVerified,
-    providerData: user.providerData,
-    metadata: user.metadata,
-  });
-
   const mfaUser = multiFactor(user);
   logger.info`[MFA] MultiFactor object created`;
   logger.info`[MFA] Enrolled factors count: ${mfaUser.enrolledFactors.length}`;
-
-  console.log("[MFA] Enrolled factors:", mfaUser.enrolledFactors);
 
   try {
     logger.info`[MFA] Calling mfaUser.getSession()...`;
     const session = await mfaUser.getSession();
     logger.info`[MFA] Session obtained successfully`;
-
-    console.log("[MFA] Session:", session);
     return session;
   } catch (error) {
     logger.error`[MFA] mfaUser.getSession() failed: ${error}`;
-
-    console.error("[MFA] getSession error:", error);
     throw error;
   }
 }
