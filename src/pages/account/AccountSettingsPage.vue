@@ -8,26 +8,29 @@ import LinkedAccountsSection from "@/components/account/LinkedAccountsSection.vu
 import DangerZone from "@/components/ui/DangerZone.vue";
 import ConfirmDangerModal from "@/components/modals/ConfirmDangerModal.vue";
 import MFAEnrollmentModal from "@/components/modals/MFAEnrollmentModal.vue";
+import MFAVerificationModal from "@/components/modals/MFAVerificationModal.vue";
 import AvatarCropperModal from "@/components/modals/AvatarCropperModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
 import AppShell from "@/layouts/AppShell.vue";
+import { updateAccountAvatar, updateProfile } from "@/services/accountActions";
 import {
-  removeAccountWithPassword,
-  updateAccountAvatar,
-  updateProfile,
-} from "@/services/accountActions";
-import {
+  changePassword,
+  completeMFAReauthentication,
+  deleteAccountWithMFA,
   enrollTOTP,
   generateTOTPSecret,
   getMFAEnrollmentStatus,
+  reauthenticateWithPassword,
   startMFAEnrollment,
   unenrollMFA,
 } from "@/firebase/authService";
+import type { MultiFactorResolver } from "firebase/auth";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
+import QRCode from "qrcode";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -70,6 +73,22 @@ const avatarSettingSaving = ref(false);
 const showDeleteModal = ref(false);
 const deleteLoading = ref(false);
 const deleteError = ref("");
+const deletePendingPassword = ref("");
+const deleteMFAResolver = ref<MultiFactorResolver | null>(null);
+const showDeleteMFAModal = ref(false);
+const deleteMFAError = ref("");
+
+// Password change state
+const showPasswordChange = ref(false);
+const currentPassword = ref("");
+const newPassword = ref("");
+const confirmNewPassword = ref("");
+const passwordChangeLoading = ref(false);
+const passwordChangeError = ref("");
+const passwordChangeSuccess = ref("");
+const passwordMFAResolver = ref<MultiFactorResolver | null>(null);
+const showPasswordMFAModal = ref(false);
+const passwordMFAError = ref("");
 
 // MFA state
 const mfaEnrolled = ref(false);
@@ -198,12 +217,20 @@ async function toggleHideAvatarInProjects() {
 // Account deletion
 function openDeleteModal() {
   deleteError.value = "";
+  deletePendingPassword.value = "";
   showDeleteModal.value = true;
 }
 
 function closeDeleteModal() {
   showDeleteModal.value = false;
   deleteError.value = "";
+  deletePendingPassword.value = "";
+}
+
+function closeDeleteMFAModal() {
+  showDeleteMFAModal.value = false;
+  deleteMFAError.value = "";
+  deleteMFAResolver.value = null;
 }
 
 async function handleDeleteAccount(password: string) {
@@ -211,8 +238,23 @@ async function handleDeleteAccount(password: string) {
 
   deleteLoading.value = true;
   deleteError.value = "";
+
   try {
-    await removeAccountWithPassword(password);
+    // まず再認証を試みる
+    const result = await reauthenticateWithPassword(password);
+
+    if (result.requiresMFA && result.resolver) {
+      // MFAが必要な場合、パスワードを保存してMFAモーダルを表示
+      deletePendingPassword.value = password;
+      deleteMFAResolver.value = result.resolver;
+      showDeleteModal.value = false;
+      showDeleteMFAModal.value = true;
+      deleteLoading.value = false;
+      return;
+    }
+
+    // MFA不要の場合、直接削除
+    await deleteAccountWithMFA(password);
     await router.push({ name: ROUTE_NAMES.login });
   } catch (error: unknown) {
     logger.error`Account deletion failed: ${error}`;
@@ -231,6 +273,146 @@ async function handleDeleteAccount(password: string) {
     }
   } finally {
     deleteLoading.value = false;
+  }
+}
+
+async function handleDeleteMFAVerification(mfaCode: string) {
+  if (deleteLoading.value || !deleteMFAResolver.value) return;
+
+  deleteLoading.value = true;
+  deleteMFAError.value = "";
+
+  try {
+    // MFA検証を完了
+    await completeMFAReauthentication(deleteMFAResolver.value, mfaCode);
+
+    // アカウントを削除
+    await deleteAccountWithMFA(deletePendingPassword.value, mfaCode);
+    await router.push({ name: ROUTE_NAMES.login });
+  } catch (error: unknown) {
+    logger.error`MFA verification for deletion failed: ${error}`;
+    const firebaseError = error as { code?: string; message?: string };
+    if (
+      firebaseError?.code === "auth/invalid-verification-code" ||
+      firebaseError?.message?.includes("invalid")
+    ) {
+      deleteMFAError.value = "認証コードが正しくありません。";
+    } else {
+      deleteMFAError.value = "認証に失敗しました。再度お試しください。";
+    }
+  } finally {
+    deleteLoading.value = false;
+  }
+}
+
+// Password change
+function togglePasswordChange() {
+  showPasswordChange.value = !showPasswordChange.value;
+  if (!showPasswordChange.value) {
+    resetPasswordChangeForm();
+  }
+}
+
+function resetPasswordChangeForm() {
+  currentPassword.value = "";
+  newPassword.value = "";
+  confirmNewPassword.value = "";
+  passwordChangeError.value = "";
+  passwordChangeSuccess.value = "";
+  passwordMFAResolver.value = null;
+}
+
+function closePasswordMFAModal() {
+  showPasswordMFAModal.value = false;
+  passwordMFAError.value = "";
+  passwordMFAResolver.value = null;
+}
+
+const canChangePassword = computed(() => {
+  return (
+    currentPassword.value.trim().length > 0 &&
+    newPassword.value.trim().length >= 8 &&
+    newPassword.value === confirmNewPassword.value
+  );
+});
+
+async function handlePasswordChange() {
+  if (!canChangePassword.value || passwordChangeLoading.value) return;
+
+  passwordChangeLoading.value = true;
+  passwordChangeError.value = "";
+  passwordChangeSuccess.value = "";
+
+  try {
+    // まず再認証を試みる
+    const result = await reauthenticateWithPassword(currentPassword.value);
+
+    if (result.requiresMFA && result.resolver) {
+      // MFAが必要な場合、MFAモーダルを表示
+      passwordMFAResolver.value = result.resolver;
+      showPasswordMFAModal.value = true;
+      passwordChangeLoading.value = false;
+      return;
+    }
+
+    // MFA不要の場合、直接パスワード変更
+    await changePassword(currentPassword.value, newPassword.value);
+    passwordChangeSuccess.value = "パスワードを変更しました。";
+    resetPasswordChangeForm();
+    showPasswordChange.value = false;
+  } catch (error: unknown) {
+    logger.error`Password change failed: ${error}`;
+    const firebaseError = error as { code?: string };
+    if (
+      firebaseError?.code === "auth/wrong-password" ||
+      firebaseError?.code === "auth/invalid-credential"
+    ) {
+      passwordChangeError.value = "現在のパスワードが正しくありません。";
+    } else if (firebaseError?.code === "auth/weak-password") {
+      passwordChangeError.value =
+        "新しいパスワードが弱すぎます。より強力なパスワードを設定してください。";
+    } else if (firebaseError?.code === "auth/too-many-requests") {
+      passwordChangeError.value =
+        "試行回数が多すぎます。しばらく待ってから再度お試しください。";
+    } else {
+      passwordChangeError.value =
+        "パスワードの変更に失敗しました。再度お試しください。";
+    }
+  } finally {
+    passwordChangeLoading.value = false;
+  }
+}
+
+async function handlePasswordMFAVerification(mfaCode: string) {
+  if (passwordChangeLoading.value || !passwordMFAResolver.value) return;
+
+  passwordChangeLoading.value = true;
+  passwordMFAError.value = "";
+
+  try {
+    // MFA検証を完了
+    await completeMFAReauthentication(passwordMFAResolver.value, mfaCode);
+
+    // パスワードを変更
+    await changePassword(currentPassword.value, newPassword.value, mfaCode);
+
+    showPasswordMFAModal.value = false;
+    passwordChangeSuccess.value = "パスワードを変更しました。";
+    resetPasswordChangeForm();
+    showPasswordChange.value = false;
+  } catch (error: unknown) {
+    logger.error`MFA verification for password change failed: ${error}`;
+    const firebaseError = error as { code?: string; message?: string };
+    if (
+      firebaseError?.code === "auth/invalid-verification-code" ||
+      firebaseError?.message?.includes("invalid")
+    ) {
+      passwordMFAError.value = "認証コードが正しくありません。";
+    } else {
+      passwordMFAError.value = "認証に失敗しました。再度お試しください。";
+    }
+  } finally {
+    passwordChangeLoading.value = false;
   }
 }
 
@@ -254,6 +436,18 @@ async function startMFASetup() {
   mfaLoading.value = true;
   mfaError.value = "";
 
+  // デバッグ: 現在のユーザー状態をログ出力
+  logger.info`[MFA] Starting MFA setup...`;
+  logger.info`[MFA] User UID: ${user.value?.uid}`;
+  logger.info`[MFA] User email: ${user.value?.email}`;
+  logger.info`[MFA] Email verified: ${user.value?.emailVerified}`;
+  logger.info`[MFA] Provider data: ${JSON.stringify(user.value?.providerData?.map((p) => ({ providerId: p.providerId, email: p.email })))}`;
+
+  // eslint-disable-next-line no-console
+  console.log("[MFA] User object:", user.value);
+  // eslint-disable-next-line no-console
+  console.log("[MFA] User providerData:", user.value?.providerData);
+
   // メール認証チェック（ソーシャルログインの場合はスキップ）
   // Google/GitHubログインの場合、プロバイダー側で既にメール認証済み
   const isSocialLogin = user.value?.providerData?.some(
@@ -261,6 +455,8 @@ async function startMFASetup() {
       provider.providerId === "google.com" ||
       provider.providerId === "github.com",
   );
+
+  logger.info`[MFA] Is social login: ${isSocialLogin}`;
 
   if (!isSocialLogin && !user.value?.emailVerified) {
     mfaError.value =
@@ -270,32 +466,70 @@ async function startMFASetup() {
   }
 
   try {
+    logger.info`[MFA] Calling startMFAEnrollment...`;
     const session = await startMFAEnrollment();
+    logger.info`[MFA] MFA session obtained successfully`;
+    // eslint-disable-next-line no-console
+    console.log("[MFA] Session object:", session);
+
+    logger.info`[MFA] Calling generateTOTPSecret...`;
     const secret = await generateTOTPSecret(session);
+    logger.info`[MFA] TOTP secret generated successfully`;
     totpSecret.value = secret;
 
-    // Generate QR code URL
+    // Generate QR code image from otpauth URL
     const issuer = "Fliro";
     const accountName = user.value?.email || "user";
     const otpauthUrl = secret.generateQrCodeUrl(accountName, issuer);
-    qrCodeUrl.value = otpauthUrl;
+    logger.info`[MFA] OTPAuth URL generated: ${otpauthUrl.substring(0, 50)}...`;
+
+    // Convert otpauth:// URL to QR code image (Data URL)
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {
+      width: 200,
+      margin: 2,
+      color: {
+        dark: "#0b2e33",
+        light: "#ffffff",
+      },
+    });
+    qrCodeUrl.value = qrCodeDataUrl;
+    logger.info`[MFA] QR code image generated successfully`;
 
     showMFAEnrollmentModal.value = true;
   } catch (error) {
-    logger.error`Failed to start MFA enrollment: ${error}`;
-    const firebaseError = error as { code?: string; message?: string };
+    logger.error`[MFA] Failed to start MFA enrollment: ${error}`;
+    const firebaseError = error as {
+      code?: string;
+      message?: string;
+      customData?: unknown;
+      serverResponse?: unknown;
+    };
 
     // デバッグ用：エラーの詳細をコンソールに出力
     // eslint-disable-next-line no-console
-    console.error("MFA enrollment error details:", {
+    console.error("[MFA] Error details:", {
       code: firebaseError?.code,
       message: firebaseError?.message,
+      customData: firebaseError?.customData,
+      serverResponse: firebaseError?.serverResponse,
       fullError: error,
     });
+
+    // エラーオブジェクト全体をJSON形式でログ出力
+    try {
+      // eslint-disable-next-line no-console
+      console.error("[MFA] Full error JSON:", JSON.stringify(error, null, 2));
+    } catch {
+      // eslint-disable-next-line no-console
+      console.error("[MFA] Error not serializable");
+    }
 
     if (firebaseError?.code === "auth/unsupported-first-factor") {
       mfaError.value =
         "二段階認証を設定するには、先にメールアドレスの認証を完了してください。";
+    } else if (firebaseError?.code === "auth/operation-not-allowed") {
+      mfaError.value =
+        "二段階認証（TOTP）がプロジェクトで有効化されていません。Firebase Console > Authentication > Sign-in method > Multi-factor authentication > TOTP を有効にしてください。";
     } else if (
       firebaseError?.message?.includes("ADMIN_ONLY_OPERATION") ||
       firebaseError?.message?.includes("TOTP_MFA_ENROLLMENT_NOT_ENABLED")
@@ -309,7 +543,7 @@ async function startMFASetup() {
       mfaError.value =
         "二段階認証を設定するには、先にメールアドレスの認証を完了してください。";
     } else {
-      mfaError.value = `MFA設定の開始に失敗しました: ${firebaseError?.message || "不明なエラー"}`;
+      mfaError.value = `MFA設定の開始に失敗しました: ${firebaseError?.code || ""} - ${firebaseError?.message || "不明なエラー"}`;
     }
   } finally {
     mfaLoading.value = false;
@@ -626,6 +860,99 @@ onBeforeUnmount(() => {
             </AppButton>
           </div>
         </div>
+
+        <!-- Password Change Section -->
+        <div class="password-section">
+          <div class="password-section__header">
+            <div class="password-section__info">
+              <h3 class="password-section__title">パスワードの変更</h3>
+              <p class="password-section__description">
+                定期的にパスワードを変更することをお勧めします。
+              </p>
+            </div>
+            <AppButton
+              v-if="!showPasswordChange"
+              variant="secondary"
+              size="sm"
+              @click="togglePasswordChange"
+            >
+              パスワードを変更
+            </AppButton>
+          </div>
+
+          <!-- Password Change Form -->
+          <div v-if="showPasswordChange" class="password-form">
+            <div class="password-form__field">
+              <label for="current-password">現在のパスワード</label>
+              <input
+                id="current-password"
+                v-model="currentPassword"
+                type="password"
+                placeholder="現在のパスワードを入力"
+                autocomplete="current-password"
+              />
+            </div>
+            <div class="password-form__field">
+              <label for="new-password">新しいパスワード</label>
+              <input
+                id="new-password"
+                v-model="newPassword"
+                type="password"
+                placeholder="8文字以上で入力"
+                autocomplete="new-password"
+              />
+              <span
+                v-if="newPassword && newPassword.length < 8"
+                class="password-form__hint password-form__hint--error"
+              >
+                8文字以上で入力してください
+              </span>
+            </div>
+            <div class="password-form__field">
+              <label for="confirm-password">新しいパスワード（確認）</label>
+              <input
+                id="confirm-password"
+                v-model="confirmNewPassword"
+                type="password"
+                placeholder="新しいパスワードを再入力"
+                autocomplete="new-password"
+              />
+              <span
+                v-if="confirmNewPassword && newPassword !== confirmNewPassword"
+                class="password-form__hint password-form__hint--error"
+              >
+                パスワードが一致しません
+              </span>
+            </div>
+
+            <p v-if="passwordChangeError" class="password-form__error">
+              {{ passwordChangeError }}
+            </p>
+            <p v-if="passwordChangeSuccess" class="password-form__success">
+              {{ passwordChangeSuccess }}
+            </p>
+
+            <div class="password-form__actions">
+              <AppButton
+                variant="secondary"
+                size="sm"
+                :disabled="passwordChangeLoading"
+                @click="togglePasswordChange"
+              >
+                キャンセル
+              </AppButton>
+              <AppButton
+                variant="primary"
+                size="sm"
+                :disabled="!canChangePassword"
+                :loading="passwordChangeLoading"
+                @click="handlePasswordChange"
+              >
+                パスワードを変更
+              </AppButton>
+            </div>
+          </div>
+        </div>
       </SectionCard>
 
       <!-- Account Linking Section -->
@@ -686,6 +1013,30 @@ onBeforeUnmount(() => {
       :image-file="selectedImageFile"
       @close="handleCropperClose"
       @confirm="handleAvatarCropConfirm"
+    />
+
+    <!-- MFA Verification Modal for Account Deletion -->
+    <MFAVerificationModal
+      :open="showDeleteMFAModal"
+      title="2段階認証（アカウント削除）"
+      description="アカウントを削除するには、認証アプリに表示されている6桁のコードを入力してください。"
+      confirm-label="削除する"
+      :loading="deleteLoading"
+      :error="deleteMFAError"
+      @close="closeDeleteMFAModal"
+      @verified="handleDeleteMFAVerification"
+    />
+
+    <!-- MFA Verification Modal for Password Change -->
+    <MFAVerificationModal
+      :open="showPasswordMFAModal"
+      title="2段階認証（パスワード変更）"
+      description="パスワードを変更するには、認証アプリに表示されている6桁のコードを入力してください。"
+      confirm-label="変更する"
+      :loading="passwordChangeLoading"
+      :error="passwordMFAError"
+      @close="closePasswordMFAModal"
+      @verified="handlePasswordMFAVerification"
     />
   </AppShell>
 </template>
@@ -1004,6 +1355,106 @@ onBeforeUnmount(() => {
   color: var(--ui-text-muted, #64748b);
 }
 
+/* Password Change Section */
+.password-section {
+  margin-top: var(--ui-space-6, 1.5rem);
+  padding-top: var(--ui-space-6, 1.5rem);
+  border-top: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+}
+
+.password-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.password-section__info {
+  flex: 1;
+}
+
+.password-section__title {
+  margin: 0;
+  font-size: var(--ui-text-base, 1rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-strong, #0f172a);
+}
+
+.password-section__description {
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.password-form {
+  margin-top: var(--ui-space-4, 1rem);
+  padding: var(--ui-space-4, 1rem);
+  background: var(--ui-surface-secondary, #f8f9fa);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+}
+
+.password-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
+  margin-bottom: var(--ui-space-3, 0.75rem);
+}
+
+.password-form__field:last-of-type {
+  margin-bottom: 0;
+}
+
+.password-form__field label {
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #0b2e33);
+}
+
+.password-form__field input {
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
+  border-radius: var(--ui-radius-md, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text, #0b2e33);
+  background: var(--ui-surface, #fff);
+  transition: var(--ui-transition-colors);
+}
+
+.password-form__field input:focus {
+  outline: none;
+  border-color: var(--ui-brand-600, #4f7c82);
+  box-shadow: var(--ui-ring-focus);
+}
+
+.password-form__hint {
+  font-size: var(--ui-text-xs, 0.75rem);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.password-form__hint--error {
+  color: var(--ui-status-danger, #dc2626);
+}
+
+.password-form__error {
+  margin: var(--ui-space-3, 0.75rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-status-danger, #dc2626);
+}
+
+.password-form__success {
+  margin: var(--ui-space-3, 0.75rem) 0 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-success, #16a34a);
+}
+
+.password-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-space-2, 0.5rem);
+  margin-top: var(--ui-space-4, 1rem);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .profile-section {
@@ -1042,6 +1493,19 @@ onBeforeUnmount(() => {
   .mfa-factor {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .password-section__header {
+    flex-direction: column;
+    gap: var(--ui-space-3, 0.75rem);
+  }
+
+  .password-form__actions {
+    flex-direction: column-reverse;
+  }
+
+  .password-form__actions button {
+    width: 100%;
   }
 }
 </style>

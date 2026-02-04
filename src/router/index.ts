@@ -413,9 +413,9 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name && authRestricted.includes(String(to.name)) && user) {
-    const needsSetup = Boolean(
-      auth.profile.value && auth.profile.value.setUp === false,
-    );
+    // プロフィールがない、またはsetUp=falseの場合はセットアップが必要
+    const needsSetup =
+      !auth.profile.value || auth.profile.value.setUp === false;
     const goingToSignup = String(to.name) === String(ROUTE_NAMES.signup);
     const explicitlySetupFlow = String(to.query.setup) === "false";
 
@@ -423,7 +423,14 @@ router.beforeEach(async (to) => {
       return true;
     }
 
-    return { name: ROUTE_NAMES.myPage };
+    // プロフィールがセットアップ済みの場合のみマイページへリダイレクト
+    if (auth.profile.value && auth.profile.value.setUp === true) {
+      return { name: ROUTE_NAMES.myPage };
+    }
+
+    // プロフィールがまだロードされていない場合は一旦許可
+    // （onMountedで再度チェックする）
+    return true;
   }
 
   // プロジェクト権限チェック（認証済みユーザー）

@@ -14,6 +14,7 @@ import {
   resendVerificationEmail,
 } from "@/firebase/authService";
 import { getCurrentUser } from "@/lib/getCurrentUser";
+import { waitForAuthReady } from "@/store/auth";
 import {
   completeProfileSetup,
   registerAccountWithProvider,
@@ -61,10 +62,20 @@ const avatarFile = ref<File | null>(null);
 const avatarPreview = ref<string | null>(null);
 
 onMounted(async () => {
+  // 認証状態が確定するまで待機
+  await waitForAuthReady();
+
+  // 既存ユーザーがページにアクセスした場合の処理
   const currentUser = user.value ?? (await getCurrentUser());
-  if (route.query.setup === "false" && currentUser) {
+
+  if (currentUser) {
     const profile = await fetchProfile(currentUser.uid);
-    if (profile && !profile.setUp) {
+
+    if (profile && profile.setUp) {
+      // 既にセットアップ済みならリダイレクト先へ
+      await router.push(redirectPath.value);
+    } else {
+      // セットアップが必要ならプロフィール入力ステップへ
       currentStep.value = "profile";
       hydrateProfileFromUser(currentUser);
     }
@@ -215,14 +226,21 @@ const checkVerificationStatus = async () => {
 };
 
 const handleProfileSubmit = async () => {
-  if (!profileValid.value || profileLoading.value) return;
+  logger.info`handleProfileSubmit called, profileValid=${profileValid.value}, profileLoading=${profileLoading.value}`;
+
+  if (!profileValid.value || profileLoading.value) {
+    logger.warn`handleProfileSubmit aborted: profileValid=${profileValid.value}, profileLoading=${profileLoading.value}`;
+    return;
+  }
 
   profileLoading.value = true;
   profileError.value = "";
 
   try {
     const nickname = buildNickname(profileForm.fullName, profileForm.nickname);
-    await completeProfileSetup({
+    logger.info`handleProfileSubmit calling completeProfileSetup with fullName=${profileForm.fullName}, nickname=${nickname}, jobRole=${profileForm.jobRole}`;
+
+    const result = await completeProfileSetup({
       fullName: profileForm.fullName,
       nickname,
       birthday: profileForm.birthday,
@@ -230,10 +248,14 @@ const handleProfileSubmit = async () => {
       jobTitle: profileForm.jobTitle,
     });
 
+    logger.info`handleProfileSubmit completeProfileSetup returned, setUp=${result.setUp}`;
+
     if (avatarFile.value) {
+      logger.info`handleProfileSubmit uploading avatar...`;
       await updateAccountAvatar(avatarFile.value);
     }
 
+    logger.info`handleProfileSubmit pushing to redirectPath: ${JSON.stringify(redirectPath.value)}`;
     await router.push(redirectPath.value);
   } catch (error) {
     logger.error`Profile submission failed: ${error}`;

@@ -4,16 +4,25 @@ import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
 import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
+import MFAVerificationModal from "@/components/modals/MFAVerificationModal.vue";
 import { ROUTE_NAMES } from "@/constants/routes";
-import { fetchProfile } from "@/firebase/authService";
+import { fetchProfile, verifyMFACode } from "@/firebase/authService";
 import { getCurrentUser } from "@/lib/getCurrentUser";
+import { auth } from "@/lib/firebase";
 import {
   authenticateWithEmail,
   authenticateWithProvider,
 } from "@/services/accountActions";
+import { setProfile } from "@/store/auth";
 import type { SocialProvider } from "@/types/auth";
-import { computed, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import {
+  getMultiFactorResolver,
+  type MultiFactorError,
+  type MultiFactorResolver,
+} from "firebase/auth";
+import { persistProfileAfterSocialLogin } from "@/firebase/authService";
 
 import { getLogger } from "@logtape/logtape";
 
@@ -21,6 +30,15 @@ const logger = getLogger("app.pages.auth.Login");
 
 const router = useRouter();
 const route = useRoute();
+
+// リダイレクト認証後の処理
+onMounted(async () => {
+  const user = await getCurrentUser();
+  if (user) {
+    // 認証済みユーザーがログインページに来た場合、適切にリダイレクト
+    await checksetUp();
+  }
+});
 
 const form = reactive({
   email: "",
@@ -31,6 +49,12 @@ const rememberMe = ref(false);
 const loading = ref(false);
 const providerLoading = ref<SocialProvider | null>(null);
 const errorMessage = ref("");
+
+// MFA関連の状態
+const showMFAModal = ref(false);
+const mfaLoading = ref(false);
+const mfaError = ref("");
+const mfaResolver = ref<MultiFactorResolver | null>(null);
 
 const redirectTarget = computed(() => {
   return (route.query.redirect as string) || { name: ROUTE_NAMES.myPage };
@@ -87,8 +111,20 @@ const handleSubmit = async () => {
     const profile = await authenticateWithEmail({ ...form });
     await checksetUp(profile);
   } catch (error) {
-    logger.error`Login failed: ${error}`;
-    errorMessage.value = mapFirebaseError(error);
+    const authError = error as { code?: string };
+
+    if (authError.code === "auth/multi-factor-auth-required") {
+      // MFAが必要 - モーダルを表示
+      logger.info`MFA required for login`;
+      mfaResolver.value = getMultiFactorResolver(
+        auth,
+        error as MultiFactorError,
+      );
+      showMFAModal.value = true;
+    } else {
+      logger.error`Login failed: ${error}`;
+      errorMessage.value = mapFirebaseError(error);
+    }
   } finally {
     loading.value = false;
   }
@@ -104,26 +140,63 @@ const handleProvider = async (provider: SocialProvider) => {
     const profile = await authenticateWithProvider(provider);
     await checksetUp(profile);
   } catch (error) {
-    logger.error`Provider login failed: ${error}`;
+    const authError = error as { code?: string };
 
-    // 未登録のSNSアカウントでログインしようとした場合はエラーページへリダイレクト
-    if (
-      typeof error === "object" &&
-      error &&
-      "code" in error &&
-      (error as { code?: string }).code === "auth/user-not-found"
-    ) {
+    if (authError.code === "auth/multi-factor-auth-required") {
+      // MFAが必要 - モーダルを表示
+      logger.info`MFA required for provider login`;
+      mfaResolver.value = getMultiFactorResolver(
+        auth,
+        error as MultiFactorError,
+      );
+      showMFAModal.value = true;
+    } else if (authError.code === "auth/user-not-found") {
+      // 未登録のSNSアカウントでログインしようとした場合はエラーページへリダイレクト
       await router.push({
         name: ROUTE_NAMES.error,
         query: { errorType: "account_not_found" },
       });
       return;
+    } else {
+      logger.error`Provider login failed: ${error}`;
+      errorMessage.value = mapFirebaseError(error);
     }
-
-    errorMessage.value = mapFirebaseError(error);
   } finally {
     providerLoading.value = null;
   }
+};
+
+const handleMFAVerified = async (code: string) => {
+  if (!mfaResolver.value) return;
+
+  mfaLoading.value = true;
+  mfaError.value = "";
+
+  try {
+    await verifyMFACode(mfaResolver.value, code);
+
+    // MFA認証成功後、プロフィールを永続化
+    const user = await getCurrentUser();
+    if (user) {
+      const profile = await persistProfileAfterSocialLogin(user);
+      setProfile(profile);
+      await checksetUp();
+    }
+
+    showMFAModal.value = false;
+    mfaResolver.value = null;
+  } catch (error) {
+    logger.error`MFA verification failed: ${error}`;
+    mfaError.value = "認証コードが正しくありません。もう一度お試しください。";
+  } finally {
+    mfaLoading.value = false;
+  }
+};
+
+const handleMFAModalClose = () => {
+  showMFAModal.value = false;
+  mfaResolver.value = null;
+  mfaError.value = "";
 };
 
 function mapFirebaseError(error: unknown): string {
@@ -257,6 +330,17 @@ function mapFirebaseError(error: unknown): string {
         <RouterLink :to="{ name: ROUTE_NAMES.signup }">新規登録</RouterLink>
       </p>
     </div>
+
+    <!-- MFA認証モーダル -->
+    <MFAVerificationModal
+      :open="showMFAModal"
+      :loading="mfaLoading"
+      :error="mfaError"
+      title="2段階認証"
+      description="セキュリティのため、認証アプリに表示されている6桁のコードを入力してください。"
+      @close="handleMFAModalClose"
+      @verified="handleMFAVerified"
+    />
   </div>
 </template>
 

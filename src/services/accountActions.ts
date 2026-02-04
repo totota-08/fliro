@@ -17,6 +17,9 @@ import type {
   ProfileSetupPayload,
   SocialProvider,
 } from "@/types/auth";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.services.accountActions");
 
 export async function authenticateWithEmail(payload: LoginPayload) {
   const profile = await loginWithEmail(payload);
@@ -25,7 +28,9 @@ export async function authenticateWithEmail(payload: LoginPayload) {
 }
 
 export async function authenticateWithProvider(provider: SocialProvider) {
+  logger.info`authenticateWithProvider called with provider: ${provider}`;
   const profile = await loginWithProvider(provider);
+  logger.info`authenticateWithProvider completed, profile.setUp=${profile.setUp}`;
   setProfile(profile);
   return profile;
 }
@@ -37,7 +42,9 @@ export async function registerAccountWithProvider(provider: SocialProvider) {
 }
 
 export async function completeProfileSetup(payload: ProfileSetupPayload) {
+  logger.info`completeProfileSetup called`;
   const profile = await saveProfileDetails(payload);
+  logger.info`completeProfileSetup completed, profile.setUp=${profile.setUp}`;
   setProfile(profile);
   return profile;
 }

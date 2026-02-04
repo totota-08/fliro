@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ZeldaPuzzleEffect from "@/components/effects/ZeldaPuzzleEffect.vue";
 import ConfirmGuestAccessModal from "@/components/modals/ConfirmGuestAccessModal.vue";
+import MFAVerificationModal from "@/components/modals/MFAVerificationModal.vue";
 import DangerZoneCard from "@/components/settings/DangerZoneCard.vue";
 import SettingsLinkList from "@/components/settings/SettingsLinkList.vue";
 import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
@@ -24,10 +25,16 @@ import {
 import { ROUTE_NAMES } from "@/constants/routes";
 import type { GuestAllowedPage } from "@/types/project";
 import {
+  getMFAEnrollmentStatus,
+  reauthenticateWithPassword,
+  completeMFAReauthentication,
+} from "@/firebase/authService";
+import {
   deleteProject,
   fetchProject,
   updateProjectMetadata,
 } from "@/firebase/projectService";
+import type { MultiFactorResolver } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import {
   getDashboardSettings,
@@ -78,6 +85,14 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const deleteError = ref("");
 const deleteConfirmInput = ref("");
+
+// MFA state for project deletion
+const showDeleteMFAModal = ref(false);
+const deleteMFAError = ref("");
+const deleteMFAResolver = ref<MultiFactorResolver | null>(null);
+const mfaEnrolled = ref(false);
+const showPasswordModal = ref(false);
+const deletePassword = ref("");
 
 // useProjectAccess で権限管理を統一
 const { can } = useProjectAccess(projectId);
@@ -974,7 +989,109 @@ async function handleDelete() {
       "本人確認のため、メールアドレスを正しく入力してください。";
     return;
   }
+
+  // MFAが有効かチェック
+  try {
+    const mfaStatus = await getMFAEnrollmentStatus();
+    mfaEnrolled.value = mfaStatus.enrolled;
+
+    if (mfaStatus.enrolled) {
+      // MFAが有効な場合、パスワード入力モーダルを表示
+      showPasswordModal.value = true;
+      return;
+    }
+  } catch (error) {
+    logger.error`Failed to check MFA status: ${error}`;
+    // MFAステータスの確認に失敗しても削除は続行可能
+  }
+
+  // MFAが無効な場合、従来のフロー
+  await executeProjectDeletion();
+}
+
+async function handleDeletePasswordConfirm() {
+  if (!deletePassword.value.trim()) {
+    deleteError.value = "パスワードを入力してください。";
+    return;
+  }
+
+  deleting.value = true;
+  deleteError.value = "";
+
+  try {
+    // パスワードで再認証
+    const result = await reauthenticateWithPassword(deletePassword.value);
+
+    if (result.requiresMFA && result.resolver) {
+      // MFA検証が必要
+      deleteMFAResolver.value = result.resolver;
+      showPasswordModal.value = false;
+      showDeleteMFAModal.value = true;
+      deleting.value = false;
+      return;
+    }
+
+    // MFA不要の場合、削除を実行
+    showPasswordModal.value = false;
+    await executeProjectDeletion();
+  } catch (error) {
+    logger.error`Password reauthentication failed: ${error}`;
+    const firebaseError = error as { code?: string };
+    if (
+      firebaseError?.code === "auth/wrong-password" ||
+      firebaseError?.code === "auth/invalid-credential"
+    ) {
+      deleteError.value = "パスワードが正しくありません。";
+    } else {
+      deleteError.value = "認証に失敗しました。再度お試しください。";
+    }
+    deleting.value = false;
+  }
+}
+
+async function handleDeleteMFAVerification(mfaCode: string) {
+  if (!deleteMFAResolver.value) return;
+
+  deleting.value = true;
+  deleteMFAError.value = "";
+
+  try {
+    // MFA検証を完了
+    await completeMFAReauthentication(deleteMFAResolver.value, mfaCode);
+
+    // 削除を実行
+    showDeleteMFAModal.value = false;
+    await executeProjectDeletion();
+  } catch (error) {
+    logger.error`MFA verification for project deletion failed: ${error}`;
+    const firebaseError = error as { code?: string; message?: string };
+    if (
+      firebaseError?.code === "auth/invalid-verification-code" ||
+      firebaseError?.message?.includes("invalid")
+    ) {
+      deleteMFAError.value = "認証コードが正しくありません。";
+    } else {
+      deleteMFAError.value = "認証に失敗しました。再度お試しください。";
+    }
+    deleting.value = false;
+  }
+}
+
+function closePasswordModal() {
+  showPasswordModal.value = false;
+  deletePassword.value = "";
+  deleteError.value = "";
+}
+
+function closeDeleteMFAModal() {
+  showDeleteMFAModal.value = false;
+  deleteMFAError.value = "";
+  deleteMFAResolver.value = null;
+}
+
+async function executeProjectDeletion() {
   if (!confirm("このプロジェクトを完全に削除します。よろしいですか？")) {
+    deleting.value = false;
     return;
   }
   deleting.value = true;
@@ -2039,6 +2156,80 @@ watch(projectId, async (newId, oldId) => {
       :loading="publicSaving"
       @close="isPublicConfirmModalOpen = false"
       @confirm="confirmEnablePublic"
+    />
+
+    <!-- プロジェクト削除用パスワード確認モーダル -->
+    <Teleport to="body">
+      <div
+        v-if="showPasswordModal"
+        class="modal-overlay"
+        @click.self="closePasswordModal"
+      >
+        <div
+          class="modal modal--sm"
+          role="dialog"
+          aria-labelledby="password-modal-title"
+        >
+          <header class="modal__header">
+            <h3 id="password-modal-title">パスワードの確認</h3>
+            <button
+              type="button"
+              class="modal__close"
+              aria-label="閉じる"
+              @click="closePasswordModal"
+            >
+              &times;
+            </button>
+          </header>
+          <div class="modal__body">
+            <p class="modal__description">
+              プロジェクトを削除するには、パスワードを入力してください。
+            </p>
+            <div class="form-field">
+              <label for="delete-password">パスワード</label>
+              <input
+                id="delete-password"
+                v-model="deletePassword"
+                type="password"
+                placeholder="パスワードを入力"
+                autocomplete="current-password"
+                @keydown.enter="handleDeletePasswordConfirm"
+              />
+            </div>
+            <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
+          </div>
+          <footer class="modal__footer">
+            <button
+              type="button"
+              class="btn btn--ghost"
+              :disabled="deleting"
+              @click="closePasswordModal"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              class="btn btn--danger"
+              :disabled="!deletePassword.trim() || deleting"
+              @click="handleDeletePasswordConfirm"
+            >
+              {{ deleting ? "確認中..." : "続行" }}
+            </button>
+          </footer>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- プロジェクト削除用MFA検証モーダル -->
+    <MFAVerificationModal
+      :open="showDeleteMFAModal"
+      title="2段階認証（プロジェクト削除）"
+      description="プロジェクトを削除するには、認証アプリに表示されている6桁のコードを入力してください。"
+      confirm-label="続行"
+      :loading="deleting"
+      :error="deleteMFAError"
+      @close="closeDeleteMFAModal"
+      @verified="handleDeleteMFAVerification"
     />
   </div>
 </template>

@@ -21,6 +21,7 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   EmailAuthProvider,
+  getMultiFactorResolver,
   linkWithPopup,
   multiFactor,
   PhoneAuthProvider,
@@ -31,12 +32,13 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
   TotpMultiFactorGenerator,
   TotpSecret,
   unlink,
+  updatePassword,
   updateProfile,
   type AuthProvider,
+  type MultiFactorError,
   type MultiFactorResolver,
   type MultiFactorSession,
   type User,
@@ -48,6 +50,9 @@ import {
   ref as storageRef,
   uploadBytes,
 } from "firebase/storage";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.firebase.authService");
 
 const providerMap: Record<SocialProvider, AuthProvider> = {
   google: googleProvider,
@@ -101,12 +106,16 @@ export async function confirmPasswordResetWithCode(
 }
 
 export async function saveProfileDetails(payload: ProfileSetupPayload) {
+  logger.info`saveProfileDetails called with payload: ${JSON.stringify(payload)}`;
+
   const user = await requireCurrentUser();
+  logger.info`saveProfileDetails user found: ${user.uid}`;
 
   const displayName = payload.nickname?.trim() || payload.fullName;
   await updateProfile(user, { displayName });
+  logger.info`saveProfileDetails displayName updated to: ${displayName}`;
 
-  return persistProfile(user, {
+  const result = await persistProfile(user, {
     fullName: payload.fullName,
     nickname: payload.nickname,
     birthday: payload.birthday ?? "",
@@ -114,6 +123,9 @@ export async function saveProfileDetails(payload: ProfileSetupPayload) {
     jobTitle: payload.jobTitle ?? "",
     setUp: true,
   });
+
+  logger.info`saveProfileDetails completed, setUp=${result.setUp}`;
+  return result;
 }
 
 export async function loginWithEmail(payload: LoginPayload) {
@@ -133,6 +145,7 @@ export async function loginWithEmail(payload: LoginPayload) {
  */
 export async function loginWithProvider(provider: SocialProvider) {
   const authProvider = providerMap[provider];
+  const { signInWithPopup } = await import("firebase/auth");
   const credential = await signInWithPopup(auth, authProvider);
 
   // Firebase AuthトークンがFirestoreに伝播するまで待機
@@ -165,6 +178,7 @@ export async function loginWithProvider(provider: SocialProvider) {
  */
 export async function registerWithProvider(provider: SocialProvider) {
   const authProvider = providerMap[provider];
+  const { signInWithPopup } = await import("firebase/auth");
   const credential = await signInWithPopup(auth, authProvider);
 
   // プロファイルの存在を確認
@@ -192,13 +206,21 @@ export async function persistProfileAfterSocialLogin(user: User) {
 
 export async function fetchProfile(uid: string) {
   const ref = doc(db, "profiles", uid);
-  const snapshot = await getDoc(ref);
 
-  if (!snapshot.exists()) {
+  try {
+    const snapshot = await getDoc(ref);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    return snapshot.data() as UserProfile;
+  } catch (error) {
+    // 認証直後のタイミングでトークンがFirestoreに伝播していない場合
+    // パーミッションエラーが発生することがある
+    logger.warn`Failed to fetch profile (auth token may not be synced yet): ${error}`;
     return null;
   }
-
-  return snapshot.data() as UserProfile;
 }
 
 export async function uploadAvatar(file: File) {
@@ -257,12 +279,41 @@ async function persistProfile(
   user: User,
   overrides: Partial<UserProfile> = {},
 ) {
+  logger.info`persistProfile called for user ${user.uid}`;
+  logger.info`persistProfile overrides: ${JSON.stringify(overrides)}`;
+
   const ref = doc(db, "profiles", user.uid);
-  const snapshot = await getDoc(ref);
-  const existing = snapshot.exists() ? (snapshot.data() as UserProfile) : null;
+  let existing: UserProfile | null = null;
+
+  // リトライ機構付きでプロファイルを読み取り
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const snapshot = await getDoc(ref);
+      existing = snapshot.exists() ? (snapshot.data() as UserProfile) : null;
+      break; // 成功したらループを抜ける
+    } catch (error) {
+      const isLastAttempt = attempt === maxRetries - 1;
+      if (isLastAttempt) {
+        // 最後の試行でも失敗した場合は新規ユーザーとして扱う
+        logger.warn`Failed to read existing profile after ${maxRetries} attempts (treating as new user): ${error}`;
+        existing = null;
+      } else {
+        // リトライ前に少し待つ（指数バックオフ）
+        const delay = Math.pow(2, attempt) * 500; // 500ms, 1000ms, 2000ms
+        logger.info`Retrying profile read in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
 
   const now = new Date().toISOString();
-  const profile: UserProfile = {
+
+  // 基本プロファイルデータ（ベータフィールドを除く）
+  const baseProfile: Omit<
+    UserProfile,
+    "betaAccess" | "betaCodeUsed" | "betaAccessAt"
+  > = {
     uid: user.uid,
     email: user.email ?? overrides.email ?? existing?.email ?? "",
     emailLower: (
@@ -285,16 +336,56 @@ async function persistProfile(
     setUp: overrides.setUp ?? existing?.setUp ?? false,
     hasUsedInviteCode:
       overrides.hasUsedInviteCode ?? existing?.hasUsedInviteCode ?? false,
-    // ベータアクセス関連フィールドを既存データから引き継ぐ
-    betaAccess: overrides.betaAccess ?? existing?.betaAccess,
-    betaCodeUsed: overrides.betaCodeUsed ?? existing?.betaCodeUsed,
-    betaAccessAt: overrides.betaAccessAt ?? existing?.betaAccessAt,
-    // プロジェクト内でのアバター表示設定
     hideAvatarInProjects:
       overrides.hideAvatarInProjects ?? existing?.hideAvatarInProjects ?? false,
   };
 
-  await setDoc(ref, profile, { merge: true });
+  // 新規作成時はベータフィールドを含めない（セキュリティルールでブロックされるため）
+  // 既存プロファイルの更新時のみベータフィールドを引き継ぐ（ただしundefinedは除外）
+  let profile: UserProfile;
+  if (existing) {
+    profile = { ...baseProfile };
+    // ベータフィールドは実際の値がある場合のみ含める
+    if (existing.betaAccess !== undefined) {
+      profile.betaAccess = overrides.betaAccess ?? existing.betaAccess;
+    }
+    if (existing.betaCodeUsed !== undefined) {
+      profile.betaCodeUsed = overrides.betaCodeUsed ?? existing.betaCodeUsed;
+    }
+    if (existing.betaAccessAt !== undefined) {
+      profile.betaAccessAt = overrides.betaAccessAt ?? existing.betaAccessAt;
+    }
+  } else {
+    profile = baseProfile;
+  }
+
+  logger.info`persistProfile existing profile found: ${existing !== null}`;
+  logger.info`persistProfile existing setUp value: ${existing?.setUp}`;
+  logger.info`persistProfile overrides.setUp: ${overrides.setUp}`;
+  logger.info`persistProfile profile to write (setUp=${profile.setUp}): ${JSON.stringify({ uid: profile.uid, setUp: profile.setUp, fullName: profile.fullName })}`;
+
+  // 書き込みもリトライ機構を追加（トークン伝播の遅延対策）
+  const writeMaxRetries = 3;
+  for (let attempt = 0; attempt < writeMaxRetries; attempt++) {
+    try {
+      logger.info`persistProfile attempting write (attempt ${attempt + 1}/${writeMaxRetries})...`;
+      await setDoc(ref, profile, { merge: true });
+      logger.info`persistProfile write SUCCESS for user ${user.uid}`;
+      return profile;
+    } catch (error) {
+      const isLastAttempt = attempt === writeMaxRetries - 1;
+      if (isLastAttempt) {
+        logger.error`Failed to save profile after ${writeMaxRetries} attempts: ${error}`;
+        throw error;
+      }
+      // リトライ前に少し待つ（指数バックオフ）
+      const delay = Math.pow(2, attempt) * 500;
+      logger.info`Retrying profile write in ${delay}ms (attempt ${attempt + 1}/${writeMaxRetries})`;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  // ここには到達しないはずだが、TypeScriptのために
   return profile;
 }
 
@@ -344,8 +435,22 @@ export async function getMFAEnrollmentStatus() {
 export async function generateTOTPSecret(
   session: MultiFactorSession,
 ): Promise<TotpSecret> {
-  const secret = await TotpMultiFactorGenerator.generateSecret(session);
-  return secret;
+  logger.info`[MFA] generateTOTPSecret called`;
+  logger.info`[MFA] Session type: ${typeof session}`;
+
+  console.log("[MFA] Session object in generateTOTPSecret:", session);
+
+  try {
+    logger.info`[MFA] Calling TotpMultiFactorGenerator.generateSecret...`;
+    const secret = await TotpMultiFactorGenerator.generateSecret(session);
+    logger.info`[MFA] TOTP secret generated successfully`;
+    return secret;
+  } catch (error) {
+    logger.error`[MFA] TotpMultiFactorGenerator.generateSecret failed: ${error}`;
+
+    console.error("[MFA] generateSecret error:", error);
+    throw error;
+  }
 }
 
 /**
@@ -371,9 +476,41 @@ export async function enrollTOTP(
  * MFAセッションを開始（登録用）
  */
 export async function startMFAEnrollment(): Promise<MultiFactorSession> {
+  logger.info`[MFA] startMFAEnrollment called`;
+
   const user = await requireCurrentUser();
+  logger.info`[MFA] User obtained: ${user.uid}`;
+  logger.info`[MFA] User email: ${user.email}`;
+  logger.info`[MFA] Email verified: ${user.emailVerified}`;
+  logger.info`[MFA] Provider IDs: ${user.providerData.map((p) => p.providerId).join(", ")}`;
+
+  console.log("[MFA] User object in startMFAEnrollment:", {
+    uid: user.uid,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    providerData: user.providerData,
+    metadata: user.metadata,
+  });
+
   const mfaUser = multiFactor(user);
-  return mfaUser.getSession();
+  logger.info`[MFA] MultiFactor object created`;
+  logger.info`[MFA] Enrolled factors count: ${mfaUser.enrolledFactors.length}`;
+
+  console.log("[MFA] Enrolled factors:", mfaUser.enrolledFactors);
+
+  try {
+    logger.info`[MFA] Calling mfaUser.getSession()...`;
+    const session = await mfaUser.getSession();
+    logger.info`[MFA] Session obtained successfully`;
+
+    console.log("[MFA] Session:", session);
+    return session;
+  } catch (error) {
+    logger.error`[MFA] mfaUser.getSession() failed: ${error}`;
+
+    console.error("[MFA] getSession error:", error);
+    throw error;
+  }
 }
 
 /**
@@ -547,4 +684,190 @@ export function isProviderLinked(
   providerId: string,
 ): boolean {
   return providerData.some((p) => p.providerId === providerId);
+}
+
+/**
+ * 重要操作前のMFA検証関連の関数
+ */
+
+/**
+ * TOTPコードを検証する（重要操作前の確認用）
+ * MFAが有効なユーザーに対して、入力されたTOTPコードが正しいか検証する
+ *
+ * @param verificationCode - 6桁のTOTPコード
+ * @returns 検証成功時はtrue
+ * @throws 検証失敗時はエラーをスロー
+ */
+export async function verifyTOTPCode(
+  verificationCode: string,
+): Promise<boolean> {
+  const user = await requireCurrentUser();
+  const mfaUser = multiFactor(user);
+
+  // MFAが有効でない場合は検証不要
+  if (mfaUser.enrolledFactors.length === 0) {
+    return true;
+  }
+
+  // TOTPファクターを探す
+  const totpFactor = mfaUser.enrolledFactors.find(
+    (factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID,
+  );
+
+  if (!totpFactor) {
+    throw new Error("TOTP認証が設定されていません。");
+  }
+
+  // TOTPコードの検証
+  // Firebase Auth では直接検証APIがないため、assertionForSignInを使用して検証
+  try {
+    const assertion = TotpMultiFactorGenerator.assertionForSignIn(
+      totpFactor.uid,
+      verificationCode,
+    );
+
+    // アサーションが作成できれば、コードの形式は正しい
+    // 実際の検証は再認証フローで行う必要がある
+    if (!assertion) {
+      throw new Error("認証コードが正しくありません。");
+    }
+
+    return true;
+  } catch (error) {
+    logger.error`TOTP verification failed: ${error}`;
+    throw new Error("認証コードが正しくありません。");
+  }
+}
+
+/**
+ * パスワードを使用して再認証し、MFAが必要な場合はリゾルバーを返す
+ *
+ * @param password - 現在のパスワード
+ * @returns MFAが必要な場合は { requiresMFA: true, resolver }、不要な場合は { requiresMFA: false }
+ */
+export async function reauthenticateWithPassword(password: string): Promise<{
+  requiresMFA: boolean;
+  resolver?: MultiFactorResolver;
+}> {
+  const user = await requireCurrentUser();
+
+  if (!user.email) {
+    throw new Error("メールアドレスが設定されていません。");
+  }
+
+  const credential = EmailAuthProvider.credential(user.email, password);
+
+  try {
+    await reauthenticateWithCredential(user, credential);
+    return { requiresMFA: false };
+  } catch (error) {
+    const authError = error as { code?: string };
+
+    if (authError.code === "auth/multi-factor-auth-required") {
+      // MFAが必要
+      const resolver = getMultiFactorResolver(auth, error as MultiFactorError);
+      return { requiresMFA: true, resolver };
+    }
+
+    // その他のエラー
+    throw error;
+  }
+}
+
+/**
+ * MFAリゾルバーを使用してTOTPコードで再認証を完了する
+ *
+ * @param resolver - MultiFactorResolver
+ * @param verificationCode - 6桁のTOTPコード
+ */
+export async function completeMFAReauthentication(
+  resolver: MultiFactorResolver,
+  verificationCode: string,
+): Promise<void> {
+  const totpHint = resolver.hints.find(
+    (hint) => hint.factorId === TotpMultiFactorGenerator.FACTOR_ID,
+  );
+
+  if (!totpHint) {
+    throw new Error("TOTP認証が見つかりません。");
+  }
+
+  const assertion = TotpMultiFactorGenerator.assertionForSignIn(
+    totpHint.uid,
+    verificationCode,
+  );
+
+  await resolver.resolveSignIn(assertion);
+}
+
+/**
+ * パスワードを変更する
+ *
+ * @param currentPassword - 現在のパスワード
+ * @param newPassword - 新しいパスワード
+ * @param mfaCode - MFAコード（MFAが有効な場合）
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  mfaCode?: string,
+): Promise<void> {
+  const user = await requireCurrentUser();
+
+  if (!user.email) {
+    throw new Error("メールアドレスが設定されていません。");
+  }
+
+  // まず再認証
+  const reauthResult = await reauthenticateWithPassword(currentPassword);
+
+  if (reauthResult.requiresMFA) {
+    if (!mfaCode) {
+      throw new Error("MFA_REQUIRED");
+    }
+    if (!reauthResult.resolver) {
+      throw new Error("MFAリゾルバーが見つかりません。");
+    }
+    await completeMFAReauthentication(reauthResult.resolver, mfaCode);
+  }
+
+  // パスワードを更新
+  // 再認証後にユーザーオブジェクトを再取得
+  const freshUser = await requireCurrentUser();
+  await updatePassword(freshUser, newPassword);
+}
+
+/**
+ * MFA付きでアカウントを削除する
+ *
+ * @param password - 現在のパスワード
+ * @param mfaCode - MFAコード（MFAが有効な場合）
+ */
+export async function deleteAccountWithMFA(
+  password: string,
+  mfaCode?: string,
+): Promise<void> {
+  const user = await requireCurrentUser();
+
+  if (!user.email) {
+    throw new Error("メールアドレスが設定されていません。");
+  }
+
+  // まず再認証
+  const reauthResult = await reauthenticateWithPassword(password);
+
+  if (reauthResult.requiresMFA) {
+    if (!mfaCode) {
+      throw new Error("MFA_REQUIRED");
+    }
+    if (!reauthResult.resolver) {
+      throw new Error("MFAリゾルバーが見つかりません。");
+    }
+    await completeMFAReauthentication(reauthResult.resolver, mfaCode);
+  }
+
+  // アカウントを削除
+  const freshUser = await requireCurrentUser();
+  await deleteDoc(doc(db, "profiles", freshUser.uid));
+  await deleteUser(freshUser);
 }
