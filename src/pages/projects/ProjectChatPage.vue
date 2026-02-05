@@ -460,6 +460,17 @@ function handleOpenTask(taskId: string) {
   openTask(taskId);
 }
 
+/**
+ * TaskDrawerからのオプティミスティック更新を処理
+ */
+function handleTaskUpdated(taskId: string, updates: Partial<TaskDoc>) {
+  const index = tasks.value.findIndex((t) => t.id === taskId);
+  if (index !== -1 && tasks.value[index]) {
+    const existing = tasks.value[index];
+    tasks.value[index] = { ...existing, ...updates } as TaskDoc;
+  }
+}
+
 // タスクスレッドのアーカイブ状態を切り替える
 async function toggleTaskArchive(taskId: string, currentArchived: boolean) {
   try {
@@ -1448,6 +1459,7 @@ watch(channels, (list) => {
         :task-id="selectedTaskId"
         :tasks="tasks"
         @close="closeTask"
+        @task-updated="handleTaskUpdated"
       />
     </Teleport>
 

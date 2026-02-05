@@ -413,6 +413,17 @@ async function handleTaskComplete(task: TaskDoc) {
   }
 }
 
+/**
+ * TaskDrawerからのオプティミスティック更新を処理
+ */
+function handleTaskUpdated(taskId: string, updates: Partial<TaskDoc>) {
+  const index = tasks.value.findIndex((t) => t.id === taskId);
+  if (index !== -1 && tasks.value[index]) {
+    const existing = tasks.value[index];
+    tasks.value[index] = { ...existing, ...updates } as TaskDoc;
+  }
+}
+
 // async function sendChatMessage(text: string) {
 //   if (!user.value) return
 //   await sendProjectMessage(
@@ -546,6 +557,7 @@ onBeforeUnmount(() => {
         :members-by-id="membersById"
         :members="members"
         @close="closeTask"
+        @task-updated="handleTaskUpdated"
       />
     </Teleport>
   </div>

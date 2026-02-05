@@ -1712,65 +1712,53 @@ watch(projectId, async (newId, oldId) => {
               </SettingsLinkList>
             </div>
 
-            <!-- 3. AIアシスタント -->
-            <SettingsSectionCard
-              title="AI アシスタント"
-              description="OpenAI API を使用してタスクのサポートを行います"
-              :dirty="isAiDirty"
-              :saving="aiSaving"
-              :save-disabled="!canEdit"
-              @save="saveAiSettings"
+            <!-- 3. AIアシスタント（現在のバージョンでは無効） -->
+            <div
+              class="ai-section-disabled"
+              title="この機能は現在のバージョンでは使用できません"
             >
-              <template #icon>
-                <svg
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
-              </template>
-              <div class="ai-settings">
-                <SettingsToggleRow
-                  v-model="aiEnabled"
-                  label="AI アシスタントを有効化"
-                  description="タスクの内容に基づいてAIが回答します"
-                  :disabled="!canEdit"
-                />
-                <AppInput
-                  id="aiKey"
-                  v-model="aiKey"
-                  type="password"
-                  label="OpenAI API Key"
-                  :disabled="!canEdit"
-                  placeholder="sk-..."
-                />
-                <div v-if="aiEnabled" class="ai-playground">
-                  <h4>テストチャット</h4>
-                  <AppTextarea
-                    v-model="aiPrompt"
-                    placeholder="タスクについて質問してください"
-                    :rows="2"
-                  />
-                  <AppButton
-                    type="button"
-                    size="sm"
-                    :disabled="aiLoading || !aiKey"
-                    @click="askAi"
+              <SettingsSectionCard
+                title="AI アシスタント"
+                description="OpenAI API を使用してタスクのサポートを行います"
+                :dirty="false"
+                :saving="false"
+                :save-disabled="true"
+              >
+                <template #icon>
+                  <svg
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
                   >
-                    {{ aiLoading ? "応答中..." : "AIに聞く" }}
-                  </AppButton>
-                  <div v-if="aiResponse" class="ai-response">
-                    <p>{{ aiResponse }}</p>
-                  </div>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                </template>
+                <div class="ai-settings">
+                  <p class="ai-unavailable-notice">
+                    この機能は現在のバージョンでは使用できません
+                  </p>
+                  <SettingsToggleRow
+                    v-model="aiEnabled"
+                    label="AI アシスタントを有効化"
+                    description="タスクの内容に基づいてAIが回答します"
+                    :disabled="true"
+                  />
+                  <AppInput
+                    id="aiKey"
+                    v-model="aiKey"
+                    type="password"
+                    label="OpenAI API Key"
+                    :disabled="true"
+                    placeholder="sk-..."
+                  />
                 </div>
-              </div>
-            </SettingsSectionCard>
+              </SettingsSectionCard>
+            </div>
           </aside>
         </div>
       </template>
@@ -2469,6 +2457,46 @@ watch(projectId, async (newId, oldId) => {
   display: flex;
   align-items: center;
   gap: var(--ui-space-4, 1rem);
+}
+
+/* AI Settings - Disabled State */
+.ai-section-disabled {
+  position: relative;
+  opacity: 0.6;
+  filter: grayscale(30%);
+  cursor: not-allowed;
+}
+
+.ai-section-disabled :deep(*) {
+  pointer-events: none;
+}
+
+.ai-section-disabled:hover::before {
+  content: "この機能は現在のバージョンでは使用できません";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-text-strong, #0f172a);
+  color: var(--ui-surface, #fff);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  white-space: nowrap;
+  box-shadow: var(--ui-shadow-lg);
+}
+
+.ai-unavailable-notice {
+  margin: 0 0 var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem);
+  background: var(--ui-warning-bg, rgba(234, 179, 8, 0.1));
+  border: 1px solid var(--ui-warning, #eab308);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-warning-dark, #a16207);
+  text-align: center;
 }
 
 /* AI Settings */

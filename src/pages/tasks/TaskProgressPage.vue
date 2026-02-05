@@ -27,7 +27,6 @@ const loading = ref(true);
 const errorMessage = ref("");
 const tasks = ref<TaskDoc[]>([]);
 const projects = ref<{ id: string; name: string }[]>([]);
-const updatingTasks = ref<Set<string>>(new Set());
 
 const PROGRESS_OPTIONS = [0, 25, 50, 75, 100] as const;
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
@@ -138,70 +137,85 @@ async function loadTasks() {
 }
 
 /**
- * 進捗率を更新
+ * 進捗率を更新（オプティミスティック更新）
  */
-async function handleProgressChange(task: TaskDoc, newProgress: number) {
-  if (updatingTasks.value.has(task.id)) return;
+function handleProgressChange(task: TaskDoc, newProgress: number) {
   if (task.progress === newProgress) return;
 
-  updatingTasks.value.add(task.id);
-  try {
-    await updateTask(
-      task.projectId,
-      task.id,
-      { progress: newProgress },
-      {
-        userId: user.value?.uid ?? null,
-        actorName: profile.value?.nickname || profile.value?.fullName || "",
-        origin: "ui",
-      },
-    );
-    // ローカル状態を更新
-    const index = tasks.value.findIndex((t) => t.id === task.id);
-    if (index !== -1 && tasks.value[index]) {
-      const existing = tasks.value[index];
-      tasks.value[index] = { ...existing, progress: newProgress } as TaskDoc;
-    }
-  } catch (error) {
-    logger.error`Failed to update progress: ${error}`;
-  } finally {
-    updatingTasks.value.delete(task.id);
+  // 元の値を保存
+  const previousProgress = task.progress;
+
+  // ローカル状態を即座に更新（UIが即座に反応）
+  const index = tasks.value.findIndex((t) => t.id === task.id);
+  if (index !== -1 && tasks.value[index]) {
+    const existing = tasks.value[index];
+    tasks.value[index] = { ...existing, progress: newProgress } as TaskDoc;
   }
-}
 
-/**
- * ステータスを更新
- */
-async function handleStatusChange(task: TaskDoc, newStatus: TaskStatus) {
-  if (updatingTasks.value.has(task.id)) return;
-  if (task.status === newStatus) return;
-
-  updatingTasks.value.add(task.id);
-  try {
-    // 完了時は進捗も100%に
-    const updates: Partial<{ status: TaskStatus; progress: number }> = {
-      status: newStatus,
-    };
-    if (newStatus === "done") {
-      updates.progress = 100;
-    }
-
-    await updateTask(task.projectId, task.id, updates, {
+  // 非同期でDBに書き込み（失敗時はロールバック）
+  updateTask(
+    task.projectId,
+    task.id,
+    { progress: newProgress },
+    {
       userId: user.value?.uid ?? null,
       actorName: profile.value?.nickname || profile.value?.fullName || "",
       origin: "ui",
-    });
-    // ローカル状態を更新
-    const index = tasks.value.findIndex((t) => t.id === task.id);
-    if (index !== -1 && tasks.value[index]) {
-      const existing = tasks.value[index];
-      tasks.value[index] = { ...existing, ...updates } as TaskDoc;
+    },
+  ).catch((error) => {
+    logger.error`Failed to update progress: ${error}`;
+    // 失敗時は元の値に戻す
+    const idx = tasks.value.findIndex((t) => t.id === task.id);
+    if (idx !== -1 && tasks.value[idx]) {
+      const existing = tasks.value[idx];
+      tasks.value[idx] = { ...existing, progress: previousProgress } as TaskDoc;
     }
-  } catch (error) {
-    logger.error`Failed to update status: ${error}`;
-  } finally {
-    updatingTasks.value.delete(task.id);
+  });
+}
+
+/**
+ * ステータスを更新（オプティミスティック更新）
+ */
+function handleStatusChange(task: TaskDoc, newStatus: TaskStatus) {
+  if (task.status === newStatus) return;
+
+  // 元の値を保存
+  const previousStatus = task.status;
+  const previousProgress = task.progress;
+
+  // 完了時は進捗も100%に
+  const updates: Partial<{ status: TaskStatus; progress: number }> = {
+    status: newStatus,
+  };
+  if (newStatus === "done") {
+    updates.progress = 100;
   }
+
+  // ローカル状態を即座に更新（UIが即座に反応）
+  const index = tasks.value.findIndex((t) => t.id === task.id);
+  if (index !== -1 && tasks.value[index]) {
+    const existing = tasks.value[index];
+    tasks.value[index] = { ...existing, ...updates } as TaskDoc;
+  }
+
+  // 非同期でDBに書き込み（失敗時はロールバック）
+  updateTask(task.projectId, task.id, updates, {
+    userId: user.value?.uid ?? null,
+    actorName: profile.value?.nickname || profile.value?.fullName || "",
+    origin: "ui",
+  }).catch((error) => {
+    logger.error`Failed to update status: ${error}`;
+    // 失敗時は元の値に戻す
+    const idx = tasks.value.findIndex((t) => t.id === task.id);
+    if (idx !== -1 && tasks.value[idx]) {
+      const existing = tasks.value[idx];
+      tasks.value[idx] = {
+        ...existing,
+        status: previousStatus,
+        progress: previousProgress,
+      } as TaskDoc;
+    }
+  });
 }
 
 /**
@@ -417,7 +431,6 @@ onMounted(() => {
                 v-for="task in group.tasks"
                 :key="task.id"
                 class="progress-card"
-                :class="{ 'is-updating': updatingTasks.has(task.id) }"
               >
                 <div class="progress-card__header">
                   <h3
@@ -448,7 +461,6 @@ onMounted(() => {
                           'progress-pill',
                           { 'is-active': (task.progress ?? 0) === option },
                         ]"
-                        :disabled="updatingTasks.has(task.id)"
                         @click="handleProgressChange(task, option)"
                       >
                         {{ option }}%
@@ -468,7 +480,6 @@ onMounted(() => {
                           `status-pill--${status.value}`,
                           { 'is-active': task.status === status.value },
                         ]"
-                        :disabled="updatingTasks.has(task.id)"
                         @click="handleStatusChange(task, status.value)"
                       >
                         {{ status.label }}

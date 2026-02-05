@@ -53,6 +53,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  taskUpdated: [taskId: string, updates: Partial<TaskDoc>];
 }>();
 
 const { user, profile } = useAuthStore();
@@ -271,42 +272,45 @@ function handleCancelEdit() {
   isEditing.value = false;
 }
 
-// 進捗率の即時保存
-async function handleProgressChange(newProgress: number) {
+// 進捗率の即時保存（オプティミスティック更新）
+function handleProgressChange(newProgress: number) {
   if (!task.value || !props.projectId) return;
   if (task.value.progress === newProgress) return;
 
-  try {
-    const updates: Partial<{ progress: number; status: TaskStatus }> = {
-      progress: newProgress,
-    };
+  const taskId = task.value.id;
+  const updates: Partial<{ progress: number; status: TaskStatus }> = {
+    progress: newProgress,
+  };
 
-    // 100%になったら自動的に完了ステータスに
-    if (newProgress === 100 && task.value.status !== "done") {
-      updates.status = "done";
-    }
-    // 進捗が0より大きく未着手の場合は進行中に
-    else if (
-      newProgress > 0 &&
-      newProgress < 100 &&
-      task.value.status === "todo"
-    ) {
-      updates.status = "in-progress";
-    }
-    // 完了状態から100%未満に戻す場合は進行中に
-    else if (newProgress < 100 && task.value.status === "done") {
-      updates.status = "in-progress";
-    }
-
-    await updateTask(props.projectId, task.value.id, updates, {
-      userId: user.value?.uid ?? null,
-      actorName:
-        profile.value?.nickname || profile.value?.fullName || "Unknown",
-      origin: "ui",
-    });
-  } catch (error) {
-    logger.error`Failed to update progress: ${error}`;
+  // 100%になったら自動的に完了ステータスに
+  if (newProgress === 100 && task.value.status !== "done") {
+    updates.status = "done";
   }
+  // 進捗が0より大きく未着手の場合は進行中に
+  else if (
+    newProgress > 0 &&
+    newProgress < 100 &&
+    task.value.status === "todo"
+  ) {
+    updates.status = "in-progress";
+  }
+  // 完了状態から100%未満に戻す場合は進行中に
+  else if (newProgress < 100 && task.value.status === "done") {
+    updates.status = "in-progress";
+  }
+
+  // 即座に親コンポーネントに通知（UIが即座に反応）
+  emit("taskUpdated", taskId, updates);
+
+  // 非同期でDBに書き込み
+  updateTask(props.projectId, taskId, updates, {
+    userId: user.value?.uid ?? null,
+    actorName: profile.value?.nickname || profile.value?.fullName || "Unknown",
+    origin: "ui",
+  }).catch((error) => {
+    logger.error`Failed to update progress: ${error}`;
+    // 注意: ロールバックは親コンポーネントのFirestoreリスナーが処理
+  });
 }
 
 async function handleSendMessage() {

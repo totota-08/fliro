@@ -339,6 +339,17 @@ async function removeTask(task: DecoratedTask) {
 }
 
 /**
+ * TaskDrawerからのオプティミスティック更新を処理
+ */
+function handleTaskUpdated(taskId: string, updates: Partial<TaskDoc>) {
+  const index = tasks.value.findIndex((t) => t.id === taskId);
+  if (index !== -1 && tasks.value[index]) {
+    const existing = tasks.value[index];
+    tasks.value[index] = { ...existing, ...updates } as TaskDoc;
+  }
+}
+
+/**
  * プルトゥーリフレッシュハンドラ（モバイル用）
  */
 async function handleRefresh() {
@@ -844,6 +855,7 @@ onBeforeUnmount(() => {
         :task-id="selectedTaskId"
         :tasks="tasks"
         @close="closeTask"
+        @task-updated="handleTaskUpdated"
       />
     </Teleport>
   </div>
