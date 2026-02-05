@@ -416,3 +416,31 @@ export function listenTask(
     },
   );
 }
+
+/**
+ * タスクスレッドのアーカイブ状態を更新する
+ */
+export async function updateTaskThreadArchived(
+  projectId: string,
+  taskId: string,
+  archived: boolean,
+) {
+  logger.debug`Updating thread archived status for task ${taskId} to ${archived}`;
+  const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+  try {
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(taskRef);
+      if (!snap.exists()) {
+        throw new Error("task-not-found");
+      }
+      transaction.update(taskRef, {
+        threadArchived: archived,
+        updatedAt: serverTimestamp(),
+      });
+    });
+    logger.debug`Thread archived status updated for task ${taskId}`;
+  } catch (error) {
+    logger.error`Failed to update thread archived status for task ${taskId}: ${error}`;
+    throw error;
+  }
+}
