@@ -108,7 +108,9 @@ const hasError = computed(() => props.error || Boolean(props.errorMessage));
   color: var(--ui-text, #0b2e33);
   font-size: max(var(--ui-text-base, 1rem), 16px); /* iOS zoom prevention */
   cursor: pointer;
-  transition: var(--ui-transition-all);
+  transition:
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-base, 180ms) var(--ui-ease-standard);
   padding-right: var(--ui-space-10, 2.5rem);
 }
 

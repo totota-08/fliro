@@ -70,7 +70,11 @@ const handleClick = (e: MouseEvent) => {
   font-size: 0.95rem;
   font-weight: 600;
   border-radius: 0.5rem;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   line-height: 1.25;
   cursor: pointer;
   border: 1px solid transparent;

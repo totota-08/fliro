@@ -1070,7 +1070,7 @@ onBeforeUnmount(() => {
 }
 
 .profile-section__avatar-upload-icon {
-  font-size: 14px;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .profile-section__avatar-message {

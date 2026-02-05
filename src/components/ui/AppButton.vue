@@ -67,7 +67,12 @@ const classes = computed(() => [
   font-weight: var(--ui-font-semibold, 600);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: var(--ui-transition-all);
+  transition:
+    background-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    transform var(--ui-duration-base, 180ms) var(--ui-ease-standard);
   text-decoration: none;
   white-space: nowrap;
 }

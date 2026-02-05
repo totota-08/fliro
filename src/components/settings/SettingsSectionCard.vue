@@ -157,7 +157,9 @@ function handleSave() {
   font-size: var(--ui-text-sm, 0.875rem);
   font-weight: var(--ui-font-medium, 500);
   cursor: pointer;
-  transition: var(--ui-transition-all);
+  transition:
+    background-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .settings-card__save-btn:hover:not(:disabled) {

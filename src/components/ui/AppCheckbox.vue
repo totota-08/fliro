@@ -113,7 +113,9 @@ const isChecked = computed({
   background: var(--ui-surface, #ffffff);
   border: 2px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-sm, 0.5rem);
-  transition: all var(--ui-duration-base, 180ms) var(--ui-ease-standard);
+  transition:
+    background-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .app-checkbox--checked .app-checkbox__box {
@@ -137,7 +139,9 @@ const isChecked = computed({
   color: var(--ui-surface, #ffffff);
   opacity: 0;
   transform: scale(0.5);
-  transition: all var(--ui-duration-fast, 120ms) var(--ui-ease-standard);
+  transition:
+    opacity var(--ui-duration-fast, 120ms) var(--ui-ease-standard),
+    transform var(--ui-duration-fast, 120ms) var(--ui-ease-standard);
 }
 
 .app-checkbox--checked .app-checkbox__icon {

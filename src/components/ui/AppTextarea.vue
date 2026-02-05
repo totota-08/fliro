@@ -71,7 +71,9 @@ const hasError = computed(() => props.error || Boolean(props.errorMessage));
   font-size: max(var(--ui-text-base, 1rem), 16px); /* iOS zoom prevention */
   font-family: inherit;
   line-height: var(--ui-leading-normal, 1.5);
-  transition: var(--ui-transition-all);
+  transition:
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-base, 180ms) var(--ui-ease-standard);
   min-height: calc(var(--ui-touch-target-min, 44px) * 2); /* At least 2 lines */
 }
 

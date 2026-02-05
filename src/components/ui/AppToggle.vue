@@ -119,7 +119,9 @@ function toggle() {
   background: var(--ui-surface-muted, #f1f5f9);
   border: 2px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-full, 9999px);
-  transition: all var(--ui-duration-base, 180ms) var(--ui-ease-standard);
+  transition:
+    background-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .app-toggle--checked .app-toggle__track {

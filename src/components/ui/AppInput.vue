@@ -71,7 +71,9 @@ const hasError = computed(() => props.error || Boolean(props.errorMessage));
   background: var(--ui-surface, #ffffff);
   color: var(--ui-text, #0b2e33);
   font-size: max(var(--ui-text-base, 1rem), 16px); /* iOS zoom prevention */
-  transition: var(--ui-transition-all);
+  transition:
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-base, 180ms) var(--ui-ease-standard);
 }
 
 .app-input::placeholder {

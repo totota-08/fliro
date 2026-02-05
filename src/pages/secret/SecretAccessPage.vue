@@ -725,7 +725,7 @@ onBeforeUnmount(() => {
 
 .header-title {
   margin-left: 1rem;
-  font-size: 0.75rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   color: rgba(0, 255, 255, 0.7);
   letter-spacing: 0.1em;
 }
@@ -1186,7 +1186,7 @@ onBeforeUnmount(() => {
   }
 
   .prompt {
-    font-size: 0.75rem;
+    font-size: var(--ui-text-xs, 0.75rem);
   }
 
   .input-field {

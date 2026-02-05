@@ -68,7 +68,10 @@ defineProps<Props>();
   cursor: pointer;
   text-align: left;
   text-decoration: none;
-  transition: var(--ui-transition-all);
+  transition:
+    border-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    background-color var(--ui-duration-base, 180ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-base, 180ms) var(--ui-ease-standard);
   width: 100%;
 }
 

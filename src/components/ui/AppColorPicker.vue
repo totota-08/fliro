@@ -170,7 +170,9 @@ function isLightColor(hex: string): boolean {
   border: 2px solid transparent;
   border-radius: var(--ui-radius-md, 0.75rem);
   cursor: pointer;
-  transition: all var(--ui-duration-fast, 120ms) var(--ui-ease-standard);
+  transition:
+    transform var(--ui-duration-fast, 120ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-fast, 120ms) var(--ui-ease-standard);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -215,7 +217,10 @@ function isLightColor(hex: string): boolean {
   border-radius: var(--ui-radius-md, 0.75rem);
   background: var(--ui-surface, #ffffff);
   cursor: pointer;
-  transition: all var(--ui-duration-fast, 120ms) var(--ui-ease-standard);
+  transition:
+    border-color var(--ui-duration-fast, 120ms) var(--ui-ease-standard),
+    background-color var(--ui-duration-fast, 120ms) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-fast, 120ms) var(--ui-ease-standard);
   position: relative;
 }
 

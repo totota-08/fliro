@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
 
 .invite-drawer__eyebrow {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);

@@ -989,7 +989,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 0.125rem 0.375rem;
-  font-size: 0.625rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   font-weight: var(--ui-font-bold, 700);
   background: var(--ui-brand-600, #4f7c82);
   color: var(--ui-surface, #ffffff);

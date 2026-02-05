@@ -1175,7 +1175,7 @@ const displayMessage = computed(() => {
 
 h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--ui-text-2xl, 1.5rem);
   background: linear-gradient(120deg, #00ffff, #ff00ff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -1198,7 +1198,7 @@ h1 {
 }
 
 .stat-value {
-  font-size: 1.25rem;
+  font-size: var(--ui-text-xl, 1.25rem);
   font-weight: 700;
   color: #e5ecff;
   text-shadow: 0 0 10px currentColor;
@@ -1307,7 +1307,7 @@ h1 {
   background: rgba(0, 255, 255, 0.1);
   border: 1px solid rgba(0, 255, 255, 0.3);
   border-radius: 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   color: #00ffff;
 }
 
@@ -1369,7 +1369,7 @@ h1 {
   }
 
   .stat-value {
-    font-size: 1rem;
+    font-size: var(--ui-text-base, 1rem);
   }
 
   .overlay-text {
@@ -1377,7 +1377,7 @@ h1 {
   }
 
   .overlay-hint {
-    font-size: 0.75rem;
+    font-size: var(--ui-text-xs, 0.75rem);
   }
 
   .game-controls {

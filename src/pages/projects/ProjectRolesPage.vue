@@ -1511,7 +1511,7 @@ onBeforeUnmount(() => {
 .modal__close {
   background: transparent;
   border: none;
-  font-size: 1.5rem;
+  font-size: var(--ui-text-2xl, 1.5rem);
   color: var(--ui-text-muted, #64748b);
   cursor: pointer;
   padding: 0;
