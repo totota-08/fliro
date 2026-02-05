@@ -13,7 +13,8 @@ import AppTextarea from "@/components/ui/AppTextarea.vue";
 import { usePageTitle } from "@/composables/usePageTitle";
 import { useProjectAccess } from "@/composables/useProjectAccess";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
-import { appName } from "@/constants/appMeta";
+// AI機能はグレーアウトのため未使用
+// import { appName } from "@/constants/appMeta";
 import {
   DEFAULT_GUEST_ALLOWED_PAGES,
   GUEST_CONFIGURABLE_PAGES,
@@ -105,14 +106,12 @@ const canManageNotifications = computed(() =>
   can(ProjectPermission.MANAGE_NOTIFICATIONS),
 );
 
-// AI設定
+// AI設定（現在グレーアウトのため最小限の変数のみ保持）
 const aiEnabled = ref(false);
 const aiKey = ref("");
-const aiPrompt = ref("");
-const aiResponse = ref("");
-const aiLoading = ref(false);
-const aiSaving = ref(false);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const tasks = ref<TaskDoc[]>([]);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let stopTasks: (() => void) | null = null;
 
 // ユーモラスコマンド設定
@@ -336,12 +335,6 @@ const isCardConfigDirty = computed(
 const isInsightCardConfigDirty = computed(
   () =>
     JSON.stringify(insightCardConfig.value) !== initialInsightCardConfig.value,
-);
-
-const isAiDirty = computed(
-  () =>
-    aiEnabled.value !== initialAiSettings.value.enabled ||
-    aiKey.value !== initialAiSettings.value.key,
 );
 
 const isHumorousDirty = computed(
@@ -698,24 +691,6 @@ function toggleGuestPage(pageKey: GuestAllowedPage) {
   }
 }
 
-// AI設定を保存
-async function saveAiSettings() {
-  if (!canEdit.value || !isAiDirty.value) return;
-  aiSaving.value = true;
-  try {
-    await updateProjectSettings(projectId.value, {
-      aiChatEnabled: aiEnabled.value,
-      aiApiKey: aiKey.value,
-    });
-    initialAiSettings.value = { enabled: aiEnabled.value, key: aiKey.value };
-  } catch (error) {
-    logger.error`Failed to save AI settings: ${error}`;
-    errorMessage.value = "AI設定の保存に失敗しました。";
-  } finally {
-    aiSaving.value = false;
-  }
-}
-
 // ユーモラスコマンド設定を保存
 async function saveHumorousSettings() {
   if (!canEdit.value || !isHumorousDirty.value) return;
@@ -926,55 +901,6 @@ function handleCustomColorChange(event: Event, target: "new" | "edit") {
     newRole.value.color = input.value;
   } else {
     editRoleForm.value.color = input.value;
-  }
-}
-
-async function askAi() {
-  if (!aiEnabled.value) {
-    aiResponse.value = "AI チャットは無効化されています。";
-    return;
-  }
-  if (!aiKey.value) {
-    aiResponse.value = "先に API キーを設定してください。";
-    return;
-  }
-  if (!aiPrompt.value.trim()) return;
-  aiLoading.value = true;
-  aiResponse.value = "";
-  try {
-    const summary = tasks.value
-      .slice(0, 10)
-      .map((task) => `- ${task.title} [${task.status}]`)
-      .join("\n");
-    const body = {
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a task assistant for the ${appName} project.`,
-        },
-        {
-          role: "user",
-          content: `Tasks:\n${summary}\nUser question: ${aiPrompt.value}`,
-        },
-      ],
-    };
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${aiKey.value}`,
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) throw new Error("AI API エラー");
-    const data = await response.json();
-    aiResponse.value =
-      data.choices?.[0]?.message?.content || "回答を取得できませんでした。";
-  } catch (error: unknown) {
-    aiResponse.value = (error as Error)?.message || "AI 応答に失敗しました。";
-  } finally {
-    aiLoading.value = false;
   }
 }
 

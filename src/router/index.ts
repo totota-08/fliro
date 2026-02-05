@@ -3,10 +3,70 @@ import { fetchProjectAccess } from "@/composables/useProjectAccess";
 import { ROUTE_TO_GUEST_PAGE } from "@/constants/guestPages";
 import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
+import { db } from "@/lib/firebase";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 import { getLogger } from "@logtape/logtape";
+import { doc, getDoc } from "firebase/firestore";
 
 const logger = getLogger("app.router");
+
+// メンテナンスモードキャッシュ（30秒間有効）
+interface MaintenanceCache {
+  enabled: boolean;
+  fetchedAt: number;
+}
+let maintenanceCache: MaintenanceCache | null = null;
+const MAINTENANCE_CACHE_TTL = 30 * 1000; // 30秒
+
+/**
+ * メンテナンスモードの状態を取得する（キャッシュ付き）
+ */
+async function fetchMaintenanceStatus(): Promise<boolean> {
+  const now = Date.now();
+
+  // キャッシュが有効な場合はキャッシュを返す
+  if (
+    maintenanceCache &&
+    now - maintenanceCache.fetchedAt < MAINTENANCE_CACHE_TTL
+  ) {
+    return maintenanceCache.enabled;
+  }
+
+  try {
+    const docRef = doc(db, "appConfig", "maintenance");
+    const docSnap = await getDoc(docRef);
+
+    const enabled = docSnap.exists() ? docSnap.data()?.enabled === true : false;
+
+    // キャッシュを更新
+    maintenanceCache = {
+      enabled,
+      fetchedAt: now,
+    };
+
+    return enabled;
+  } catch (error) {
+    logger.error`Failed to fetch maintenance status: ${error}`;
+    // エラー時はメンテナンスモードでないとみなす（サービス継続優先）
+    return false;
+  }
+}
+
+/**
+ * ユーザーが管理者かどうかをチェックする
+ */
+async function isAdmin(): Promise<boolean> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return false;
+
+    const idTokenResult = await user.getIdTokenResult();
+    return idTokenResult.claims.admin === true;
+  } catch (error) {
+    logger.error`Failed to check admin status: ${error}`;
+    return false;
+  }
+}
 
 // 初回アクセスで必要なページのみ静的インポート
 import ProjectLayout from "@/layouts/ProjectLayout.vue";
@@ -54,6 +114,9 @@ const SecretAccessPage = () => import("@/pages/secret/SecretAccessPage.vue");
 const SecretChatPage = () => import("@/pages/secret/SecretChatPage.vue");
 const MyTasksPage = () => import("@/pages/tasks/MyTasksPage.vue");
 const TaskProgressPage = () => import("@/pages/tasks/TaskProgressPage.vue");
+const AdminDashboardPage = () =>
+  import("@/features/admin/pages/AdminDashboardPage.vue");
+const MaintenancePage = () => import("@/pages/MaintenancePage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -266,6 +329,18 @@ export const router = createRouter({
       component: ChatDemoPage,
     },
     {
+      path: "/admin",
+      name: ROUTE_NAMES.admin,
+      component: AdminDashboardPage,
+      meta: { requiresAuth: true, requiresAdmin: true, layout: "full" },
+    },
+    {
+      path: "/maintenance",
+      name: ROUTE_NAMES.maintenance,
+      component: MaintenancePage,
+      meta: { layout: "full" },
+    },
+    {
       path: "/error",
       name: ROUTE_NAMES.error,
       component: ErrorPage,
@@ -292,6 +367,47 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
+
+  // ===========================================
+  // 1. メンテナンスモードチェック（最初に実行）
+  // ===========================================
+  // メンテナンスページと管理者ページは除外
+  const isMaintenancePage = to.name === ROUTE_NAMES.maintenance;
+  const isAdminPage = to.name === ROUTE_NAMES.admin;
+
+  if (!isMaintenancePage && !isAdminPage) {
+    const isMaintenanceMode = await fetchMaintenanceStatus();
+
+    if (isMaintenanceMode) {
+      // 管理者はメンテナンスモードでもアクセス可能
+      const userIsAdmin = await isAdmin();
+
+      if (!userIsAdmin) {
+        logger.info`Maintenance mode active, redirecting to maintenance page`;
+        return { name: ROUTE_NAMES.maintenance };
+      }
+    }
+  }
+
+  // ===========================================
+  // 2. 管理者ルートチェック
+  // ===========================================
+  const requiresAdmin = to.matched.some(
+    (record) => record.meta.requiresAdmin === true,
+  );
+
+  if (requiresAdmin) {
+    const userIsAdmin = await isAdmin();
+
+    if (!userIsAdmin) {
+      logger.warn`Admin access denied: user is not an admin`;
+      return { name: ROUTE_NAMES.home };
+    }
+  }
+
+  // ===========================================
+  // 3. 既存の認証チェック
+  // ===========================================
   const requiresAuth = to.matched.some(
     (record) => record.meta.requiresAuth === true,
   );

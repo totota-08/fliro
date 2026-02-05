@@ -18,6 +18,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // appConfig: メンテナンス・通知設定（読み取りは全員、書き込みはAdmin SDKのみ）
+    match /appConfig/{configId} {
+      allow read: if configId in ['maintenance', 'announcement'];
+      allow write: if false;
+    }
+
+    // adminLogs: 管理者操作ログ（Admin SDKのみ）
+    match /adminLogs/{logId} {
+      allow read, write: if false;
+    }
+
     match /profiles/{userId} {
       // betaAccess, betaCodeUsed, betaAccessAt はクライアントから直接設定不可（Cloud Functionsのみ）
       function isBetaFieldChange() {

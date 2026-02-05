@@ -434,7 +434,10 @@ onBeforeUnmount(() => {
     <template v-else>
       <div class="invites-content">
         <section class="invites-page">
-          <header class="invites-page__header">
+          <header
+            v-if="filteredInvites.length > 0"
+            class="invites-page__header"
+          >
             <div
               class="invites-page__header-action"
               :title="!canCreateInvite ? '作成権限がありません' : undefined"
@@ -594,7 +597,10 @@ onBeforeUnmount(() => {
               </table>
             </div>
 
-            <div v-if="hasMore" class="invites-page__more">
+            <div
+              v-if="hasMore && filteredInvites.length > 0"
+              class="invites-page__more"
+            >
               <button
                 type="button"
                 class="invites-page__more-button"

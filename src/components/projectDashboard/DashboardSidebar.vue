@@ -68,7 +68,7 @@ const emit = defineEmits<{
 
 const route = useRoute();
 const router = useRouter();
-const { isNavigating, targetPath } = useNavigationState();
+const { isNavigating, targetPath, startNavigation } = useNavigationState();
 
 const currentSection = computed(() => {
   if (typeof route.meta.section === "string") {
@@ -104,12 +104,21 @@ const rootClasses = computed(() => [
 
 const handleClose = () => emit("close");
 
-const handleNavigate = (event?: MouseEvent) => {
+const handleNavigate = (to?: string | object, event?: MouseEvent) => {
   // ナビゲーション中は追加のクリックを無視
   if (isNavigating.value) {
     event?.preventDefault();
     return;
   }
+
+  // クリック時に即座にローディング状態を開始
+  if (to) {
+    const toPath = typeof to === "string" ? to : router.resolve(to).path;
+    if (toPath !== route.path) {
+      startNavigation(route.path, toPath);
+    }
+  }
+
   if (window.matchMedia("(max-width: 1200px)").matches) {
     emit("close");
   }
@@ -141,7 +150,11 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
         :to="props.dashboardTo"
         class="sidebar__brand"
         :class="{ 'sidebar__brand--clickable': props.dashboardTo }"
-        @click="props.dashboardTo ? handleNavigate() : undefined"
+        @click="
+          props.dashboardTo
+            ? handleNavigate(props.dashboardTo, $event)
+            : undefined
+        "
       >
         <div class="sidebar__logo">
           <BrandLogo class="sidebar__logo-icon" />
@@ -167,7 +180,7 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
               'is-active': item.active,
               'is-navigating': isNavigatingToPath(item.to),
             }"
-            @click="handleNavigate"
+            @click="handleNavigate(item.to, $event)"
           >
             <span class="sidebar__nav-icon" aria-hidden="true">
               <!-- ローディングスピナー -->
@@ -341,7 +354,7 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
             :is="project.to ? RouterLink : 'span'"
             class="sidebar__project-link"
             :to="project.to"
-            @click="project.to ? handleNavigate() : undefined"
+            @click="project.to ? handleNavigate(project.to, $event) : undefined"
           >
             <span
               class="dot"

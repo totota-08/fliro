@@ -30,4 +30,6 @@ export const ROUTE_NAMES = {
   notFound: "not-found",
   error: "error",
   demoDashboard: "demo.dashboard",
+  admin: "admin",
+  maintenance: "maintenance",
 } as const;
