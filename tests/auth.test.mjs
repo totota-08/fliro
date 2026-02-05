@@ -117,7 +117,7 @@ describe("認証フロー テスト", () => {
         apiKey: "fake-api-key",
         projectId: "test-project",
       },
-      "auth-test-app"
+      "auth-test-app",
     );
 
     auth = getAuth(app);
@@ -152,14 +152,14 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       assert.ok(credential.user, "ユーザーが作成されるべき");
       assert.strictEqual(
         credential.user.email,
         TEST_EMAIL,
-        "メールアドレスが一致するべき"
+        "メールアドレスが一致するべき",
       );
       assert.ok(credential.user.uid, "UIDが生成されるべき");
     });
@@ -173,7 +173,7 @@ describe("認証フロー テスト", () => {
       const credential = await signInWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       assert.ok(credential.user, "ログインに成功するべき");
@@ -191,7 +191,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "auth/invalid-credential";
         },
-        "間違ったパスワードでは認証エラーになるべき"
+        "間違ったパスワードでは認証エラーになるべき",
       );
     });
 
@@ -201,7 +201,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "auth/invalid-credential";
         },
-        "存在しないユーザーでは認証エラーになるべき"
+        "存在しないユーザーでは認証エラーになるべき",
       );
     });
   });
@@ -212,7 +212,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -237,9 +237,7 @@ describe("認証フロー テスト", () => {
       };
 
       // Firestore にプロフィールを保存（Admin SDK経由でエミュレータに直接書き込み）
-      const adminDb = testEnv
-        .authenticatedContext(user.uid)
-        .firestore();
+      const adminDb = testEnv.authenticatedContext(user.uid).firestore();
       await setDoc(doc(adminDb, "profiles", user.uid), profile);
 
       // プロフィールを取得して確認
@@ -248,12 +246,12 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         savedProfile.data().setUp,
         false,
-        "setUp は false であるべき"
+        "setUp は false であるべき",
       );
       assert.strictEqual(
         savedProfile.data().email,
         TEST_EMAIL,
-        "メールアドレスが一致するべき"
+        "メールアドレスが一致するべき",
       );
     });
 
@@ -262,13 +260,11 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
-      const adminDb = testEnv
-        .authenticatedContext(user.uid)
-        .firestore();
+      const adminDb = testEnv.authenticatedContext(user.uid).firestore();
 
       // 初期プロフィールを作成（setUp: false）
       const now = new Date().toISOString();
@@ -302,7 +298,7 @@ describe("認証フロー テスト", () => {
           setUp: true, // 設定完了
           updatedAt: updatedNow,
         },
-        { merge: true }
+        { merge: true },
       );
 
       // プロフィールを取得して確認
@@ -311,17 +307,17 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         savedProfile.data().setUp,
         true,
-        "setUp は true であるべき"
+        "setUp は true であるべき",
       );
       assert.strictEqual(
         savedProfile.data().fullName,
         "テスト ユーザー",
-        "本名が設定されるべき"
+        "本名が設定されるべき",
       );
       assert.strictEqual(
         savedProfile.data().jobRole,
         "engineer",
-        "職業が設定されるべき"
+        "職業が設定されるべき",
       );
     });
 
@@ -329,13 +325,11 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
-      const adminDb = testEnv
-        .authenticatedContext(user.uid)
-        .firestore();
+      const adminDb = testEnv.authenticatedContext(user.uid).firestore();
 
       // 初期プロフィールを作成
       const now = new Date().toISOString();
@@ -364,7 +358,7 @@ describe("認証フロー テスト", () => {
           nickname: "新しいニックネーム",
           updatedAt: new Date().toISOString(),
         },
-        { merge: true }
+        { merge: true },
       );
 
       // プロフィールを取得して確認
@@ -372,17 +366,17 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         savedProfile.data().nickname,
         "新しいニックネーム",
-        "ニックネームが更新されるべき"
+        "ニックネームが更新されるべき",
       );
       assert.strictEqual(
         savedProfile.data().fullName,
         "初期名前",
-        "本名は維持されるべき"
+        "本名は維持されるべき",
       );
       assert.strictEqual(
         savedProfile.data().betaAccess,
         true,
-        "ベータアクセスは維持されるべき"
+        "ベータアクセスは維持されるべき",
       );
     });
   });
@@ -392,7 +386,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -427,7 +421,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -457,7 +451,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "permission-denied";
         },
-        "他人のプロフィール作成は拒否されるべき"
+        "他人のプロフィール作成は拒否されるべき",
       );
     });
 
@@ -465,7 +459,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -496,7 +490,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "permission-denied";
         },
-        "ベータアクセスフィールドを含む作成は拒否されるべき"
+        "ベータアクセスフィールドを含む作成は拒否されるべき",
       );
     });
   });
@@ -508,7 +502,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "auth/weak-password";
         },
-        "短いパスワードは拒否されるべき"
+        "短いパスワードは拒否されるべき",
       );
     });
 
@@ -516,7 +510,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         TEST_EMAIL,
-        "password123" // 11文字
+        "password123", // 11文字
       );
       assert.ok(credential.user, "8文字以上のパスワードは受け入れられるべき");
     });
@@ -528,7 +522,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "sns-user@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -555,27 +549,27 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         profile.setUp,
         false,
-        "新規ユーザーは setUp=false であるべき"
+        "新規ユーザーは setUp=false であるべき",
       );
       assert.strictEqual(
         profile.fullName,
         "Google User",
-        "displayName が fullName にコピーされるべき"
+        "displayName が fullName にコピーされるべき",
       );
       assert.strictEqual(
         profile.nickname,
         "Google User",
-        "displayName が nickname にコピーされるべき"
+        "displayName が nickname にコピーされるべき",
       );
       assert.strictEqual(
         profile.avatarUrl,
         "https://example.com/google-avatar.png",
-        "photoURL が avatarUrl にコピーされるべき"
+        "photoURL が avatarUrl にコピーされるべき",
       );
       assert.strictEqual(
         profile.email,
         "sns-user@example.com",
-        "メールアドレスが保存されるべき"
+        "メールアドレスが保存されるべき",
       );
     });
 
@@ -583,7 +577,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "sns-user2@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -603,12 +597,12 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         result.needsSetup,
         true,
-        "setUp=false なのでセットアップが必要"
+        "setUp=false なのでセットアップが必要",
       );
       assert.strictEqual(
         result.profile.setUp,
         false,
-        "プロフィールの setUp は false"
+        "プロフィールの setUp は false",
       );
     });
 
@@ -616,7 +610,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "sns-user3@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -646,17 +640,17 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         result.needsSetup,
         false,
-        "setUp=true なのでセットアップ不要"
+        "setUp=true なのでセットアップ不要",
       );
       assert.strictEqual(
         result.profile.setUp,
         true,
-        "プロフィールの setUp は true"
+        "プロフィールの setUp は true",
       );
       assert.strictEqual(
         result.profile.fullName,
         "設定済み ユーザー",
-        "fullName が更新されているべき"
+        "fullName が更新されているべき",
       );
     });
 
@@ -664,7 +658,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "returning-user@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -698,17 +692,17 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         profileAfterReLogin.setUp,
         true,
-        "再ログイン後も setUp=true が維持されるべき"
+        "再ログイン後も setUp=true が維持されるべき",
       );
       assert.strictEqual(
         profileAfterReLogin.fullName,
         "既存 ユーザー",
-        "既存の fullName が維持されるべき"
+        "既存の fullName が維持されるべき",
       );
       assert.strictEqual(
         profileAfterReLogin.jobRole,
         "designer",
-        "既存の jobRole が維持されるべき"
+        "既存の jobRole が維持されるべき",
       );
     });
 
@@ -716,7 +710,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "no-displayname@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -733,12 +727,12 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         profile.fullName,
         "",
-        "displayName がない場合は空文字"
+        "displayName がない場合は空文字",
       );
       assert.strictEqual(
         profile.nickname,
         "",
-        "displayName がない場合は空文字"
+        "displayName がない場合は空文字",
       );
       assert.strictEqual(profile.setUp, false, "setUp は false");
     });
@@ -750,16 +744,12 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "newuser@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
       assert.ok(user, "ユーザーが作成されるべき");
-      assert.strictEqual(
-        user.emailVerified,
-        false,
-        "初期状態ではメール未認証"
-      );
+      assert.strictEqual(user.emailVerified, false, "初期状態ではメール未認証");
 
       const adminDb = testEnv.authenticatedContext(user.uid).firestore();
 
@@ -782,7 +772,7 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         result.profile.fullName,
         "新規 ユーザー",
-        "本名が設定されている"
+        "本名が設定されている",
       );
     });
   });
@@ -792,7 +782,7 @@ describe("認証フロー テスト", () => {
       const credential = await createUserWithEmailAndPassword(
         auth,
         "no-profile@example.com",
-        TEST_PASSWORD
+        TEST_PASSWORD,
       );
 
       const user = credential.user;
@@ -804,7 +794,7 @@ describe("認証フロー テスト", () => {
       assert.strictEqual(
         result.needsSetup,
         true,
-        "プロフィールがない場合はセットアップ必要"
+        "プロフィールがない場合はセットアップ必要",
       );
       assert.strictEqual(result.profile, null, "プロフィールは null");
     });
@@ -819,7 +809,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "auth/email-already-in-use";
         },
-        "重複メールアドレスは拒否されるべき"
+        "重複メールアドレスは拒否されるべき",
       );
     });
 
@@ -829,7 +819,7 @@ describe("認証フロー テスト", () => {
         (error) => {
           return error.code === "auth/invalid-email";
         },
-        "無効なメールアドレスは拒否されるべき"
+        "無効なメールアドレスは拒否されるべき",
       );
     });
   });

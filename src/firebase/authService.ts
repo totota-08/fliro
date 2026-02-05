@@ -27,6 +27,7 @@ import {
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
   RecaptchaVerifier,
   reload,
   sendEmailVerification,
@@ -780,6 +781,76 @@ export async function completeMFAReauthentication(
   );
 
   await resolver.resolveSignIn(assertion);
+}
+
+/**
+ * SNSプロバイダを使用して再認証する
+ *
+ * @param providerId - プロバイダID ('google.com', 'github.com')
+ * @returns MFAが必要な場合は { requiresMFA: true, resolver }、不要な場合は { requiresMFA: false }
+ */
+export async function reauthenticateWithProvider(providerId: string): Promise<{
+  requiresMFA: boolean;
+  resolver?: MultiFactorResolver;
+}> {
+  const user = await requireCurrentUser();
+
+  // プロバイダを取得
+  let provider: AuthProvider;
+  if (providerId === "google.com") {
+    provider = googleProvider;
+  } else if (providerId === "github.com") {
+    provider = githubProvider;
+  } else {
+    throw new Error(`サポートされていないプロバイダです: ${providerId}`);
+  }
+
+  try {
+    await reauthenticateWithPopup(user, provider);
+    return { requiresMFA: false };
+  } catch (error) {
+    const authError = error as { code?: string };
+
+    if (authError.code === "auth/multi-factor-auth-required") {
+      // MFAが必要
+      const resolver = getMultiFactorResolver(auth, error as MultiFactorError);
+      return { requiresMFA: true, resolver };
+    }
+
+    // その他のエラー
+    throw error;
+  }
+}
+
+/**
+ * ユーザーの認証プロバイダ情報を取得する
+ *
+ * @returns プロバイダ情報（パスワード認証かSNS認証か）
+ */
+export async function getAuthProviderInfo(): Promise<{
+  hasPassword: boolean;
+  providers: string[];
+  primaryProvider: string | null;
+}> {
+  const user = await requireCurrentUser();
+
+  const providers = user.providerData.map((p) => p.providerId);
+  const hasPassword = providers.includes("password");
+
+  // 主要なプロバイダを決定（パスワード以外を優先）
+  const snsProviders = providers.filter((p) => p !== "password");
+  const primaryProvider: string | null =
+    snsProviders.length > 0
+      ? (snsProviders[0] ?? null)
+      : hasPassword
+        ? "password"
+        : null;
+
+  return {
+    hasPassword,
+    providers,
+    primaryProvider,
+  };
 }
 
 /**

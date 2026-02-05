@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import LoadingScreen from "@/components/ui/LoadingScreen.vue";
 import RouterProgressBar from "@/components/ui/RouterProgressBar.vue";
+import AppAnnouncementBanner from "@/components/common/AppAnnouncementBanner.vue";
 import { useNavigationState } from "@/composables/useNavigationState";
 import { useAuthStore, waitForAuthReady } from "@/store/auth";
 import { BetaGatePage, useBetaAccess } from "@/features/beta-gate";
-import { onMounted, ref, computed } from "vue";
+import { subscribeToAppConfig } from "@/features/admin/services/appConfigService";
+import type {
+  AnnouncementConfig,
+  MaintenanceConfig,
+} from "@/features/admin/types/admin";
+import { onMounted, onBeforeUnmount, ref, computed } from "vue";
 import { RouterView, useRoute } from "vue-router";
 
 const isLoading = ref(true);
@@ -12,6 +18,25 @@ const { isProjectSwitch } = useNavigationState();
 const auth = useAuthStore();
 const route = useRoute();
 const { isBetaGateEnabled, hasBetaAccess } = useBetaAccess();
+
+// 通知・メンテナンス状態
+const announcementConfig = ref<AnnouncementConfig | null>(null);
+const maintenanceConfig = ref<MaintenanceConfig | null>(null);
+const announcementDismissed = ref(false);
+
+// 通知バナーを表示するかどうか
+const shouldShowAnnouncement = computed(() => {
+  if (!announcementConfig.value?.enabled) return false;
+  if (announcementDismissed.value) return false;
+  return true;
+});
+
+// 管理者用メンテナンス警告表示
+const showMaintenanceWarning = computed(() => {
+  // 管理者かつメンテナンス有効時に表示
+  // （管理者チェックはuserのカスタムクレームで）
+  return maintenanceConfig.value?.enabled === true;
+});
 
 // ベータゲートを表示すべきか
 const shouldShowBetaGate = computed(() => {
@@ -40,12 +65,31 @@ const shouldShowBetaGate = computed(() => {
   return true;
 });
 
+let appConfigUnsubscribe: (() => void) | null = null;
+
 onMounted(async () => {
   // 認証状態の準備を待つ
   await waitForAuthReady();
   // Minimum loading time for smooth UX
   await new Promise((resolve) => setTimeout(resolve, 800));
   isLoading.value = false;
+
+  // appConfig購読開始
+  appConfigUnsubscribe = subscribeToAppConfig(
+    (maintenance) => {
+      maintenanceConfig.value = maintenance;
+    },
+    (announcement) => {
+      announcementConfig.value = announcement;
+    },
+  );
+});
+
+onBeforeUnmount(() => {
+  // appConfig購読解除
+  if (appConfigUnsubscribe) {
+    appConfigUnsubscribe();
+  }
 });
 </script>
 
@@ -63,6 +107,22 @@ onMounted(async () => {
 
   <!-- ベータゲート表示 -->
   <BetaGatePage v-if="shouldShowBetaGate" />
+
+  <!-- App-wide Announcement Banner -->
+  <AppAnnouncementBanner
+    v-if="shouldShowAnnouncement && announcementConfig"
+    :message="announcementConfig.message"
+    :type="announcementConfig.type"
+    :link="announcementConfig.link"
+    :link-text="announcementConfig.linkText"
+    :dismissible="announcementConfig.dismissible"
+    @dismiss="announcementDismissed = true"
+  />
+
+  <!-- Maintenance Mode Warning for Admins -->
+  <div v-if="showMaintenanceWarning" class="maintenance-admin-warning">
+    メンテナンスモードが有効です。一般ユーザーはアクセスできません。
+  </div>
 
   <!-- 通常のルーティング -->
   <RouterView v-else v-slot="{ Component }">
@@ -144,5 +204,15 @@ onMounted(async () => {
 .page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
+}
+
+/* メンテナンス管理者警告 */
+.maintenance-admin-warning {
+  background: var(--ui-warning, #eab308);
+  color: var(--ui-warning-dark, #713f12);
+  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
+  text-align: center;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
 }
 </style>
