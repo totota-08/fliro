@@ -31,7 +31,7 @@ const emit = defineEmits<{
 
 const inputValue = computed({
   get: () => props.modelValue,
-  set: (value: string) => emit("update:modelValue", value),
+  set: (value: string | number) => emit("update:modelValue", String(value)),
 });
 
 const hasError = computed(() => props.error || Boolean(props.errorMessage));
