@@ -260,7 +260,7 @@ function copySecret() {
 
 .secret-key {
   flex: 1;
-  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-family: var(--ui-font-mono);
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--ui-text, #0b2e33);
   word-break: break-all;

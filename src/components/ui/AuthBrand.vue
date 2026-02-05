@@ -59,14 +59,14 @@ const props = withDefaults(
 }
 
 .auth-brand__name {
-  font-size: 1.4rem;
+  font-size: var(--ui-text-2xl, 1.5rem);
   font-weight: 700;
   color: #0b2e33;
 }
 
 h1 {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: var(--ui-text-3xl, 1.875rem);
   color: #0b2e33;
 }
 

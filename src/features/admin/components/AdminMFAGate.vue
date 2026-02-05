@@ -618,7 +618,7 @@ onMounted(() => {
   border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
   border-radius: var(--ui-radius-md, 0.75rem);
   font-size: var(--ui-text-xl, 1.25rem);
-  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-family: var(--ui-font-mono);
   letter-spacing: 0.5em;
   text-align: center;
   color: var(--ui-text, #0b2e33);

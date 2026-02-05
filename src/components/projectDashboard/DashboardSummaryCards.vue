@@ -535,7 +535,7 @@ onBeforeUnmount(() => {
   border-radius: 0.75rem;
   background: var(--surface);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: var(--ui-text-sm, 0.875rem);
   transition: border-color 150ms ease;
 }
 
@@ -575,7 +575,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .summary__customize-checkbox input {
@@ -670,7 +670,7 @@ onBeforeUnmount(() => {
 
 .summary-card__label {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--ui-text-base, 1rem);
   color: var(--text-muted);
 }
 
@@ -685,7 +685,7 @@ onBeforeUnmount(() => {
 
 .summary-card__caption {
   margin: 0.05rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   color: var(--text-muted);
 }
 
@@ -760,12 +760,12 @@ onBeforeUnmount(() => {
   }
 
   .summary-card__label {
-    font-size: 0.875rem;
+    font-size: var(--ui-text-sm, 0.875rem);
     line-height: 1.3;
   }
 
   .summary-card__caption {
-    font-size: 0.7rem;
+    font-size: var(--ui-text-xs, 0.75rem);
     line-height: 1.3;
   }
 
@@ -776,7 +776,7 @@ onBeforeUnmount(() => {
   }
 
   .summary-card__value {
-    font-size: 1.75rem;
+    font-size: var(--ui-text-3xl, 1.875rem);
   }
 
   .summary-card__bar {
@@ -800,15 +800,15 @@ onBeforeUnmount(() => {
   }
 
   .summary-card__label {
-    font-size: 0.8rem;
+    font-size: var(--ui-text-sm, 0.875rem);
   }
 
   .summary-card__caption {
-    font-size: 0.65rem;
+    font-size: var(--ui-text-xs, 0.75rem);
   }
 
   .summary-card__value {
-    font-size: 1.5rem;
+    font-size: var(--ui-text-2xl, 1.5rem);
   }
 }
 </style>

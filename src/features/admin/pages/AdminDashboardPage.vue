@@ -362,7 +362,7 @@ onUnmounted(() => {
 
 .admin-dashboard__session-timer {
   font-size: var(--ui-text-sm, 0.875rem);
-  font-family: "Monaco", "Menlo", "Courier New", monospace;
+  font-family: var(--ui-font-mono);
   color: var(--ui-text-muted, #64748b);
   padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
   background: var(--ui-surface-muted, #f1f5f9);
