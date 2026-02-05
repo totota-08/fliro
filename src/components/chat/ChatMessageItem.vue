@@ -523,6 +523,26 @@ function handleScrollToReply() {
     transform: translateY(50%);
   }
 }
+
+/* prefers-reduced-motion: アニメーションとトランジションを無効化 */
+@media (prefers-reduced-motion: reduce) {
+  .message-item {
+    transition: none;
+  }
+
+  .reaction-chip {
+    transition: none;
+  }
+
+  .reply-indicator {
+    transition: none;
+  }
+
+  .actions-fade-enter-active,
+  .actions-fade-leave-active {
+    transition: none;
+  }
+}
 </style>
 
 <style>

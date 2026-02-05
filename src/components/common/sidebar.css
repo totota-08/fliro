@@ -385,3 +385,42 @@
     transition: transform 0.1s ease;
   }
 }
+
+/* prefers-reduced-motion: アニメーションとトランジションを無効化 */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+
+  .sidebar__brand--clickable {
+    transition: none;
+  }
+
+  .sidebar__toggle {
+    transition: none;
+  }
+
+  .sidebar__nav-button {
+    transition: none;
+  }
+
+  .sidebar__add {
+    transition: none;
+  }
+
+  .sidebar__projects li {
+    transition: none;
+  }
+
+  .sidebar__spinner {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (hover: none) and (pointer: coarse) {
+  .sidebar__nav-button:active,
+  .sidebar__projects li:active {
+    transform: none;
+    transition: none;
+  }
+}

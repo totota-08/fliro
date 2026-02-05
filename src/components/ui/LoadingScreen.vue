@@ -73,7 +73,7 @@ defineProps<{
     -apple-system,
     sans-serif;
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: var(--ui-text-2xl, 1.5rem);
   color: #0b2e33;
   letter-spacing: 3px;
   margin: 0;
@@ -86,7 +86,7 @@ defineProps<{
     -apple-system,
     sans-serif;
   font-weight: 400;
-  font-size: 0.5rem;
+  font-size: var(--ui-text-xs, 0.75rem);
   color: var(--color-teal, #4f7c82);
   letter-spacing: 3.5px;
   text-transform: uppercase;
@@ -101,5 +101,13 @@ defineProps<{
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* prefers-reduced-motion: アニメーションを無効化 */
+@media (prefers-reduced-motion: reduce) {
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: none;
+  }
 }
 </style>
