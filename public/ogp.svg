@@ -1,32 +1,25 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background with gradient -->
-  <rect width="1200" height="630" fill="url(#bg_gradient)"/>
+  <!-- Background with deep green -->
+  <rect width="1200" height="630" fill="#0b2e33"/>
 
-  <!-- Logo icon (scaled from fliro-icon.svg) -->
-  <g transform="translate(440, 120) scale(0.35)">
-    <rect width="512" height="512" rx="128" fill="url(#logo_gradient)"/>
-    <path d="M196 96H156C133.909 96 116 113.909 116 136V376C116 398.091 133.909 416 156 416H196C218.091 416 236 398.091 236 376V136C236 113.909 218.091 96 196 96Z" fill="white"/>
-    <path d="M396 96H236V176H396C418.091 176 436 158.091 436 136C436 113.909 418.091 96 396 96Z" fill="white"/>
-    <path d="M346 216H236V296H346C368.091 296 386 278.091 386 256C386 233.909 368.091 216 346 216Z" fill="white"/>
+  <!-- Logo icon (V3×V4 hybrid design) -->
+  <g transform="translate(500, 80)">
+    <rect width="200" height="200" rx="50" fill="#4f7c82"/>
+    <!-- Stem: signature S-curve -->
+    <path d="M122 37 C108 37, 95 47, 88 63 C82 83, 75 107, 68 127 C65 137, 58 150, 45 157" stroke="#ffffff" stroke-width="8.3" stroke-linecap="round" fill="none"/>
+    <!-- Crossbar: sweeps across with flick -->
+    <path d="M47 90 C67 83, 93 80, 123 78 C133 77, 140 78, 143 82" stroke="#ffffff" stroke-width="8.3" stroke-linecap="round" fill="none"/>
   </g>
 
-  <!-- App name -->
-  <text x="600" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white" text-anchor="middle">Fliro</text>
+  <!-- App name with Sora-like style -->
+  <text x="600" y="360" font-family="Sora, system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#a8d4d0" text-anchor="middle" letter-spacing="6">Fliro</text>
 
-  <!-- Tagline -->
-  <text x="600" y="490" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="rgba(255,255,255,0.85)" text-anchor="middle">チームの「今やるべきこと」を、シンプルに。</text>
+  <!-- Tagline: PROJECT FLOW -->
+  <text x="600" y="405" font-family="DM Sans, system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#4f7c82" text-anchor="middle" letter-spacing="6">PROJECT FLOW</text>
+
+  <!-- Main tagline -->
+  <text x="600" y="480" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="rgba(168,212,208,0.9)" text-anchor="middle">チームの「今やるべきこと」を、シンプルに。</text>
 
   <!-- Subtitle -->
-  <text x="600" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="rgba(255,255,255,0.6)" text-anchor="middle">小規模チーム向けプロジェクト管理ツール</text>
-
-  <defs>
-    <linearGradient id="bg_gradient" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0f2f33"/>
-      <stop offset="1" stop-color="#1A4A51"/>
-    </linearGradient>
-    <linearGradient id="logo_gradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1A4A51"/>
-      <stop offset="1" stop-color="#4F7C82"/>
-    </linearGradient>
-  </defs>
+  <text x="600" y="530" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="rgba(79,124,130,0.8)" text-anchor="middle">小規模チーム向けプロジェクト管理ツール</text>
 </svg>
