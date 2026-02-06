@@ -14,6 +14,7 @@ import {
   HttpsError,
   CallableRequest,
 } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 // admin.initializeApp() は validateInviteCode.ts で既に呼ばれているため省略
 // 複数回呼ぶとエラーになるので、初期化済みかチェック
@@ -466,6 +467,116 @@ export const adminUpdateAppConfig = onCall<UpdateAppConfigRequest>(
         success: false,
         error: "アプリ設定の更新中にエラーが発生しました",
       };
+    }
+  },
+);
+
+// ============================================
+// 6. adminUpdateLandingStats - LP統計の更新
+// ============================================
+
+interface UpdateLandingStatsResponse {
+  success: boolean;
+  stats?: {
+    completedTasks: number;
+    activeProjects: number;
+  };
+  error?: string;
+}
+
+/**
+ * LP用の統計データを更新
+ * - completedTasks: 完了したタスクの数
+ * - activeProjects: アクティブなプロジェクトの数
+ */
+export const adminUpdateLandingStats = onCall(
+  functionConfig,
+  async (request): Promise<UpdateLandingStatsResponse> => {
+    assertAdmin(request);
+
+    try {
+      // プロジェクト数を取得
+      const projectsSnap = await db.collection("projects").get();
+      const activeProjects = projectsSnap.size;
+
+      // 完了タスク数を取得（collectionGroup query）
+      const tasksSnap = await db
+        .collectionGroup("tasks")
+        .where("status", "==", "done")
+        .get();
+      const completedTasks = tasksSnap.size;
+
+      const stats = {
+        completedTasks,
+        activeProjects,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: request.auth!.uid,
+      };
+
+      // appConfig/landingStats に保存
+      await db.collection("appConfig").doc("landingStats").set(stats);
+
+      // 操作ログを記録
+      await db.collection("adminLogs").add({
+        action: "update_landing_stats",
+        performedBy: request.auth!.uid,
+        performedAt: admin.firestore.FieldValue.serverTimestamp(),
+        details: { completedTasks, activeProjects },
+      });
+
+      return {
+        success: true,
+        stats: { completedTasks, activeProjects },
+      };
+    } catch (error) {
+      console.error("adminUpdateLandingStats error:", error);
+      return {
+        success: false,
+        error: "LP統計の更新中にエラーが発生しました",
+      };
+    }
+  },
+);
+
+// ============================================
+// 7. scheduledUpdateLandingStats - LP統計の定期更新
+// ============================================
+
+/**
+ * LP用の統計データを毎時更新するスケジュール関数
+ */
+export const scheduledUpdateLandingStats = onSchedule(
+  {
+    schedule: "every 1 hours",
+    region: "asia-northeast1",
+    timeZone: "Asia/Tokyo",
+  },
+  async () => {
+    try {
+      // プロジェクト数を取得
+      const projectsSnap = await db.collection("projects").get();
+      const activeProjects = projectsSnap.size;
+
+      // 完了タスク数を取得（collectionGroup query）
+      const tasksSnap = await db
+        .collectionGroup("tasks")
+        .where("status", "==", "done")
+        .get();
+      const completedTasks = tasksSnap.size;
+
+      // appConfig/landingStats に保存
+      await db.collection("appConfig").doc("landingStats").set({
+        completedTasks,
+        activeProjects,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: "scheduler",
+      });
+
+      console.log(
+        `Landing stats updated: ${completedTasks} tasks, ${activeProjects} projects`,
+      );
+    } catch (error) {
+      console.error("scheduledUpdateLandingStats error:", error);
     }
   },
 );

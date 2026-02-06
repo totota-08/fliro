@@ -18,9 +18,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // appConfig: メンテナンス・通知設定（読み取りは全員、書き込みはAdmin SDKのみ）
+    // appConfig: メンテナンス・通知設定・LP統計（読み取りは全員、書き込みはAdmin SDKのみ）
     match /appConfig/{configId} {
-      allow read: if configId in ['maintenance', 'announcement'];
+      allow read: if configId in ['maintenance', 'announcement', 'landingStats'];
       allow write: if false;
     }
 

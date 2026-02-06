@@ -36,20 +36,25 @@ export interface LandingPageStats {
 
 /**
  * LP用の統計データを取得
- * - completedTasks: 完了したタスクの数
- * - activeProjects: アクティブなプロジェクトの数
+ * appConfig/landingStats から公開統計データを取得
+ * （未認証ユーザーでもアクセス可能）
  */
 export async function fetchLandingPageStats(): Promise<LandingPageStats> {
-  const [projectSnap, completedTaskSnap] = await Promise.all([
-    getCountFromServer(collection(db, "projects")),
-    getCountFromServer(
-      query(collectionGroup(db, "tasks"), where("status", "==", "done")),
-    ),
-  ]);
+  const { doc, getDoc } = await import("firebase/firestore");
+  const statsDoc = await getDoc(doc(db, "appConfig", "landingStats"));
 
+  if (statsDoc.exists()) {
+    const data = statsDoc.data();
+    return {
+      completedTasks: data.completedTasks ?? 0,
+      activeProjects: data.activeProjects ?? 0,
+    };
+  }
+
+  // ドキュメントが存在しない場合はデフォルト値を返す
   return {
-    activeProjects: projectSnap.data().count,
-    completedTasks: completedTaskSnap.data().count,
+    completedTasks: 0,
+    activeProjects: 0,
   };
 }
 

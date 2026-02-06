@@ -13,4 +13,6 @@ export {
   adminCreateInviteCode,
   adminListInviteCodes,
   adminUpdateAppConfig,
+  adminUpdateLandingStats,
+  scheduledUpdateLandingStats,
 } from "./admin";
