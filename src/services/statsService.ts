@@ -3,8 +3,6 @@ import {
   collectionGroup,
   getCountFromServer,
   getDocs,
-  query,
-  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { TaskDoc } from "@/services/taskService";

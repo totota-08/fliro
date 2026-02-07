@@ -13,7 +13,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 
 const logger = getLogger("app.services.task");

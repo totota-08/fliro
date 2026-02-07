@@ -9,8 +9,9 @@ export function useInView(
 
   onMounted(() => {
     if (!target.value) return;
-    observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
+    observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      if (entry?.isIntersecting) {
         isInView.value = true;
         observer?.unobserve(entry.target); // 一度だけ発火
       }
