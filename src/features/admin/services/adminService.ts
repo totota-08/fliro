@@ -6,6 +6,7 @@ import type {
   AdminFunctionResponse,
   MaintenanceConfig,
   AnnouncementConfig,
+  SampleProjectConfig,
 } from "../types/admin";
 
 // ユーザー検索
@@ -63,8 +64,11 @@ export async function listInviteCodes(params?: {
 
 // アプリ設定更新
 export async function updateAppConfig(
-  configType: "maintenance" | "announcement",
-  config: Partial<MaintenanceConfig> | Partial<AnnouncementConfig>,
+  configType: "maintenance" | "announcement" | "sampleProject",
+  config:
+    | Partial<MaintenanceConfig>
+    | Partial<AnnouncementConfig>
+    | Partial<SampleProjectConfig>,
 ): Promise<AdminFunctionResponse> {
   const fn = httpsCallable<
     { configType: string; config: object },

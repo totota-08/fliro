@@ -11,10 +11,14 @@ import {
   type ReleaseNote,
 } from "@/services/releaseNotesService";
 import { fetchLandingPageStats } from "@/services/statsService";
+import { getSampleProjectId } from "@/features/admin/services/appConfigService";
 import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger("app.pages.HomePage");
 const { appName } = useAppMeta();
+
+// サンプルプロジェクトID（Firestoreから取得、フォールバックはappConfig）
+const sampleProjectId = ref(APP_CONFIG.sampleProjectId);
 
 // スクロールアニメーション用のref
 const { elementRef: heroRef, isVisible: heroVisible } = useScrollAnimation({
@@ -37,27 +41,23 @@ const { elementRef: ctaRef, isVisible: ctaVisible } = useScrollAnimation({
 const countUpStarted = ref(false);
 const isLoadingStats = ref(true);
 const stats = ref([
-  { label: "タスク完了", value: 0, target: 0, suffix: "+" },
-  { label: "アクティブチーム", value: 0, target: 0, suffix: "+" },
+  { label: "完了したタスク", value: 0, target: 0, suffix: "件" },
+  { label: "参加チーム", value: 0, target: 0, suffix: "チーム" },
 ]);
 
 // Firestoreから統計データを取得
 async function loadStats() {
   try {
     const data = await fetchLandingPageStats();
-    const tasksStat = stats.value.find((s) => s.label === "タスク完了");
-    const projectsStat = stats.value.find(
-      (s) => s.label === "アクティブチーム",
-    );
+    const tasksStat = stats.value.find((s) => s.label === "完了したタスク");
+    const projectsStat = stats.value.find((s) => s.label === "参加チーム");
     if (tasksStat) tasksStat.target = data.completedTasks;
     if (projectsStat) projectsStat.target = data.activeProjects;
   } catch (error) {
     logger.error`Failed to fetch landing page stats: ${error}`;
     // フォールバック値を設定
-    const tasksStat = stats.value.find((s) => s.label === "タスク完了");
-    const projectsStat = stats.value.find(
-      (s) => s.label === "アクティブチーム",
-    );
+    const tasksStat = stats.value.find((s) => s.label === "完了したタスク");
+    const projectsStat = stats.value.find((s) => s.label === "参加チーム");
     if (tasksStat) tasksStat.target = 100;
     if (projectsStat) projectsStat.target = 10;
   } finally {
@@ -153,7 +153,7 @@ const defaultReleaseNotes: ReleaseNote[] = [
 ];
 
 onMounted(async () => {
-  // 統計データとリリースノートを並行取得
+  // 統計データ、リリースノート、サンプルプロジェクトIDを並行取得
   await Promise.all([
     loadStats(),
     (async () => {
@@ -165,6 +165,12 @@ onMounted(async () => {
         releaseNotes.value = defaultReleaseNotes;
       }
       isLoadingReleases.value = false;
+    })(),
+    (async () => {
+      const projectId = await getSampleProjectId();
+      if (projectId) {
+        sampleProjectId.value = projectId;
+      }
     })(),
   ]);
 });
@@ -179,7 +185,8 @@ defineExpose({
   ctaRef,
 });
 
-const featureCards = [
+// コア機能（大きく表示）
+const coreFeatures = [
   {
     title: "直感的なタスク管理",
     description:
@@ -198,6 +205,10 @@ const featureCards = [
       "スレッド機能、リアクション、メンションを搭載。プロジェクトごとのチャットで効率的にコミュニケーション。",
     icon: "chat",
   },
+];
+
+// その他の機能（コンパクトに表示）
+const otherFeatures = [
   {
     title: "チーム＆ロール管理",
     description:
@@ -248,7 +259,8 @@ const pricingPlans = [
       "ダッシュボード",
       "基本的なロール設定",
     ],
-    cta: "始める",
+    cta: "まず試す",
+    variant: "secondary" as const,
   },
   {
     name: "スタンダード",
@@ -256,14 +268,15 @@ const pricingPlans = [
     unit: "/月",
     highlight: true,
     ribbon: "人気",
+    prefix: "フリープランの全機能に加えて：",
     features: [
       "最大15名まで",
-      "すべての機能",
       "カスタムロール＆権限管理",
       "アクティビティログ",
       "スコア＆成績表",
     ],
     cta: "始める",
+    variant: "primary" as const,
   },
   {
     name: "エンタープライズ",
@@ -277,6 +290,7 @@ const pricingPlans = [
       "オンボーディング支援",
     ],
     cta: "お問い合わせ",
+    variant: "secondary" as const,
   },
 ];
 </script>
@@ -319,23 +333,22 @@ const pricingPlans = [
       >
         <div class="hero__content">
           <p class="hero__eyebrow animate-fade-up" style="--delay: 0ms">
-            小〜中規模チームのためのプロジェクト管理
+            管理に追われず、実行に集中したいチームへ
           </p>
           <h1 class="animate-fade-up" style="--delay: 100ms">
             「今やるべきこと」が<br class="hero__br" />一目でわかる
           </h1>
           <p class="animate-fade-up" style="--delay: 200ms">
-            {{
+            毎朝「何から始めればいい？」と迷う時間をゼロに。{{
               appName
-            }}は、タスク管理・チャット・進捗可視化を統合したプロジェクト管理ツールです。
-            管理のための管理ではなく、チームの意思決定と実行を加速します。
+            }}はチームの優先順位を明確にし、意思決定と実行を加速します。
           </p>
           <div class="hero__actions animate-fade-up" style="--delay: 300ms">
             <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
               >無料で始める</AppButton
             >
             <AppButton
-              :to="`/projects/${APP_CONFIG.sampleProjectId}/dashboard`"
+              :to="`/projects/${sampleProjectId}/dashboard`"
               variant="secondary"
               >サンプルを見る</AppButton
             >
@@ -351,45 +364,49 @@ const pricingPlans = [
               <span class="hero-card__dot hero-card__dot--yellow" />
               <span class="hero-card__dot hero-card__dot--green" />
             </header>
-            <div class="hero-card__body">
+            <div class="hero-card__body hero-card__body--now-first">
+              <!-- いまやること（フォーカス） -->
               <div
-                class="hero-card__column animate-slide-up"
+                class="hero-card__section hero-card__section--now animate-slide-up"
                 style="--delay: 400ms"
               >
-                <p class="hero-card__status hero-card__status--backlog">
-                  Backlog
+                <p class="hero-card__label hero-card__label--now">
+                  <span class="hero-card__fire">🔥</span>
+                  いまやること
                 </p>
-                <ul>
-                  <li class="hero-card__task">オンボーディング資料の更新</li>
-                  <li class="hero-card__task">初回ユーザー調査の準備</li>
-                </ul>
+                <div class="hero-card__focus-task">
+                  <span class="hero-card__focus-indicator" />
+                  チームダッシュボードの実装
+                </div>
               </div>
+
+              <!-- 次にやること -->
               <div
-                class="hero-card__column animate-slide-up"
+                class="hero-card__section hero-card__section--next animate-slide-up"
                 style="--delay: 500ms"
               >
-                <p class="hero-card__status hero-card__status--progress">
-                  In Progress
+                <p class="hero-card__label hero-card__label--next">
+                  次にやること
                 </p>
-                <ul>
-                  <li class="hero-card__task hero-card__task--active">
-                    チームダッシュボードの実装
-                  </li>
-                  <li class="hero-card__task">
-                    デイリースタンドアップの自動化
-                  </li>
+                <ul class="hero-card__next-list">
+                  <li>デイリースタンドアップの自動化</li>
+                  <li>オンボーディング資料の更新</li>
                 </ul>
               </div>
+
+              <!-- 完了 -->
               <div
-                class="hero-card__column animate-slide-up"
+                class="hero-card__section hero-card__section--done animate-slide-up"
                 style="--delay: 600ms"
               >
-                <p class="hero-card__status hero-card__status--done">Done</p>
-                <ul>
-                  <li class="hero-card__task hero-card__task--done">
+                <p class="hero-card__label hero-card__label--done">完了</p>
+                <ul class="hero-card__done-list">
+                  <li>
+                    <span class="hero-card__check">✓</span>
                     Firebase 認証のセットアップ
                   </li>
-                  <li class="hero-card__task hero-card__task--done">
+                  <li>
+                    <span class="hero-card__check">✓</span>
                     UI コンポーネントの設計
                   </li>
                 </ul>
@@ -430,16 +447,158 @@ const pricingPlans = [
           <p>主な機能</p>
           <h2>チームの生産性を高める機能が揃っています</h2>
         </div>
-        <div class="features__grid">
+        <!-- コア機能（大きく表示） -->
+        <div class="features__grid features__grid--core">
           <article
-            v-for="(card, index) in featureCards"
+            v-for="(card, index) in coreFeatures"
             :key="card.title"
-            class="feature-card animate-fade-up"
-            :style="{ '--delay': `${(index % 3) * 100 + 100}ms` }"
+            class="feature-card feature-card--core animate-fade-up"
+            :style="{ '--delay': `${index * 100 + 100}ms` }"
           >
-            <div class="feature-card__icon" :data-icon="card.icon" />
+            <div class="feature-card__icon feature-card__icon--core">
+              <!-- チェックリスト -->
+              <svg
+                v-if="card.icon === 'board'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01" />
+                <path d="M7 9h2M7 15h2M13 9h2M13 15h2" />
+              </svg>
+              <!-- ダッシュボード -->
+              <svg
+                v-else-if="card.icon === 'kanban'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="4" rx="1" />
+                <rect x="14" y="10" width="7" height="11" rx="1" />
+                <rect x="3" y="13" width="7" height="8" rx="1" />
+              </svg>
+              <!-- チャット -->
+              <svg
+                v-else-if="card.icon === 'chat'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                />
+                <path d="M8 10h.01M12 10h.01M16 10h.01" />
+              </svg>
+            </div>
             <h3>{{ card.title }}</h3>
             <p>{{ card.description }}</p>
+          </article>
+        </div>
+
+        <!-- その他の機能（コンパクトに表示） -->
+        <div class="features__grid features__grid--other">
+          <article
+            v-for="(card, index) in otherFeatures"
+            :key="card.title"
+            class="feature-card feature-card--compact animate-fade-up"
+            :style="{ '--delay': `${index * 50 + 400}ms` }"
+          >
+            <div class="feature-card__icon">
+              <!-- チーム -->
+              <svg
+                v-if="card.icon === 'team'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <!-- 目 -->
+              <svg
+                v-else-if="card.icon === 'eye'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <!-- モバイル -->
+              <svg
+                v-else-if="card.icon === 'mobile'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="5" y="2" width="14" height="20" rx="2" />
+                <path d="M12 18h.01" />
+              </svg>
+              <!-- ベル -->
+              <svg
+                v-else-if="card.icon === 'bell'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <!-- チェックサークル -->
+              <svg
+                v-else-if="card.icon === 'check-circle'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+              <!-- アクティビティ -->
+              <svg
+                v-else-if="card.icon === 'activity'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <div class="feature-card__text">
+              <h3>{{ card.title }}</h3>
+              <p>{{ card.description }}</p>
+            </div>
           </article>
         </div>
       </section>
@@ -470,16 +629,21 @@ const pricingPlans = [
               <span>{{ plan.price }}</span>
               <small>{{ plan.unit }}</small>
             </div>
-            <ul>
-              <li v-for="item in plan.features" :key="item">{{ item }}</li>
-            </ul>
+            <div class="pricing-card__features">
+              <p v-if="plan.prefix" class="pricing-card__prefix">
+                {{ plan.prefix }}
+              </p>
+              <ul>
+                <li v-for="item in plan.features" :key="item">{{ item }}</li>
+              </ul>
+            </div>
             <AppButton
               :to="
                 plan.price === 'お問い合わせ'
                   ? undefined
                   : { name: ROUTE_NAMES.signup }
               "
-              variant="primary"
+              :variant="plan.variant"
               block
             >
               {{ plan.cta }}
@@ -538,11 +702,19 @@ const pricingPlans = [
             フリープランで今すぐ始められます。
             チームの「今やるべきこと」を明確にし、プロジェクトを前に進めましょう。
           </p>
-          <div class="animate-fade-up" style="--delay: 200ms">
-            <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="secondary"
+          <div class="cta__actions animate-fade-up" style="--delay: 200ms">
+            <AppButton :to="{ name: ROUTE_NAMES.signup }" variant="primary"
               >無料で始める</AppButton
             >
+            <AppButton
+              :to="`/projects/${sampleProjectId}/dashboard`"
+              variant="secondary"
+              >サンプルを見る</AppButton
+            >
           </div>
+          <p class="cta__note animate-fade-up" style="--delay: 300ms">
+            フリープランは永久無料 • 3名まで利用可能
+          </p>
         </div>
       </section>
     </main>
@@ -658,12 +830,7 @@ const pricingPlans = [
 
 .landing {
   min-height: 100vh;
-  background: linear-gradient(
-    135deg,
-    var(--ui-brand-300),
-    var(--ui-surface) 45%,
-    var(--ui-brand-400)
-  );
+  background: var(--ui-brand-50);
   color: var(--ui-brand-900);
   display: flex;
   flex-direction: column;
@@ -828,48 +995,75 @@ const pricingPlans = [
   gap: var(--ui-space-4);
 }
 
-.hero-card__column {
-  padding: var(--ui-space-4);
+/* Now-first レイアウト */
+.hero-card__body--now-first {
+  gap: var(--ui-space-5);
+}
+
+.hero-card__section {
   border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface-accent);
   transition: var(--ui-transition-all);
 }
 
-.hero-card__column:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--ui-shadow-md);
-}
-
-.hero-card__status {
+.hero-card__label {
   margin: 0 0 var(--ui-space-2);
   font-weight: var(--ui-font-semibold);
   font-size: var(--ui-text-sm);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--ui-space-2);
 }
 
-.hero-card__status::before {
-  content: "";
-  width: 8px;
-  height: 8px;
+/* いまやること - フォーカスエリア */
+.hero-card__section--now {
+  padding: var(--ui-space-5);
+  background: var(--ui-brand-600);
+  border-radius: var(--ui-radius-xl);
+}
+
+.hero-card__label--now {
+  color: var(--ui-brand-200);
+  font-size: var(--ui-text-base);
+  margin-bottom: var(--ui-space-3);
+}
+
+.hero-card__fire {
+  font-size: var(--ui-text-lg);
+}
+
+.hero-card__focus-task {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  color: var(--ui-text-inverse);
+  font-size: var(--ui-text-lg);
+  font-weight: var(--ui-font-semibold);
+  padding: var(--ui-space-4);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--ui-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hero-card__focus-indicator {
+  width: 10px;
+  height: 10px;
   border-radius: var(--ui-radius-full);
-}
-
-.hero-card__status--backlog::before {
-  background: var(--ui-brand-400);
-}
-
-.hero-card__status--progress::before {
   background: var(--ui-warning-500, #f59e0b);
   animation: pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
-.hero-card__status--done::before {
-  background: var(--ui-success-500, #22c55e);
+/* 次にやること */
+.hero-card__section--next {
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-accent);
 }
 
-.hero-card__body ul {
+.hero-card__label--next {
+  color: var(--ui-brand-600);
+}
+
+.hero-card__next-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -878,32 +1072,50 @@ const pricingPlans = [
   gap: var(--ui-space-2);
 }
 
-.hero-card__task {
+.hero-card__next-list li {
   color: var(--ui-brand-600);
   font-size: var(--ui-text-sm);
   padding: var(--ui-space-2) var(--ui-space-3);
   background: var(--ui-surface);
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-light);
-  transition: var(--ui-transition-all);
 }
 
-.hero-card__task:hover {
-  border-color: var(--ui-brand-400);
+/* 完了 */
+.hero-card__section--done {
+  padding: var(--ui-space-3) var(--ui-space-4);
+  opacity: 0.7;
 }
 
-.hero-card__task--active {
-  border-color: var(--ui-warning-500, #f59e0b);
-  background: linear-gradient(
-    135deg,
-    rgba(245, 158, 11, 0.05),
-    var(--ui-surface)
-  );
-}
-
-.hero-card__task--done {
-  text-decoration: line-through;
+.hero-card__label--done {
   color: var(--ui-brand-400);
+  font-size: var(--ui-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hero-card__done-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+}
+
+.hero-card__done-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  color: var(--ui-brand-400);
+  font-size: var(--ui-text-xs);
+  text-decoration: line-through;
+}
+
+.hero-card__check {
+  color: var(--ui-success, #16a34a);
+  font-weight: var(--ui-font-bold);
+  font-size: var(--ui-text-xs);
 }
 
 /* Hero break point */
@@ -978,10 +1190,21 @@ const pricingPlans = [
 
 .features__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--ui-space-6);
   max-width: 1140px;
   margin: 0 auto;
+}
+
+/* コア機能グリッド */
+.features__grid--core {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: var(--ui-space-8);
+}
+
+/* その他機能グリッド */
+.features__grid--other {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--ui-space-4);
 }
 
 .feature-card {
@@ -997,20 +1220,107 @@ const pricingPlans = [
   transform: translateY(-4px);
 }
 
+/* コア機能カード（大きく表示） */
+.feature-card--core {
+  padding: var(--ui-space-8);
+  background: var(--ui-surface);
+  border-color: var(--ui-brand-400);
+}
+
+.feature-card--core h3 {
+  font-size: var(--ui-text-xl);
+  margin-bottom: var(--ui-space-3);
+}
+
+.feature-card--core p {
+  font-size: var(--ui-text-base);
+  line-height: var(--ui-leading-relaxed);
+}
+
+/* コンパクトカード（その他機能） */
+.feature-card--compact {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-4);
+}
+
+.feature-card--compact:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ui-shadow-md);
+}
+
+.feature-card--compact h3 {
+  font-size: var(--ui-text-base);
+  margin-bottom: var(--ui-space-1);
+}
+
+.feature-card--compact p {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-brand-500);
+  line-height: var(--ui-leading-normal);
+}
+
+.feature-card__text {
+  flex: 1;
+}
+
 .feature-card__icon {
   width: 3rem;
   height: 3rem;
   border-radius: var(--ui-radius-md);
-  background: var(--ui-brand-300);
+  background: var(--ui-brand-200);
   margin-bottom: var(--ui-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ui-space-2);
+  flex-shrink: 0;
+}
+
+/* コア機能の大きなアイコン */
+.feature-card__icon--core {
+  width: 4rem;
+  height: 4rem;
+  background: var(--ui-brand-100);
+}
+
+.feature-card__icon--core svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* コンパクトカードのアイコンはマージンなし */
+.feature-card--compact .feature-card__icon {
+  margin-bottom: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.feature-card--compact .feature-card__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.feature-card__icon svg {
+  width: 24px;
+  height: 24px;
+  color: var(--ui-brand-600);
+}
+
+/* レスポンシブ */
+@media (max-width: 768px) {
+  .features__grid--core {
+    grid-template-columns: 1fr;
+  }
+
+  .features__grid--other {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pricing {
-  background: linear-gradient(
-    135deg,
-    rgba(184, 227, 233, 0.25),
-    var(--ui-surface)
-  );
+  background: var(--ui-surface-muted);
 }
 
 .pricing__grid {
@@ -1058,6 +1368,17 @@ const pricingPlans = [
 .pricing-card__price small {
   color: var(--ui-brand-400);
   margin-left: var(--ui-space-1);
+}
+
+.pricing-card__features {
+  flex: 1;
+}
+
+.pricing-card__prefix {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-brand-500);
+  margin: 0 0 var(--ui-space-2);
+  font-weight: var(--ui-font-medium);
 }
 
 .pricing-card ul {
@@ -1181,6 +1502,20 @@ const pricingPlans = [
   color: var(--ui-brand-300);
   margin: 0;
   line-height: var(--ui-leading-relaxed);
+}
+
+.cta__actions {
+  display: flex;
+  gap: var(--ui-space-4);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: var(--ui-space-2);
+}
+
+.cta__note {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-brand-200);
+  opacity: 0.8;
 }
 
 .landing__footer {

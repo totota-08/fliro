@@ -14,10 +14,10 @@ import UserSearchPanel from "../components/UserSearchPanel.vue";
 import InviteCodeManager from "../components/InviteCodeManager.vue";
 import MaintenanceToggle from "../components/MaintenanceToggle.vue";
 import AnnouncementEditor from "../components/AnnouncementEditor.vue";
+import SampleProjectSelector from "../components/SampleProjectSelector.vue";
 import { useAdminAccess } from "../composables/useAdminAccess";
-import { useRouter } from "vue-router";
+import NotFoundPage from "@/components/errorPage/404.vue";
 
-const router = useRouter();
 const {
   session,
   isAdmin,
@@ -82,10 +82,6 @@ function stopTimer() {
   }
 }
 
-function goBack() {
-  router.push("/");
-}
-
 onMounted(() => {
   if (isSessionValid.value) {
     startTimer();
@@ -105,38 +101,8 @@ onUnmounted(() => {
       <p>読み込み中...</p>
     </div>
 
-    <!-- 管理者でない場合 -->
-    <div v-else-if="!isAdmin" class="admin-dashboard__access-denied">
-      <SectionCard size="md" elevated>
-        <div class="admin-dashboard__access-denied-content">
-          <div
-            class="admin-dashboard__icon-wrapper admin-dashboard__icon-wrapper--danger"
-          >
-            <svg
-              class="admin-dashboard__icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-            </svg>
-          </div>
-          <h1 class="admin-dashboard__title">アクセスが拒否されました</h1>
-          <p class="admin-dashboard__description">
-            このページにアクセスする権限がありません。<br />
-            管理者権限が必要です。
-          </p>
-          <AppButton variant="primary" @click="goBack">
-            ホームに戻る
-          </AppButton>
-        </div>
-      </SectionCard>
-    </div>
+    <!-- 管理者でない場合は404を表示（管理者ページの存在を隠す） -->
+    <NotFoundPage v-else-if="!isAdmin" />
 
     <!-- MFA未設定の場合 -->
     <div v-else-if="!hasMFAEnabled" class="admin-dashboard__mfa-required">
@@ -221,6 +187,7 @@ onUnmounted(() => {
 
         <!-- アプリ設定タブ -->
         <template v-if="activeTab === 'app-settings'">
+          <SampleProjectSelector />
           <MaintenanceToggle />
           <AnnouncementEditor />
         </template>
@@ -262,8 +229,7 @@ onUnmounted(() => {
   }
 }
 
-/* アクセス拒否 / MFA未設定 */
-.admin-dashboard__access-denied,
+/* MFA未設定 */
 .admin-dashboard__mfa-required {
   display: flex;
   align-items: center;
@@ -271,7 +237,6 @@ onUnmounted(() => {
   min-height: 50vh;
 }
 
-.admin-dashboard__access-denied-content,
 .admin-dashboard__mfa-required-content {
   display: flex;
   flex-direction: column;
@@ -291,10 +256,6 @@ onUnmounted(() => {
   border-radius: var(--ui-radius-full, 9999px);
 }
 
-.admin-dashboard__icon-wrapper--danger {
-  background: var(--ui-danger-light, #fee2e2);
-}
-
 .admin-dashboard__icon-wrapper--warning {
   background: var(--ui-warning-light, #fef3c7);
 }
@@ -302,10 +263,6 @@ onUnmounted(() => {
 .admin-dashboard__icon {
   width: 32px;
   height: 32px;
-}
-
-.admin-dashboard__icon-wrapper--danger .admin-dashboard__icon {
-  color: var(--ui-status-danger, #dc2626);
 }
 
 .admin-dashboard__icon-wrapper--warning .admin-dashboard__icon {

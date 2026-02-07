@@ -21,6 +21,14 @@ export interface AnnouncementConfig {
   updatedBy: string;
 }
 
+// サンプルプロジェクト設定
+export interface SampleProjectConfig {
+  projectId: string;
+  projectName: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
 // 招待コード（Cloud Functionsから返される形式）
 // Cloud FunctionsはJSON経由で返すためTimestampではなくISO文字列
 export interface InvitationCode {

@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || "",
   /** サンプルプロジェクトのID（LPからのリンク先） */
-  sampleProjectId: "A0u22ZoeJjCNqnJ3ydZx",
+  sampleProjectId: "Tk6b6Kelr8O3XUS8BqCq",
 };
 
 /**
