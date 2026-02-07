@@ -413,7 +413,7 @@ export const adminListInviteCodes = onCall<ListInviteCodesRequest>(
 // ============================================
 
 interface UpdateAppConfigRequest {
-  configType: "maintenance" | "announcement";
+  configType: "maintenance" | "announcement" | "sampleProject";
   config: Record<string, unknown>;
 }
 
@@ -431,7 +431,10 @@ export const adminUpdateAppConfig = onCall<UpdateAppConfigRequest>(
     const adminUid = request.auth!.uid;
 
     // configTypeバリデーション
-    if (!configType || !["maintenance", "announcement"].includes(configType)) {
+    if (
+      !configType ||
+      !["maintenance", "announcement", "sampleProject"].includes(configType)
+    ) {
       return { success: false, error: "無効なconfigTypeです" };
     }
 
