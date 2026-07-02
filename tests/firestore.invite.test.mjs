@@ -220,7 +220,9 @@ describe("Firestore rules / 招待機能", () => {
     await createInvite(ownerDb, "invite-delete");
 
     const userDb = testEnv.authenticatedContext("user2").firestore();
-    await assertFails(deleteDoc(doc(userDb, "projectInvites", "invite-delete")));
+    await assertFails(
+      deleteDoc(doc(userDb, "projectInvites", "invite-delete")),
+    );
 
     await assertSucceeds(
       deleteDoc(doc(ownerDb, "projectInvites", "invite-delete")),
