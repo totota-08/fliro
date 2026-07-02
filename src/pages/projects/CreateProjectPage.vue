@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import AvatarCropperModal from "@/components/modals/AvatarCropperModal.vue";
+import AppAlert from "@/components/ui/AppAlert.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppColorPicker from "@/components/ui/AppColorPicker.vue";
+import AppField from "@/components/ui/AppField.vue";
+import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
-import AuthFormField from "@/components/ui/AuthFormField.vue";
 import DatePicker from "@/components/ui/DatePicker.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
@@ -88,14 +90,19 @@ onBeforeUnmount(() => {
   if (iconPreviewUrl.value) URL.revokeObjectURL(iconPreviewUrl.value);
 });
 
-const homeColors = ["#4f7c82", "#0b2e33", "#93b1b5", "#b8e3e9"];
+const presetColors = ["#4f7c82", "#0b2e33", "#93b1b5", "#b8e3e9"];
 
 type CreateStep = "basic" | "appearance" | "settings";
 const stepOrder: CreateStep[] = ["basic", "appearance", "settings"];
 const stepLabels: Record<CreateStep, string> = {
   basic: "基本情報",
-  appearance: "見た目の設定",
+  appearance: "見た目",
   settings: "詳細設定",
+};
+const stepDescriptions: Record<CreateStep, string> = {
+  basic: "プロジェクトの名前と目的を入力してください。",
+  appearance: "アイコンとテーマカラーでプロジェクトを識別しやすくします。",
+  settings: "公開範囲を選び、内容を確認して作成します。",
 };
 
 const currentStep = ref<CreateStep>("basic");
@@ -106,7 +113,27 @@ const progressPercent = computed(
   () => ((currentStepIndex.value + 1) / stepOrder.length) * 100,
 );
 const basicValid = computed(() => name.value.trim().length > 0);
+const displayName = computed(() => name.value.trim() || "新しいプロジェクト");
 const scaleStats = ref<ScaleStats | null>(null);
+
+const scheduleSummary = computed(() => {
+  if (!startDate.value && !dueDate.value) return "未設定";
+  const format = (value: string | null) =>
+    value
+      ? new Date(value).toLocaleDateString("ja-JP", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "未定";
+  return `${format(startDate.value)} 〜 ${format(dueDate.value)}`;
+});
+
+const visibilitySummary = computed(() => {
+  const parts = [isPublic.value ? "公開" : "非公開"];
+  if (allowGuestView.value) parts.push("ゲスト閲覧可");
+  return parts.join(" / ");
+});
 
 onMounted(async () => {
   try {
@@ -154,6 +181,13 @@ async function handleSubmit() {
   } finally {
     submitting.value = false;
   }
+}
+
+function goToStep(step: CreateStep) {
+  const targetIndex = stepOrder.indexOf(step);
+  // 未入力のまま先のステップへ飛ばないよう、進む方向は基本情報の入力を必須にする
+  if (targetIndex > currentStepIndex.value && !basicValid.value) return;
+  currentStep.value = step;
 }
 
 function nextStep() {
@@ -210,46 +244,98 @@ function prevStep() {
       </section>
 
       <section class="project-panel">
-        <header class="panel-header">
-          <div>
-            <p>ステップ {{ currentStepIndex + 1 }} / {{ stepOrder.length }}</p>
-            <h2>{{ stepLabels[currentStep] }}</h2>
-          </div>
-          <span class="panel-pill">{{ Math.round(progressPercent) }}%</span>
-        </header>
-        <div class="panel-progress">
+        <nav class="stepper" aria-label="作成ステップ">
+          <ol class="stepper__list">
+            <li
+              v-for="(step, index) in stepOrder"
+              :key="step"
+              class="stepper__item"
+            >
+              <button
+                type="button"
+                class="stepper__button"
+                :class="{
+                  'is-current': step === currentStep,
+                  'is-done': index < currentStepIndex,
+                }"
+                :aria-current="step === currentStep ? 'step' : undefined"
+                :disabled="index > currentStepIndex && !basicValid"
+                @click="goToStep(step)"
+              >
+                <span class="stepper__index" aria-hidden="true">
+                  <svg
+                    v-if="index < currentStepIndex"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                  >
+                    <path
+                      d="M3 8L7 12L13 4"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <template v-else>{{ index + 1 }}</template>
+                </span>
+                <span class="stepper__label">{{ stepLabels[step] }}</span>
+              </button>
+              <span
+                v-if="index < stepOrder.length - 1"
+                class="stepper__connector"
+                :class="{ 'is-done': index < currentStepIndex }"
+                aria-hidden="true"
+              />
+            </li>
+          </ol>
           <div
-            class="panel-progress__value"
-            :style="{ width: `${progressPercent}%` }"
-          />
-        </div>
+            class="stepper__progress"
+            role="progressbar"
+            :aria-valuenow="currentStepIndex + 1"
+            aria-valuemin="1"
+            :aria-valuemax="stepOrder.length"
+            :aria-valuetext="`ステップ ${currentStepIndex + 1} / ${stepOrder.length}`"
+          >
+            <div
+              class="stepper__progress-value"
+              :style="{ width: `${progressPercent}%` }"
+            />
+          </div>
+        </nav>
+
+        <header class="panel-header">
+          <h2>{{ stepLabels[currentStep] }}</h2>
+          <p>{{ stepDescriptions[currentStep] }}</p>
+        </header>
 
         <Transition name="slide-fade" mode="out-in">
           <div :key="currentStep" class="panel-body">
             <div v-if="currentStep === 'basic'" class="panel-section">
-              <AuthFormField
-                v-model="name"
-                label="プロジェクト名"
-                placeholder="例）Webサイトリニューアル"
-                required
-              />
+              <AppField label="プロジェクト名" required>
+                <AppInput
+                  v-model="name"
+                  placeholder="例）Webサイトリニューアル"
+                />
+              </AppField>
 
-              <div class="form-block">
-                <span>プロジェクト説明</span>
+              <AppField
+                label="プロジェクト説明"
+                hint="プロジェクトの目的やゴール、主要タスクなどを記載してください（任意）。"
+              >
                 <AppTextarea
                   v-model="description"
                   :rows="6"
-                  placeholder="プロジェクトの目的やゴール、主要タスクなどを記載してください"
+                  placeholder="例）自社サイトを刷新し、問い合わせ数を2倍にする"
                 />
-              </div>
+              </AppField>
             </div>
 
             <div v-else-if="currentStep === 'appearance'" class="panel-section">
-              <div class="form-block">
-                <span>プロジェクトアイコン</span>
-                <p class="form-hint">
-                  サイドバーやプロジェクト一覧に表示されます（5MBまでの画像、任意）。
-                </p>
+              <AppField
+                label="プロジェクトアイコン"
+                hint="サイドバーやプロジェクト一覧に表示されます（5MBまでの画像、任意）。"
+                :error="iconError || undefined"
+              >
                 <div class="icon-uploader">
                   <div class="icon-uploader__preview" aria-hidden="true">
                     <img
@@ -263,7 +349,7 @@ function prevStep() {
                       class="icon-uploader__fallback"
                       :style="{ backgroundColor: color }"
                     >
-                      {{ name.trim().charAt(0) || "P" }}
+                      {{ displayName.charAt(0) }}
                     </span>
                   </div>
                   <div class="icon-uploader__actions">
@@ -292,39 +378,56 @@ function prevStep() {
                     @change="handleIconSelect"
                   />
                 </div>
-                <p v-if="iconError" class="form-error" role="alert">
-                  {{ iconError }}
-                </p>
+              </AppField>
+
+              <AppField
+                label="テーマカラー"
+                :hint="`${appName} のブランドカラーから選ぶか、カスタムで細かく調整できます。`"
+              >
+                <AppColorPicker v-model="color" :preset-colors="presetColors" />
+              </AppField>
+
+              <div class="appearance-preview" aria-hidden="true">
+                <p class="appearance-preview__caption">表示イメージ</p>
+                <div
+                  class="appearance-preview__item"
+                  :style="{ borderLeftColor: color }"
+                >
+                  <img
+                    v-if="iconPreviewUrl"
+                    :src="iconPreviewUrl"
+                    alt=""
+                    class="appearance-preview__icon"
+                  />
+                  <span
+                    v-else
+                    class="appearance-preview__dot"
+                    :style="{ backgroundColor: color }"
+                  />
+                  <span class="appearance-preview__name">
+                    {{ displayName }}
+                  </span>
+                </div>
               </div>
 
-              <div class="form-block">
-                <span>テーマカラー</span>
-                <p class="form-hint">
-                  {{ appName }}
-                  のブランドカラーから選ぶか、カラーピッカーで細かく調整できます。
-                </p>
-                <AppColorPicker v-model="color" :preset-colors="homeColors" />
-              </div>
-
-              <div class="form-block">
-                <span>スケジュール</span>
-                <div class="date-stack">
-                  <div class="date-field">
-                    <span class="date-label">開始日</span>
+              <AppField
+                label="スケジュール"
+                hint="期限はいつでも更新できます。未定の場合は空欄のままでも構いません。"
+              >
+                <div class="date-grid">
+                  <label class="date-field">
+                    <span class="date-field__label">開始日</span>
                     <DatePicker
                       v-model="startDate"
                       placeholder="開始日を選択"
                     />
-                  </div>
-                  <div class="date-field">
-                    <span class="date-label">期限</span>
+                  </label>
+                  <label class="date-field">
+                    <span class="date-field__label">期限</span>
                     <DatePicker v-model="dueDate" placeholder="期限を選択" />
-                  </div>
+                  </label>
                 </div>
-                <p class="form-hint">
-                  終了期限はいつでも更新できます。未定の場合は空欄のままでも構いません。
-                </p>
-              </div>
+              </AppField>
             </div>
 
             <div v-else class="panel-section">
@@ -340,32 +443,68 @@ function prevStep() {
                 description="リンクを共有されたゲストにも読み取り専用で公開します。"
               />
 
-              <div class="invite-hint">
-                <strong>参加リンクについて</strong>
-                <p>
-                  プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。
-                </p>
+              <AppAlert variant="info" title="参加リンクについて">
+                プロジェクト作成後、メンバー管理ページから参加リンクを生成し、チームに共有できます。
+              </AppAlert>
+
+              <div class="summary">
+                <p class="summary__title">作成内容の確認</p>
+                <dl class="summary__list">
+                  <div class="summary__row">
+                    <dt>プロジェクト名</dt>
+                    <dd>
+                      <span class="summary__project">
+                        <img
+                          v-if="iconPreviewUrl"
+                          :src="iconPreviewUrl"
+                          alt=""
+                          class="summary__icon"
+                        />
+                        <span
+                          v-else
+                          class="summary__dot"
+                          :style="{ backgroundColor: color }"
+                          aria-hidden="true"
+                        />
+                        {{ displayName }}
+                      </span>
+                    </dd>
+                  </div>
+                  <div class="summary__row">
+                    <dt>スケジュール</dt>
+                    <dd>{{ scheduleSummary }}</dd>
+                  </div>
+                  <div class="summary__row">
+                    <dt>公開設定</dt>
+                    <dd>{{ visibilitySummary }}</dd>
+                  </div>
+                </dl>
               </div>
             </div>
           </div>
         </Transition>
 
-        <p v-if="errorMsg" class="panel-error">{{ errorMsg }}</p>
+        <AppAlert v-if="errorMsg" variant="danger" class="panel-alert">
+          {{ errorMsg }}
+        </AppAlert>
 
         <div class="panel-actions">
           <AppButton
-            variant="secondary"
+            v-if="currentStepIndex > 0"
+            variant="ghost"
             @click="prevStep"
-            :disabled="currentStepIndex === 0"
-            >戻る</AppButton
           >
+            戻る
+          </AppButton>
+          <span v-else aria-hidden="true" />
           <AppButton
             v-if="currentStepIndex < stepOrder.length - 1"
             variant="primary"
             :disabled="currentStep === 'basic' && !basicValid"
             @click="nextStep"
-            >次へ進む</AppButton
           >
+            次へ進む
+          </AppButton>
           <AppButton
             v-else
             type="button"
@@ -373,8 +512,9 @@ function prevStep() {
             :loading="submitting"
             :disabled="submitting || !basicValid"
             @click="handleSubmit"
-            >プロジェクトを作成</AppButton
           >
+            プロジェクトを作成
+          </AppButton>
         </div>
       </section>
     </div>
@@ -527,49 +667,135 @@ function prevStep() {
   }
 }
 
-.panel-header {
+.stepper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3, 0.75rem);
+}
+
+.stepper__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-4, 1rem);
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.stepper__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  flex: 1;
+  min-width: 0;
+}
+
+.stepper__item:last-child {
+  flex: 0 0 auto;
+}
+
+.stepper__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  border: none;
+  background: transparent;
+  padding: var(--ui-space-1, 0.25rem);
+  border-radius: var(--ui-radius-md, 0.75rem);
+  cursor: pointer;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  transition: var(--ui-transition-colors);
+}
+
+.stepper__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stepper__button:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring-focus);
+}
+
+.stepper__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--ui-radius-full, 9999px);
+  background: var(--ui-surface-muted, #f1f5f9);
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-bold, 700);
+  flex-shrink: 0;
+  transition: var(--ui-transition-colors);
+}
+
+.stepper__index svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.stepper__button.is-current {
+  color: var(--ui-brand-900, #0b2e33);
+}
+
+.stepper__button.is-current .stepper__index {
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-text-inverse, #ffffff);
+}
+
+.stepper__button.is-done {
+  color: var(--ui-brand-600, #4f7c82);
+}
+
+.stepper__button.is-done .stepper__index {
+  background: var(--ui-brand-200, #b8e3e9);
+  color: var(--ui-brand-900, #0b2e33);
+}
+
+.stepper__connector {
+  flex: 1;
+  height: 2px;
+  min-width: var(--ui-space-3, 0.75rem);
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-full, 9999px);
+}
+
+.stepper__connector.is-done {
+  background: var(--ui-brand-400, #7ec3cc);
+}
+
+.stepper__progress {
+  height: 4px;
+  background: var(--ui-surface-muted, #f1f5f9);
+  border-radius: var(--ui-radius-full, 9999px);
+  overflow: hidden;
+}
+
+.stepper__progress-value {
+  height: 100%;
+  background: var(--ui-brand-600, #4f7c82);
+  transition: width var(--ui-duration-base, 180ms) var(--ui-ease-standard);
+}
+
+.panel-header {
+  margin: var(--ui-space-5, 1.25rem) 0;
 }
 
 .panel-header h2 {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
+  margin: 0;
   color: var(--ui-brand-900, #0b2e33);
   font-size: var(--ui-text-xl, 1.25rem);
 }
 
 .panel-header p {
-  margin: 0;
-  color: var(--ui-brand-600, #4f7c82);
-  font-weight: var(--ui-font-semibold, 600);
-}
-
-.panel-pill {
-  background: var(--ui-brand-200, #b8e3e9);
-  color: var(--ui-brand-900, #0b2e33);
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  border-radius: var(--ui-radius-full, 9999px);
-  font-weight: var(--ui-font-bold, 700);
-}
-
-.panel-progress {
-  height: 6px;
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-full, 9999px);
-  margin: var(--ui-space-4, 1rem) 0 var(--ui-space-5, 1.25rem);
-  overflow: hidden;
-}
-
-.panel-progress__value {
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--ui-brand-600, #4f7c82),
-    var(--ui-brand-900, #0b2e33)
-  );
-  transition: width var(--ui-duration-base, 180ms) var(--ui-ease-standard);
+  margin: var(--ui-space-1, 0.25rem) 0 0;
+  color: var(--ui-text-muted, #64748b);
+  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .panel-body {
@@ -580,28 +806,6 @@ function prevStep() {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-5, 1.25rem);
-}
-
-.form-block {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2, 0.5rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
-}
-
-.form-hint {
-  margin: 0;
-  font-weight: var(--ui-font-normal, 400);
-  color: var(--ui-brand-600, #4f7c82);
-  font-size: var(--ui-text-sm, 0.875rem);
-}
-
-.form-error {
-  margin: 0;
-  font-weight: var(--ui-font-normal, 400);
-  color: var(--ui-danger, #d64545);
-  font-size: var(--ui-text-sm, 0.875rem);
 }
 
 .icon-uploader {
@@ -646,121 +850,146 @@ function prevStep() {
   display: none;
 }
 
-.project-textarea {
-  border: 2px solid var(--ui-brand-200, #b8e3e9);
-  border-radius: var(--ui-radius-lg, 1rem);
-  padding: var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-base, 1rem);
-  min-height: 180px;
-  resize: vertical;
-  font-family: inherit;
-  transition: var(--ui-transition-colors);
-}
-
-.project-textarea:focus {
-  outline: none;
-  border-color: var(--ui-brand-600, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
-}
-
-.color-grid {
+.appearance-preview {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.appearance-preview__caption {
+  margin: 0;
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.appearance-preview__item {
+  display: flex;
+  align-items: center;
   gap: var(--ui-space-3, 0.75rem);
-  align-items: center;
-}
-
-.color-swatch {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--ui-radius-lg, 1rem);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.color-swatch.is-active {
-  border-color: var(--ui-brand-900, #0b2e33);
-  transform: translateY(-2px) scale(1.05);
-}
-
-.color-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-1, 0.25rem);
-  border: 1px dashed var(--ui-border-strong, rgba(11, 46, 51, 0.2));
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
+  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  border-left-width: 3px;
   border-radius: var(--ui-radius-md, 0.75rem);
-  color: var(--ui-brand-600, #4f7c82);
 }
 
-.color-picker input {
-  border: none;
-  background: transparent;
-  width: 40px;
-  height: 32px;
-  padding: 0;
+.appearance-preview__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
-.date-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
+.appearance-preview__dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: var(--ui-radius-full, 9999px);
+  flex-shrink: 0;
 }
 
-.date-stack label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1, 0.25rem);
+.appearance-preview__name {
   font-weight: var(--ui-font-semibold, 600);
   color: var(--ui-text, #0b2e33);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.date-stack input {
-  border: 2px solid var(--ui-brand-200, #b8e3e9);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-base, 1rem);
-  transition: var(--ui-transition-colors);
+.date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-space-3, 0.75rem);
 }
 
-.date-stack input:focus {
-  outline: none;
-  border-color: var(--ui-brand-600, #4f7c82);
-  box-shadow: var(--ui-ring-focus);
+.date-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1, 0.25rem);
 }
 
-.invite-hint {
+.date-field__label {
+  font-size: var(--ui-text-xs, 0.75rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-text-muted, #64748b);
+}
+
+.summary {
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
+  border-radius: var(--ui-radius-lg, 1rem);
+  padding: var(--ui-space-4, 1rem);
   background: var(--ui-brand-50, #f5fcff);
 }
 
-.invite-hint strong {
-  display: block;
-  margin-bottom: var(--ui-space-1, 0.25rem);
-  color: var(--ui-text, #0b2e33);
-}
-
-.invite-hint p {
-  margin: 0;
-  color: var(--ui-text-muted, #64748b);
+.summary__title {
+  margin: 0 0 var(--ui-space-3, 0.75rem);
   font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-semibold, 600);
+  color: var(--ui-brand-900, #0b2e33);
 }
 
-.panel-error {
-  margin: var(--ui-space-4, 1rem) 0 0;
-  padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-lg, 1rem);
-  background: var(--ui-danger-bg, rgba(214, 69, 69, 0.1));
-  color: var(--ui-danger, #d64545);
-  font-weight: var(--ui-font-semibold, 600);
+.summary__list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2, 0.5rem);
+}
+
+.summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3, 0.75rem);
+}
+
+.summary__row dt {
+  font-size: var(--ui-text-sm, 0.875rem);
+  color: var(--ui-text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+.summary__row dd {
+  margin: 0;
+  font-size: var(--ui-text-sm, 0.875rem);
+  font-weight: var(--ui-font-medium, 500);
+  color: var(--ui-text, #0b2e33);
+  text-align: right;
+  min-width: 0;
+}
+
+.summary__project {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2, 0.5rem);
+  max-width: 100%;
+}
+
+.summary__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--ui-radius-sm, 0.5rem);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.summary__dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: var(--ui-radius-full, 9999px);
+  flex-shrink: 0;
+}
+
+.panel-alert {
+  margin-top: var(--ui-space-4, 1rem);
 }
 
 .panel-actions {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: var(--ui-space-3, 0.75rem);
   margin-top: var(--ui-space-5, 1.25rem);
 }
@@ -774,6 +1003,14 @@ function prevStep() {
 .slide-fade-leave-to {
   opacity: 0;
   transform: translateY(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-fade-enter-active,
+  .slide-fade-leave-active,
+  .stepper__progress-value {
+    transition: none;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -846,19 +1083,30 @@ function prevStep() {
     border-radius: var(--ui-radius-xl, 1.25rem);
   }
 
-  .panel-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--ui-space-2, 0.5rem);
+  .stepper__label {
+    display: none;
   }
 
-  .panel-pill {
-    align-self: flex-end;
-    margin-top: calc(-1 * var(--ui-space-6, 1.5rem));
+  .stepper__button.is-current .stepper__label {
+    display: inline;
+  }
+
+  .date-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-1, 0.25rem);
+  }
+
+  .summary__row dd {
+    text-align: left;
   }
 
   .panel-actions {
-    flex-direction: column;
+    flex-direction: column-reverse;
   }
 
   .panel-actions > * {
