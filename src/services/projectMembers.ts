@@ -37,6 +37,10 @@ interface AddProjectMemberOptions {
   roles?: string[];
   invitedBy: string;
   projectName?: string;
+  /** サイドバー等の一覧表示用に userProjects へ引き継ぐテーマカラー */
+  projectColor?: string;
+  /** サイドバー等の一覧表示用に userProjects へ引き継ぐアイコンURL */
+  projectIconUrl?: string;
   profile?: {
     nickname?: string;
     fullName?: string;
@@ -101,6 +105,8 @@ export async function addProjectMember({
   roles,
   invitedBy,
   projectName,
+  projectColor,
+  projectIconUrl,
   profile,
 }: AddProjectMemberOptions) {
   const timestamp = serverTimestamp();
@@ -134,6 +140,8 @@ export async function addProjectMember({
       projectName: projectName ?? "参加中プロジェクト",
       role,
       lastAccessedAt: timestamp,
+      ...(projectColor ? { color: projectColor } : {}),
+      ...(projectIconUrl ? { iconUrl: projectIconUrl } : {}),
     },
     { merge: true },
   );

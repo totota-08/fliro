@@ -342,16 +342,16 @@ export async function redeemInvite(
   }
 
   const projectSnap = await getDoc(doc(db, "projects", data.projectId));
-  const projectName = projectSnap.exists()
-    ? (projectSnap.data().name as string)
-    : undefined;
+  const projectData = projectSnap.exists() ? projectSnap.data() : undefined;
 
   await addProjectMember({
     projectId: data.projectId,
     userId,
     role: "member",
     invitedBy: data.createdBy,
-    projectName,
+    projectName: projectData?.name as string | undefined,
+    projectColor: projectData?.color as string | undefined,
+    projectIconUrl: projectData?.icon as string | undefined,
   });
   await updateDoc(ref, {
     status: maxUses && usedCount + 1 >= maxUses ? "accepted" : "pending",

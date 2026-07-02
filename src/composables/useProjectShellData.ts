@@ -42,18 +42,23 @@ export function useProjectShellData(projectIdRef: Ref<string>) {
     const snap = await getDocs(
       collection(db, "userProjects", user.value.uid, "projects"),
     );
-    projectList.value = snap.docs.map((docSnap, index) => ({
-      key: docSnap.id,
-      label: (docSnap.data().projectName as string) || "Project",
-      to: {
-        name: ROUTE_NAMES.projectDashboard,
-        params: { projectId: docSnap.id },
-      },
-      accent: ["primary", "secondary", "accent"][index % 3] as
-        | "primary"
-        | "secondary"
-        | "accent",
-    }));
+    projectList.value = snap.docs.map((docSnap, index) => {
+      const data = docSnap.data();
+      return {
+        key: docSnap.id,
+        label: (data.projectName as string) || "Project",
+        to: {
+          name: ROUTE_NAMES.projectDashboard,
+          params: { projectId: docSnap.id },
+        },
+        accent: ["primary", "secondary", "accent"][index % 3] as
+          | "primary"
+          | "secondary"
+          | "accent",
+        color: (data.color as string) || undefined,
+        iconUrl: (data.iconUrl as string) || undefined,
+      };
+    });
   }
 
   onMounted(() => {

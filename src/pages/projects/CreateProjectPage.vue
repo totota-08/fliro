@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvatarCropperModal from "@/components/modals/AvatarCropperModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppColorPicker from "@/components/ui/AppColorPicker.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
@@ -11,7 +12,7 @@ import { createProject } from "@/firebase/projectService";
 import { fetchScaleStats, type ScaleStats } from "@/services/statsService";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const logger = getLogger("app.pages.projects.CreateProject");
@@ -22,13 +23,70 @@ const { user } = useAuthStore();
 const name = ref("");
 const description = ref("");
 const color = ref("#4f7c82");
-// icon upload feature removed
 const isPublic = ref(false);
 const allowGuestView = ref(false);
 const startDate = ref<string | null>(null);
 const dueDate = ref<string | null>(null);
 const submitting = ref(false);
 const errorMsg = ref("");
+
+// アイコンアップロード
+const MAX_ICON_SIZE = 5 * 1024 * 1024; // Storage ルールの 5MB 制限に合わせる
+const iconFile = ref<File | null>(null);
+const iconPreviewUrl = ref("");
+const iconError = ref("");
+const cropperOpen = ref(false);
+const pendingImageFile = ref<File | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+function openIconPicker() {
+  fileInputRef.value?.click();
+}
+
+function handleIconSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    iconError.value = "画像ファイルを選択してください。";
+    return;
+  }
+  if (file.size > MAX_ICON_SIZE) {
+    iconError.value = "画像サイズは5MB以下にしてください。";
+    return;
+  }
+
+  iconError.value = "";
+  pendingImageFile.value = file;
+  cropperOpen.value = true;
+}
+
+function handleCropConfirm(file: File) {
+  iconFile.value = file;
+  if (iconPreviewUrl.value) URL.revokeObjectURL(iconPreviewUrl.value);
+  iconPreviewUrl.value = URL.createObjectURL(file);
+  cropperOpen.value = false;
+  pendingImageFile.value = null;
+}
+
+function handleCropClose() {
+  cropperOpen.value = false;
+  pendingImageFile.value = null;
+}
+
+function removeIcon() {
+  iconFile.value = null;
+  if (iconPreviewUrl.value) {
+    URL.revokeObjectURL(iconPreviewUrl.value);
+    iconPreviewUrl.value = "";
+  }
+}
+
+onBeforeUnmount(() => {
+  if (iconPreviewUrl.value) URL.revokeObjectURL(iconPreviewUrl.value);
+});
 
 const homeColors = ["#4f7c82", "#0b2e33", "#93b1b5", "#b8e3e9"];
 
@@ -83,6 +141,7 @@ async function handleSubmit() {
         allowGuestView: allowGuestView.value,
       },
       user.value.uid,
+      { iconFile: iconFile.value },
     );
 
     await router.push({
@@ -109,8 +168,6 @@ function prevStep() {
   if (!prev) return;
   currentStep.value = prev;
 }
-
-// icon upload feature removed
 </script>
 
 <template>
@@ -188,6 +245,58 @@ function prevStep() {
             </div>
 
             <div v-else-if="currentStep === 'appearance'" class="panel-section">
+              <div class="form-block">
+                <span>プロジェクトアイコン</span>
+                <p class="form-hint">
+                  サイドバーやプロジェクト一覧に表示されます（5MBまでの画像、任意）。
+                </p>
+                <div class="icon-uploader">
+                  <div class="icon-uploader__preview" aria-hidden="true">
+                    <img
+                      v-if="iconPreviewUrl"
+                      :src="iconPreviewUrl"
+                      alt=""
+                      class="icon-uploader__image"
+                    />
+                    <span
+                      v-else
+                      class="icon-uploader__fallback"
+                      :style="{ backgroundColor: color }"
+                    >
+                      {{ name.trim().charAt(0) || "P" }}
+                    </span>
+                  </div>
+                  <div class="icon-uploader__actions">
+                    <AppButton
+                      variant="outline"
+                      size="sm"
+                      @click="openIconPicker"
+                    >
+                      {{ iconPreviewUrl ? "画像を変更" : "画像を選択" }}
+                    </AppButton>
+                    <AppButton
+                      v-if="iconPreviewUrl"
+                      variant="ghost"
+                      size="sm"
+                      @click="removeIcon"
+                    >
+                      削除
+                    </AppButton>
+                  </div>
+                  <input
+                    ref="fileInputRef"
+                    type="file"
+                    accept="image/*"
+                    class="icon-uploader__input"
+                    aria-label="プロジェクトアイコンを選択"
+                    @change="handleIconSelect"
+                  />
+                </div>
+                <p v-if="iconError" class="form-error" role="alert">
+                  {{ iconError }}
+                </p>
+              </div>
+
               <div class="form-block">
                 <span>テーマカラー</span>
                 <p class="form-hint">
@@ -269,6 +378,13 @@ function prevStep() {
         </div>
       </section>
     </div>
+
+    <AvatarCropperModal
+      :open="cropperOpen"
+      :image-file="pendingImageFile"
+      @close="handleCropClose"
+      @confirm="handleCropConfirm"
+    />
   </div>
 </template>
 
@@ -479,6 +595,55 @@ function prevStep() {
   font-weight: var(--ui-font-normal, 400);
   color: var(--ui-brand-600, #4f7c82);
   font-size: var(--ui-text-sm, 0.875rem);
+}
+
+.form-error {
+  margin: 0;
+  font-weight: var(--ui-font-normal, 400);
+  color: var(--ui-danger, #d64545);
+  font-size: var(--ui-text-sm, 0.875rem);
+}
+
+.icon-uploader {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4, 1rem);
+}
+
+.icon-uploader__preview {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--ui-radius-lg, 1rem);
+  overflow: hidden;
+  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  flex-shrink: 0;
+}
+
+.icon-uploader__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.icon-uploader__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--ui-text-inverse, #ffffff);
+  font-size: var(--ui-text-xl, 1.25rem);
+  font-weight: var(--ui-font-bold, 700);
+}
+
+.icon-uploader__actions {
+  display: flex;
+  gap: var(--ui-space-2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+.icon-uploader__input {
+  display: none;
 }
 
 .project-textarea {
