@@ -257,7 +257,16 @@ export async function updateTask(
             ? before.dueDate
             : (before.dueDate ?? null);
         const toDue = updates.dueDate ?? after.dueDate ?? null;
-        if (JSON.stringify(fromDue) !== JSON.stringify(toDue)) {
+        // Date と Firestore Timestamp が混在するため、ミリ秒に正規化して比較する
+        const toMillis = (value: unknown): number | null => {
+          if (!value) return null;
+          if (value instanceof Date) return value.getTime();
+          if (typeof value === "object" && "seconds" in value) {
+            return (value as { seconds: number }).seconds * 1000;
+          }
+          return null;
+        };
+        if (toMillis(fromDue) !== toMillis(toDue)) {
           eventsQueue.push({
             type: "task.due_changed",
             payload: {

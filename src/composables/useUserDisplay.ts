@@ -2,11 +2,12 @@ import { db } from "@/lib/firebase";
 import type { ProjectMember } from "@/services/projectMembers";
 import { getLogger } from "@logtape/logtape";
 import { doc, getDoc } from "firebase/firestore";
-import type { Ref } from "vue";
+import { reactive, type Ref } from "vue";
 
 const logger = getLogger("app.composables.useUserDisplay");
 
-const nameCache = new Map<string, string>();
+// バックグラウンド取得の完了時に表示へ反映されるよう、リアクティブな Map にする
+const nameCache = reactive(new Map<string, string>());
 const fetching = new Set<string>();
 
 /**

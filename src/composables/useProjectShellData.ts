@@ -60,8 +60,10 @@ export function useProjectShellData(projectIdRef: Ref<string>) {
     loadProjectList();
   });
 
+  // マウント時点で認証が未確定だと一覧が空のままになるため、
+  // ユーザー確定・プロジェクト切替のどちらでも再取得する
   watch(
-    () => route.params.projectId,
+    () => [route.params.projectId, user.value?.uid],
     () => {
       loadProjectList();
     },
