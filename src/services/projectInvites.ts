@@ -10,6 +10,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   startAfter,
@@ -353,12 +354,24 @@ export async function redeemInvite(
     invitedBy: data.createdBy,
     projectName,
   });
-  await updateDoc(ref, {
-    status: maxUses && usedCount + 1 >= maxUses ? "accepted" : "pending",
-    usedCount: usedCount + 1,
-    acceptedAt: serverTimestamp(),
-    acceptedBy: userId,
-    acceptedEmail: email,
+  // 複数ユーザーが同時に redeem しても usedCount が正しく増えるよう、
+  // 読み直してから更新するトランザクションにする
+  await runTransaction(db, async (transaction) => {
+    const latestSnap = await transaction.get(ref);
+    if (!latestSnap.exists()) return;
+    const latest = latestSnap.data() as ProjectInviteDoc;
+    const latestUsedCount = latest.usedCount ?? 0;
+    const latestMaxUses = latest.maxUses ?? null;
+    transaction.update(ref, {
+      status:
+        latestMaxUses && latestUsedCount + 1 >= latestMaxUses
+          ? "accepted"
+          : "pending",
+      usedCount: latestUsedCount + 1,
+      acceptedAt: serverTimestamp(),
+      acceptedBy: userId,
+      acceptedEmail: email,
+    });
   });
   return data.projectId;
 }

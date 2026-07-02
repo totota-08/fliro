@@ -52,17 +52,28 @@ export async function getDashboardSettings(
   projectId: string,
 ): Promise<DashboardSettings> {
   if (!userId || !projectId) {
-    return { cards: DEFAULT_CARDS, insightCards: DEFAULT_INSIGHT_CARDS };
+    return {
+      cards: [...DEFAULT_CARDS],
+      insightCards: [...DEFAULT_INSIGHT_CARDS],
+    };
   }
 
   const docRef = doc(db, "profiles", userId, "dashboardSettings", projectId);
   const snapshot = await getDoc(docRef);
 
   if (!snapshot.exists()) {
-    return { cards: DEFAULT_CARDS, insightCards: DEFAULT_INSIGHT_CARDS };
+    return {
+      cards: [...DEFAULT_CARDS],
+      insightCards: [...DEFAULT_INSIGHT_CARDS],
+    };
   }
 
   const data = snapshot.data() as DashboardSettings;
+
+  // 旧スキーマ（cards 未保存）のドキュメントでもクラッシュしないようにする
+  if (!Array.isArray(data.cards)) {
+    data.cards = [...DEFAULT_CARDS];
+  }
 
   // Ensure all default cards exist (for backwards compatibility)
   const existingIds = new Set(data.cards.map((c) => c.id));
