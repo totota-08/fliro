@@ -114,6 +114,8 @@ async function fetchTasks() {
         name: projectName,
         role: data.role as string,
         lastAccessedAt,
+        color: (data.color as string) || undefined,
+        iconUrl: (data.iconUrl as string) || undefined,
       });
       const tasksSnap = await getDocs(
         query(collection(db, "projects", projectId, "tasks")),

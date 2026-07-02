@@ -16,6 +16,10 @@ export interface ProjectItem {
   name: string;
   role?: string;
   lastAccessedAt?: Date;
+  /** プロジェクトのテーマカラー */
+  color?: string;
+  /** プロジェクトアイコン画像URL */
+  iconUrl?: string;
 }
 
 export interface ProjectInvite {
@@ -101,6 +105,21 @@ function getRoleLabel(role?: string): string {
           class="project-item"
           :class="{ 'project-item--recent': isRecentAccess(project) }"
         >
+          <div class="project-item__avatar" aria-hidden="true">
+            <img
+              v-if="project.iconUrl"
+              :src="project.iconUrl"
+              alt=""
+              class="project-item__avatar-image"
+            />
+            <span
+              v-else
+              class="project-item__avatar-fallback"
+              :style="project.color ? { backgroundColor: project.color } : {}"
+            >
+              {{ project.name.charAt(0) }}
+            </span>
+          </div>
           <div class="project-item__info">
             <div class="project-item__header">
               <p class="project-item__name">{{ project.name }}</p>
@@ -212,6 +231,32 @@ function getRoleLabel(role?: string): string {
 
 .project-item--invite:hover {
   border-color: var(--ui-brand-400, #7ec3cc);
+}
+
+.project-item__avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ui-radius-md, 0.75rem);
+  overflow: hidden;
+}
+
+.project-item__avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-item__avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--ui-brand-600, #4f7c82);
+  color: var(--ui-text-inverse, #ffffff);
+  font-weight: var(--ui-font-bold, 700);
+  font-size: var(--ui-text-base, 1rem);
 }
 
 .project-item__info {

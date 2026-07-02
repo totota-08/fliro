@@ -343,16 +343,16 @@ export async function redeemInvite(
   }
 
   const projectSnap = await getDoc(doc(db, "projects", data.projectId));
-  const projectName = projectSnap.exists()
-    ? (projectSnap.data().name as string)
-    : undefined;
+  const projectData = projectSnap.exists() ? projectSnap.data() : undefined;
 
   await addProjectMember({
     projectId: data.projectId,
     userId,
     role: "member",
     invitedBy: data.createdBy,
-    projectName,
+    projectName: projectData?.name as string | undefined,
+    projectColor: projectData?.color as string | undefined,
+    projectIconUrl: projectData?.icon as string | undefined,
   });
   // 複数ユーザーが同時に redeem しても usedCount が正しく増えるよう、
   // 読み直してから更新するトランザクションにする

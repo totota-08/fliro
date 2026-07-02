@@ -356,10 +356,24 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
             :to="project.to"
             @click="project.to ? handleNavigate(project.to, $event) : undefined"
           >
+            <img
+              v-if="project.iconUrl"
+              :src="project.iconUrl"
+              alt=""
+              class="sidebar__project-icon"
+            />
             <span
+              v-else
               class="dot"
               :class="
-                project.accent ? `dot--${project.accent}` : 'dot--primary'
+                project.color
+                  ? undefined
+                  : project.accent
+                    ? `dot--${project.accent}`
+                    : 'dot--primary'
+              "
+              :style="
+                project.color ? { backgroundColor: project.color } : undefined
               "
             />
             {{ project.label }}

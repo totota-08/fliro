@@ -1,4 +1,4 @@
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { addProjectMember } from "@/services/projectMembers";
 import { ensureDefaultRoles } from "@/services/rolesService";
 import type {
@@ -6,6 +6,7 @@ import type {
   GuestAllowedPage,
   ProjectDoc,
 } from "@/types/project";
+import { getLogger } from "@logtape/logtape";
 import {
   addDoc,
   collection,
@@ -15,13 +16,27 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
+import {
+  getDownloadURL,
+  ref as storageRef,
+  uploadBytes,
+} from "firebase/storage";
+
+const logger = getLogger("app.firebase.projectService");
+
+export interface CreateProjectOptions {
+  /** プロジェクトアイコン画像（作成後に Storage へアップロードされる） */
+  iconFile?: File | null;
+}
 
 export async function createProject(
   payload: CreateProjectPayload,
   currentUserId: string,
+  options: CreateProjectOptions = {},
 ) {
   const projectBase: any = {
     name: payload.name.trim(),
@@ -47,6 +62,7 @@ export async function createProject(
   };
 
   if (payload.color) projectBase.color = payload.color;
+  if (payload.icon) projectBase.icon = payload.icon;
   if (payload.startDate) projectBase.startDate = new Date(payload.startDate);
   if (payload.dueDate) projectBase.dueDate = new Date(payload.dueDate);
 
@@ -61,12 +77,60 @@ export async function createProject(
     roles: ["admin"],
     invitedBy: currentUserId,
     projectName: projectBase.name,
+    projectColor: payload.color,
   });
 
   // デフォルトロールを作成
   await ensureDefaultRoles(projRef.id);
 
+  // アイコンはプロジェクトIDを含むStorageパスに置くため、作成後にアップロードする。
+  // 失敗してもプロジェクト作成自体は成立させる。
+  if (options.iconFile) {
+    try {
+      await setProjectIcon(projRef.id, currentUserId, options.iconFile);
+    } catch (error) {
+      logger.warn`Failed to upload project icon for ${projRef.id}: ${error}`;
+    }
+  }
+
   return projRef.id;
+}
+
+/**
+ * プロジェクトアイコン画像を Storage にアップロードし、ダウンロードURLを返す
+ */
+export async function uploadProjectIcon(
+  projectId: string,
+  file: File,
+): Promise<string> {
+  const fileRef = storageRef(
+    storage,
+    `projects/${projectId}/icon/${Date.now()}`,
+  );
+  await uploadBytes(fileRef, file, { contentType: file.type });
+  return getDownloadURL(fileRef);
+}
+
+/**
+ * アイコンをアップロードしてプロジェクトに反映する
+ * （projects/{id}.icon と、サイドバー表示用の userProjects エントリを更新）
+ */
+export async function setProjectIcon(
+  projectId: string,
+  userId: string,
+  file: File,
+): Promise<string> {
+  const url = await uploadProjectIcon(projectId, file);
+  await updateDoc(doc(db, "projects", projectId), {
+    icon: url,
+    updatedAt: serverTimestamp(),
+  });
+  await setDoc(
+    doc(db, "userProjects", userId, "projects", projectId),
+    { iconUrl: url },
+    { merge: true },
+  );
+  return url;
 }
 
 export async function fetchProject(projectId: string) {
@@ -140,5 +204,3 @@ export async function deleteProject(projectId: string) {
 
   await deleteDoc(doc(db, "projects", projectId));
 }
-
-// icon upload feature removed

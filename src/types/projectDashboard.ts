@@ -42,6 +42,10 @@ export type DashboardProjectItem = {
   key: string;
   label: string;
   accent?: "primary" | "secondary" | "accent";
+  /** プロジェクトのテーマカラー（設定時は accent より優先して表示） */
+  color?: string;
+  /** プロジェクトアイコン画像URL（設定時はドットの代わりに表示） */
+  iconUrl?: string;
   to?: RouteLocationRaw;
 };
 
