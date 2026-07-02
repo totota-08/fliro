@@ -375,7 +375,16 @@ service cloud.firestore {
                         && (resource.data.maxUses == null
                             || resource.data.usedCount < resource.data.maxUses)
                         && resource.data.status == 'pending'
-                        && request.resource.data.status == 'accepted'
+                        // 使用回数上限に達したら accepted、まだ使える場合は pending のまま
+                        // （アプリの redeemInvite と同じ判定。複数回使える招待に対応）
+                        && (
+                          (request.resource.data.status == 'accepted'
+                            && resource.data.maxUses != null
+                            && request.resource.data.usedCount >= resource.data.maxUses)
+                          || (request.resource.data.status == 'pending'
+                            && (resource.data.maxUses == null
+                                || request.resource.data.usedCount < resource.data.maxUses))
+                        )
                         && request.resource.data.acceptedBy == request.auth.uid
                         && request.resource.data.acceptedAt is timestamp
                         && request.resource.data.usedCount == resource.data.usedCount + 1
@@ -402,6 +411,11 @@ service cloud.firestore {
                         && request.resource.data.revokedBy.name is string
                       )
                     );
+
+      // プロジェクト削除時のクリーンアップ用（削除済みプロジェクトの招待が
+      // redeem され続けるのを防ぐ）。プロジェクト本体より先に削除すること。
+      allow delete: if isProjectOwner(resource.data.projectId)
+                    || canInviteMembers(resource.data.projectId);
     }
   }
 }

@@ -14,9 +14,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import {
   getDownloadURL,
@@ -170,6 +172,16 @@ export async function updateProjectMetadata(
 }
 
 export async function deleteProject(projectId: string) {
+  // 招待リンクを先に削除する（削除済みプロジェクトへの参加を防ぐ）。
+  // 削除権限はオーナー情報の参照に依存するため、プロジェクト本体より先に行う。
+  const invitesSnap = await getDocs(
+    query(
+      collection(db, "projectInvites"),
+      where("projectId", "==", projectId),
+    ),
+  );
+  await Promise.all(invitesSnap.docs.map((invite) => deleteDoc(invite.ref)));
+
   const membersSnap = await getDocs(
     collection(db, "projects", projectId, "members"),
   );

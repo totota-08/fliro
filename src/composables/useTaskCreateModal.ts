@@ -97,6 +97,9 @@ export function useTaskCreateData(projectIdRef: Ref<string>) {
 
   let stopCategories: (() => void) | null = null;
   let stopMembers: (() => void) | null = null;
+  // プロフィール取得の await 中に購読が切り替わった場合、
+  // 古いスナップショットの結果で members を上書きしないための世代カウンタ
+  let membersGeneration = 0;
 
   function startWatchers() {
     const projectId = projectIdRef.value;
@@ -111,6 +114,7 @@ export function useTaskCreateData(projectIdRef: Ref<string>) {
     stopMembers = onSnapshot(
       collection(db, "projects", projectId, "members"),
       async (snapshot) => {
+        const generation = ++membersGeneration;
         const promises = snapshot.docs.map(async (docSnap) => {
           const data = docSnap.data();
           const memberId = data.userId || docSnap.id;
@@ -135,7 +139,9 @@ export function useTaskCreateData(projectIdRef: Ref<string>) {
           };
         });
 
-        members.value = await Promise.all(promises);
+        const resolved = await Promise.all(promises);
+        if (generation !== membersGeneration) return;
+        members.value = resolved;
       },
     );
   }
@@ -145,6 +151,8 @@ export function useTaskCreateData(projectIdRef: Ref<string>) {
     stopMembers?.();
     stopCategories = null;
     stopMembers = null;
+    // 解決待ちの古いスナップショット結果を無効化
+    membersGeneration++;
   }
 
   onMounted(() => {

@@ -2,7 +2,7 @@ import { buildPermissionsFromRoles } from "@/constants/roles";
 import { database, db } from "@/lib/firebase";
 import { addProjectEvent } from "@/services/projectActivityLogService";
 import { getLogger } from "@logtape/logtape";
-import { ref, remove, set } from "firebase/database";
+import { ref, remove, set, update } from "firebase/database";
 import {
   collection,
   deleteDoc,
@@ -272,10 +272,8 @@ export async function updateProjectMemberRole(
   }
 
   const rtdbRef = ref(database, `projects/${projectId}/members/${userId}`);
-  await set(rtdbRef, {
-    role,
-    joinedAt: Date.now(),
-  }).catch((error) => {
+  // set だと joinedAt が毎回現在時刻で上書きされるため、role のみ部分更新する
+  await update(rtdbRef, { role }).catch((error) => {
     logger.warn`Failed to update realtime member for ${userId}: ${error}`;
   });
 }
