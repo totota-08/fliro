@@ -407,7 +407,7 @@ function mapFirebaseError(error: unknown): string {
 
 .form-error {
   background: var(--ui-danger-bg, rgba(214, 69, 69, 0.1));
-  border: 1px solid rgba(214, 69, 69, 0.3);
+  border: 1px solid var(--ui-danger, #d64545);
   color: var(--ui-danger, #d64545);
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   border-radius: var(--ui-radius-md, 0.75rem);

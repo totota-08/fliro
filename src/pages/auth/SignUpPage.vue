@@ -551,9 +551,9 @@ function mapFirebaseError(error: unknown): string {
   min-height: calc(100vh - 4rem);
   background: linear-gradient(
     135deg,
-    rgba(184, 227, 233, 0.35),
+    var(--ui-brand-100, rgba(184, 227, 233, 0.35)),
     var(--ui-surface, #fff),
-    rgba(147, 177, 181, 0.35)
+    var(--ui-border-strong, rgba(147, 177, 181, 0.35))
   );
   display: flex;
   align-items: center;
@@ -721,7 +721,7 @@ function mapFirebaseError(error: unknown): string {
 
 .form-error {
   background: var(--ui-danger-bg, rgba(214, 69, 69, 0.08));
-  border: 1px solid rgba(214, 69, 69, 0.35);
+  border: 1px solid var(--ui-danger, #d64545);
   color: var(--ui-danger, #d64545);
   padding: var(--ui-space-3, 0.75rem) var(--ui-space-4, 1rem);
   border-radius: var(--ui-radius-md, 0.75rem);

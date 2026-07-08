@@ -1007,7 +1007,9 @@ onBeforeUnmount(() => {
   top: calc(100% + var(--ui-space-2, 0.5rem));
   right: 0;
   z-index: var(--ui-z-dropdown, 100);
-  min-width: 280px;
+  /* 狭幅端末で画面外に溢れないよう、min-width と max-width の両方を制御する */
+  min-width: min(280px, calc(100vw - var(--ui-space-8, 2rem)));
+  max-width: calc(100vw - var(--ui-space-8, 2rem));
   padding: var(--ui-space-4, 1rem);
   background: var(--ui-surface, #ffffff);
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
