@@ -62,39 +62,3 @@ export function buildPermissionsFromRoles(
       !isAdmin && !isManager && !isPM && !isMember && isViewerOrObserver,
   };
 }
-
-/**
- * ロールのラベル定義
- */
-export const ROLE_LABELS: Record<RoleKey, string> = {
-  admin: "管理者",
-  manager: "マネージャー",
-  pm: "PM",
-  member: "メンバー",
-  viewer: "閲覧者",
-  observer: "オブザーバー",
-};
-
-/**
- * ロールの説明
- */
-export const ROLE_DESCRIPTIONS: Record<RoleKey, string> = {
-  admin: "全ての操作が可能",
-  manager: "タスク管理・招待が可能、設定変更は不可",
-  pm: "タスク管理のみ可能",
-  member: "タスクの操作が可能",
-  viewer: "閲覧のみ",
-  observer: "閲覧のみ（外部オブザーバー）",
-};
-
-/**
- * 利用可能なロール一覧（UI表示用）
- */
-export const AVAILABLE_ROLES: RoleKey[] = [
-  "admin",
-  "manager",
-  "pm",
-  "member",
-  "viewer",
-  "observer",
-];

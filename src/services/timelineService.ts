@@ -1,12 +1,5 @@
 import { db } from "@/lib/firebase";
-import {
-  addDoc,
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
 export type TimelinePost = {
   id: string;
@@ -17,14 +10,6 @@ export type TimelinePost = {
   taskId?: string | null;
   dueDate?: string | null;
   createdAt?: { seconds: number; nanoseconds: number };
-};
-
-type CreateTimelinePayload = {
-  authorId: string;
-  authorName: string;
-  body: string;
-  taskId?: string | null;
-  dueDate?: string | null;
 };
 
 export function listenTimeline(
@@ -41,16 +26,5 @@ export function listenTimeline(
       ...(docSnap.data() as Omit<TimelinePost, "id">),
     }));
     callback(posts);
-  });
-}
-
-export async function addTimelinePost(
-  projectId: string,
-  payload: CreateTimelinePayload,
-) {
-  await addDoc(collection(db, "projects", projectId, "timeline"), {
-    ...payload,
-    createdAt: serverTimestamp(),
-    isBot: false,
   });
 }

@@ -52,20 +52,6 @@ export const DEFAULT_GUEST_ALLOWED_PAGES: GuestAllowedPage[] = [
 ];
 
 /**
- * ページキーからルート名へのマッピング
- */
-export const GUEST_PAGE_TO_ROUTE: Record<
-  GuestAllowedPage,
-  (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES][]
-> = {
-  dashboard: [ROUTE_NAMES.projectDashboard],
-  tasks: [ROUTE_NAMES.myTasks, ROUTE_NAMES.projectTaskDetail],
-  threads: [ROUTE_NAMES.projectThreads],
-  activity: [ROUTE_NAMES.projectActivity],
-  members: [ROUTE_NAMES.projectMembers],
-};
-
-/**
  * ルート名からページキーへのマッピング（逆引き）
  */
 export const ROUTE_TO_GUEST_PAGE: Partial<

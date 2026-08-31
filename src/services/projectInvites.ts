@@ -3,7 +3,6 @@ import { toMillis } from "@/utils/datetime";
 import { addProjectMember } from "@/services/projectMembers";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -251,11 +250,6 @@ export async function revokeProjectInvite(
       name: actor?.name || actor?.id || "System",
     },
   });
-}
-
-export async function deleteProjectInvite(inviteId: string) {
-  const ref = doc(db, "projectInvites", inviteId);
-  await deleteDoc(ref);
 }
 
 /**

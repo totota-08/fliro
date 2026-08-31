@@ -232,37 +232,6 @@ export async function addMessageReaction(
 }
 
 /**
- * 指定したユーザーの指定した絵文字リアクションを削除する
- */
-export async function removeMessageReaction(
-  projectId: string,
-  messageId: string,
-  emoji: string,
-  userId: string,
-) {
-  if (!emoji || !userId) return;
-  const reactionsRef = dbRef(
-    database,
-    `projects/${projectId}/realtimeChat/${messageId}/reactions`,
-  );
-  const snapshot = await getValue(reactionsRef);
-  if (!snapshot.exists()) return;
-
-  // 該当するリアクションを探して削除
-  snapshot.forEach((child) => {
-    const data = child.val();
-    if (data?.emoji === emoji && data?.userId === userId) {
-      remove(
-        dbRef(
-          database,
-          `projects/${projectId}/realtimeChat/${messageId}/reactions/${child.key}`,
-        ),
-      );
-    }
-  });
-}
-
-/**
  * リアクションをトグル（未リアクションなら追加、リアクション済みなら削除）
  */
 export async function toggleMessageReaction(

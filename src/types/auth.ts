@@ -62,5 +62,3 @@ export const PROVIDER_IDS = {
   GITHUB: "github.com",
   PASSWORD: "password",
 } as const;
-
-export type ProviderIdType = (typeof PROVIDER_IDS)[keyof typeof PROVIDER_IDS];

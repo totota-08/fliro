@@ -80,17 +80,6 @@ export function isTaskOverdue(task: TaskDoc): boolean {
 }
 
 /**
- * 期限が近いかどうかを判定（3日以内）
- */
-export function isTaskDueSoon(task: TaskDoc): boolean {
-  if (!task.dueDate?.seconds || task.status === "done") return false;
-  const dueTime = task.dueDate.seconds * 1000;
-  const now = Date.now();
-  const threeDays = 3 * 24 * 60 * 60 * 1000;
-  return dueTime > now && dueTime - now <= threeDays;
-}
-
-/**
  * 期限までの日数を計算
  */
 export function getDaysUntilDue(dueDate?: {

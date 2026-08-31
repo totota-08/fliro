@@ -24,11 +24,9 @@ import {
   getMultiFactorResolver,
   linkWithPopup,
   multiFactor,
-  PhoneAuthProvider,
   PhoneMultiFactorGenerator,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
-  RecaptchaVerifier,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -390,14 +388,6 @@ async function persistProfile(
   return profile;
 }
 
-/**
- * 招待コード使用済みフラグをtrueに更新する
- */
-export async function markInviteCodeAsUsed() {
-  const user = await requireCurrentUser();
-  return persistProfile(user, { hasUsedInviteCode: true });
-}
-
 async function requireCurrentUser() {
   const user = await getCurrentUser();
 
@@ -494,43 +484,6 @@ export async function startMFAEnrollment(): Promise<MultiFactorSession> {
     logger.error`[MFA] mfaUser.getSession() failed: ${error}`;
     throw error;
   }
-}
-
-/**
- * 電話番号を使用したMFA登録を開始
- */
-export async function enrollPhoneMFA(
-  phoneNumber: string,
-  recaptchaVerifier: RecaptchaVerifier,
-) {
-  const user = await requireCurrentUser();
-  const mfaUser = multiFactor(user);
-  const session = await mfaUser.getSession();
-
-  const phoneAuthProvider = new PhoneAuthProvider(auth);
-  const verificationId = await phoneAuthProvider.verifyPhoneNumber(
-    { phoneNumber, session },
-    recaptchaVerifier,
-  );
-
-  return verificationId;
-}
-
-/**
- * 電話番号MFAの登録を完了
- */
-export async function completePhoneMFAEnrollment(
-  verificationId: string,
-  verificationCode: string,
-  displayName: string,
-) {
-  const user = await requireCurrentUser();
-  const mfaUser = multiFactor(user);
-
-  const cred = PhoneAuthProvider.credential(verificationId, verificationCode);
-  const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
-
-  await mfaUser.enroll(multiFactorAssertion, displayName);
 }
 
 /**
@@ -672,55 +625,6 @@ export function isProviderLinked(
 /**
  * 重要操作前のMFA検証関連の関数
  */
-
-/**
- * TOTPコードを検証する（重要操作前の確認用）
- * MFAが有効なユーザーに対して、入力されたTOTPコードが正しいか検証する
- *
- * @param verificationCode - 6桁のTOTPコード
- * @returns 検証成功時はtrue
- * @throws 検証失敗時はエラーをスロー
- */
-export async function verifyTOTPCode(
-  verificationCode: string,
-): Promise<boolean> {
-  const user = await requireCurrentUser();
-  const mfaUser = multiFactor(user);
-
-  // MFAが有効でない場合は検証不要
-  if (mfaUser.enrolledFactors.length === 0) {
-    return true;
-  }
-
-  // TOTPファクターを探す
-  const totpFactor = mfaUser.enrolledFactors.find(
-    (factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID,
-  );
-
-  if (!totpFactor) {
-    throw new Error("TOTP認証が設定されていません。");
-  }
-
-  // TOTPコードの検証
-  // Firebase Auth では直接検証APIがないため、assertionForSignInを使用して検証
-  try {
-    const assertion = TotpMultiFactorGenerator.assertionForSignIn(
-      totpFactor.uid,
-      verificationCode,
-    );
-
-    // アサーションが作成できれば、コードの形式は正しい
-    // 実際の検証は再認証フローで行う必要がある
-    if (!assertion) {
-      throw new Error("認証コードが正しくありません。");
-    }
-
-    return true;
-  } catch (error) {
-    logger.error`TOTP verification failed: ${error}`;
-    throw new Error("認証コードが正しくありません。");
-  }
-}
 
 /**
  * パスワードを使用して再認証し、MFAが必要な場合はリゾルバーを返す
