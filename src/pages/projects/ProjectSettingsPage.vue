@@ -2736,58 +2736,6 @@ watch(projectId, async (newId, oldId) => {
 }
 
 /* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  cursor: pointer;
-  transition: var(--ui-transition-colors, all 0.15s ease);
-  border: none;
-}
-
-.btn--primary {
-  background: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-text-on-primary, white);
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: var(--ui-brand-700, #3a5c61);
-}
-
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.btn--ghost:hover {
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.btn--danger {
-  background: var(--ui-danger, #d64545);
-  color: var(--ui-text-on-danger, white);
-}
-
-.btn--danger:hover:not(:disabled) {
-  background: var(--ui-danger-hover, #c03a3a);
-}
-
-.btn--danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* Role Section Additional Styles */
 .role-section__intro-box {
   margin-bottom: var(--ui-space-4, 1rem);

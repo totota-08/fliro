@@ -1374,18 +1374,6 @@ const goToRoleSettingsHandler = () => {
   color: var(--ui-text-muted, #64748b);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .invite-panel {
   border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
   border-radius: var(--ui-radius-xl, 1.25rem);

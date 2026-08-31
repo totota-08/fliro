@@ -1356,73 +1356,6 @@ onBeforeUnmount(() => {
 }
 
 /* ボタン */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
-}
-
-.btn--sm {
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-xs, 0.75rem);
-}
-
-.btn--primary {
-  background: var(--ui-brand-600, #4f7c82);
-  color: white;
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: var(--ui-brand-700, #3a5c61);
-}
-
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.btn--ghost:hover {
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.btn--danger {
-  background: var(--color-danger, #ef4444);
-  color: white;
-}
-
-.btn--danger:hover:not(:disabled) {
-  background: var(--color-danger-hover, #dc2626);
-}
-
-.btn--danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--danger-outline {
-  background: transparent;
-  border: 1px solid var(--color-danger, #ef4444);
-  color: var(--color-danger, #ef4444);
-}
-
-.btn--danger-outline:hover {
-  background: var(--color-danger-bg, #fef2f2);
-}
-
 /* モーダル */
 .modal-overlay {
   position: fixed;
@@ -1737,18 +1670,6 @@ onBeforeUnmount(() => {
 
 .error-alert p {
   margin: 0;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* レスポンシブ */
