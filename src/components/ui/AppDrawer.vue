@@ -5,21 +5,17 @@
  * 右から出る + オーバーレイで閉じる
  * Nowファースト思想の中核コンポーネント
  */
-import { onBeforeUnmount, onMounted, watch } from "vue";
+import { useModalOverlay } from "@/composables/useModalOverlay";
 
 const props = withDefaults(
   defineProps<{
     open: boolean;
     title?: string;
     width?: string;
-    closeOnOverlay?: boolean;
-    closeOnEscape?: boolean;
   }>(),
   {
     title: undefined,
     width: "420px",
-    closeOnOverlay: true,
-    closeOnEscape: true,
   },
 );
 
@@ -27,52 +23,16 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape" && props.closeOnEscape) {
-    emit("close");
-  }
-}
-
-function handleOverlayClick() {
-  if (props.closeOnOverlay) {
-    emit("close");
-  }
-}
-
-onMounted(() => {
-  if (props.open) {
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeydown);
-  }
-});
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = "";
-  window.removeEventListener("keydown", handleKeydown);
-});
-
-watch(
+useModalOverlay(
   () => props.open,
-  (isOpen) => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeydown);
-    } else {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", handleKeydown);
-    }
-  },
+  () => emit("close"),
 );
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="app-drawer">
-      <div
-        v-if="open"
-        class="app-drawer__overlay"
-        @click.self="handleOverlayClick"
-      >
+      <div v-if="open" class="app-drawer__overlay" @click.self="emit('close')">
         <aside
           class="app-drawer__panel"
           :style="{ '--drawer-width': width }"

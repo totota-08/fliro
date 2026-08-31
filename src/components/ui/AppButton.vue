@@ -21,14 +21,12 @@ const props = withDefaults(
     loading?: boolean;
     to?: RouteLocationRaw;
     type?: "button" | "submit" | "reset";
-    block?: boolean;
   }>(),
   {
     variant: "primary",
     size: "md",
     loading: false,
     type: "button",
-    block: false,
   },
 );
 
@@ -39,7 +37,7 @@ const classes = computed(() => [
   "app-button",
   `app-button--${props.variant}`,
   `app-button--${props.size}`,
-  { "is-loading": props.loading, "is-block": props.block },
+  { "is-loading": props.loading },
 ]);
 </script>
 
@@ -209,12 +207,6 @@ const classes = computed(() => [
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
-}
-
-/* Block */
-.app-button.is-block {
-  display: flex;
-  width: 100%;
 }
 
 /* Spinner */
