@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
@@ -14,9 +13,10 @@ const routePath = computed(() => route.path || "/");
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get("https://api.adviceslip.com/advice", {
+    const res = await fetch("https://api.adviceslip.com/advice", {
       headers: { Accept: "application/json" },
     });
+    const data = await res.json();
     advice.value = data.slip?.advice ?? advice.value;
   } catch (err) {
     logger.error`アドバイス取得失敗: ${err}`;
