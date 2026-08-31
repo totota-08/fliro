@@ -217,17 +217,87 @@ export interface ProjectAccessResult {
 }
 
 /**
- * 権限を一度だけ取得する（非リアクティブ）
+ * ルートガード用の短命キャッシュ
+ *
+ * プロジェクト内のページを移動するたびに同じ project / member ドキュメントを
+ * 読み直すと、遷移のたびに Firestore への往復が発生して体感が重くなる。
+ * 実際のアクセス制御は Firestore Rules が最終防衛線なので、
+ * ここでは短い TTL のキャッシュで往復を減らす。
+ */
+const PROJECT_ACCESS_CACHE_TTL = 10 * 1000; // 10秒
+
+interface ProjectAccessCacheEntry {
+  promise: Promise<ProjectAccessResult>;
+  fetchedAt: number;
+}
+
+const projectAccessCache = new Map<string, ProjectAccessCacheEntry>();
+
+/** プロジェクト権限のキャッシュを破棄する（権限変更後などに使用） */
+export function clearProjectAccessCache(projectId?: string) {
+  if (!projectId) {
+    projectAccessCache.clear();
+    return;
+  }
+
+  for (const key of projectAccessCache.keys()) {
+    if (key.startsWith(`${projectId}:`)) {
+      projectAccessCache.delete(key);
+    }
+  }
+}
+
+/**
+ * 権限を一度だけ取得する（非リアクティブ / 短命キャッシュ付き）
  * オーナーはメンバードキュメントが存在しなくてもアクセス可能
  * userId が null の場合は未認証ユーザーとして処理
  */
-export async function fetchProjectAccess(
+export function fetchProjectAccess(
+  projectId: string,
+  userId: string | null,
+): Promise<ProjectAccessResult> {
+  const key = `${projectId}:${userId ?? "@guest"}`;
+  const cached = projectAccessCache.get(key);
+
+  if (cached && Date.now() - cached.fetchedAt < PROJECT_ACCESS_CACHE_TTL) {
+    return cached.promise;
+  }
+
+  const promise = fetchProjectAccessUncached(projectId, userId);
+  projectAccessCache.set(key, { promise, fetchedAt: Date.now() });
+
+  // エラー結果（ネットワーク断など）はキャッシュに残さない
+  void promise
+    .then((result) => {
+      if (result.error === "network") {
+        projectAccessCache.delete(key);
+      }
+    })
+    .catch(() => {
+      projectAccessCache.delete(key);
+    });
+
+  return promise;
+}
+
+async function fetchProjectAccessUncached(
   projectId: string,
   userId: string | null,
 ): Promise<ProjectAccessResult> {
   try {
-    // 未認証ユーザーの場合はプロジェクト情報のみ取得
-    const projectSnap = await getDoc(doc(db, "projects", projectId));
+    // プロジェクトとメンバーの取得は独立しているので並列で行う。
+    // メンバー取得のエラーはここでは潰さず、プロジェクトの存在確認を
+    // 済ませてから改めて投げ直す（not_found と network を取り違えないため）
+    const [projectSnap, memberResult] = await Promise.all([
+      getDoc(doc(db, "projects", projectId)),
+      userId
+        ? getDoc(doc(db, "projects", projectId, "members", userId)).then(
+            (snap) => ({ snap, error: null as unknown }),
+            (error: unknown) => ({ snap: null, error }),
+          )
+        : Promise.resolve({ snap: null, error: null as unknown }),
+    ]);
+
     const project = projectSnap.exists() ? projectSnap.data() : null;
 
     // プロジェクトが存在しない場合
@@ -281,11 +351,13 @@ export async function fetchProjectAccess(
       };
     }
 
-    // 認証済みユーザーの場合、メンバー情報も取得
-    const memberSnap = await getDoc(
-      doc(db, "projects", projectId, "members", userId),
-    );
-    const member = memberSnap.exists() ? memberSnap.data() : null;
+    // 認証済みユーザーの場合、メンバー情報も参照する
+    if (memberResult.error) {
+      throw memberResult.error;
+    }
+    const member = memberResult.snap?.exists()
+      ? memberResult.snap.data()
+      : null;
 
     // オーナー判定を優先（メンバードキュメントがなくてもオーナーならアクセス可能）
     const isOwnerByProject = project.ownerUserId === userId;

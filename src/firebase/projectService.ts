@@ -1,4 +1,5 @@
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { storage } from "@/lib/firebaseStorage";
 import { addProjectMember } from "@/services/projectMembers";
 import { ensureDefaultRoles } from "@/services/rolesService";
 import type {
