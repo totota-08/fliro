@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+import { useSidebarState } from "@/composables/useSidebarState";
+import { ref, computed } from "vue";
 import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
 import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
 import { appName } from "@/constants/appMeta";
@@ -22,7 +23,7 @@ interface DemoThread {
   unreadCount?: number;
 }
 
-const isSidebarOpen = ref(true);
+const { isSidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
 
 const threads: DemoThread[] = [
   { id: "general", name: "全体", type: "general" },
@@ -168,20 +169,6 @@ function formatDate(date: Date) {
   if (date.toDateString() === yesterday.toDateString()) return "昨日";
   return date.toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
 }
-
-const closeSidebar = () => {
-  isSidebarOpen.value = false;
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
-
-onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
-});
 </script>
 
 <template>
