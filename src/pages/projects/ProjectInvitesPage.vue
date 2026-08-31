@@ -5,6 +5,7 @@ import PageSkeleton from "@/components/loading/PageSkeleton.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
+import { useActionFeedback } from "@/composables/useActionFeedback";
 import { usePageTitle } from "@/composables/usePageTitle";
 import { buildPermissionsFromRoles } from "@/constants/roles";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
@@ -13,12 +14,15 @@ import {
   buildInviteStatus,
   buildInviteUrl,
   fetchProjectInvitesPage,
+  inviteStatusClass as statusClass,
+  inviteStatusLabel as statusLabel,
   listenProjectInvites,
   revokeProjectInvite,
   type ProjectInvite,
   type ProjectInviteCursor,
   type ProjectInviteStatus,
 } from "@/services/projectInvites";
+import { formatDateJa as formatDate, toMillis } from "@/utils/datetime";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
 import { getLogger } from "@logtape/logtape";
@@ -57,8 +61,8 @@ const loading = ref(true);
 const loadingMore = ref(false);
 const hasMore = ref(true);
 const isCreateOpen = ref(false);
-const actionMessage = ref("");
-const actionError = ref("");
+const { actionMessage, actionError, setActionMessage, setActionError } =
+  useActionFeedback();
 const revokeTarget = ref<string | null>(null);
 const isInitialLoading = ref(true);
 
@@ -69,7 +73,6 @@ const showOnboardingHint = ref(!localStorage.getItem(ONBOARDING_KEY));
 let stopProject: (() => void) | null = null;
 let stopMembers: (() => void) | null = null;
 let stopInvites: (() => void) | null = null;
-let actionTimer: ReturnType<typeof setTimeout> | null = null;
 
 const memberNameMap = computed(() => {
   const map = new Map<string, string>();
@@ -109,7 +112,7 @@ const invites = computed(() => [...liveInvites.value, ...olderInvites.value]);
 const sortedInvites = computed(() => {
   const list = [...invites.value];
   list.sort(
-    (a, b) => resolveTimestamp(b.createdAt) - resolveTimestamp(a.createdAt),
+    (a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0),
   );
   return list;
 });
@@ -140,21 +143,6 @@ const statusOptions: { label: string; value: InviteFilter }[] = [
   { label: "無効化", value: "revoked" },
 ];
 
-function resolveTimestamp(value: any) {
-  if (!value) return 0;
-  if (typeof value === "number") return value;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value.toMillis === "function") return value.toMillis();
-  if (typeof value.seconds === "number") return value.seconds * 1000;
-  return 0;
-}
-
-function formatDate(value: any) {
-  const ts = resolveTimestamp(value);
-  if (!ts) return "—";
-  return new Date(ts).toLocaleDateString("ja-JP");
-}
-
 function formatExpiry(invite: ProjectInvite) {
   if (!invite.expiresAt) return "無期限";
   return formatDate(invite.expiresAt);
@@ -178,39 +166,6 @@ function getCreatorName(invite: ProjectInvite) {
   }
   // フォールバック表示
   return "不明なユーザー";
-}
-
-function statusLabel(status: ProjectInviteStatus) {
-  if (status === "active") return "有効";
-  if (status === "expired") return "期限切れ";
-  return "無効化";
-}
-
-function statusClass(status: ProjectInviteStatus) {
-  if (status === "active") return "status-active";
-  if (status === "expired") return "status-expired";
-  return "status-revoked";
-}
-
-function setActionMessage(message: string) {
-  actionMessage.value = message;
-  actionError.value = "";
-  if (actionTimer) {
-    clearTimeout(actionTimer);
-  }
-  actionTimer = setTimeout(() => {
-    actionMessage.value = "";
-  }, 2500);
-}
-
-function setActionError(message: string) {
-  actionError.value = message;
-  if (actionTimer) {
-    clearTimeout(actionTimer);
-  }
-  actionTimer = setTimeout(() => {
-    actionError.value = "";
-  }, 3000);
 }
 
 async function copyInvite(invite: ProjectInvite) {
@@ -422,9 +377,6 @@ onBeforeUnmount(() => {
   stopProject?.();
   stopMembers?.();
   stopInvites?.();
-  if (actionTimer) {
-    clearTimeout(actionTimer);
-  }
 });
 </script>
 

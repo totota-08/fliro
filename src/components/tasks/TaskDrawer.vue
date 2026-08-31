@@ -6,6 +6,7 @@
  * 3タブ構成: 概要 / スレッド / ログ
  * 軽編集可能（ステータス/担当/期限/進捗）
  */
+import { formatTimeShort as formatMessageTime } from "@/utils/datetime";
 import { computed, ref, watch, onBeforeUnmount, toRef } from "vue";
 import AppDrawer from "@/components/ui/AppDrawer.vue";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -380,13 +381,6 @@ async function handleDeleteMessage(messageId: string) {
   } catch (error) {
     logger.error`Failed to delete message: ${error}`;
   }
-}
-
-// 時間フォーマット（ChatMessage用）
-function formatMessageTime(createdAt: ChatMessage["createdAt"]): string {
-  if (!createdAt) return "";
-  const date = new Date(createdAt);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatEventType(event: ProjectEvent): string {

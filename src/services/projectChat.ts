@@ -1,3 +1,4 @@
+import { toMillis } from "@/utils/datetime";
 import { database, db } from "@/lib/firebase";
 import { getLogger } from "@logtape/logtape";
 import {
@@ -45,19 +46,6 @@ export interface ChatMessage {
   isBot?: boolean;
   isTask?: boolean;
   privateFor?: string | null;
-}
-
-function resolveTimestamp(value: any): number | undefined {
-  if (typeof value === "number") return value;
-  if (
-    value &&
-    typeof value === "object" &&
-    "seconds" in value &&
-    typeof value.seconds === "number"
-  ) {
-    return value.seconds * 1000;
-  }
-  return undefined;
 }
 
 function summarizeReactions(reactions: any): {
@@ -158,7 +146,7 @@ export function listenProjectChat(
           channelId:
             typeof data?.channelId === "string" ? data.channelId : "general",
           linkedTaskId: data?.linkedTaskId,
-          createdAt: resolveTimestamp(data?.createdAt),
+          createdAt: toMillis(data?.createdAt) ?? undefined,
           reactionSummary: reactions.summary,
           reactionDetails: reactions.details,
           replyToId: data?.replyToId,

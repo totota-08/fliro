@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toMillis } from "@/utils/datetime";
 import AppButton from "@/components/ui/AppButton.vue";
 import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthCredentialFields from "@/components/ui/AuthCredentialFields.vue";
@@ -199,15 +200,6 @@ function formatDate(date: Date) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
-}
-
-function toMillis(value: any): number | null {
-  if (!value) return null;
-  if (typeof value === "number") return value;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value.seconds === "number") return value.seconds * 1000;
-  if (typeof value.toMillis === "function") return value.toMillis();
-  return null;
 }
 
 onMounted(async () => {

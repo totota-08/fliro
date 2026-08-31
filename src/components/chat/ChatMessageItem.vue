@@ -5,6 +5,7 @@
  * ホバー時にアクションバーを表示
  * リアクション、返信、編集、コピー、削除に対応
  */
+import { formatTimeShort as formatTime } from "@/utils/datetime";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import ChatMessageActions from "./ChatMessageActions.vue";
@@ -100,13 +101,6 @@ const canEdit = computed(() => isOwnMessage.value);
 
 // 削除可能か（自分のメッセージまたはOwner/Admin）
 const canDelete = computed(() => isOwnMessage.value || props.isAdmin);
-
-// タイムスタンプのフォーマット
-function formatTime(createdAt?: number): string {
-  if (!createdAt) return "";
-  const date = new Date(createdAt);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 // メッセージテキストのフォーマット（HTML変換）
 function formatMessage(text: string): string {
