@@ -3,7 +3,7 @@
  * SettingsToggleRow.vue
  * トグル行（ラベル/説明/スイッチ）を統一
  */
-import { computed } from "vue";
+import { useId } from "vue";
 
 interface Props {
   label: string;
@@ -23,9 +23,7 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
 }>();
 
-const inputId = computed(
-  () => `toggle-${Math.random().toString(36).slice(2, 9)}`,
-);
+const inputId = `toggle-${useId()}`;
 
 function toggle() {
   if (!props.disabled) {

@@ -11,6 +11,9 @@ import UserAvatar from "@/components/common/UserAvatar.vue";
 import ChatMessageActions from "./ChatMessageActions.vue";
 import ChatEmojiPicker from "./ChatEmojiPicker.vue";
 import type { ChatMessage, ReactionDetail } from "@/services/projectChat";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.components.chat.ChatMessageItem");
 
 const props = defineProps<{
   message: ChatMessage;
@@ -165,15 +168,8 @@ async function handleCopy() {
   try {
     await navigator.clipboard.writeText(props.message.text);
     emit("copy", props.message.text);
-  } catch {
-    // フォールバック
-    const textarea = document.createElement("textarea");
-    textarea.value = props.message.text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textarea);
-    emit("copy", props.message.text);
+  } catch (error) {
+    logger.error`メッセージのコピーに失敗しました: ${error}`;
   }
 }
 

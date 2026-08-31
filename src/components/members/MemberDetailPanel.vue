@@ -298,31 +298,11 @@ function setCopyMessage(message: string) {
   }, 2000);
 }
 
-async function fallbackCopy(text: string) {
-  if (typeof document === "undefined") return false;
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "true");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const succeeded = document.execCommand("copy");
-  document.body.removeChild(textarea);
-  return succeeded;
-}
-
 async function handleCopy() {
   if (!props.member) return;
-  const text = props.member.userId;
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      setCopyMessage("コピーしました。");
-      return;
-    }
-    const succeeded = await fallbackCopy(text);
-    setCopyMessage(succeeded ? "コピーしました。" : "コピーに失敗しました。");
+    await navigator.clipboard.writeText(props.member.userId);
+    setCopyMessage("コピーしました。");
   } catch {
     setCopyMessage("コピーに失敗しました。");
   }
