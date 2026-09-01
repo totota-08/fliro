@@ -7,6 +7,7 @@ import { initAuthListener } from "@/store/auth";
 import "@/styles/motion.css";
 import "@/styles/ui-tokens.css";
 import "@/styles/buttons.css";
+import "@/styles/modal.css";
 import { createApp } from "vue";
 import App from "./App.vue";
 import "./assets/reset.css";
