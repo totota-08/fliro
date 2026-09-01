@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isTaskOverdue } from "@/utils/taskUi";
 import DashboardInsights from "@/components/projectDashboard/DashboardInsights.vue";
 import DashboardSummaryCards, {
   type SummaryCard,
@@ -232,12 +233,6 @@ const summaryCards = computed<SummaryCard[]>(() => {
 
   return cards;
 });
-
-function isTaskOverdue(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return false;
-  const due = task.dueDate.seconds * 1000;
-  return due < Date.now() && task.status !== "done";
-}
 
 // Load dashboard card configuration
 async function loadCardConfig() {
