@@ -594,6 +594,28 @@ router.beforeEach(async (to) => {
         };
       }
 
+      // 公開プロジェクトを閲覧する非メンバー（認証済みゲスト）には、
+      // 未認証ゲストと同じページ許可リストを適用する
+      if (access.isGuest) {
+        const guestPageKey = ROUTE_TO_GUEST_PAGE[routeName];
+        if (
+          guestPageKey === null ||
+          (guestPageKey &&
+            access.guestAllowedPages &&
+            !access.guestAllowedPages.includes(guestPageKey))
+        ) {
+          logger.warn`Guest access denied to page: ${String(routeName)}`;
+          return {
+            name: ROUTE_NAMES.error,
+            query: {
+              projectId,
+              errorType: "forbidden",
+              reason: "このページはゲストには公開されていません。",
+            },
+          };
+        }
+      }
+
       // owner/adminは全権限を持つ（fetchProjectAccessで既に判定済み）
       // ロールベースの権限チェック（Firestoreから取得した権限を使用）
       const hasPermission = access.permissions.includes(requiredPermission);

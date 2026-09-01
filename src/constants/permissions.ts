@@ -112,7 +112,7 @@ export const ROUTE_REQUIRED_PERMISSIONS: Partial<
 
   // 認証のみ必要（プロジェクト権限不要）
   [ROUTE_NAMES.myPage]: null,
-  [ROUTE_NAMES.myTasks]: null,
+  [ROUTE_NAMES.myTasks]: ProjectPermission.VIEW_TASKS,
   [ROUTE_NAMES.projectCreate]: null,
 
   // 権限チェック不要（認証系）
