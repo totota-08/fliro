@@ -75,17 +75,24 @@ export async function initAuthListener() {
       currentUser.value = user;
 
       if (user) {
+        const uid = user.uid;
         try {
           // Cloud Functions (onUserSignedIn) がプロファイルを作成するので、
           // リトライロジックで取得を試みる
-          profile.value = await fetchProfileWithRetry(user.uid);
+          const fetched = await fetchProfileWithRetry(uid);
 
-          if (profile.value === null) {
-            logger.warn`Profile not found for user ${user.uid} after retries`;
+          // リトライ中にサインアウト/ユーザー切替した場合は反映しない
+          if (currentUser.value?.uid === uid) {
+            profile.value = fetched;
+            if (fetched === null) {
+              logger.warn`Profile not found for user ${uid} after retries`;
+            }
           }
         } catch (error) {
           logger.error`Failed to load profile: ${error}`;
-          profile.value = null;
+          if (currentUser.value?.uid === uid) {
+            profile.value = null;
+          }
         }
       } else {
         profile.value = null;

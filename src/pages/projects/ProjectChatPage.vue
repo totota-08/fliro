@@ -305,6 +305,7 @@ function toggleMobileThreads() {
 
 // Watchers
 function watchChat() {
+  unsubscribeChat?.();
   unsubscribeChat = listenProjectChat(projectId.value, (list) => {
     messages.value = list;
     scrollToBottom();
@@ -312,12 +313,14 @@ function watchChat() {
 }
 
 function watchMembers() {
+  unsubscribeMembers?.();
   unsubscribeMembers = listenProjectMembers(projectId.value, (list) => {
     projectMembers.value = list;
   });
 }
 
 function watchTasks() {
+  unsubscribeTasks?.();
   unsubscribeTasks = listenTasks(projectId.value, (list) => {
     tasks.value = list;
   });
@@ -379,10 +382,14 @@ async function refreshProjectContext() {
   customChannels.value = [];
   project.value = null;
 
-  if (!projectId.value) return;
+  const id = projectId.value;
+  if (!id) return;
 
   try {
-    project.value = await fetchProject(projectId.value);
+    const fetched = await fetchProject(id);
+    // await 中に別プロジェクトへ切り替わっていたら、この呼び出しの結果は捨てる
+    if (id !== projectId.value) return;
+    project.value = fetched;
   } catch (error) {
     logger.error`Failed to load project: ${error}`;
     return;
@@ -436,7 +443,9 @@ async function handleSend() {
           undefined,
           {
             isBot: true,
-            linkedTaskId: activeTaskId || result.result.linkedTaskId,
+            // タスクスレッド外で linkedTaskId を付けると通常チャンネルの
+            // フィルタで確認メッセージが非表示になるため、スレッド内のみ付与
+            linkedTaskId: activeTaskId ?? undefined,
             isTask: Boolean(activeTaskId),
           },
         );

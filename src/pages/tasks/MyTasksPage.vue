@@ -230,25 +230,21 @@ function applyFilters(taskList: DecoratedTask[]): DecoratedTask[] {
 
     // 期限フィルター
     if (filterDueDate.value !== "all") {
-      const due = (task as any).dueDate?.seconds
-        ? new Date((task as any).dueDate.seconds * 1000)
-        : null;
+      const days = getDaysUntilDue((task as any).dueDate);
 
       switch (filterDueDate.value) {
         case "overdue":
-          if (!due || getDaysDiff(due) >= 0) return false;
+          if (days === null || days >= 0) return false;
           break;
         case "today":
-          if (!due || getDaysDiff(due) !== 0) return false;
+          if (days !== 0) return false;
           break;
         case "week": {
-          if (!due) return false;
-          const diff = getDaysDiff(due);
-          if (diff < 0 || diff > 7) return false;
+          if (days === null || days < 0 || days > 7) return false;
           break;
         }
         case "none":
-          if (due) return false;
+          if (days !== null) return false;
           break;
       }
     }
