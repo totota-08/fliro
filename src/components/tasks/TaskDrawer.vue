@@ -12,6 +12,7 @@ import AppButton from "@/components/ui/AppButton.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import TaskStatusBadge from "@/components/ui/TaskStatusBadge.vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import BotAvatar from "@/components/ui/BotAvatar.vue";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
 import { updateTask } from "@/services/taskService";
 import type { TaskCategory } from "@/services/taskCategoryService";
@@ -685,7 +686,7 @@ function formatEventDetail(event: ProjectEvent): string {
               :name="msg.senderName || 'ゲスト'"
               class="task-drawer__message-avatar"
             />
-            <div v-else class="task-drawer__bot-avatar">🤖</div>
+            <BotAvatar v-else class="task-drawer__bot-avatar" />
             <div class="task-drawer__message-content">
               <div class="task-drawer__message-meta">
                 <span class="task-drawer__message-sender">{{
@@ -706,7 +707,19 @@ function formatEventDetail(event: ProjectEvent): string {
                     aria-label="メッセージを編集"
                     @click="startEditMessage(msg)"
                   >
-                    ✏️
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M4 20h4L19.5 8.5a2.12 2.12 0 0 0-3-3L5 17z" />
+                      <path d="M13.5 6.5l3 3" />
+                    </svg>
                   </button>
                   <button
                     type="button"
@@ -715,7 +728,23 @@ function formatEventDetail(event: ProjectEvent): string {
                     aria-label="メッセージを削除"
                     @click="handleDeleteMessage(msg.id)"
                   >
-                    🗑️
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M4 7h16" />
+                      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      <path
+                        d="M6.5 7l.9 12a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-12"
+                      />
+                      <path d="M10 11v6M14 11v6" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -1171,15 +1200,7 @@ function formatEventDetail(event: ProjectEvent): string {
 }
 
 .task-drawer__bot-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--ui-success-50, #f0fdf4);
-  display: grid;
-  place-items: center;
-  font-size: var(--ui-text-base);
-  border: 1px solid var(--ui-success-200, #bbf7d0);
-  flex-shrink: 0;
+  --bot-avatar-size: 32px;
 }
 
 .task-drawer__message-avatar {
@@ -1236,9 +1257,15 @@ function formatEventDetail(event: ProjectEvent): string {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
   opacity: 0.6;
   transition: var(--ui-transition-colors);
+}
+
+.task-drawer__action-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .task-drawer__action-btn:hover {

@@ -378,7 +378,7 @@ onBeforeUnmount(() => {
               <h2 class="section-title">決定</h2>
               <div class="section-body decision-list">
                 <div v-if="decisions.length === 0" class="bot-message">
-                  🤖 決定はまだありません。<code>/decide</code> で記録できます。
+                  決定はまだありません。<code>/decide</code> で記録できます。
                 </div>
                 <div v-for="d in decisions" :key="d.id" class="decision-card">
                   <div class="decision-icon" aria-hidden="true">

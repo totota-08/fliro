@@ -42,6 +42,8 @@ function isTarget(relPath) {
   if (!p.startsWith("src/")) return false;
   if (p.startsWith("src/styles/")) return false; // トークン定義は生値を持つ
   if (p.startsWith("src/assets/")) return false;
+  if (p.startsWith("src/pages/secret/")) return false; // イースターエッグ (意図的なネオン演出)
+  if (p.startsWith("src/pages/debug/")) return false; // 開発用ツール画面
   return p.endsWith(".vue") || p.endsWith(".css");
 }
 
@@ -96,8 +98,9 @@ function isAiPurple(rgb) {
 // ルール定義
 // ========================================
 
+// クォート付きフォント名で判定する (font-family が複数行に折り返されても検出できる)
 const AI_FONTS =
-  /font-family[^;]*\b(Inter|Poppins|Montserrat|Space Grotesk|Sora|Manrope|DM Sans|Plus Jakarta|Nunito|Quicksand|Raleway|Outfit|Lexend)\b/i;
+  /["'](Inter|Poppins|Montserrat|Space Grotesk|Sora|Manrope|DM Sans|Plus Jakarta Sans|Plus Jakarta|Nunito|Quicksand|Raleway|Outfit|Lexend)["']/i;
 
 const SLOP_EMOJI = new Set([
   "✨",
@@ -114,7 +117,9 @@ const SLOP_EMOJI = new Set([
   "🎯",
 ]);
 
-const EMOJI_RE = /\p{Extended_Pictographic}/gu;
+// 絵文字プレゼンテーションのみ検出する (© ™ ↗ 等のテキスト記号は対象外。
+// テキスト記号でも VS16 (U+FE0F) で絵文字表示を強制しているものは検出する)
+const EMOJI_RE = /(\p{Emoji_Presentation}|\p{Extended_Pictographic}\uFE0F)/gu;
 const HEX_RE = /#[0-9a-fA-F]{3,8}\b/g;
 const FUNC_COLOR_RE = /\b(rgba?|hsla?|oklch|color-mix)\(/;
 const RGB_VALUES_RE = /\brgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/;
@@ -131,6 +136,7 @@ function collectViolations(relPath, content) {
   // Vue SFC のトップレベルブロック追跡 (Prettier 整形前提でカラム0のタグを見る)
   let region = isCss ? "style" : "none";
   let inCssComment = false;
+  let currentSelector = ""; // floaty-hover 判定用 (直近に開いたルールのセレクタ)
 
   const add = (line, severity, rule, message) => {
     violations.push({ line, severity, rule, message });
@@ -184,8 +190,16 @@ function collectViolations(relPath, content) {
       }
       if (!line.trim()) continue;
 
+      // セレクタ追跡 (floaty-hover を :hover ルール内に限定するため)
+      const braceOpen = line.match(/^\s*([^{}]+)\{/);
+      if (braceOpen) currentSelector = braceOpen[1].trim();
+
+      // var(--token, fallback) のフォールバック値は既存コード規約として許容し、
+      // 色チェックの対象から外す (トークン参照が主、リテラルは従のため)
+      const bare = line.replace(/var\([^)]*\)/g, "var()");
+
       // 紫系 / 直書きカラー
-      const hexes = line.match(HEX_RE) ?? [];
+      const hexes = bare.match(HEX_RE) ?? [];
       for (const hex of hexes) {
         if (isAiPurple(hexToRgb(hex))) {
           add(
@@ -203,8 +217,8 @@ function collectViolations(relPath, content) {
           );
         }
       }
-      if (hexes.length === 0 && FUNC_COLOR_RE.test(line)) {
-        const rgbMatch = line.match(RGB_VALUES_RE);
+      if (hexes.length === 0 && FUNC_COLOR_RE.test(bare)) {
+        const rgbMatch = bare.match(RGB_VALUES_RE);
         if (
           rgbMatch &&
           isAiPurple({ r: +rgbMatch[1], g: +rgbMatch[2], b: +rgbMatch[3] })
@@ -224,7 +238,7 @@ function collectViolations(relPath, content) {
           );
         }
       }
-      if (/:\s*[^;{]*\b(white|black)\b/.test(line) && !/var\(/.test(line)) {
+      if (/:\s*[^;{]*\b(white|black)\b/.test(bare)) {
         add(
           lineNo,
           "error",
@@ -234,17 +248,14 @@ function collectViolations(relPath, content) {
       }
 
       // グラデーション
-      if (/linear-gradient\(\s*135deg/.test(line)) {
+      if (/linear-gradient\(\s*135deg/.test(bare)) {
         add(
           lineNo,
           "error",
           "ai-gradient",
           "linear-gradient(135deg …) はAI生成UIの典型。グラデ自体を再検討し、Hero 用途なら --ui-hero-gradient を使う",
         );
-      } else if (
-        /\b(linear|radial|conic)-gradient\(/.test(line) &&
-        !/var\(/.test(line)
-      ) {
+      } else if (/\b(linear|radial|conic)-gradient\(/.test(bare)) {
         add(
           lineNo,
           "warn",
@@ -274,7 +285,11 @@ function collectViolations(relPath, content) {
           "ai-font",
           "AI生成UI定番の Web フォント。--ui-font-sans (system-ui スタック) を使う",
         );
-      } else if (/font-family\s*:/.test(line) && !/var\(/.test(line)) {
+      } else if (
+        /font-family\s*:/.test(line) &&
+        !/var\(/.test(line) &&
+        !/font-family\s*:\s*inherit\b/.test(line)
+      ) {
         add(
           lineNo,
           "warn",
@@ -315,14 +330,18 @@ function collectViolations(relPath, content) {
         }
       }
 
-      // 浮遊ホバー
+      // 浮遊ホバー (:hover ルール内のみ。エントランスアニメの開始オフセットは対象外)
       const floatMatch = line.match(/translateY\(\s*-(\d+(?:\.\d+)?)px/);
-      if (floatMatch && parseFloat(floatMatch[1]) >= 6) {
+      if (
+        floatMatch &&
+        parseFloat(floatMatch[1]) >= 6 &&
+        currentSelector.includes(":hover")
+      ) {
         add(
           lineNo,
           "warn",
           "floaty-hover",
-          `translateY(-${floatMatch[1]}px) の大きな浮遊はAI生成UIの典型。動きは控えめに (2px 程度まで)`,
+          `:hover での translateY(-${floatMatch[1]}px) の大きな浮遊はAI生成UIの典型。動きは控えめに (2px 程度まで)`,
         );
       }
       continue;

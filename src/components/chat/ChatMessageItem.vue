@@ -7,6 +7,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import BotAvatar from "@/components/ui/BotAvatar.vue";
 import ChatMessageActions from "./ChatMessageActions.vue";
 import ChatEmojiPicker from "./ChatEmojiPicker.vue";
 import type { ChatMessage, ReactionDetail } from "@/services/projectChat";
@@ -240,7 +241,7 @@ function handleScrollToReply() {
         :name="message.senderName || 'ゲスト'"
         class="message-avatar"
       />
-      <div v-else class="bot-avatar">🤖</div>
+      <BotAvatar v-else class="bot-avatar" />
 
       <!-- メッセージ本文 -->
       <div class="message-content">
@@ -328,15 +329,7 @@ function handleScrollToReply() {
 }
 
 .bot-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--ui-success-50);
-  display: grid;
-  place-items: center;
-  font-size: var(--ui-text-xl);
-  border: 1px solid var(--ui-success-200);
-  flex-shrink: 0;
+  --bot-avatar-size: 36px;
 }
 
 .message-content {
@@ -494,9 +487,7 @@ function handleScrollToReply() {
   }
 
   .bot-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: var(--ui-text-lg);
+    --bot-avatar-size: 32px;
   }
 
   .reply-indicator {

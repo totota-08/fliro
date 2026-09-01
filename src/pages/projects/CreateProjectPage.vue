@@ -649,9 +649,7 @@ function prevStep() {
 }
 
 .project-panel {
-  background: var(--ui-surface-glass, rgba(255, 255, 255, 0.8));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--ui-surface, #ffffff);
   margin: var(--ui-space-8, 2rem);
   border-radius: var(--ui-radius-2xl, 1.5rem);
   padding: var(--ui-space-8, 2rem);
@@ -659,12 +657,6 @@ function prevStep() {
   box-shadow: var(--ui-shadow-xl);
   display: flex;
   flex-direction: column;
-}
-
-@supports not (backdrop-filter: blur(12px)) {
-  .project-panel {
-    background: var(--ui-surface, #ffffff);
-  }
 }
 
 .stepper {

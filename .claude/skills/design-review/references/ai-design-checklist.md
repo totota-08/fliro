@@ -27,7 +27,18 @@ Flilo は Deep Green / Card UI のデザインシステム（`src/styles/ui-toke
 | `token-size`       | WARN  | font-size 直書き                                                                  | `--ui-text-xs`〜`3xl`                                  |
 | `token-radius`     | WARN  | border-radius 直書き                                                              | `--ui-radius-sm`〜`full`                               |
 | `token-font`       | WARN  | font-family 直書き                                                                | `--ui-font-sans` / `--ui-font-mono`                    |
-| `floaty-hover`     | WARN  | `translateY(-6px)` 以上のホバー浮遊                                               | 動きは控えめに（〜2px、150〜220ms）                    |
+| `floaty-hover`     | WARN  | `:hover` での `translateY(-6px)` 以上の浮遊                                       | 動きは控えめに（〜2px、150〜220ms）                    |
+
+### 意図的に許容しているパターン（違反ではない）
+
+- `src/pages/secret/`（イースターエッグの演出ページ）と `src/pages/debug/`（開発用ツール）は検査対象外。
+- モーダル / ドロワー / モバイルサイドバーの**オーバーレイ**の `blur(2px)` 程度、および
+  スティッキートップバーの半透明 + blur は、全画面で統一された既存パターンとして許容。
+  ただし**カード・パネル面**のガラスモーフィズムは不可（Card UI で表現する）。
+- `var(--token, フォールバック値)` のフォールバックリテラルは既存規約として許容
+  （トークン参照が主であるため。色チェックの対象外）。
+- エントランスアニメーションの開始オフセット（例: `translateY(-8px)` → 0）は
+  浮遊ホバーとは別物として許容。
 
 ---
 

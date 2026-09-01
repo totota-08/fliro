@@ -750,9 +750,7 @@ async function handleRemove() {
 }
 
 .member-panel__mono {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  font-family: var(--ui-font-mono);
   font-size: 0.85rem;
   color: var(--text-muted);
 }
@@ -831,9 +829,7 @@ async function handleRemove() {
 
 .member-panel__error-detail-text {
   margin: 0.4rem 0 0;
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  font-family: var(--ui-font-mono);
   word-break: break-all;
 }
 
