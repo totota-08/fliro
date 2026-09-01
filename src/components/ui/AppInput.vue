@@ -7,7 +7,15 @@ import { computed } from "vue";
 const props = withDefaults(
   defineProps<{
     modelValue?: string;
-    type?: "text" | "email" | "password" | "search" | "tel" | "url" | "number";
+    type?:
+      | "text"
+      | "email"
+      | "password"
+      | "search"
+      | "tel"
+      | "url"
+      | "number"
+      | "date";
     placeholder?: string;
     disabled?: boolean;
     error?: boolean;

@@ -7,7 +7,6 @@ import AppField from "@/components/ui/AppField.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
-import DatePicker from "@/components/ui/DatePicker.vue";
 import { appName } from "@/constants/appMeta";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { createProject } from "@/firebase/projectService";
@@ -27,8 +26,8 @@ const description = ref("");
 const color = ref("#4f7c82");
 const isPublic = ref(false);
 const allowGuestView = ref(false);
-const startDate = ref<string | null>(null);
-const dueDate = ref<string | null>(null);
+const startDate = ref("");
+const dueDate = ref("");
 const submitting = ref(false);
 const errorMsg = ref("");
 
@@ -417,14 +416,11 @@ function prevStep() {
                 <div class="date-grid">
                   <label class="date-field">
                     <span class="date-field__label">開始日</span>
-                    <DatePicker
-                      v-model="startDate"
-                      placeholder="開始日を選択"
-                    />
+                    <AppInput v-model="startDate" type="date" />
                   </label>
                   <label class="date-field">
                     <span class="date-field__label">期限</span>
-                    <DatePicker v-model="dueDate" placeholder="期限を選択" />
+                    <AppInput v-model="dueDate" type="date" />
                   </label>
                 </div>
               </AppField>
