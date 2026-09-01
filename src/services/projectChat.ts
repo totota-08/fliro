@@ -1,5 +1,6 @@
 import { toMillis } from "@/utils/datetime";
-import { database, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { database } from "@/lib/firebaseDatabase";
 import { getLogger } from "@logtape/logtape";
 import {
   ref as dbRef,

@@ -69,7 +69,6 @@ async function isAdmin(): Promise<boolean> {
 }
 
 // 初回アクセスで必要なページのみ静的インポート
-import ProjectLayout from "@/layouts/ProjectLayout.vue";
 import HomePage from "@/pages/HomePage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
 
@@ -192,7 +191,7 @@ export const router = createRouter({
     },
     {
       path: "/projects/:projectId",
-      component: ProjectLayout,
+      component: () => import("@/layouts/ProjectLayout.vue"),
       meta: { requiresAuth: true, allowGuestAccess: true },
       children: [
         {

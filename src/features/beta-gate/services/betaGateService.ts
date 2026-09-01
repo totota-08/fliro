@@ -3,8 +3,7 @@
  *
  * Cloud Functionsを呼び出して招待コードの検証を行う
  */
-import { functions } from "@/lib/firebase";
-import { httpsCallable } from "firebase/functions";
+
 import type { ValidateCodeResult } from "../types/betaGate";
 import { getLogger } from "@logtape/logtape";
 
@@ -23,6 +22,11 @@ export async function validateInviteCode(
   code: string,
 ): Promise<ValidateCodeResult> {
   try {
+    // functions SDK は初回検証時にのみ読み込む（エントリチャンク削減）
+    const [{ httpsCallable }, { functions }] = await Promise.all([
+      import("firebase/functions"),
+      import("@/lib/firebaseFunctions"),
+    ]);
     const validateFn = httpsCallable<
       ValidateInviteCodeRequest,
       ValidateCodeResult

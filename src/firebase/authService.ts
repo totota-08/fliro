@@ -1,11 +1,5 @@
 import { getActionCodeSettings } from "@/config/appConfig";
-import {
-  auth,
-  db,
-  githubProvider,
-  googleProvider,
-  storage,
-} from "@/lib/firebase";
+import { auth, db, githubProvider, googleProvider } from "@/lib/firebase";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 import type {
   CredentialSignUpPayload,
@@ -44,11 +38,6 @@ import {
   type UserInfo,
 } from "firebase/auth";
 import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
-import {
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytes,
-} from "firebase/storage";
 import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger("app.firebase.authService");
@@ -225,6 +214,12 @@ export async function fetchProfile(uid: string) {
 export async function uploadAvatar(file: File) {
   const user = await requireCurrentUser();
 
+  // storage SDK はアップロード時にのみ読み込む（エントリチャンク削減）
+  const [{ getDownloadURL, ref: storageRef, uploadBytes }, { storage }] =
+    await Promise.all([
+      import("firebase/storage"),
+      import("@/lib/firebaseStorage"),
+    ]);
   const fileRef = storageRef(storage, `avatars/${user.uid}/${Date.now()}`);
   await uploadBytes(fileRef, file, { contentType: file.type });
   const url = await getDownloadURL(fileRef);
