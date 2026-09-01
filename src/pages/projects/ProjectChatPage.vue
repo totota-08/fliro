@@ -397,9 +397,19 @@ async function refreshProjectContext() {
 
 // Actions
 // Actions
+// IME変換確定のEnter（isComposing / keyCode 229）では送信しない
+function handleComposerEnter(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
+  handleSend();
+}
+
 async function handleSend() {
   const text = input.value.trim();
   if (!text || !user.value) return;
+  // 送信中の二重送信を防ぐため先にクリアする（失敗時は復元）
+  input.value = "";
+  const replyTo = replyingToId.value;
+  replyingToId.value = null;
   const activeTaskId =
     currentChannel.value.type === "task" ? currentChannel.value.id : null;
 
@@ -431,7 +441,6 @@ async function handleSend() {
           },
         );
       }
-      input.value = "";
       scrollToBottom();
       return;
     }
@@ -444,13 +453,13 @@ async function handleSend() {
       profile.value?.nickname || profile.value?.fullName || "ユーザー",
       text,
       activeChannelId.value, // Explicitly set channelId
-      replyingToId.value ?? undefined, // 返信先ID
+      replyTo ?? undefined, // 返信先ID
       activeTaskId ? { linkedTaskId: activeTaskId, isTask: true } : undefined,
     );
-    input.value = "";
-    replyingToId.value = null; // 返信状態をリセット
     scrollToBottom();
   } catch (e) {
+    input.value = text;
+    replyingToId.value = replyTo;
     logger.error`Failed to send message: ${e}`;
   }
 }
@@ -1295,7 +1304,7 @@ watch(channels, (list) => {
                 <input
                   ref="composerInput"
                   v-model="input"
-                  @keydown.enter="handleSend"
+                  @keydown.enter="handleComposerEnter"
                   :placeholder="
                     replyingToMessage ? '返信を入力...' : 'メッセージを送信...'
                   "
