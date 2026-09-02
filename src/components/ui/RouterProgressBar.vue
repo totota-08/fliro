@@ -11,6 +11,11 @@ const progress = ref(0);
 let progressInterval: ReturnType<typeof setInterval> | null = null;
 
 function startProgress(fromPath: string, toPath: string) {
+  // 前のナビゲーションのインターバルが残っていれば解除する（連続遷移時のリーク防止）
+  if (progressInterval) {
+    clearInterval(progressInterval);
+    progressInterval = null;
+  }
   isLoading.value = true;
   progress.value = 0;
   startNavigation(fromPath, toPath);
