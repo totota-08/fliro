@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@logtape/logtape": "^1.2.2",
-    "axios": "^1.13.2",
+    "axios": "^1.13.4",
     "canvas-confetti": "^1.9.4",
     "cropperjs": "^2.1.0",
     "firebase": "^12.8.0",
