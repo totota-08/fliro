@@ -35,12 +35,7 @@ const props = withDefaults(
         },
         { key: "tasks", label: "マイタスク", to: "/demo/tasks", icon: "tasks" },
         { key: "team", label: "チーム", to: "/demo/team", icon: "team" },
-        {
-          key: "members",
-          label: "メンバー",
-          to: "/demo/team",
-          icon: "members",
-        },
+        { key: "chat", label: "スレッド", to: "/demo/chat", icon: "chat" },
         { key: "settings", label: "設定", icon: "settings", disabled: true },
       ] satisfies DashboardNavItem[],
     projects: () =>
@@ -298,6 +293,19 @@ function isNavigatingToPath(to: string | object | undefined): boolean {
               >
                 <path
                   d="M18 20V10M12 20V4M6 20v-6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.8"
+                />
+              </svg>
+              <svg
+                v-else-if="item.icon === 'chat'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="1.8"

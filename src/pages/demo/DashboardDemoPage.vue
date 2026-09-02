@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useSidebarState } from "@/composables/useSidebarState";
-import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
 import { appName } from "@/constants/appMeta";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSidebarState } from "@/composables/useSidebarState";
 import { ref, computed } from "vue";
-import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
 import { appName } from "@/constants/appMeta";
 
