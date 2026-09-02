@@ -100,9 +100,9 @@ const goToContinue = () => {
   min-height: calc(100vh - 4rem);
   background: linear-gradient(
     135deg,
-    rgba(184, 227, 233, 0.35),
-    #fff,
-    rgba(147, 177, 181, 0.35)
+    var(--ui-brand-100, rgba(184, 227, 233, 0.35)),
+    var(--ui-surface, #ffffff),
+    var(--ui-border-strong, rgba(147, 177, 181, 0.35))
   );
   display: flex;
   align-items: center;
@@ -112,25 +112,28 @@ const goToContinue = () => {
 
 .action-card {
   width: min(460px, 100%);
-  background: #fff;
+  background: var(--ui-surface, #ffffff);
   border-radius: 1.5rem;
   padding: 2.25rem;
-  border: 1px solid rgba(147, 177, 181, 0.35);
-  box-shadow: 0 40px 70px rgba(11, 46, 51, 0.1);
+  border: 1px solid var(--ui-border-strong, rgba(147, 177, 181, 0.35));
+  box-shadow: var(
+    --ui-shadow-xl,
+    0 40px 70px var(--ui-shadow-color, rgba(11, 46, 51, 0.1))
+  );
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
 .action-body {
-  color: #4f7c82;
+  color: var(--ui-brand-600, #4f7c82);
   line-height: 1.7;
 }
 
 .action-error {
-  background: rgba(214, 69, 69, 0.08);
-  border: 1px solid rgba(214, 69, 69, 0.35);
-  color: #d64545;
+  background: var(--ui-danger-bg, rgba(214, 69, 69, 0.08));
+  border: 1px solid var(--ui-danger, #d64545);
+  color: var(--ui-danger, #d64545);
   border-radius: 0.85rem;
   padding: 0.75rem 1rem;
   font-weight: 600;
@@ -145,10 +148,10 @@ const goToContinue = () => {
 
 .action-footer a {
   font-weight: 600;
-  color: #4f7c82;
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .action-footer a:hover {
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
 </style>

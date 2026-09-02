@@ -104,9 +104,9 @@ const handleSubmit = async () => {
   min-height: calc(100vh - 4rem);
   background: linear-gradient(
     135deg,
-    rgba(184, 227, 233, 0.35),
-    #fff,
-    rgba(147, 177, 181, 0.35)
+    var(--ui-brand-100, rgba(184, 227, 233, 0.35)),
+    var(--ui-surface, #ffffff),
+    var(--ui-border-strong, rgba(147, 177, 181, 0.35))
   );
   display: flex;
   align-items: center;
@@ -116,11 +116,14 @@ const handleSubmit = async () => {
 
 .reset-card {
   width: min(460px, 100%);
-  background: #fff;
+  background: var(--ui-surface, #ffffff);
   border-radius: 1.5rem;
   padding: 2.5rem;
-  border: 1px solid rgba(147, 177, 181, 0.35);
-  box-shadow: 0 40px 70px rgba(11, 46, 51, 0.1);
+  border: 1px solid var(--ui-border-strong, rgba(147, 177, 181, 0.35));
+  box-shadow: var(
+    --ui-shadow-xl,
+    0 40px 70px var(--ui-shadow-color, rgba(11, 46, 51, 0.1))
+  );
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -133,18 +136,18 @@ const handleSubmit = async () => {
 }
 
 .reset-success {
-  background: rgba(79, 124, 130, 0.1);
-  border: 1px solid rgba(79, 124, 130, 0.2);
-  color: #0b2e33;
+  background: var(--ui-brand-50, rgba(79, 124, 130, 0.1));
+  border: 1px solid var(--ui-border, rgba(79, 124, 130, 0.2));
+  color: var(--ui-brand-900, #0b2e33);
   border-radius: 0.85rem;
   padding: 0.85rem 1rem;
   font-weight: 600;
 }
 
 .reset-error {
-  background: rgba(214, 69, 69, 0.08);
-  border: 1px solid rgba(214, 69, 69, 0.35);
-  color: #d64545;
+  background: var(--ui-danger-bg, rgba(214, 69, 69, 0.08));
+  border: 1px solid var(--ui-danger, #d64545);
+  color: var(--ui-danger, #d64545);
   border-radius: 0.85rem;
   padding: 0.85rem 1rem;
   font-weight: 600;
@@ -152,15 +155,15 @@ const handleSubmit = async () => {
 
 .reset-helper {
   text-align: center;
-  color: #4f7c82;
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .reset-helper a {
   font-weight: 600;
-  color: #4f7c82;
+  color: var(--ui-brand-600, #4f7c82);
 }
 
 .reset-helper a:hover {
-  color: #0b2e33;
+  color: var(--ui-brand-900, #0b2e33);
 }
 </style>
