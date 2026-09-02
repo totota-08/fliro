@@ -172,6 +172,19 @@ export async function updateProjectMetadata(
   await updateDoc(doc(db, "projects", projectId), updateData);
 }
 
+/**
+ * サブコレクションの全ドキュメントをベストエフォートで削除する。
+ * 権限不足などで一部が消せなくてもプロジェクト削除全体は止めない。
+ */
+async function deleteSubcollectionDocs(projectId: string, name: string) {
+  try {
+    const snap = await getDocs(collection(db, "projects", projectId, name));
+    await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+  } catch (error) {
+    logger.warn`Failed to clean up ${name} for project ${projectId}: ${error}`;
+  }
+}
+
 export async function deleteProject(projectId: string) {
   // 招待リンクを先に削除する（削除済みプロジェクトへの参加を防ぐ）。
   // 削除権限はオーナー情報の参照に依存するため、プロジェクト本体より先に行う。
@@ -194,14 +207,43 @@ export async function deleteProject(projectId: string) {
     }),
   );
 
-  const tasksSnap = await getDocs(
-    collection(db, "projects", projectId, "tasks"),
-  );
-  await Promise.all(
-    tasksSnap.docs.map((task) =>
-      deleteDoc(doc(db, "projects", projectId, "tasks", task.id)),
-    ),
-  );
+  // タスクはコメント（messages サブコレクション）を先に消してから本体を削除
+  try {
+    const tasksSnap = await getDocs(
+      collection(db, "projects", projectId, "tasks"),
+    );
+    await Promise.all(
+      tasksSnap.docs.map(async (task) => {
+        try {
+          const messagesSnap = await getDocs(
+            collection(db, "projects", projectId, "tasks", task.id, "messages"),
+          );
+          await Promise.all(
+            messagesSnap.docs.map((message) => deleteDoc(message.ref)),
+          );
+        } catch (error) {
+          logger.warn`Failed to clean up task messages for ${task.id}: ${error}`;
+        }
+        await deleteDoc(task.ref);
+      }),
+    );
+  } catch (error) {
+    logger.warn`Failed to clean up tasks for project ${projectId}: ${error}`;
+  }
+
+  // Firestore は親ドキュメントを消してもサブコレクションを消さないため、
+  // 残りのサブコレクションも明示的に削除する（孤児ドキュメント防止）
+  for (const name of [
+    "events",
+    "roles",
+    "categories",
+    "threads",
+    "timeline",
+    "messages",
+    "activities",
+  ]) {
+    await deleteSubcollectionDocs(projectId, name);
+  }
 
   await deleteDoc(doc(db, "projects", projectId));
 }

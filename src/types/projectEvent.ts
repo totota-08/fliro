@@ -35,8 +35,4 @@ export type ProjectEventInput = Omit<
 };
 
 export type ProjectEventCategory =
-  | "task"
-  | "decision"
-  | "member"
-  | "bot"
-  | "other";
+  "task" | "decision" | "member" | "bot" | "other";

@@ -440,8 +440,7 @@ router.beforeEach(async (to) => {
   // プロジェクト関連のルートでゲストアクセスが許可されている場合
   const projectId = to.params.projectId as string | undefined;
   const routeName = to.name as
-    | (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES]
-    | undefined;
+    (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES] | undefined;
 
   // 未認証ユーザーでプロジェクトIDがあり、ゲストアクセスが許可されている場合
   if (requiresAuth && !user && allowGuestAccess && projectId) {

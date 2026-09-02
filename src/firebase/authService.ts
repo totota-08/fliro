@@ -136,16 +136,18 @@ export async function loginWithProvider(provider: SocialProvider) {
   const { signInWithPopup } = await import("firebase/auth");
   const credential = await signInWithPopup(auth, authProvider);
 
-  // Firebase AuthトークンがFirestoreに伝播するまで待機
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // プロファイルの存在を確認（権限エラーの場合もプロファイルなしとして扱う）
+  // プロファイルの存在を確認する。
+  // 認証直後はトークンが Firestore に伝播しておらず一時的に取得失敗（null）に
+  // なることがあるため、リトライしてから「未登録」と判定する。
+  // 1回の失敗で判定すると、登録済みユーザーを誤ってサインアウトさせてしまう。
   let existingProfile = null;
-  try {
+  const retryDelays = [500, 1000, 2000];
+  for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
     existingProfile = await fetchProfile(credential.user.uid);
-  } catch (error) {
-    // Firestoreの権限エラーはプロファイルが存在しないケースとして扱う
-    // （認証トークン伝播遅延による一時的なエラーの可能性もあるため）
+    if (existingProfile) break;
+    if (attempt < retryDelays.length) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+    }
   }
 
   if (!existingProfile) {

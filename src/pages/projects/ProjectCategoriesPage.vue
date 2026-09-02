@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import SectionCard from "@/components/ui/SectionCard.vue";
 import { usePageTitle } from "@/composables/usePageTitle";
-import AppModal from "@/components/ui/AppModal.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppColorPicker from "@/components/ui/AppColorPicker.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { db } from "@/lib/firebase";
 import {
@@ -68,14 +69,14 @@ const isUpdating = ref(false);
  *   #64748b = --ui-text-muted (Slate)
  */
 const presetColors = [
-  { value: "#0b2e33", label: "Deep Green" },
-  { value: "#4f7c82", label: "Teal" },
-  { value: "#16a34a", label: "Green" },
-  { value: "#f59e0b", label: "Amber" },
-  { value: "#ef4444", label: "Red" },
-  { value: "#8b5cf6", label: "Purple" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#64748b", label: "Slate" },
+  "#0b2e33", // Deep Green
+  "#4f7c82", // Teal
+  "#16a34a", // Green
+  "#f59e0b", // Amber
+  "#ef4444", // Red
+  "#8b5cf6", // Purple
+  "#3b82f6", // Blue
+  "#64748b", // Slate
 ];
 
 let stopCategories: (() => void) | null = null;
@@ -200,24 +201,6 @@ async function confirmDelete() {
   }
 }
 
-// カラーピッカー関連
-function selectPresetColor(color: string, target: "new" | "edit") {
-  if (target === "new") {
-    newCategory.value.color = color;
-  } else {
-    editForm.value.color = color;
-  }
-}
-
-function handleCustomColorChange(event: Event, target: "new" | "edit") {
-  const input = event.target as HTMLInputElement;
-  if (target === "new") {
-    newCategory.value.color = input.value;
-  } else {
-    editForm.value.color = input.value;
-  }
-}
-
 onMounted(() => {
   evaluatePermissions();
   watchCategories();
@@ -265,31 +248,10 @@ onBeforeUnmount(() => {
 
           <div class="create-form__field">
             <label class="form-label">カラー</label>
-            <div class="color-picker">
-              <div class="color-picker__presets">
-                <button
-                  v-for="preset in presetColors"
-                  :key="preset.value"
-                  type="button"
-                  class="color-preset"
-                  :class="{ 'is-selected': newCategory.color === preset.value }"
-                  :style="{ backgroundColor: preset.value }"
-                  :title="preset.label"
-                  @click="selectPresetColor(preset.value, 'new')"
-                />
-              </div>
-              <div class="color-picker__custom">
-                <label class="color-custom-label">
-                  その他:
-                  <input
-                    type="color"
-                    class="color-custom-input"
-                    :value="newCategory.color || '#0b2e33'"
-                    @input="handleCustomColorChange($event, 'new')"
-                  />
-                </label>
-              </div>
-            </div>
+            <AppColorPicker
+              v-model="newCategory.color"
+              :preset-colors="presetColors"
+            />
           </div>
 
           <div class="create-form__field">
@@ -388,31 +350,10 @@ onBeforeUnmount(() => {
 
         <div class="form-field">
           <label class="form-label">カラー</label>
-          <div class="color-picker">
-            <div class="color-picker__presets">
-              <button
-                v-for="preset in presetColors"
-                :key="preset.value"
-                type="button"
-                class="color-preset"
-                :class="{ 'is-selected': editForm.color === preset.value }"
-                :style="{ backgroundColor: preset.value }"
-                :title="preset.label"
-                @click="selectPresetColor(preset.value, 'edit')"
-              />
-            </div>
-            <div class="color-picker__custom">
-              <label class="color-custom-label">
-                その他:
-                <input
-                  type="color"
-                  class="color-custom-input"
-                  :value="editForm.color || '#0b2e33'"
-                  @input="handleCustomColorChange($event, 'edit')"
-                />
-              </label>
-            </div>
-          </div>
+          <AppColorPicker
+            v-model="editForm.color"
+            :preset-colors="presetColors"
+          />
         </div>
 
         <div class="form-field">
@@ -560,63 +501,6 @@ onBeforeUnmount(() => {
   min-height: 60px;
 }
 
-/* カラーピッカー */
-.color-picker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
-}
-
-.color-picker__presets {
-  display: flex;
-  gap: var(--ui-space-1);
-  flex-wrap: wrap;
-}
-
-.color-preset {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--ui-radius-sm);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.color-preset:hover {
-  transform: scale(1.1);
-}
-
-.color-preset.is-selected {
-  border-color: var(--ui-brand-600);
-  box-shadow:
-    0 0 0 2px var(--ui-surface),
-    0 0 0 4px var(--ui-brand-600);
-}
-
-.color-picker__custom {
-  display: flex;
-  align-items: center;
-}
-
-.color-custom-label {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2);
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-muted);
-}
-
-.color-custom-input {
-  width: 40px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: var(--ui-radius-sm);
-  cursor: pointer;
-}
-
 /* カテゴリ一覧 */
 .category-list {
   list-style: none;
@@ -727,26 +611,6 @@ onBeforeUnmount(() => {
 
   .category-item__desc {
     max-width: 100%;
-  }
-
-  /* カラーピッカーのタッチターゲット拡大 */
-  .color-picker__presets {
-    gap: var(--ui-space-2);
-  }
-
-  .color-preset {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--ui-radius-md);
-  }
-
-  .color-preset:active {
-    transform: scale(0.95);
-  }
-
-  .color-custom-input {
-    width: 48px;
-    height: 44px;
   }
 }
 </style>

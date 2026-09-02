@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { usePageTitle } from "@/composables/usePageTitle";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppColorPicker from "@/components/ui/AppColorPicker.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import {
@@ -80,14 +81,14 @@ const isDeleting = ref(false);
 
 // プリセットカラー（Deep Greenパレットに合う色）
 const presetColors = [
-  { value: "#4f7c82", label: "Teal" },
-  { value: "#0b2e33", label: "Deep Green" },
-  { value: "#16a34a", label: "Green" },
-  { value: "#f59e0b", label: "Amber" },
-  { value: "#ef4444", label: "Red" },
-  { value: "#8b5cf6", label: "Purple" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#64748b", label: "Slate" },
+  "#4f7c82", // Teal
+  "#0b2e33", // Deep Green
+  "#16a34a", // Green
+  "#f59e0b", // Amber
+  "#ef4444", // Red
+  "#8b5cf6", // Purple
+  "#3b82f6", // Blue
+  "#64748b", // Slate
 ];
 
 // デフォルトロールの説明
@@ -468,23 +469,6 @@ async function confirmDelete() {
 }
 
 // カラーピッカー関連
-function selectPresetColor(color: string, target: "new" | "edit") {
-  if (target === "new") {
-    newRole.value.color = color;
-  } else {
-    editForm.value.color = color;
-  }
-}
-
-function handleCustomColorChange(event: Event, target: "new" | "edit") {
-  const input = event.target as HTMLInputElement;
-  if (target === "new") {
-    newRole.value.color = input.value;
-  } else {
-    editForm.value.color = input.value;
-  }
-}
-
 // ロールの表示名（IDから名前へ）
 function getRoleName(roleId: string): string {
   const role = roles.value.find((r) => r.id === roleId);
@@ -732,31 +716,10 @@ onBeforeUnmount(() => {
 
         <div class="form-field">
           <label class="form-label">カラー</label>
-          <div class="color-picker">
-            <div class="color-picker__presets">
-              <button
-                v-for="preset in presetColors"
-                :key="preset.value"
-                type="button"
-                class="color-preset"
-                :class="{ 'is-selected': newRole.color === preset.value }"
-                :style="{ backgroundColor: preset.value }"
-                :title="preset.label"
-                @click="selectPresetColor(preset.value, 'new')"
-              />
-            </div>
-            <div class="color-picker__custom">
-              <label class="color-custom-label">
-                その他:
-                <input
-                  type="color"
-                  class="color-custom-input"
-                  :value="newRole.color"
-                  @input="handleCustomColorChange($event, 'new')"
-                />
-              </label>
-            </div>
-          </div>
+          <AppColorPicker
+            v-model="newRole.color"
+            :preset-colors="presetColors"
+          />
         </div>
       </form>
       <template #footer>
@@ -819,33 +782,10 @@ onBeforeUnmount(() => {
 
           <div class="form-field">
             <label class="form-label">カラー</label>
-            <div class="color-picker">
-              <div class="color-picker__presets">
-                <button
-                  v-for="preset in presetColors"
-                  :key="preset.value"
-                  type="button"
-                  class="color-preset"
-                  :class="{
-                    'is-selected': editForm.color === preset.value,
-                  }"
-                  :style="{ backgroundColor: preset.value }"
-                  :title="preset.label"
-                  @click="selectPresetColor(preset.value, 'edit')"
-                />
-              </div>
-              <div class="color-picker__custom">
-                <label class="color-custom-label">
-                  その他:
-                  <input
-                    type="color"
-                    class="color-custom-input"
-                    :value="editForm.color || '#64748b'"
-                    @input="handleCustomColorChange($event, 'edit')"
-                  />
-                </label>
-              </div>
-            </div>
+            <AppColorPicker
+              v-model="editForm.color"
+              :preset-colors="presetColors"
+            />
           </div>
         </div>
 
@@ -1329,63 +1269,6 @@ onBeforeUnmount(() => {
 .form-input:focus {
   outline: none;
   border-color: var(--ui-brand-600, #4f7c82);
-}
-
-/* カラーピッカー */
-.color-picker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.color-picker__presets {
-  display: flex;
-  gap: var(--ui-space-2, 0.5rem);
-  flex-wrap: wrap;
-}
-
-.color-preset {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.color-preset:hover {
-  transform: scale(1.1);
-}
-
-.color-preset.is-selected {
-  border-color: var(--ui-brand-600, #4f7c82);
-  box-shadow:
-    0 0 0 2px var(--ui-surface, #ffffff),
-    0 0 0 4px var(--ui-brand-600, #4f7c82);
-}
-
-.color-picker__custom {
-  display: flex;
-  align-items: center;
-}
-
-.color-custom-label {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.color-custom-input {
-  width: 40px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  cursor: pointer;
 }
 
 /* 権限モーダル */

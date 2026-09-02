@@ -1,10 +1,5 @@
 export type RoleKey =
-  | "admin"
-  | "manager"
-  | "pm"
-  | "member"
-  | "viewer"
-  | "observer";
+  "admin" | "manager" | "pm" | "member" | "viewer" | "observer";
 
 export type RolePermissions = {
   canEditProject: boolean;

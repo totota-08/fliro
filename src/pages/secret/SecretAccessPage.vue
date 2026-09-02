@@ -17,6 +17,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 const showSuccessAnimation = ref(false);
 const isBooting = ref(true);
 const audioContext = ref<AudioContext | null>(null);
+let pingIntervalId: ReturnType<typeof setInterval> | null = null;
 const accessCode = ref("");
 const passwordMode = ref(false);
 const passwordAttempts = ref(0);
@@ -163,8 +164,13 @@ function createAmbientSound() {
     whiteNoise.start(0);
 
     // Occasional synth pings
-    setInterval(() => {
-      if (Math.random() > 0.6 && audioContext.value) {
+    // アンマウント後も鳴り続けない（closed な AudioContext を触らない）よう ID を保持して解除する
+    pingIntervalId = setInterval(() => {
+      if (
+        Math.random() > 0.6 &&
+        audioContext.value &&
+        audioContext.value.state !== "closed"
+      ) {
         const osc = audioContext.value.createOscillator();
         const oscGain = audioContext.value.createGain();
         osc.type = "sine";
@@ -529,6 +535,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", resizeCanvas);
   if (rainAnimationId) {
     cancelAnimationFrame(rainAnimationId);
+  }
+  if (pingIntervalId) {
+    clearInterval(pingIntervalId);
+    pingIntervalId = null;
   }
   if (audioContext.value) {
     audioContext.value.close();

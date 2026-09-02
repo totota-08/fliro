@@ -52,9 +52,7 @@ export function useProjectShellData(projectIdRef: Ref<string>) {
           params: { projectId: docSnap.id },
         },
         accent: ["primary", "secondary", "accent"][index % 3] as
-          | "primary"
-          | "secondary"
-          | "accent",
+          "primary" | "secondary" | "accent",
         color: (data.color as string) || undefined,
         iconUrl: (data.iconUrl as string) || undefined,
       };
