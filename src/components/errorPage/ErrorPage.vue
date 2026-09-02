@@ -354,9 +354,7 @@ function retry() {
 
 .error-page__path {
   display: inline-block;
-  font-family:
-    "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
-    monospace;
+  font-family: var(--ui-font-mono);
   padding: 0.25rem 0.75rem;
   border-radius: var(--ui-radius-full, 9999px);
   background: var(--ui-surface-muted, #f1f5f9);

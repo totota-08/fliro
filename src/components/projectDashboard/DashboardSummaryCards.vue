@@ -700,7 +700,7 @@ onBeforeUnmount(() => {
 
 .summary-card.is-success {
   border-color: rgba(34, 197, 94, 0.35);
-  background: linear-gradient(135deg, #fff 0%, rgba(34, 197, 94, 0.05) 100%);
+  background: var(--ui-success-50, #f0fdf4);
 }
 
 .summary-card.is-success .summary-card__value {

@@ -371,7 +371,6 @@ const pricingPlans = [
                 style="--delay: 400ms"
               >
                 <p class="hero-card__label hero-card__label--now">
-                  <span class="hero-card__fire">🔥</span>
                   いまやること
                 </p>
                 <div class="hero-card__focus-task">
@@ -790,16 +789,6 @@ const pricingPlans = [
   }
 }
 
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
 /* アニメーションユーティリティ */
 .animate-fade-up {
   opacity: 0;
@@ -1025,10 +1014,6 @@ const pricingPlans = [
   color: var(--ui-brand-200);
   font-size: var(--ui-text-base);
   margin-bottom: var(--ui-space-3);
-}
-
-.hero-card__fire {
-  font-size: var(--ui-text-lg);
 }
 
 .hero-card__focus-task {

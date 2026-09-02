@@ -647,7 +647,23 @@ onBeforeUnmount(() => {
                   class="profile-section__avatar-upload-icon"
                   aria-hidden="true"
                 >
-                  {{ avatarUploading ? "..." : "📷" }}
+                  <template v-if="avatarUploading">...</template>
+                  <svg
+                    v-else
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path
+                      d="M4 8.5a2 2 0 0 1 2-2h2l1.4-2h5.2l1.4 2h2a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"
+                    />
+                    <circle cx="12" cy="13" r="3.4" />
+                  </svg>
                 </span>
               </label>
             </div>
@@ -1071,6 +1087,13 @@ onBeforeUnmount(() => {
 
 .profile-section__avatar-upload-icon {
   font-size: var(--ui-text-sm, 0.875rem);
+  display: inline-grid;
+  place-items: center;
+}
+
+.profile-section__avatar-upload-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .profile-section__avatar-message {

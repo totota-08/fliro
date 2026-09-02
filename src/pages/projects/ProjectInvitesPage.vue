@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
               v-if="showOnboardingHint && canCreateInvite"
               variant="info"
               dismissible
-              title="💡 ヒント: 招待リンクの使い方"
+              title="ヒント: 招待リンクの使い方"
               @dismiss="dismissOnboardingHint"
             >
               <p>

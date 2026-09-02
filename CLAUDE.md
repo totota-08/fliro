@@ -8,6 +8,17 @@
 - **server**: `npm run dev`
 - **format**: `npm run format`
 - **typecheck**: `npm run typecheck`
+- **design-check**: `node scripts/checkAiDesign.mjs --diff`（AIっぽいデザイン検出）
+
+---
+
+## AIっぽいデザインの自動レビュー
+
+- UI を作る・変えるときは `human-design` スキルに従い、仕上げに `/design-review` スキルでレビューする。
+- `scripts/checkAiDesign.mjs` が「AIっぽいデザイン」（紫系カラー・135degグラデ・装飾絵文字・ガラスモーフィズム・トークン無視の直書き等）を機械判定する。
+  - 編集のたびに PostToolUse フック、ターン終了時に Stop フックが自動実行され、ERROR が残っているとやり直しになる（`.claude/settings.json`）。
+  - 検査対象は「変更された行」のみ。既存コードの違反は触ったときに直す。
+- 判定基準の一覧: `.claude/skills/design-review/references/ai-design-checklist.md`
 
 ---
 
