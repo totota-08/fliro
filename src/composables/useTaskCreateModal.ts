@@ -89,12 +89,19 @@ export type MemberOption = {
 /**
  * useTaskCreateData - タスク作成モーダルに必要なデータを購読
  *
- * categoriesとmembersをプロジェクトIDに基づいて取得
+ * categoriesとmembersをプロジェクトIDに基づいて取得する。
+ *
+ * これらはモーダルを開いたときにしか表示されないため、購読は
+ * 初めてモーダルが開かれるまで遅延させる。プロジェクトページを開くたびに
+ * members の購読 + メンバー人数分の profiles 取得（ダッシュボード側の
+ * 購読と重複する）が走っていたのを避けるため。
  */
 export function useTaskCreateData(projectIdRef: Ref<string>) {
   const categories = ref<TaskCategory[]>([]);
   const members = ref<MemberOption[]>([]);
 
+  // モーダルが一度でも開かれたか（＝購読が必要になったか）
+  let subscriptionRequested = false;
   let stopCategories: (() => void) | null = null;
   let stopMembers: (() => void) | null = null;
   // プロフィール取得の await 中に購読が切り替わった場合、
@@ -155,17 +162,28 @@ export function useTaskCreateData(projectIdRef: Ref<string>) {
     membersGeneration++;
   }
 
-  onMounted(() => {
-    startWatchers();
-  });
+  // モーダルが初めて開かれたタイミングで購読を開始する
+  watch(
+    isTaskModalOpen,
+    (open) => {
+      if (open && !subscriptionRequested) {
+        subscriptionRequested = true;
+        startWatchers();
+      }
+    },
+    { immediate: true },
+  );
 
   watch(projectIdRef, () => {
+    // モーダルが一度も開かれていない場合は購読しない
+    if (!subscriptionRequested) return;
     stopWatchers();
     startWatchers();
   });
 
   onBeforeUnmount(() => {
     stopWatchers();
+    subscriptionRequested = false;
   });
 
   return {

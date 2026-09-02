@@ -1,11 +1,5 @@
 import { getActionCodeSettings } from "@/config/appConfig";
-import {
-  auth,
-  db,
-  githubProvider,
-  googleProvider,
-  storage,
-} from "@/lib/firebase";
+import { auth, db, githubProvider, googleProvider } from "@/lib/firebase";
 import { getCurrentUser } from "@/lib/getCurrentUser";
 import type {
   CredentialSignUpPayload,
@@ -46,11 +40,6 @@ import {
   type UserInfo,
 } from "firebase/auth";
 import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
-import {
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytes,
-} from "firebase/storage";
 import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger("app.firebase.authService");
@@ -153,6 +142,7 @@ export async function loginWithProvider(provider: SocialProvider) {
   // 認証直後はトークンが Firestore に伝播しておらず一時的に取得失敗（null）に
   // なることがあるため、リトライしてから「未登録」と判定する。
   // 1回の失敗で判定すると、登録済みユーザーを誤ってサインアウトさせてしまう。
+  // （固定の sleep は挟まない。1回目で取得できれば待ち時間はゼロ）
   let existingProfile = null;
   const retryDelays = [500, 1000, 2000];
   for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
@@ -228,6 +218,13 @@ export async function fetchProfile(uid: string) {
 
 export async function uploadAvatar(file: File) {
   const user = await requireCurrentUser();
+
+  // Storage SDK は初期表示に不要なため、アップロード時に動的ロードする
+  const [{ storage }, { getDownloadURL, ref: storageRef, uploadBytes }] =
+    await Promise.all([
+      import("@/lib/firebaseStorage"),
+      import("firebase/storage"),
+    ]);
 
   const fileRef = storageRef(storage, `avatars/${user.uid}/${Date.now()}`);
   await uploadBytes(fileRef, file, { contentType: file.type });

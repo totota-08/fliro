@@ -1,5 +1,6 @@
 import { buildPermissionsFromRoles } from "@/constants/roles";
-import { database, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { database } from "@/lib/firebaseDatabase";
 import { addProjectEvent } from "@/services/projectActivityLogService";
 import { getLogger } from "@logtape/logtape";
 import { ref, remove, set, update } from "firebase/database";
