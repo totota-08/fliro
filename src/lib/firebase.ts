@@ -6,10 +6,7 @@ import {
   connectAuthEmulator,
   getAuth,
 } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
-import { connectDatabaseEmulator, getDatabase } from "firebase/database";
-import { connectStorageEmulator, getStorage } from "firebase/storage";
-import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 // TODO: App Check を正しく設定後に有効化する
 // import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
@@ -82,11 +79,17 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 //   });
 // }
 
+/**
+ * エミュレータを使用するかどうか
+ *
+ * Auth / Firestore 以外（Database / Storage / Functions）は遅延ロードされる
+ * ため、それぞれのモジュール（@/lib/firebaseDatabase など）から参照する。
+ */
+export const useEmulators =
+  import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
-const database = getDatabase(app);
-const functions = getFunctions(app, "asia-northeast1");
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
@@ -94,24 +97,9 @@ googleProvider.setCustomParameters({ prompt: "select_account" });
 const githubProvider = new GithubAuthProvider();
 githubProvider.setCustomParameters({ allow_signup: "true" });
 
-const useEmulators =
-  import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
-
 if (useEmulators) {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
-  connectDatabaseEmulator(database, "localhost", 9000);
-  connectStorageEmulator(storage, "localhost", 9199);
-  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
 }
 
-export {
-  app,
-  auth,
-  database,
-  db,
-  functions,
-  githubProvider,
-  googleProvider,
-  storage,
-};
+export { app, auth, db, githubProvider, googleProvider };

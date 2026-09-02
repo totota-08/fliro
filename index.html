@@ -4,10 +4,23 @@
     <meta charset="UTF-8" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Webフォントは描画をブロックしないように読み込む。
+      （rel=stylesheet のままだと Google Fonts への往復が終わるまで
+       ブラウザが最初の描画を始めない）
+    -->
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media = 'all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
     <link rel="icon" type="image/svg+xml" href="/fliro-icon.svg" />
     <link rel="apple-touch-icon" href="/fliro-icon.svg" />
     <meta
@@ -53,7 +66,78 @@
     <meta name="theme-color" content="#1A4A51" />
   </head>
   <body>
-    <div id="app"></div>
+    <!--
+      JS バンドルの読み込み・実行が終わるまで画面が真っ白にならないよう、
+      アプリと同じローディング画面を HTML にインライン展開しておく。
+      Vue の mount 時に #app の中身は置き換えられるため後片付けは不要。
+    -->
+    <style>
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background-color: #f8fafa;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      #app-splash svg {
+        filter: drop-shadow(0 4px 16px rgba(11, 46, 51, 0.3));
+      }
+      #app-splash .app-splash-name {
+        margin: 0;
+        font-family:
+          "Sora",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        font-weight: 600;
+        font-size: 1.5rem;
+        letter-spacing: 3px;
+        color: #0b2e33;
+      }
+      #app-splash .app-splash-tagline {
+        margin: 0;
+        font-family:
+          "DM Sans",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        font-weight: 400;
+        font-size: 0.75rem;
+        letter-spacing: 3.5px;
+        text-transform: uppercase;
+        color: #4f7c82;
+      }
+    </style>
+    <div id="app">
+      <div id="app-splash">
+        <svg viewBox="0 0 120 120" width="80" height="80" fill="none">
+          <rect width="120" height="120" rx="28" fill="#4f7c82" />
+          <path
+            d="M73 22 C65 22, 57 28, 53 38 C49 50, 45 64, 41 76 C39 82, 35 90, 27 94"
+            stroke="#ffffff"
+            stroke-width="5"
+            stroke-linecap="round"
+            fill="none"
+          />
+          <path
+            d="M28 54 C40 50, 56 48, 74 47 C80 46.5, 84 47, 86 49"
+            stroke="#ffffff"
+            stroke-width="5"
+            stroke-linecap="round"
+            fill="none"
+          />
+        </svg>
+        <p class="app-splash-name">Fliro</p>
+        <p class="app-splash-tagline">Project Flow</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

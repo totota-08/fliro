@@ -4,7 +4,6 @@ import { ROUTE_TO_GUEST_PAGE } from "@/constants/guestPages";
 import { ROUTE_REQUIRED_PERMISSIONS } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import { db } from "@/lib/firebase";
-import { getCurrentUser } from "@/lib/getCurrentUser";
 import { getLogger } from "@logtape/logtape";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -16,48 +15,83 @@ interface MaintenanceCache {
   fetchedAt: number;
 }
 let maintenanceCache: MaintenanceCache | null = null;
+let maintenanceInFlight: Promise<boolean> | null = null;
 const MAINTENANCE_CACHE_TTL = 30 * 1000; // 30秒
+// 初期表示をブロックし続けないための上限。超えたら「メンテナンスではない」
+// とみなして遷移を進める（結果はキャッシュに反映され次の遷移で使われる）
+const MAINTENANCE_FETCH_TIMEOUT = 3000; // 3秒
+// ログイン/サインアップ判定でプロフィール取得を待つ上限
+const PROFILE_WAIT_TIMEOUT = 2000; // 2秒
 
 /**
- * メンテナンスモードの状態を取得する（キャッシュ付き）
+ * メンテナンスモードの状態をFirestoreから取得する（同時実行はまとめる）
  */
-async function fetchMaintenanceStatus(): Promise<boolean> {
-  const now = Date.now();
+function requestMaintenanceStatus(): Promise<boolean> {
+  if (maintenanceInFlight) {
+    return maintenanceInFlight;
+  }
 
+  maintenanceInFlight = (async () => {
+    try {
+      const docRef = doc(db, "appConfig", "maintenance");
+      const docSnap = await getDoc(docRef);
+
+      const enabled = docSnap.exists()
+        ? docSnap.data()?.enabled === true
+        : false;
+
+      // キャッシュを更新
+      maintenanceCache = {
+        enabled,
+        fetchedAt: Date.now(),
+      };
+
+      return enabled;
+    } catch (error) {
+      logger.error`Failed to fetch maintenance status: ${error}`;
+      // エラー時はメンテナンスモードでないとみなす（サービス継続優先）
+      return false;
+    } finally {
+      maintenanceInFlight = null;
+    }
+  })();
+
+  return maintenanceInFlight;
+}
+
+/**
+ * メンテナンスモードの状態を取得する（キャッシュ + タイムアウト付き）
+ */
+function fetchMaintenanceStatus(): Promise<boolean> {
   // キャッシュが有効な場合はキャッシュを返す
   if (
     maintenanceCache &&
-    now - maintenanceCache.fetchedAt < MAINTENANCE_CACHE_TTL
+    Date.now() - maintenanceCache.fetchedAt < MAINTENANCE_CACHE_TTL
   ) {
-    return maintenanceCache.enabled;
+    return Promise.resolve(maintenanceCache.enabled);
   }
 
-  try {
-    const docRef = doc(db, "appConfig", "maintenance");
-    const docSnap = await getDoc(docRef);
+  const request = requestMaintenanceStatus();
 
-    const enabled = docSnap.exists() ? docSnap.data()?.enabled === true : false;
-
-    // キャッシュを更新
-    maintenanceCache = {
-      enabled,
-      fetchedAt: now,
-    };
-
-    return enabled;
-  } catch (error) {
-    logger.error`Failed to fetch maintenance status: ${error}`;
-    // エラー時はメンテナンスモードでないとみなす（サービス継続優先）
-    return false;
-  }
+  // Firestore の初回接続が遅い場合でも画面を待たせ続けない
+  return Promise.race([
+    request,
+    new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), MAINTENANCE_FETCH_TIMEOUT);
+    }),
+  ]);
 }
+
+// 認証状態の復元と並行して先読みしておく（初回遷移の待ち時間を短縮する）
+void requestMaintenanceStatus();
 
 /**
  * ユーザーが管理者かどうかをチェックする
  */
 async function isAdmin(): Promise<boolean> {
   try {
-    const user = await getCurrentUser();
+    await waitForAuthReady();
+    const user = useAuthStore().user.value;
     if (!user) return false;
 
     const idTokenResult = await user.getIdTokenResult();
@@ -73,7 +107,11 @@ import ProjectLayout from "@/layouts/ProjectLayout.vue";
 import HomePage from "@/pages/HomePage.vue";
 import LoginPage from "@/pages/auth/LoginPage.vue";
 
-import { useAuthStore, waitForAuthReady } from "@/store/auth";
+import {
+  useAuthStore,
+  waitForAuthReady,
+  waitForProfileReady,
+} from "@/store/auth";
 import { createRouter, createWebHistory } from "vue-router";
 
 // 動的インポート関数（コード分割用）
@@ -425,11 +463,12 @@ router.beforeEach(async (to) => {
     return true;
   }
 
-  await waitForAuthReady();
-
   let user = null;
   try {
-    user = await getCurrentUser();
+    // authReady 後は store が現在のユーザーを保持しているので、
+    // ここで onAuthStateChanged を張り直さない（往復を1回減らす）
+    await waitForAuthReady();
+    user = auth.user.value;
   } catch (error) {
     logger.error`Auth check failed: ${error}`;
     // ゲストアクセス可能なルートの場合はログインにリダイレクトしない
@@ -529,6 +568,11 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name && authRestricted.includes(String(to.name)) && user) {
+    // このルートだけはプロフィールの内容で分岐するため取得完了を待つ。
+    // ただし待ち続けて画面が止まらないよう上限を設ける
+    // （未取得のまま抜けた場合は下の「一旦許可」に落ちる）
+    await waitForProfileReady(PROFILE_WAIT_TIMEOUT);
+
     // プロフィールがない、またはsetUp=falseの場合はセットアップが必要
     const needsSetup =
       !auth.profile.value || auth.profile.value.setUp === false;

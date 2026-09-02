@@ -49,6 +49,9 @@ const shouldShowBetaGate = computed(() => {
   // 未ログインなら表示しない（ログインページを見せる）
   if (!auth.isAuthenticated.value) return false;
 
+  // プロフィール取得前は判定できないため表示しない（ゲートのちらつき防止）
+  if (!auth.profileReady.value) return false;
+
   // 認証関連ページにいるなら表示しない
   const authRoutes = [
     "login",
@@ -68,10 +71,8 @@ const shouldShowBetaGate = computed(() => {
 let appConfigUnsubscribe: (() => void) | null = null;
 
 onMounted(async () => {
-  // 認証状態の準備を待つ
+  // 認証状態の準備を待つ（プロフィール取得は待たない）
   await waitForAuthReady();
-  // Minimum loading time for smooth UX
-  await new Promise((resolve) => setTimeout(resolve, 800));
   isLoading.value = false;
 
   // appConfig購読開始
