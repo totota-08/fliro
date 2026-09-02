@@ -2,7 +2,11 @@ export type ProjectStatus = "active" | "archived" | "completed";
 
 /** ゲストがアクセス可能なページの種類 */
 export type GuestAllowedPage =
-  "dashboard" | "tasks" | "threads" | "activity" | "members";
+  | "dashboard"
+  | "tasks"
+  | "threads"
+  | "activity"
+  | "members";
 
 export interface ProjectSettings {
   isPublic: boolean;

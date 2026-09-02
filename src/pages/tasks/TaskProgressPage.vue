@@ -63,7 +63,9 @@ const sidebarProjects = computed(() =>
       params: { projectId: project.id },
     },
     accent: ["primary", "secondary", "accent"][index % 3] as
-      "primary" | "secondary" | "accent",
+      | "primary"
+      | "secondary"
+      | "accent",
   })),
 );
 

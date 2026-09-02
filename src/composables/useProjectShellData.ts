@@ -30,10 +30,14 @@ export function useProjectShellData(projectIdRef: Ref<string>) {
 
   const sidebarProjects = computed(() => projectList.value);
 
+  // プロフィールは非同期に読み込まれるため、届くまでは Auth の表示名で埋める
   const profileInfo = computed<DashboardProfileInfo>(() => ({
     name:
-      profile.value?.nickname || profile.value?.fullName || `${appName} User`,
-    email: profile.value?.email || "",
+      profile.value?.nickname ||
+      profile.value?.fullName ||
+      user.value?.displayName ||
+      `${appName} User`,
+    email: profile.value?.email || user.value?.email || "",
     avatar: profile.value?.avatarUrl || user.value?.photoURL || undefined,
   }));
 
@@ -52,7 +56,9 @@ export function useProjectShellData(projectIdRef: Ref<string>) {
           params: { projectId: docSnap.id },
         },
         accent: ["primary", "secondary", "accent"][index % 3] as
-          "primary" | "secondary" | "accent",
+          | "primary"
+          | "secondary"
+          | "accent",
         color: (data.color as string) || undefined,
         iconUrl: (data.iconUrl as string) || undefined,
       };
