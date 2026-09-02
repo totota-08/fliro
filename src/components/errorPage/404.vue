@@ -37,7 +37,7 @@ onMounted(async () => {
       </h2>
       <p class="error-page__advice">
         <span v-if="isLoading">読み込み中...</span>
-        <span v-else>😉 {{ advice }}</span>
+        <span v-else>{{ advice }}</span>
       </p>
       <RouterLink to="/" class="error-page__cta">トップページに戻る</RouterLink>
     </div>
@@ -93,9 +93,7 @@ onMounted(async () => {
 
 .error-page__path {
   display: inline-block;
-  font-family:
-    "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
-    monospace;
+  font-family: var(--ui-font-mono);
   padding: 0.25rem 0.75rem;
   margin-left: 0.25rem;
   border-radius: 999px;

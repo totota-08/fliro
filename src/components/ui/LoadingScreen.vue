@@ -67,11 +67,7 @@ defineProps<{
 }
 
 .loading-text {
-  font-family:
-    "Sora",
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: var(--ui-font-sans);
   font-weight: 600;
   font-size: var(--ui-text-2xl, 1.5rem);
   color: #0b2e33;
@@ -80,11 +76,7 @@ defineProps<{
 }
 
 .loading-tagline {
-  font-family:
-    "DM Sans",
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: var(--ui-font-sans);
   font-weight: 400;
   font-size: var(--ui-text-xs, 0.75rem);
   color: var(--color-teal, #4f7c82);

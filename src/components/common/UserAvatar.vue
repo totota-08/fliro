@@ -50,8 +50,8 @@ const style = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #b8e3e9 0%, #89c5cc 100%);
-  color: #0b2e33;
+  background: var(--ui-brand-300, #b8e3e9);
+  color: var(--ui-brand-900, #0b2e33);
   font-weight: 600;
   flex-shrink: 0;
   user-select: none;
