@@ -138,17 +138,10 @@ export async function loginWithProvider(provider: SocialProvider) {
   const { signInWithPopup } = await import("firebase/auth");
   const credential = await signInWithPopup(auth, authProvider);
 
-  // Firebase AuthトークンがFirestoreに伝播するまで待機
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // プロファイルの存在を確認（権限エラーの場合もプロファイルなしとして扱う）
-  let existingProfile = null;
-  try {
-    existingProfile = await fetchProfile(credential.user.uid);
-  } catch (error) {
-    // Firestoreの権限エラーはプロファイルが存在しないケースとして扱う
-    // （認証トークン伝播遅延による一時的なエラーの可能性もあるため）
-  }
+  // プロファイルの存在を確認する。
+  // Firebase Auth トークンの伝播待ちは固定の sleep ではなく、
+  // 実際にエラーになった場合だけ再試行する（通常は待ち時間ゼロ）
+  const existingProfile = await fetchProfileAfterSignIn(credential.user.uid);
 
   if (!existingProfile) {
     // プロファイルが存在しない場合は即座にサインアウト
@@ -194,22 +187,46 @@ export async function persistProfileAfterSocialLogin(user: User) {
   return persistProfile(user);
 }
 
+/** プロファイルを読む（エラーはそのまま投げる） */
+async function readProfileDoc(uid: string) {
+  const snapshot = await getDoc(doc(db, "profiles", uid));
+  return snapshot.exists() ? (snapshot.data() as UserProfile) : null;
+}
+
 export async function fetchProfile(uid: string) {
-  const ref = doc(db, "profiles", uid);
-
   try {
-    const snapshot = await getDoc(ref);
-
-    if (!snapshot.exists()) {
-      return null;
-    }
-
-    return snapshot.data() as UserProfile;
+    return await readProfileDoc(uid);
   } catch (error) {
     // 認証直後のタイミングでトークンがFirestoreに伝播していない場合
     // パーミッションエラーが発生することがある
     logger.warn`Failed to fetch profile (auth token may not be synced yet): ${error}`;
     return null;
+  }
+}
+
+/**
+ * ログイン直後にプロファイルを取得する
+ *
+ * 認証トークンが Firestore に伝播する前に読むとパーミッションエラーに
+ * なることがあるため、「エラーになった場合だけ」短いバックオフで
+ * 再試行する。存在しないことが確定した場合は待たずに null を返す。
+ */
+async function fetchProfileAfterSignIn(
+  uid: string,
+): Promise<UserProfile | null> {
+  const delays = [300, 600];
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await readProfileDoc(uid);
+    } catch (error) {
+      if (attempt >= delays.length) {
+        logger.warn`Failed to fetch profile after sign-in (treating as not registered): ${error}`;
+        return null;
+      }
+      logger.info`Profile read failed right after sign-in, retrying in ${delays[attempt]}ms`;
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+    }
   }
 }
 
