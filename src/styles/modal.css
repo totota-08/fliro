@@ -1,81 +1,10 @@
 /**
- * 共通モーダルスタイル
- * ProjectSettingsPage / ProjectRolesPage で重複定義されていた .modal 系を統合。
- * 新規実装はまず components/ui/AppModal.vue の利用を検討すること。
+ * モーダル関連の共通スタイル
+ * モーダル本体は components/ui/AppModal.vue を使用すること。
  */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--ui-overlay-bg, rgba(0, 0, 0, 0.5));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-4, 1rem);
-  z-index: var(--ui-z-modal, 50);
-}
-
-.modal {
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  width: 100%;
-  max-width: var(--ui-modal-width-md, 480px);
-  max-height: var(--ui-modal-max-height, 90vh);
-  overflow-y: auto;
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.modal--sm {
-  max-width: var(--ui-modal-width-sm, 400px);
-}
-
-.modal--lg {
-  max-width: var(--ui-modal-width-lg, 640px);
-}
-
-.modal__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.modal__header h3 {
-  margin: 0;
-  font-size: var(--ui-text-lg, 1.125rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.modal__close {
-  background: transparent;
-  border: none;
-  font-size: var(--ui-text-2xl, 1.5rem);
-  color: var(--ui-text-muted, #64748b);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal__close:hover {
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.modal__body {
-  padding: var(--ui-space-5, 1.25rem);
-}
 
 .modal__warning {
   margin-top: var(--ui-space-2, 0.5rem);
   font-size: var(--ui-text-sm, 0.875rem);
   color: var(--ui-text-muted, #64748b);
-}
-
-.modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-3, 0.75rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }

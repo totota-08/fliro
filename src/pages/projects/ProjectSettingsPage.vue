@@ -8,6 +8,7 @@ import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
 import AppButton from "@/components/ui/AppButton.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import { usePageTitle } from "@/composables/usePageTitle";
@@ -1304,66 +1305,42 @@ watch(projectId, async (newId, oldId) => {
     />
 
     <!-- プロジェクト削除用パスワード確認モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="showPasswordModal"
-        class="modal-overlay"
-        @click.self="closePasswordModal"
-      >
-        <div
-          class="modal modal--sm"
-          role="dialog"
-          aria-labelledby="password-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="password-modal-title">パスワードの確認</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closePasswordModal"
-            >
-              &times;
-            </button>
-          </header>
-          <div class="modal__body">
-            <p class="modal__description">
-              プロジェクトを削除するには、パスワードを入力してください。
-            </p>
-            <div class="form-field">
-              <label for="delete-password">パスワード</label>
-              <input
-                id="delete-password"
-                v-model="deletePassword"
-                type="password"
-                placeholder="パスワードを入力"
-                autocomplete="current-password"
-                @keydown.enter="handleDeletePasswordConfirm"
-              />
-            </div>
-            <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
-          </div>
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              :disabled="deleting"
-              @click="closePasswordModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="!deletePassword.trim() || deleting"
-              @click="handleDeletePasswordConfirm"
-            >
-              {{ deleting ? "確認中..." : "続行" }}
-            </button>
-          </footer>
-        </div>
+    <AppModal
+      :open="showPasswordModal"
+      title="パスワードの確認"
+      size="sm"
+      @close="closePasswordModal"
+    >
+      <p>プロジェクトを削除するには、パスワードを入力してください。</p>
+      <div class="form-field">
+        <label for="delete-password">パスワード</label>
+        <input
+          id="delete-password"
+          v-model="deletePassword"
+          type="password"
+          placeholder="パスワードを入力"
+          autocomplete="current-password"
+          @keydown.enter="handleDeletePasswordConfirm"
+        />
       </div>
-    </Teleport>
+      <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
+      <template #footer>
+        <AppButton
+          variant="ghost"
+          :disabled="deleting"
+          @click="closePasswordModal"
+        >
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="danger"
+          :disabled="!deletePassword.trim() || deleting"
+          @click="handleDeletePasswordConfirm"
+        >
+          {{ deleting ? "確認中..." : "続行" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- プロジェクト削除用MFA検証モーダル -->
     <MFAVerificationModal

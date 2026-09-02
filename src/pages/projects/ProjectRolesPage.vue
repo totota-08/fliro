@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { usePageTitle } from "@/composables/usePageTitle";
+import AppButton from "@/components/ui/AppButton.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import {
   ProjectPermission,
@@ -708,384 +710,282 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ロール作成モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isCreateModalOpen"
-        class="modal-overlay"
-        @click.self="closeCreateModal"
-      >
-        <div class="modal" role="dialog" aria-labelledby="create-modal-title">
-          <header class="modal__header">
-            <h3 id="create-modal-title">新しいロールを作成</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeCreateModal"
-            >
-              &times;
-            </button>
-          </header>
+    <AppModal
+      :open="isCreateModalOpen"
+      title="新しいロールを作成"
+      @close="closeCreateModal"
+    >
+      <form id="role-create-form" @submit.prevent="createRole">
+        <div class="form-field">
+          <label class="form-label">
+            ロール名 <span class="required">*</span>
+          </label>
+          <input
+            v-model="newRole.name"
+            type="text"
+            class="form-input"
+            placeholder="例: moderator"
+            maxlength="30"
+            required
+          />
+        </div>
 
-          <form class="modal__body" @submit.prevent="createRole">
-            <div class="form-field">
-              <label class="form-label">
-                ロール名 <span class="required">*</span>
-              </label>
-              <input
-                v-model="newRole.name"
-                type="text"
-                class="form-input"
-                placeholder="例: moderator"
-                maxlength="30"
-                required
+        <div class="form-field">
+          <label class="form-label">カラー</label>
+          <div class="color-picker">
+            <div class="color-picker__presets">
+              <button
+                v-for="preset in presetColors"
+                :key="preset.value"
+                type="button"
+                class="color-preset"
+                :class="{ 'is-selected': newRole.color === preset.value }"
+                :style="{ backgroundColor: preset.value }"
+                :title="preset.label"
+                @click="selectPresetColor(preset.value, 'new')"
               />
             </div>
-
-            <div class="form-field">
-              <label class="form-label">カラー</label>
-              <div class="color-picker">
-                <div class="color-picker__presets">
-                  <button
-                    v-for="preset in presetColors"
-                    :key="preset.value"
-                    type="button"
-                    class="color-preset"
-                    :class="{ 'is-selected': newRole.color === preset.value }"
-                    :style="{ backgroundColor: preset.value }"
-                    :title="preset.label"
-                    @click="selectPresetColor(preset.value, 'new')"
-                  />
-                </div>
-                <div class="color-picker__custom">
-                  <label class="color-custom-label">
-                    その他:
-                    <input
-                      type="color"
-                      class="color-custom-input"
-                      :value="newRole.color"
-                      @input="handleCustomColorChange($event, 'new')"
-                    />
-                  </label>
-                </div>
-              </div>
+            <div class="color-picker__custom">
+              <label class="color-custom-label">
+                その他:
+                <input
+                  type="color"
+                  class="color-custom-input"
+                  :value="newRole.color"
+                  @input="handleCustomColorChange($event, 'new')"
+                />
+              </label>
             </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeCreateModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!newRole.name.trim() || isCreating"
-              >
-                {{ isCreating ? "作成中..." : "作成" }}
-              </button>
-            </footer>
-          </form>
+          </div>
         </div>
-      </div>
-    </Teleport>
+      </form>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeCreateModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="role-create-form"
+          variant="primary"
+          :disabled="!newRole.name.trim() || isCreating"
+        >
+          {{ isCreating ? "作成中..." : "作成" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- ロール編集モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isEditModalOpen"
-        class="modal-overlay"
-        @click.self="closeEditModal"
-      >
-        <div
-          class="modal modal--lg"
-          role="dialog"
-          aria-labelledby="edit-modal-title"
+    <AppModal
+      :open="isEditModalOpen"
+      :title="`ロールを編集 - ${editingRole?.name ?? ''}`"
+      size="lg"
+      @close="closeEditModal"
+    >
+      <!-- タブ切り替え -->
+      <div class="modal-tabs">
+        <button
+          type="button"
+          class="modal-tab"
+          :class="{ 'modal-tab--active': editActiveTab === 'basic' }"
+          @click="editActiveTab = 'basic'"
         >
-          <header class="modal__header">
-            <h3 id="edit-modal-title">
-              ロールを編集 - {{ editingRole?.name }}
-            </h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeEditModal"
-            >
-              &times;
-            </button>
-          </header>
+          基本情報
+        </button>
+        <button
+          type="button"
+          class="modal-tab"
+          :class="{ 'modal-tab--active': editActiveTab === 'permissions' }"
+          @click="editActiveTab = 'permissions'"
+        >
+          権限
+        </button>
+      </div>
 
-          <!-- タブ切り替え -->
-          <div class="modal-tabs">
-            <button
-              type="button"
-              class="modal-tab"
-              :class="{ 'modal-tab--active': editActiveTab === 'basic' }"
-              @click="editActiveTab = 'basic'"
-            >
-              基本情報
-            </button>
-            <button
-              type="button"
-              class="modal-tab"
-              :class="{ 'modal-tab--active': editActiveTab === 'permissions' }"
-              @click="editActiveTab = 'permissions'"
-            >
-              権限
-            </button>
+      <form id="role-edit-form" @submit.prevent="saveRoleEdit">
+        <!-- 基本情報タブ -->
+        <div v-if="editActiveTab === 'basic'">
+          <div class="form-field">
+            <label class="form-label">
+              ロール名 <span class="required">*</span>
+            </label>
+            <input
+              v-model="editForm.name"
+              type="text"
+              class="form-input"
+              maxlength="30"
+              required
+            />
           </div>
 
-          <form class="modal__body" @submit.prevent="saveRoleEdit">
-            <!-- 基本情報タブ -->
-            <div v-if="editActiveTab === 'basic'">
-              <div class="form-field">
-                <label class="form-label">
-                  ロール名 <span class="required">*</span>
-                </label>
-                <input
-                  v-model="editForm.name"
-                  type="text"
-                  class="form-input"
-                  maxlength="30"
-                  required
+          <div class="form-field">
+            <label class="form-label">カラー</label>
+            <div class="color-picker">
+              <div class="color-picker__presets">
+                <button
+                  v-for="preset in presetColors"
+                  :key="preset.value"
+                  type="button"
+                  class="color-preset"
+                  :class="{
+                    'is-selected': editForm.color === preset.value,
+                  }"
+                  :style="{ backgroundColor: preset.value }"
+                  :title="preset.label"
+                  @click="selectPresetColor(preset.value, 'edit')"
                 />
               </div>
-
-              <div class="form-field">
-                <label class="form-label">カラー</label>
-                <div class="color-picker">
-                  <div class="color-picker__presets">
-                    <button
-                      v-for="preset in presetColors"
-                      :key="preset.value"
-                      type="button"
-                      class="color-preset"
-                      :class="{
-                        'is-selected': editForm.color === preset.value,
-                      }"
-                      :style="{ backgroundColor: preset.value }"
-                      :title="preset.label"
-                      @click="selectPresetColor(preset.value, 'edit')"
-                    />
-                  </div>
-                  <div class="color-picker__custom">
-                    <label class="color-custom-label">
-                      その他:
-                      <input
-                        type="color"
-                        class="color-custom-input"
-                        :value="editForm.color || '#64748b'"
-                        @input="handleCustomColorChange($event, 'edit')"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 権限タブ -->
-            <div
-              v-if="editActiveTab === 'permissions'"
-              class="permission-modal-body"
-            >
-              <p class="permission-modal-intro">
-                各ページ・機能へのアクセス権限を設定します。
-              </p>
-              <div
-                v-for="pagePerm in pagePermissions"
-                :key="pagePerm.page"
-                class="permission-page-group"
-              >
-                <div class="permission-page-group__header">
-                  <h4 class="permission-page-group__title">
-                    {{ pagePerm.page }}
-                  </h4>
-                  <p class="permission-page-group__desc">
-                    {{ pagePerm.description }}
-                  </p>
-                </div>
-                <div class="permission-page-group__items">
-                  <label
-                    v-for="perm in pagePerm.permissions"
-                    :key="perm.key"
-                    class="permission-checkbox"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="editForm.permissions.has(perm.key)"
-                      @change="toggleEditPermission(perm.key)"
-                    />
-                    <span class="permission-checkbox__label">{{
-                      perm.label
-                    }}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeEditModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!editForm.name.trim() || isUpdating"
-              >
-                {{ isUpdating ? "保存中..." : "保存" }}
-              </button>
-            </footer>
-          </form>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- 権限編集モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isPermissionModalOpen"
-        class="modal-overlay"
-        @click.self="closePermissionModal"
-      >
-        <div
-          class="modal modal--lg"
-          role="dialog"
-          aria-labelledby="permission-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="permission-modal-title">
-              権限を編集 - {{ editingPermissionRole?.name }}
-            </h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closePermissionModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <div class="modal__body permission-modal-body">
-            <p class="permission-modal-intro">
-              各ページ・機能へのアクセス権限を設定します。
-            </p>
-            <div
-              v-for="pagePerm in pagePermissions"
-              :key="pagePerm.page"
-              class="permission-page-group"
-            >
-              <div class="permission-page-group__header">
-                <h4 class="permission-page-group__title">
-                  {{ pagePerm.page }}
-                </h4>
-                <p class="permission-page-group__desc">
-                  {{ pagePerm.description }}
-                </p>
-              </div>
-              <div class="permission-page-group__items">
-                <label
-                  v-for="perm in pagePerm.permissions"
-                  :key="perm.key"
-                  class="permission-checkbox"
-                >
+              <div class="color-picker__custom">
+                <label class="color-custom-label">
+                  その他:
                   <input
-                    type="checkbox"
-                    :checked="editingPermissions.has(perm.key)"
-                    @change="togglePermission(perm.key)"
+                    type="color"
+                    class="color-custom-input"
+                    :value="editForm.color || '#64748b'"
+                    @input="handleCustomColorChange($event, 'edit')"
                   />
-                  <span class="permission-checkbox__label">{{
-                    perm.label
-                  }}</span>
                 </label>
               </div>
             </div>
           </div>
-
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closePermissionModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--primary"
-              :disabled="isSavingPermissions"
-              @click="savePermissions"
-            >
-              {{ isSavingPermissions ? "保存中..." : "保存" }}
-            </button>
-          </footer>
         </div>
-      </div>
-    </Teleport>
 
-    <!-- ロール削除確認モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isDeleteModalOpen"
-        class="modal-overlay"
-        @click.self="closeDeleteModal"
-      >
+        <!-- 権限タブ -->
         <div
-          class="modal modal--sm"
-          role="alertdialog"
-          aria-labelledby="delete-modal-title"
+          v-if="editActiveTab === 'permissions'"
+          class="permission-modal-body"
         >
-          <header class="modal__header">
-            <h3 id="delete-modal-title">ロールを削除</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeDeleteModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <div class="modal__body">
-            <p>
-              「<strong>{{ deletingRole?.name }}</strong
-              >」を削除しますか？
-            </p>
-            <p class="modal__warning">この操作は取り消せません。</p>
-
-            <div v-if="deleteError" class="error-alert">
-              <p>{{ deleteError }}</p>
+          <p class="permission-modal-intro">
+            各ページ・機能へのアクセス権限を設定します。
+          </p>
+          <div
+            v-for="pagePerm in pagePermissions"
+            :key="pagePerm.page"
+            class="permission-page-group"
+          >
+            <div class="permission-page-group__header">
+              <h4 class="permission-page-group__title">
+                {{ pagePerm.page }}
+              </h4>
+              <p class="permission-page-group__desc">
+                {{ pagePerm.description }}
+              </p>
+            </div>
+            <div class="permission-page-group__items">
+              <label
+                v-for="perm in pagePerm.permissions"
+                :key="perm.key"
+                class="permission-checkbox"
+              >
+                <input
+                  type="checkbox"
+                  :checked="editForm.permissions.has(perm.key)"
+                  @change="toggleEditPermission(perm.key)"
+                />
+                <span class="permission-checkbox__label">{{ perm.label }}</span>
+              </label>
             </div>
           </div>
+        </div>
+      </form>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeEditModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="role-edit-form"
+          variant="primary"
+          :disabled="!editForm.name.trim() || isUpdating"
+        >
+          {{ isUpdating ? "保存中..." : "保存" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closeDeleteModal"
+    <!-- 権限編集モーダル -->
+    <AppModal
+      :open="isPermissionModalOpen"
+      :title="`権限を編集 - ${editingPermissionRole?.name ?? ''}`"
+      size="lg"
+      @close="closePermissionModal"
+    >
+      <div class="permission-modal-body">
+        <p class="permission-modal-intro">
+          各ページ・機能へのアクセス権限を設定します。
+        </p>
+        <div
+          v-for="pagePerm in pagePermissions"
+          :key="pagePerm.page"
+          class="permission-page-group"
+        >
+          <div class="permission-page-group__header">
+            <h4 class="permission-page-group__title">
+              {{ pagePerm.page }}
+            </h4>
+            <p class="permission-page-group__desc">
+              {{ pagePerm.description }}
+            </p>
+          </div>
+          <div class="permission-page-group__items">
+            <label
+              v-for="perm in pagePerm.permissions"
+              :key="perm.key"
+              class="permission-checkbox"
             >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="isDeleting"
-              @click="confirmDelete"
-            >
-              {{ isDeleting ? "削除中..." : "削除する" }}
-            </button>
-          </footer>
+              <input
+                type="checkbox"
+                :checked="editingPermissions.has(perm.key)"
+                @change="togglePermission(perm.key)"
+              />
+              <span class="permission-checkbox__label">{{ perm.label }}</span>
+            </label>
+          </div>
         </div>
       </div>
-    </Teleport>
+
+      <template #footer>
+        <AppButton variant="ghost" @click="closePermissionModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :disabled="isSavingPermissions"
+          @click="savePermissions"
+        >
+          {{ isSavingPermissions ? "保存中..." : "保存" }}
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <!-- ロール削除確認モーダル -->
+    <AppModal
+      :open="isDeleteModalOpen"
+      title="ロールを削除"
+      size="sm"
+      @close="closeDeleteModal"
+    >
+      <p>
+        「<strong>{{ deletingRole?.name }}</strong
+        >」を削除しますか？
+      </p>
+      <p class="modal__warning">この操作は取り消せません。</p>
+
+      <div v-if="deleteError" class="error-alert">
+        <p>{{ deleteError }}</p>
+      </div>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeDeleteModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="danger"
+          :disabled="isDeleting"
+          @click="confirmDelete"
+        >
+          {{ isDeleting ? "削除中..." : "削除する" }}
+        </AppButton>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -1359,6 +1259,9 @@ onBeforeUnmount(() => {
 .modal-tabs {
   display: flex;
   border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  /* AppModal 本文の padding を相殺してヘッダー直下いっぱいに広げる */
+  margin: calc(-1 * var(--ui-space-6, 1.5rem))
+    calc(-1 * var(--ui-space-6, 1.5rem)) var(--ui-space-4, 1rem);
   padding: 0 var(--ui-space-5, 1.25rem);
   gap: var(--ui-space-1, 0.25rem);
 }

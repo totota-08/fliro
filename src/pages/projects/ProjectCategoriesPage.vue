@@ -694,14 +694,6 @@ onBeforeUnmount(() => {
   font-size: var(--ui-text-sm);
 }
 
-/* モーダルスタイルは AppModal コンポーネントで管理 */
-
-.modal__warning {
-  margin-top: var(--ui-space-2);
-  font-size: var(--ui-text-sm);
-  color: var(--ui-text-muted);
-}
-
 /* エラーアラート */
 .error-alert {
   margin-top: var(--ui-space-4);
