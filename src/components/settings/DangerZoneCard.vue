@@ -3,7 +3,7 @@
  * DangerZoneCard.vue
  * Danger Zone を折りたたみカード化
  */
-import { ref, computed } from "vue";
+import { ref, useId } from "vue";
 
 interface Props {
   title: string;
@@ -15,9 +15,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const isOpen = ref(props.defaultOpen);
-const contentId = computed(
-  () => `danger-zone-${Math.random().toString(36).slice(2, 9)}`,
-);
+const contentId = `danger-zone-${useId()}`;
 
 function toggle() {
   isOpen.value = !isOpen.value;

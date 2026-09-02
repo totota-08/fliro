@@ -63,12 +63,6 @@ export interface ProjectMemberDoc {
   lastAccessedAt: Date;
 }
 
-export interface UserProjectEntryDoc {
-  projectName: string;
-  role: ProjectMemberDoc["role"];
-  lastAccessedAt: Date;
-}
-
 export interface CreateProjectPayload {
   name: string;
   description?: string;

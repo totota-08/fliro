@@ -8,7 +8,7 @@ import SettingsSectionCard from "@/components/settings/SettingsSectionCard.vue";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow.vue";
 import AppAlert from "@/components/ui/AppAlert.vue";
 import AppButton from "@/components/ui/AppButton.vue";
-import AppColorPicker from "@/components/ui/AppColorPicker.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import { usePageTitle } from "@/composables/usePageTitle";
@@ -20,10 +20,7 @@ import {
   DEFAULT_GUEST_ALLOWED_PAGES,
   GUEST_CONFIGURABLE_PAGES,
 } from "@/constants/guestPages";
-import {
-  ProjectPermission,
-  type ProjectPermissionKey,
-} from "@/constants/permissions";
+import { ProjectPermission } from "@/constants/permissions";
 import { ROUTE_NAMES } from "@/constants/routes";
 import type { GuestAllowedPage } from "@/types/project";
 import {
@@ -47,14 +44,6 @@ import {
   type InsightCardConfig,
 } from "@/services/dashboardSettingsService";
 import { updateProjectSettings } from "@/services/projectSettings";
-import {
-  addRole,
-  listenProjectRoles,
-  removeRole,
-  updateRole,
-  updateRolePermissions,
-  type ProjectRole,
-} from "@/services/rolesService";
 import { listenTasks, type TaskDoc } from "@/services/taskService";
 import { useAuthStore } from "@/store/auth";
 import type { ProjectDoc } from "@/types/project";
@@ -120,138 +109,6 @@ const humorousEnabled = ref(false);
 const initialHumorousEnabled = ref(false);
 const humorousSaving = ref(false);
 const showZeldaEffect = ref(false);
-
-// ロール管理
-const roles = ref<ProjectRole[]>([]);
-let stopRoles: (() => void) | null = null;
-const canManageRoles = computed(() => can(ProjectPermission.MANAGE_ROLES));
-const isPermissionModalOpen = ref(false);
-const editingPermissionRole = ref<ProjectRole | null>(null);
-const editingPermissions = ref<Set<ProjectPermissionKey>>(new Set());
-const isSavingPermissions = ref(false);
-
-// ロール追加モーダル
-const isCreateRoleModalOpen = ref(false);
-const newRole = ref({ name: "", color: "#64748b" });
-const isCreatingRole = ref(false);
-
-// ロール編集モーダル（権限設定も含む）
-const isEditRoleModalOpen = ref(false);
-const editingRole = ref<ProjectRole | null>(null);
-const editRoleForm = ref({ name: "", color: "" });
-const editRolePermissions = ref<Set<ProjectPermissionKey>>(new Set());
-const isUpdatingRole = ref(false);
-
-// ロール削除モーダル
-const isDeleteRoleModalOpen = ref(false);
-const deletingRole = ref<ProjectRole | null>(null);
-const isDeletingRole = ref(false);
-const deleteRoleError = ref("");
-
-// プリセットカラー
-const presetColors = [
-  "#4f7c82", // Teal
-  "#0b2e33", // Deep Green
-  "#16a34a", // Green
-  "#f59e0b", // Amber
-  "#ef4444", // Red
-  "#8b5cf6", // Purple
-  "#3b82f6", // Blue
-  "#64748b", // Slate
-];
-
-// ページ/機能ごとの権限定義
-const pagePermissions: {
-  page: string;
-  description: string;
-  permissions: { key: ProjectPermissionKey; label: string }[];
-}[] = [
-  {
-    page: "ダッシュボード",
-    description: "プロジェクトの概要を表示するページ",
-    permissions: [{ key: ProjectPermission.VIEW_DASHBOARD, label: "閲覧" }],
-  },
-  {
-    page: "タスク",
-    description: "タスクの一覧・詳細ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_TASKS, label: "閲覧" },
-      { key: ProjectPermission.MANAGE_TASKS, label: "作成・編集" },
-      { key: ProjectPermission.DELETE_TASKS, label: "削除" },
-      {
-        key: ProjectPermission.UPDATE_OWN_PROGRESS,
-        label: "自分の進捗のみ更新",
-      },
-    ],
-  },
-  {
-    page: "スレッド",
-    description: "チームのコミュニケーションページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_THREADS, label: "閲覧" },
-      { key: ProjectPermission.POST_THREADS, label: "投稿" },
-    ],
-  },
-  {
-    page: "メンバー",
-    description: "プロジェクトメンバーの一覧ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_MEMBERS, label: "閲覧" },
-      { key: ProjectPermission.INVITE_MEMBERS, label: "招待" },
-      { key: ProjectPermission.MANAGE_MEMBERS, label: "管理（キック等）" },
-    ],
-  },
-  {
-    page: "カテゴリ",
-    description: "タスクカテゴリの管理ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_CATEGORIES, label: "閲覧" },
-      { key: ProjectPermission.MANAGE_CATEGORIES, label: "管理" },
-    ],
-  },
-  {
-    page: "招待リンク",
-    description: "招待リンクの管理ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_INVITES, label: "閲覧" },
-      { key: ProjectPermission.MANAGE_INVITES, label: "管理" },
-    ],
-  },
-  {
-    page: "プロジェクト設定",
-    description: "プロジェクトの設定ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_SETTINGS, label: "閲覧" },
-      { key: ProjectPermission.MANAGE_SETTINGS, label: "変更" },
-    ],
-  },
-  {
-    page: "ロール管理",
-    description: "ロールと権限の管理ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_ROLES, label: "閲覧" },
-      { key: ProjectPermission.MANAGE_ROLES, label: "管理" },
-    ],
-  },
-  {
-    page: "アクティビティ",
-    description: "プロジェクトの活動履歴ページ",
-    permissions: [{ key: ProjectPermission.VIEW_ACTIVITY, label: "閲覧" }],
-  },
-  {
-    page: "通知",
-    description: "通知設定ページ",
-    permissions: [
-      { key: ProjectPermission.VIEW_NOTIFICATIONS, label: "閲覧" },
-      { key: ProjectPermission.MANAGE_NOTIFICATIONS, label: "変更" },
-    ],
-  },
-  {
-    page: "週次スコア",
-    description: "チームの週次パフォーマンスページ",
-    permissions: [{ key: ProjectPermission.VIEW_SCORES, label: "閲覧" }],
-  },
-];
 
 // Dashboard card configuration
 const cardConfig = ref<DashboardCardConfig[]>([]);
@@ -723,170 +580,6 @@ function handleZeldaEffectComplete() {
   showZeldaEffect.value = false;
 }
 
-// ロール管理関数
-function watchRoles() {
-  stopRoles = listenProjectRoles(projectId.value, (list) => {
-    roles.value = list;
-  });
-}
-
-function closePermissionModal() {
-  isPermissionModalOpen.value = false;
-  editingPermissionRole.value = null;
-  editingPermissions.value = new Set();
-}
-
-function togglePermission(key: ProjectPermissionKey) {
-  if (editingPermissions.value.has(key)) {
-    editingPermissions.value.delete(key);
-  } else {
-    editingPermissions.value.add(key);
-  }
-  editingPermissions.value = new Set(editingPermissions.value);
-}
-
-async function savePermissions() {
-  if (!canManageRoles.value || !editingPermissionRole.value) return;
-  if (isSavingPermissions.value) return;
-
-  isSavingPermissions.value = true;
-  try {
-    await updateRolePermissions(
-      projectId.value,
-      editingPermissionRole.value.id,
-      Array.from(editingPermissions.value),
-    );
-    closePermissionModal();
-  } catch (error) {
-    logger.error`Failed to update permissions: ${error}`;
-    errorMessage.value = "権限の更新に失敗しました。";
-  } finally {
-    isSavingPermissions.value = false;
-  }
-}
-
-// ロール追加
-function openCreateRoleModal() {
-  if (!canManageRoles.value) return;
-  newRole.value = { name: "", color: "#64748b" };
-  isCreateRoleModalOpen.value = true;
-}
-
-function closeCreateRoleModal() {
-  isCreateRoleModalOpen.value = false;
-  newRole.value = { name: "", color: "#64748b" };
-}
-
-async function createRole() {
-  if (!canManageRoles.value || !newRole.value.name.trim()) return;
-  if (isCreatingRole.value) return;
-
-  isCreatingRole.value = true;
-  try {
-    await addRole(projectId.value, newRole.value.name, {
-      name: newRole.value.name.trim(),
-      color: newRole.value.color,
-    });
-    closeCreateRoleModal();
-  } catch (error) {
-    logger.error`Failed to create role: ${error}`;
-    errorMessage.value =
-      error instanceof Error ? error.message : "ロールの作成に失敗しました";
-  } finally {
-    isCreatingRole.value = false;
-  }
-}
-
-// ロール編集（権限も含む）
-function openEditRoleModal(role: ProjectRole) {
-  if (!canManageRoles.value) return;
-  editingRole.value = role;
-  editRoleForm.value = { name: role.name, color: role.color };
-  editRolePermissions.value = new Set(role.permissions);
-  isEditRoleModalOpen.value = true;
-}
-
-function closeEditRoleModal() {
-  isEditRoleModalOpen.value = false;
-  editingRole.value = null;
-  editRoleForm.value = { name: "", color: "" };
-  editRolePermissions.value = new Set();
-}
-
-function toggleEditPermission(key: ProjectPermissionKey) {
-  if (editRolePermissions.value.has(key)) {
-    editRolePermissions.value.delete(key);
-  } else {
-    editRolePermissions.value.add(key);
-  }
-  editRolePermissions.value = new Set(editRolePermissions.value);
-}
-
-async function saveRoleEdit() {
-  if (!canManageRoles.value || !editingRole.value) return;
-  if (!editRoleForm.value.name.trim()) return;
-  if (isUpdatingRole.value) return;
-
-  isUpdatingRole.value = true;
-  try {
-    // ロール名・カラーを更新
-    await updateRole(projectId.value, editingRole.value.id, {
-      name: editRoleForm.value.name.trim(),
-      color: editRoleForm.value.color,
-    });
-    // 権限を更新
-    await updateRolePermissions(
-      projectId.value,
-      editingRole.value.id,
-      Array.from(editRolePermissions.value),
-    );
-    closeEditRoleModal();
-  } catch (error) {
-    logger.error`Failed to update role: ${error}`;
-    errorMessage.value =
-      error instanceof Error ? error.message : "ロールの更新に失敗しました";
-  } finally {
-    isUpdatingRole.value = false;
-  }
-}
-
-// ロール削除
-function openDeleteRoleModal(role: ProjectRole) {
-  if (!canManageRoles.value) return;
-  deletingRole.value = role;
-  deleteRoleError.value = "";
-  isDeleteRoleModalOpen.value = true;
-}
-
-function closeDeleteRoleModal() {
-  isDeleteRoleModalOpen.value = false;
-  deletingRole.value = null;
-  deleteRoleError.value = "";
-}
-
-async function confirmDeleteRole() {
-  if (!canManageRoles.value || !deletingRole.value) return;
-  if (isDeletingRole.value) return;
-
-  isDeletingRole.value = true;
-  deleteRoleError.value = "";
-
-  try {
-    const result = await removeRole(projectId.value, deletingRole.value.id);
-    if (!result.success) {
-      deleteRoleError.value = result.error || "ロールの削除に失敗しました";
-      return;
-    }
-    closeDeleteRoleModal();
-  } catch (error) {
-    logger.error`Failed to delete role: ${error}`;
-    deleteRoleError.value =
-      error instanceof Error ? error.message : "ロールの削除に失敗しました";
-  } finally {
-    isDeletingRole.value = false;
-  }
-}
-
 async function handleDelete() {
   deleteError.value = "";
   if (!canEdit.value || !project.value) {
@@ -1020,22 +713,18 @@ onMounted(async () => {
   await loadProject();
   await loadCardConfig();
   watchTasks();
-  watchRoles();
 });
 
 onBeforeUnmount(() => {
   stopTasks?.();
-  stopRoles?.();
 });
 
 watch(projectId, async (newId, oldId) => {
   if (!newId || newId === oldId) return;
   stopTasks?.();
-  stopRoles?.();
   await loadProject();
   await loadCardConfig();
   watchTasks();
-  watchRoles();
 });
 </script>
 
@@ -1394,7 +1083,7 @@ watch(projectId, async (newId, oldId) => {
             <!-- 5. ロール管理 -->
             <SettingsSectionCard
               title="ロール管理"
-              description="プロジェクトのロールと権限を管理します"
+              description="ロールと権限の作成・編集・削除は専用ページで行います"
             >
               <template #icon>
                 <svg
@@ -1410,92 +1099,20 @@ watch(projectId, async (newId, oldId) => {
                   />
                 </svg>
               </template>
-              <div class="role-section">
-                <!-- デフォルトロールの説明 -->
-                <div class="role-section__intro-box">
-                  <h4 class="role-section__subtitle">デフォルトロール</h4>
-                  <p class="role-section__intro">
-                    オーナーは全権限を持つ固定ロールです。管理者とメンバーの権限は編集可能です。
-                  </p>
-                </div>
-
-                <!-- ロール一覧 -->
-                <ul class="role-list">
-                  <!-- オーナー（特別扱い） -->
-                  <li class="role-list__item role-list__item--owner">
-                    <div class="role-list__header">
-                      <span class="role-list__color role-list__color--owner" />
-                      <span class="role-list__name">オーナー</span>
-                      <span class="role-list__badge">固定</span>
-                    </div>
-                    <p class="role-list__description">
-                      プロジェクトの作成者です。全ての権限を持ち、プロジェクトの削除が可能です。
-                    </p>
-                  </li>
-
-                  <!-- Firestoreから取得したロール -->
-                  <li
-                    v-for="role in roles"
-                    :key="role.id"
-                    class="role-list__item"
-                  >
-                    <div class="role-list__header">
-                      <span
-                        class="role-list__color"
-                        :style="{ backgroundColor: role.color }"
-                      />
-                      <span class="role-list__name">{{ role.name }}</span>
-                      <span v-if="role.isDefault" class="role-list__badge">
-                        デフォルト
-                      </span>
-                      <span class="role-list__perm-count">
-                        {{ role.permissions.length }}個の権限
-                      </span>
-                    </div>
-                    <div v-if="canManageRoles" class="role-list__actions">
-                      <button
-                        type="button"
-                        class="role-list__action-btn"
-                        @click="openEditRoleModal(role)"
-                      >
-                        編集
-                      </button>
-                      <button
-                        v-if="!role.isDefault"
-                        type="button"
-                        class="role-list__action-btn role-list__action-btn--danger"
-                        @click="openDeleteRoleModal(role)"
-                      >
-                        削除
-                      </button>
-                    </div>
-                  </li>
-                </ul>
-
-                <!-- ロール追加ボタン -->
-                <div v-if="canManageRoles" class="role-section__add">
-                  <button
-                    type="button"
-                    class="role-add-btn"
-                    @click="openCreateRoleModal"
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    カスタムロールを追加
-                  </button>
-                </div>
+              <div class="role-link">
+                <p>
+                  カスタムロールの追加や権限の変更は「ロール管理」ページに
+                  集約されています。
+                </p>
+                <AppButton
+                  variant="outline"
+                  :to="{
+                    name: ROUTE_NAMES.projectRoles,
+                    params: { projectId },
+                  }"
+                >
+                  ロール管理ページを開く
+                </AppButton>
               </div>
             </SettingsSectionCard>
 
@@ -1679,330 +1296,6 @@ watch(projectId, async (newId, oldId) => {
       @complete="handleZeldaEffectComplete"
     />
 
-    <!-- 権限編集モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isPermissionModalOpen"
-        class="modal-overlay"
-        @click.self="closePermissionModal"
-      >
-        <div
-          class="modal modal--lg"
-          role="dialog"
-          aria-labelledby="permission-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="permission-modal-title">
-              権限を編集 - {{ editingPermissionRole?.name }}
-            </h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closePermissionModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <div class="modal__body permission-modal-body">
-            <p class="permission-modal-intro">
-              各ページ・機能へのアクセス権限を設定します。
-            </p>
-            <div
-              v-for="pagePerm in pagePermissions"
-              :key="pagePerm.page"
-              class="permission-page-group"
-            >
-              <div class="permission-page-group__header">
-                <h4 class="permission-page-group__title">
-                  {{ pagePerm.page }}
-                </h4>
-                <p class="permission-page-group__desc">
-                  {{ pagePerm.description }}
-                </p>
-              </div>
-              <div class="permission-page-group__items">
-                <label
-                  v-for="perm in pagePerm.permissions"
-                  :key="perm.key"
-                  class="permission-checkbox"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="editingPermissions.has(perm.key)"
-                    @change="togglePermission(perm.key)"
-                  />
-                  <span class="permission-checkbox__label">{{
-                    perm.label
-                  }}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closePermissionModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--primary"
-              :disabled="isSavingPermissions"
-              @click="savePermissions"
-            >
-              {{ isSavingPermissions ? "保存中..." : "保存" }}
-            </button>
-          </footer>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ロール追加モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isCreateRoleModalOpen"
-        class="modal-overlay"
-        @click.self="closeCreateRoleModal"
-      >
-        <div
-          class="modal"
-          role="dialog"
-          aria-labelledby="create-role-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="create-role-modal-title">新しいロールを作成</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeCreateRoleModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <form class="modal__body" @submit.prevent="createRole">
-            <div class="form-field">
-              <label class="form-label">
-                ロール名 <span class="required">*</span>
-              </label>
-              <input
-                v-model="newRole.name"
-                type="text"
-                class="form-input"
-                placeholder="例: レビュアー"
-                maxlength="30"
-                required
-              />
-            </div>
-
-            <div class="form-field">
-              <label class="form-label">カラー</label>
-              <AppColorPicker
-                v-model="newRole.color"
-                :preset-colors="presetColors"
-              />
-            </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeCreateRoleModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!newRole.name.trim() || isCreatingRole"
-              >
-                {{ isCreatingRole ? "作成中..." : "作成" }}
-              </button>
-            </footer>
-          </form>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ロール編集モーダル（権限設定含む） -->
-    <Teleport to="body">
-      <div
-        v-if="isEditRoleModalOpen"
-        class="modal-overlay"
-        @click.self="closeEditRoleModal"
-      >
-        <div
-          class="modal modal--lg"
-          role="dialog"
-          aria-labelledby="edit-role-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="edit-role-modal-title">ロールを編集</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeEditRoleModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <form
-            class="modal__body edit-role-modal-body"
-            @submit.prevent="saveRoleEdit"
-          >
-            <!-- 基本設定 -->
-            <div class="edit-role-section">
-              <h4 class="edit-role-section__title">基本設定</h4>
-              <div class="edit-role-section__content">
-                <div class="form-field">
-                  <label class="form-label">
-                    ロール名 <span class="required">*</span>
-                  </label>
-                  <input
-                    v-model="editRoleForm.name"
-                    type="text"
-                    class="form-input"
-                    maxlength="30"
-                    required
-                  />
-                </div>
-
-                <div class="form-field">
-                  <label class="form-label">カラー</label>
-                  <AppColorPicker
-                    v-model="editRoleForm.color"
-                    :preset-colors="presetColors"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- 権限設定 -->
-            <div class="edit-role-section">
-              <h4 class="edit-role-section__title">権限設定</h4>
-              <p class="edit-role-section__desc">
-                各ページ・機能へのアクセス権限を設定します。
-              </p>
-              <div class="edit-role-permissions">
-                <div
-                  v-for="pagePerm in pagePermissions"
-                  :key="pagePerm.page"
-                  class="permission-page-group"
-                >
-                  <div class="permission-page-group__header">
-                    <h5 class="permission-page-group__title">
-                      {{ pagePerm.page }}
-                    </h5>
-                    <p class="permission-page-group__desc">
-                      {{ pagePerm.description }}
-                    </p>
-                  </div>
-                  <div class="permission-page-group__items">
-                    <label
-                      v-for="perm in pagePerm.permissions"
-                      :key="perm.key"
-                      class="permission-checkbox"
-                    >
-                      <input
-                        type="checkbox"
-                        :checked="editRolePermissions.has(perm.key)"
-                        @change="toggleEditPermission(perm.key)"
-                      />
-                      <span class="permission-checkbox__label">{{
-                        perm.label
-                      }}</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeEditRoleModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!editRoleForm.name.trim() || isUpdatingRole"
-              >
-                {{ isUpdatingRole ? "保存中..." : "保存" }}
-              </button>
-            </footer>
-          </form>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ロール削除確認モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isDeleteRoleModalOpen"
-        class="modal-overlay"
-        @click.self="closeDeleteRoleModal"
-      >
-        <div
-          class="modal modal--sm"
-          role="alertdialog"
-          aria-labelledby="delete-role-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="delete-role-modal-title">ロールを削除</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeDeleteRoleModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <div class="modal__body">
-            <p>
-              「<strong>{{ deletingRole?.name }}</strong
-              >」を削除しますか？
-            </p>
-            <p class="modal__warning">この操作は取り消せません。</p>
-
-            <div v-if="deleteRoleError" class="error-alert">
-              <p>{{ deleteRoleError }}</p>
-            </div>
-          </div>
-
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closeDeleteRoleModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="isDeletingRole"
-              @click="confirmDeleteRole"
-            >
-              {{ isDeletingRole ? "削除中..." : "削除する" }}
-            </button>
-          </footer>
-        </div>
-      </div>
-    </Teleport>
-
     <!-- 公開プロジェクト確認モーダル -->
     <ConfirmGuestAccessModal
       :open="isPublicConfirmModalOpen"
@@ -2012,66 +1305,42 @@ watch(projectId, async (newId, oldId) => {
     />
 
     <!-- プロジェクト削除用パスワード確認モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="showPasswordModal"
-        class="modal-overlay"
-        @click.self="closePasswordModal"
-      >
-        <div
-          class="modal modal--sm"
-          role="dialog"
-          aria-labelledby="password-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="password-modal-title">パスワードの確認</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closePasswordModal"
-            >
-              &times;
-            </button>
-          </header>
-          <div class="modal__body">
-            <p class="modal__description">
-              プロジェクトを削除するには、パスワードを入力してください。
-            </p>
-            <div class="form-field">
-              <label for="delete-password">パスワード</label>
-              <input
-                id="delete-password"
-                v-model="deletePassword"
-                type="password"
-                placeholder="パスワードを入力"
-                autocomplete="current-password"
-                @keydown.enter="handleDeletePasswordConfirm"
-              />
-            </div>
-            <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
-          </div>
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              :disabled="deleting"
-              @click="closePasswordModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="!deletePassword.trim() || deleting"
-              @click="handleDeletePasswordConfirm"
-            >
-              {{ deleting ? "確認中..." : "続行" }}
-            </button>
-          </footer>
-        </div>
+    <AppModal
+      :open="showPasswordModal"
+      title="パスワードの確認"
+      size="sm"
+      @close="closePasswordModal"
+    >
+      <p>プロジェクトを削除するには、パスワードを入力してください。</p>
+      <div class="form-field">
+        <label for="delete-password">パスワード</label>
+        <input
+          id="delete-password"
+          v-model="deletePassword"
+          type="password"
+          placeholder="パスワードを入力"
+          autocomplete="current-password"
+          @keydown.enter="handleDeletePasswordConfirm"
+        />
       </div>
-    </Teleport>
+      <p v-if="deleteError" class="error-message">{{ deleteError }}</p>
+      <template #footer>
+        <AppButton
+          variant="ghost"
+          :disabled="deleting"
+          @click="closePasswordModal"
+        >
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="danger"
+          :disabled="!deletePassword.trim() || deleting"
+          @click="handleDeletePasswordConfirm"
+        >
+          {{ deleting ? "確認中..." : "続行" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- プロジェクト削除用MFA検証モーダル -->
     <MFAVerificationModal
@@ -2371,36 +1640,6 @@ watch(projectId, async (newId, oldId) => {
   gap: var(--ui-space-4, 1rem);
 }
 
-.ai-playground {
-  margin-top: var(--ui-space-4, 1rem);
-  padding-top: var(--ui-space-4, 1rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.ai-playground h4 {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
-  margin: 0;
-}
-
-.ai-response {
-  padding: var(--ui-space-3, 0.75rem);
-  background: var(--ui-brand-100, #e5f6f8);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-brand-300, #b8e3e9);
-  color: var(--ui-brand-900, #0b2e33);
-  font-size: var(--ui-text-sm, 0.875rem);
-  white-space: pre-wrap;
-}
-
-.ai-response p {
-  margin: 0;
-}
-
 /* Loading & Error */
 .loading-state {
   display: flex;
@@ -2451,368 +1690,6 @@ watch(projectId, async (newId, oldId) => {
   }
 }
 
-/* Role Management */
-.role-section__intro {
-  margin: 0 0 var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.role-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3, 0.75rem);
-}
-
-.role-list__item {
-  padding: var(--ui-space-4, 1rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.role-list__header {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  margin-bottom: var(--ui-space-2, 0.5rem);
-}
-
-.role-list__color {
-  width: var(--ui-space-4, 1rem);
-  height: var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  flex-shrink: 0;
-}
-
-.role-list__color--owner {
-  background-color: var(--ui-brand-900, #0b2e33);
-}
-
-.role-list__name {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.role-list__badge {
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-medium, 500);
-  background: var(--ui-surface, #ffffff);
-  color: var(--ui-text-muted, #64748b);
-  padding: var(--ui-space-0-5, 0.125rem) var(--ui-space-2, 0.5rem);
-  border-radius: var(--ui-radius-full, 9999px);
-}
-
-.role-list__description {
-  margin: 0 0 var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-  line-height: var(--ui-leading-normal, 1.5);
-}
-
-.role-list__edit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-brand-600, #4f7c82);
-  background: var(--ui-surface, #ffffff);
-  border: 1px solid var(--ui-brand-300, #b8e3e9);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  cursor: pointer;
-  transition: var(--ui-transition-colors);
-}
-
-.role-list__edit-btn:hover {
-  background: var(--ui-brand-100, #e5f6f8);
-  border-color: var(--ui-brand-400, #7ab5be);
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--ui-overlay-bg, rgba(0, 0, 0, 0.5));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-4, 1rem);
-  z-index: var(--ui-z-modal, 100);
-}
-
-.modal {
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  width: 100%;
-  max-width: var(--ui-modal-width-md, 480px);
-  max-height: var(--ui-modal-max-height, 90vh);
-  overflow-y: auto;
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.modal--lg {
-  max-width: var(--ui-modal-width-lg, 640px);
-}
-
-.modal__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.modal__header h3 {
-  margin: 0;
-  font-size: var(--ui-text-lg, 1.125rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.modal__close {
-  background: transparent;
-  border: none;
-  font-size: var(--ui-text-2xl, 1.5rem);
-  color: var(--ui-text-muted, #64748b);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal__close:hover {
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.modal__body {
-  padding: var(--ui-space-5, 1.25rem);
-}
-
-.modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-3, 0.75rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-/* Permission Modal */
-.permission-modal-body {
-  max-height: var(--ui-modal-body-max-height, 60vh);
-  overflow-y: auto;
-}
-
-.permission-modal-intro {
-  margin: 0 0 var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.permission-page-group {
-  margin-bottom: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-3, 0.75rem);
-  background: var(--ui-surface-muted, #f1f5f9);
-  border-radius: var(--ui-radius-md, 0.75rem);
-}
-
-.permission-page-group:last-child {
-  margin-bottom: 0;
-}
-
-.permission-page-group__header {
-  margin-bottom: var(--ui-space-2, 0.5rem);
-}
-
-.permission-page-group__title {
-  margin: 0;
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.permission-page-group__desc {
-  margin: var(--ui-space-1, 0.25rem) 0 0;
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.permission-page-group__items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-space-2, 0.5rem);
-}
-
-.permission-checkbox {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  cursor: pointer;
-  padding: var(--ui-space-2, 0.5rem);
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  transition: var(--ui-transition-colors, background-color 0.15s ease);
-}
-
-.permission-checkbox:hover {
-  background: var(--ui-brand-100, #e5f6f8);
-}
-
-.permission-checkbox input[type="checkbox"] {
-  width: var(--ui-space-4, 1rem);
-  height: var(--ui-space-4, 1rem);
-  accent-color: var(--ui-brand-600, #4f7c82);
-  cursor: pointer;
-}
-
-.permission-checkbox__label {
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text, #0b2e33);
-}
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  cursor: pointer;
-  transition: var(--ui-transition-colors, all 0.15s ease);
-  border: none;
-}
-
-.btn--primary {
-  background: var(--ui-brand-600, #4f7c82);
-  color: var(--ui-text-on-primary, white);
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: var(--ui-brand-700, #3a5c61);
-}
-
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.btn--ghost:hover {
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.btn--danger {
-  background: var(--ui-danger, #d64545);
-  color: var(--ui-text-on-danger, white);
-}
-
-.btn--danger:hover:not(:disabled) {
-  background: var(--ui-danger-hover, #c03a3a);
-}
-
-.btn--danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Role Section Additional Styles */
-.role-section__intro-box {
-  margin-bottom: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-3, 0.75rem);
-  background: var(--ui-brand-100, #e5f6f8);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  border-left: var(--ui-border-accent-width, 3px) solid
-    var(--ui-brand-600, #4f7c82);
-}
-
-.role-section__subtitle {
-  margin: 0 0 var(--ui-space-1, 0.25rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
-.role-list__item--owner {
-  background: var(--ui-brand-100, #e5f6f8);
-  border-color: var(--ui-brand-300, #b8e3e9);
-}
-
-.role-list__perm-count {
-  font-size: var(--ui-text-xs, 0.75rem);
-  color: var(--ui-text-muted, #64748b);
-  margin-left: auto;
-}
-
-.role-list__actions {
-  display: flex;
-  gap: var(--ui-space-2, 0.5rem);
-  margin-top: var(--ui-space-2, 0.5rem);
-}
-
-.role-list__action-btn {
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-xs, 0.75rem);
-  font-weight: var(--ui-font-medium, 500);
-  color: var(--ui-brand-600, #4f7c82);
-  background: var(--ui-surface, #ffffff);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  border-radius: var(--ui-radius-sm, 0.5rem);
-  cursor: pointer;
-  transition: var(--ui-transition-colors);
-}
-
-.role-list__action-btn:hover {
-  background: var(--ui-brand-100, #e5f6f8);
-  border-color: var(--ui-brand-300, #b8e3e9);
-}
-
-.role-list__action-btn--danger {
-  color: var(--ui-danger, #d64545);
-}
-
-.role-list__action-btn--danger:hover {
-  background: var(--ui-danger-light, #fee2e2);
-  border-color: var(--ui-danger, #d64545);
-}
-
-.role-section__add {
-  margin-top: var(--ui-space-4, 1rem);
-  padding-top: var(--ui-space-4, 1rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.role-add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-brand-600, #4f7c82);
-  background: var(--ui-surface, #ffffff);
-  border: 1px dashed var(--ui-brand-400, #7ab5be);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  cursor: pointer;
-  transition: var(--ui-transition-all);
-}
-
-.role-add-btn:hover {
-  background: var(--ui-brand-100, #e5f6f8);
-  border-style: solid;
-}
-
 /* Form Field */
 .form-field {
   display: flex;
@@ -2821,54 +1698,8 @@ watch(projectId, async (newId, oldId) => {
   margin-bottom: var(--ui-space-4, 1rem);
 }
 
-.form-label {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text-strong, #0f172a);
-}
-
 .required {
   color: var(--ui-danger, #d64545);
-}
-
-.form-input {
-  width: 100%;
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-3, 0.75rem);
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  background: var(--ui-surface, #ffffff);
-  transition: var(--ui-transition-colors, border-color 0.15s ease);
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--ui-brand-600, #4f7c82);
-}
-
-/* Modal Small */
-.modal--sm {
-  max-width: var(--ui-modal-width-sm, 400px);
-}
-
-.modal__warning {
-  margin-top: var(--ui-space-2, 0.5rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-/* Error Alert */
-.error-alert {
-  margin-top: var(--ui-space-4, 1rem);
-  padding: var(--ui-space-3, 0.75rem);
-  background: var(--ui-danger-light, #fee2e2);
-  border: 1px solid var(--ui-danger, #d64545);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  color: var(--ui-danger, #d64545);
-}
-
-.error-alert p {
-  margin: 0;
 }
 
 /* ゲスト閲覧ページ設定 */

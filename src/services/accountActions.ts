@@ -1,7 +1,6 @@
 import {
   applyEmailVerificationCode,
   confirmPasswordResetWithCode,
-  deleteAccountWithPassword,
   deleteCurrentAccount,
   loginWithEmail,
   loginWithProvider,
@@ -57,13 +56,6 @@ export async function updateAccountAvatar(file: File) {
 
 export async function removeAccount(): Promise<void> {
   await deleteCurrentAccount();
-  setProfile(null);
-}
-
-export async function removeAccountWithPassword(
-  password: string,
-): Promise<void> {
-  await deleteAccountWithPassword(password);
   setProfile(null);
 }
 

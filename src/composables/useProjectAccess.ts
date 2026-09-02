@@ -7,7 +7,10 @@ import { db } from "@/lib/firebase";
 import { useAuthStore } from "@/store/auth";
 import type { GuestAllowedPage, ProjectDoc } from "@/types/project";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { getLogger } from "@logtape/logtape";
 import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
+
+const logger = getLogger("app.composables.useProjectAccess");
 
 /**
  * プロジェクトへのアクセス権限を判定するComposable
@@ -52,6 +55,11 @@ export function useProjectAccess(projectId: Ref<string>) {
           project.value = null;
         }
       },
+      (error) => {
+        logger.error`プロジェクト購読でエラーが発生しました: ${error}`;
+        project.value = null;
+        loading.value = false;
+      },
     );
 
     // メンバー情報の購読
@@ -69,6 +77,12 @@ export function useProjectAccess(projectId: Ref<string>) {
         } else {
           memberData.value = null;
         }
+        loading.value = false;
+      },
+      (error) => {
+        // ルール拒否等でリスナーが終了すると loading が永久に true のままになるため
+        logger.error`メンバー購読でエラーが発生しました: ${error}`;
+        memberData.value = null;
         loading.value = false;
       },
     );

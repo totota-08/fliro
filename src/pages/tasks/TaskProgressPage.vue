@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSidebarState } from "@/composables/useSidebarState";
 import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import { appName } from "@/constants/appMeta";
@@ -22,7 +23,7 @@ const logger = getLogger("app.pages.tasks.TaskProgress");
 const { user, profile } = useAuthStore();
 const router = useRouter();
 
-const isSidebarOpen = ref(true);
+const { isSidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
 const loading = ref(true);
 const errorMessage = ref("");
 const tasks = ref<TaskDoc[]>([]);
@@ -243,17 +244,6 @@ function goToMyTasks() {
 }
 
 /**
- * サイドバー制御
- */
-const closeSidebar = () => {
-  isSidebarOpen.value = false;
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
-
-/**
  * 期限表示
  */
 function formatDueDate(task: TaskDoc): { label: string; class: string } {
@@ -281,9 +271,6 @@ function formatDueDate(task: TaskDoc): { label: string; class: string } {
  * 初期ロード
  */
 onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
   loadTasks();
 });
 </script>
@@ -834,18 +821,6 @@ onMounted(() => {
   background: var(--ui-success-light);
   border-color: var(--ui-success);
   color: var(--ui-success);
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* Responsive */

@@ -1,8 +1,8 @@
 import { db } from "@/lib/firebase";
+import { toMillis } from "@/utils/datetime";
 import { addProjectMember } from "@/services/projectMembers";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -143,24 +143,29 @@ export async function createProjectInvite({
   return token;
 }
 
-function resolveTimestamp(value: any): number | null {
-  if (!value) return null;
-  if (typeof value === "number") return value;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value.toMillis === "function") return value.toMillis();
-  if (typeof value.seconds === "number") return value.seconds * 1000;
-  return null;
-}
-
 export function buildInviteStatus(
   invite: ProjectInviteDoc,
 ): ProjectInviteStatus {
   if (invite.revokedAt) return "revoked";
-  const expiresAt = resolveTimestamp(invite.expiresAt);
+  const expiresAt = toMillis(invite.expiresAt);
   if (typeof expiresAt === "number" && Date.now() > expiresAt) {
     return "expired";
   }
   return "active";
+}
+
+/** 招待ステータスの表示ラベル（全画面で統一） */
+export function inviteStatusLabel(status: ProjectInviteStatus): string {
+  if (status === "active") return "有効";
+  if (status === "expired") return "期限切れ";
+  return "無効化";
+}
+
+/** 招待ステータスに対応する CSS クラス */
+export function inviteStatusClass(status: ProjectInviteStatus): string {
+  if (status === "active") return "status-active";
+  if (status === "expired") return "status-expired";
+  return "status-revoked";
 }
 
 export function buildInviteUrl(invite: ProjectInviteDoc & { id?: string }) {
@@ -247,11 +252,6 @@ export async function revokeProjectInvite(
   });
 }
 
-export async function deleteProjectInvite(inviteId: string) {
-  const ref = doc(db, "projectInvites", inviteId);
-  await deleteDoc(ref);
-}
-
 /**
  * Listen for pending invites for a specific user email.
  * Returns invites where acceptedEmail matches and status is 'pending'.
@@ -273,7 +273,7 @@ export function listenUserInvites(
       // Filter out revoked invites
       if (invite.revokedAt) return false;
       // Filter out expired invites
-      const expiresAt = resolveTimestamp(invite.expiresAt);
+      const expiresAt = toMillis(invite.expiresAt);
       if (typeof expiresAt === "number" && Date.now() > expiresAt) {
         return false;
       }

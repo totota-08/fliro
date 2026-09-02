@@ -24,13 +24,3 @@ export function consumeSecretAccess() {
     return null;
   }
 }
-
-export function hasSecretAccess(code: string) {
-  try {
-    const value = sessionStorage.getItem(STORAGE_KEY);
-    return value === code;
-  } catch (error) {
-    logger.warn`Failed to check secret access: ${error}`;
-    return false;
-  }
-}

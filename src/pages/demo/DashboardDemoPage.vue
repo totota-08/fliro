@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
+import { useSidebarState } from "@/composables/useSidebarState";
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
 import { appName } from "@/constants/appMeta";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
@@ -193,10 +194,6 @@ onMounted(() => {
     activeCardIndex.value =
       (activeCardIndex.value + 1) % summaryCards.value.length;
   }, 3500);
-
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
 });
 
 onBeforeUnmount(() => {
@@ -220,15 +217,7 @@ function statusLabel(status: string) {
 }
 
 // サイドバー状態
-const isSidebarOpen = ref(true);
-
-const closeSidebar = () => {
-  isSidebarOpen.value = false;
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
+const { isSidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
 </script>
 
 <template>

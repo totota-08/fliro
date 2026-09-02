@@ -9,7 +9,10 @@ import { ref, watch, onBeforeUnmount } from "vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import Cropper from "cropperjs";
+import { getLogger } from "@logtape/logtape";
 // CropperJS 2.x はCSSをJSにバンドルしているため、CSS importは不要
+
+const logger = getLogger("app.components.modals.AvatarCropperModal");
 
 const props = defineProps<{
   /** モーダルの開閉状態 */
@@ -40,6 +43,28 @@ watch(
   },
 );
 
+// CropperJS 2.x はコンストラクタオプションではなくテンプレートで構成する。
+// デフォルトテンプレートに正方形制約（aspect-ratio="1"）と初期範囲 0.9 を加えたもの
+const CROPPER_TEMPLATE = `
+<cropper-canvas background>
+  <cropper-image rotatable scalable translatable></cropper-image>
+  <cropper-shade hidden></cropper-shade>
+  <cropper-handle action="select" plain></cropper-handle>
+  <cropper-selection initial-coverage="0.9" aspect-ratio="1" movable resizable>
+    <cropper-grid role="grid" bordered covered></cropper-grid>
+    <cropper-crosshair centered></cropper-crosshair>
+    <cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.35)"></cropper-handle>
+    <cropper-handle action="n-resize"></cropper-handle>
+    <cropper-handle action="e-resize"></cropper-handle>
+    <cropper-handle action="s-resize"></cropper-handle>
+    <cropper-handle action="w-resize"></cropper-handle>
+    <cropper-handle action="ne-resize"></cropper-handle>
+    <cropper-handle action="nw-resize"></cropper-handle>
+    <cropper-handle action="se-resize"></cropper-handle>
+    <cropper-handle action="sw-resize"></cropper-handle>
+  </cropper-selection>
+</cropper-canvas>`;
+
 // 画像が読み込まれたらCropperを初期化
 function handleImageLoad() {
   if (!imageRef.value) return;
@@ -49,23 +74,9 @@ function handleImageLoad() {
     cropper.value.destroy();
   }
 
-  // Cropper.js 2.x の型定義との互換性のため as any を使用
   cropper.value = new Cropper(imageRef.value, {
-    aspectRatio: 1,
-    viewMode: 1,
-    dragMode: "move",
-    autoCropArea: 0.9,
-    cropBoxResizable: true,
-    cropBoxMovable: true,
-    guides: false,
-    center: true,
-    highlight: false,
-    background: false,
-    responsive: true,
-    restore: false,
-    checkCrossOrigin: false,
-    checkOrientation: false,
-  } as any);
+    template: CROPPER_TEMPLATE,
+  });
 }
 
 // トリミングを確定
@@ -75,14 +86,11 @@ async function handleConfirm() {
   loading.value = true;
 
   try {
-    // Cropper.js 2.x の型定義との互換性のため as any を使用
-    const canvas = (cropper.value as any).getCroppedCanvas({
-      width: 256,
-      height: 256,
-      fillColor: "#fff",
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: "high",
-    }) as HTMLCanvasElement;
+    const selection = cropper.value.getCropperSelection();
+    if (!selection) {
+      throw new Error("トリミング範囲を取得できませんでした");
+    }
+    const canvas = await selection.$toCanvas({ width: 256, height: 256 });
 
     const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob((b: Blob | null) => resolve(b), "image/png", 0.95);
@@ -94,6 +102,8 @@ async function handleConfirm() {
 
     const file = new File([blob], "avatar.png", { type: "image/png" });
     emit("confirm", file);
+  } catch (error) {
+    logger.error`アバター画像のトリミングに失敗しました: ${error}`;
   } finally {
     loading.value = false;
   }

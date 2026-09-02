@@ -6,6 +6,7 @@
  * カードの表示/非表示と並び順は cardConfig で制御可能。
  * モバイルでは折りたたみ可能。
  */
+import { isTaskOverdue } from "@/utils/taskUi";
 import type { InsightCardConfig } from "@/services/dashboardSettingsService";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
 import { computed } from "vue";
@@ -129,12 +130,6 @@ const gaugeSegmentStyles = computed(() => {
     return style;
   });
 });
-
-function isTaskOverdue(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return false;
-  const due = task.dueDate.seconds * 1000;
-  return due < Date.now() && task.status !== "done";
-}
 </script>
 
 <template>
@@ -629,19 +624,6 @@ function isTaskOverdue(task: TaskDoc) {
 
 .gauge-chart__legend-dot--good {
   background: var(--ui-success, #16a34a);
-}
-
-/* Screen reader only */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* Reduced motion */

@@ -5,7 +5,6 @@ import AuthBrand from "@/components/ui/AuthBrand.vue";
 import AuthCredentialFields from "@/components/ui/AuthCredentialFields.vue";
 import AuthFormField from "@/components/ui/AuthFormField.vue";
 import AuthProviderButtons from "@/components/ui/AuthProviderButtons.vue";
-import { useAuth } from "@/composables/useAuth";
 import { ROUTE_NAMES } from "@/constants/routes";
 import {
   fetchProfile,
@@ -14,7 +13,7 @@ import {
   resendVerificationEmail,
 } from "@/firebase/authService";
 import { getCurrentUser } from "@/lib/getCurrentUser";
-import { waitForAuthReady } from "@/store/auth";
+import { useAuthStore, waitForAuthReady } from "@/store/auth";
 import {
   completeProfileSetup,
   registerAccountWithProvider,
@@ -30,7 +29,7 @@ const logger = getLogger("app.pages.auth.SignUp");
 
 const router = useRouter();
 const route = useRoute();
-const { user } = useAuth();
+const { user } = useAuthStore();
 
 type SignUpStep = "credentials" | "verify" | "profile";
 

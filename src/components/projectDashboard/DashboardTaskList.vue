@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isTaskOverdue } from "@/utils/taskUi";
 import AppButton from "@/components/ui/AppButton.vue";
 import type { TaskCategory } from "@/services/taskCategoryService";
 import type { TaskDoc, TaskStatus } from "@/services/taskService";
@@ -92,12 +93,6 @@ function resetFilters() {
     due: "all",
     category: "all",
   });
-}
-
-function isTaskOverdue(task: TaskDoc) {
-  if (!task.dueDate?.seconds) return false;
-  const due = task.dueDate.seconds * 1000;
-  return due < Date.now() && task.status !== "done";
 }
 
 function formatDueDate(task: TaskDoc) {

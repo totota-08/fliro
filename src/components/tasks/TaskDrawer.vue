@@ -6,6 +6,7 @@
  * 3タブ構成: 概要 / スレッド / ログ
  * 軽編集可能（ステータス/担当/期限/進捗）
  */
+import { formatTimeShort as formatMessageTime } from "@/utils/datetime";
 import { computed, ref, watch, onBeforeUnmount, toRef } from "vue";
 import AppDrawer from "@/components/ui/AppDrawer.vue";
 import AppButton from "@/components/ui/AppButton.vue";
@@ -314,21 +315,35 @@ function handleProgressChange(newProgress: number) {
   });
 }
 
+// IME変換確定のEnter（isComposing / keyCode 229）では送信しない
+function handleComposerEnter(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
+  handleSendMessage();
+}
+
+function handleEditEnter(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
+  saveEditMessage();
+}
+
 async function handleSendMessage() {
-  if (!messageInput.value.trim() || !task.value || !user.value) return;
+  const text = messageInput.value.trim();
+  if (!text || !task.value || !user.value) return;
+  // 送信中の二重送信を防ぐため先にクリアする（失敗時は復元）
+  messageInput.value = "";
 
   try {
     await sendProjectMessage(
       props.projectId,
       user.value.uid,
       profile.value?.nickname || profile.value?.fullName || "ユーザー",
-      messageInput.value.trim(),
+      text,
       task.value.id, // channelId = taskId for task threads
       undefined,
       { linkedTaskId: task.value.id, isTask: true },
     );
-    messageInput.value = "";
   } catch (error) {
+    messageInput.value = text;
     logger.error`Failed to send message: ${error}`;
   }
 }
@@ -381,13 +396,6 @@ async function handleDeleteMessage(messageId: string) {
   } catch (error) {
     logger.error`Failed to delete message: ${error}`;
   }
-}
-
-// 時間フォーマット（ChatMessage用）
-function formatMessageTime(createdAt: ChatMessage["createdAt"]): string {
-  if (!createdAt) return "";
-  const date = new Date(createdAt);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatEventType(event: ProjectEvent): string {
@@ -755,7 +763,7 @@ function formatEventDetail(event: ProjectEvent): string {
                     v-model="editingMessageText"
                     type="text"
                     class="task-drawer__edit-input"
-                    @keydown.enter="saveEditMessage"
+                    @keydown.enter="handleEditEnter"
                     @keydown.escape="cancelEditMessage"
                   />
                   <div class="task-drawer__edit-actions">
@@ -816,7 +824,7 @@ function formatEventDetail(event: ProjectEvent): string {
             type="text"
             class="task-drawer__composer-input"
             placeholder="メッセージを入力..."
-            @keydown.enter="handleSendMessage"
+            @keydown.enter="handleComposerEnter"
           />
           <AppButton
             variant="primary"

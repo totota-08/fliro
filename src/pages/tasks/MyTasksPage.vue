@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getDaysUntilDue } from "@/utils/taskUi";
 import TaskDrawer from "@/components/tasks/TaskDrawer.vue";
 import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppBadge from "@/components/ui/AppBadge.vue";
@@ -141,14 +142,6 @@ const getPriorityBadgeVariant = (
 };
 
 /**
- * 期限までの日数計算（Date → 日数）
- */
-const getDaysDiff = (due: Date, base = new Date()) => {
-  const diffTime = due.getTime() - base.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
-/**
  * Firestore タスク → UI 用タスクに変換
  */
 function decorate(task: TaskDoc): DecoratedTask {
@@ -164,7 +157,7 @@ function decorate(task: TaskDoc): DecoratedTask {
   let dueDateLabel = "未設定";
 
   if (due) {
-    const diff = getDaysDiff(due);
+    const diff = getDaysUntilDue((task as any).dueDate) ?? 0;
     dueDateLabel = due.toISOString().slice(0, 10);
 
     if (diff < 0) {
@@ -237,25 +230,21 @@ function applyFilters(taskList: DecoratedTask[]): DecoratedTask[] {
 
     // 期限フィルター
     if (filterDueDate.value !== "all") {
-      const due = (task as any).dueDate?.seconds
-        ? new Date((task as any).dueDate.seconds * 1000)
-        : null;
+      const days = getDaysUntilDue((task as any).dueDate);
 
       switch (filterDueDate.value) {
         case "overdue":
-          if (!due || getDaysDiff(due) >= 0) return false;
+          if (days === null || days >= 0) return false;
           break;
         case "today":
-          if (!due || getDaysDiff(due) !== 0) return false;
+          if (days !== 0) return false;
           break;
         case "week": {
-          if (!due) return false;
-          const diff = getDaysDiff(due);
-          if (diff < 0 || diff > 7) return false;
+          if (days === null || days < 0 || days > 7) return false;
           break;
         }
         case "none":
-          if (due) return false;
+          if (days !== null) return false;
           break;
       }
     }

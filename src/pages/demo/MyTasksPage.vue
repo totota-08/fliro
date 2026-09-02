@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
+import { useSidebarState } from "@/composables/useSidebarState";
+import { computed, ref } from "vue";
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
 import { appName } from "@/constants/appMeta";
 
@@ -15,7 +16,7 @@ type Task = {
   description: string;
 };
 
-const isSidebarOpen = ref(true);
+const { isSidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
 const activeTab = ref<"active" | "completed">("active");
 
 const myTasks = ref<Task[]>([
@@ -70,20 +71,6 @@ const myTasks = ref<Task[]>([
     description: "ユーザー情報とタスク管理のためのDB設計",
   },
 ]);
-
-const closeSidebar = () => {
-  isSidebarOpen.value = false;
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
-
-onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
-});
 
 const getStatusBadgeClass = (status: Task["status"]) => {
   switch (status) {

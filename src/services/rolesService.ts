@@ -121,33 +121,6 @@ export function listenProjectRoles(
 }
 
 /**
- * プロジェクトのロール一覧を一度だけ取得
- */
-export async function fetchProjectRoles(
-  projectId: string,
-): Promise<ProjectRole[]> {
-  const rolesRef = collection(db, "projects", projectId, "roles");
-  const snapshot = await getDocs(rolesRef);
-
-  const roles = snapshot.docs.map((docSnap) => {
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      name: data.name || docSnap.id,
-      color: data.color || "#64748b",
-      permissions: data.permissions || [],
-      position: data.position ?? 99,
-      isDefault: data.isDefault ?? false,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-    } as ProjectRole;
-  });
-
-  roles.sort((a, b) => a.position - b.position);
-  return roles;
-}
-
-/**
  * 新しいロールを追加
  */
 export async function addRole(
@@ -271,29 +244,4 @@ export async function updateRole(
     ...updates,
     updatedAt: serverTimestamp(),
   });
-}
-
-/**
- * 特定のロールを取得
- */
-export async function fetchRole(
-  projectId: string,
-  roleKey: string,
-): Promise<ProjectRole | null> {
-  const roleRef = doc(db, "projects", projectId, "roles", roleKey);
-  const snap = await getDoc(roleRef);
-
-  if (!snap.exists()) return null;
-
-  const data = snap.data();
-  return {
-    id: snap.id,
-    name: data.name || snap.id,
-    color: data.color || "#64748b",
-    permissions: data.permissions || [],
-    position: data.position ?? 99,
-    isDefault: data.isDefault ?? false,
-    createdAt: data.createdAt?.toDate() || new Date(),
-    updatedAt: data.updatedAt?.toDate() || new Date(),
-  };
 }

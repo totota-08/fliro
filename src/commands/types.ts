@@ -12,6 +12,8 @@ export interface ChatCommand {
   name: string; // e.g. "/task"
   description: string;
   example: string;
+  /** ユーモラスコマンド設定が有効な場合のみ実行するコマンド */
+  humorousOnly?: boolean;
   suggestions?: Array<{
     name: string;
     description: string;

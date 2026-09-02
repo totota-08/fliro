@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { commands, executeCommand } from "@/commands";
+import { executeCommand } from "@/commands";
 import {
   ChatMessageEditor,
   ChatMessageItem,
@@ -13,6 +13,13 @@ import AppEmptyState from "@/components/ui/AppEmptyState.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppModal from "@/components/ui/AppModal.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
+import {
+  DEFAULT_CHANNEL,
+  MAX_VISIBLE_TASK_CHANNELS,
+  useChatChannels,
+  type ChatChannel,
+} from "@/composables/useChatChannels";
+import { useCommandSuggestions } from "@/composables/useCommandSuggestions";
 import { usePageTitle } from "@/composables/usePageTitle";
 import { useProjectIdRoute } from "@/composables/useProjectIdRoute";
 import { useTaskDrawerRouteSync } from "@/composables/useTaskDrawerRouteSync";
@@ -64,26 +71,6 @@ const logger = getLogger("app.pages.projects.ProjectChat");
 
 const route = useRoute();
 
-type ChatChannel = {
-  id: string;
-  name: string;
-  description?: string;
-  type: "general" | "custom" | "task";
-  createdBy?: string;
-  isPublic?: boolean;
-  allowedUserIds?: string[];
-  allowedRoles?: string[]; // 送信許可されたロールのリスト（空なら全員許可）
-  settingsAllowedRoles?: string[]; // 設定編集を許可されたロールのリスト（空なら admin/owner/作成者のみ）
-  archived?: boolean; // アーカイブフラグ
-};
-
-const defaultChannel: ChatChannel = {
-  id: "general",
-  name: "全体",
-  description: "全メンバーと共有するチャネル",
-  type: "general",
-};
-
 const router = useRouter();
 const { user, profile } = useAuthStore();
 const { projectId } = useProjectIdRoute();
@@ -120,7 +107,6 @@ const customChannels = ref<ChatChannel[]>([]);
 const projectRoles = ref<ProjectRole[]>([]);
 const chatContainer = ref<HTMLElement | null>(null);
 const composerInput = ref<HTMLInputElement | null>(null);
-const activeChannelId = ref("general");
 
 // カスタムスレッド設定モーダル
 const showThreadSettings = ref(false);
@@ -133,62 +119,6 @@ const threadSettingsForm = ref({
 const showArchiveConfirm = ref(false);
 const isSavingSettings = ref(false);
 
-// Command Autocomplete
-const showCommandSuggestions = ref(false);
-const availableCommands = computed(() => {
-  const humorousEnabled =
-    project.value?.settings?.humorousCommandsEnabled ?? false;
-
-  return commands
-    .filter((c) => {
-      // Flilo Bot は humorousCommandsEnabled がtrueの場合のみ表示
-      if (c.name === "Flilo Bot") {
-        return humorousEnabled;
-      }
-      return true;
-    })
-    .flatMap((c) =>
-      c.suggestions?.length
-        ? c.suggestions.map((s) => ({
-            label: s.name,
-            description: s.description,
-            example: s.example ?? c.example,
-          }))
-        : [
-            {
-              label: c.name,
-              description: c.description,
-              example: c.example,
-            },
-          ],
-    );
-});
-
-const filteredCommands = computed(() => {
-  if (!input.value.startsWith("/")) return [];
-  const query = input.value.toLowerCase();
-  return availableCommands.value.filter((cmd) => cmd.label.startsWith(query));
-});
-
-watch(input, (val) => {
-  if (val.startsWith("/") && !val.includes(" ")) {
-    showCommandSuggestions.value = true;
-  } else {
-    showCommandSuggestions.value = false;
-  }
-});
-
-function selectCommand(cmd: string) {
-  if (cmd === "/news") {
-    // /news command doesn't need arguments usually, so maybe just set it?
-    // User might validly just hit enter.
-    input.value = `${cmd}`;
-  } else {
-    input.value = `${cmd} `;
-  }
-  showCommandSuggestions.value = false;
-  composerInput.value?.focus();
-}
 // UI state
 const customThreadFormOpen = ref(false);
 const customThreadForm = ref({
@@ -200,111 +130,45 @@ const customThreadForm = ref({
 const isCreateThreadDisabled = computed(
   () => !customThreadForm.value.name.trim(),
 );
-const showAllTaskChannels = ref(false); // タスク一覧の「すべて表示」フラグ
-const showArchivedTaskChannels = ref(false); // アーカイブ済みタスクの表示フラグ
-const showMobileThreads = ref(false); // モバイル用スレッドドロワー
-const MAX_VISIBLE_TASK_CHANNELS = 8;
 let unsubscribeChat: (() => void) | null = null;
 let unsubscribeMembers: (() => void) | null = null;
 let unsubscribeCustomChannels: (() => void) | null = null;
 let unsubscribeTasks: (() => void) | null = null;
 let unsubscribeRoles: (() => void) | null = null;
 
-// アーカイブ済みカスタムスレッド表示フラグ
-const showArchivedCustomChannels = ref(false);
+// チャンネル状態・派生リスト（composableに集約）
+const {
+  activeChannelId,
+  showAllTaskChannels,
+  showArchivedTaskChannels,
+  showArchivedCustomChannels,
+  showMobileThreads,
+  activeCustomChannels,
+  archivedCustomChannels,
+  activeTaskChannels,
+  archivedTaskChannels,
+  visibleActiveTaskChannels,
+  hiddenActiveTaskCount,
+  channels,
+  currentChannel,
+  currentChannelMessages,
+  isCurrentChannelArchived,
+  selectChannel,
+  selectChannelWithClose,
+  toggleMobileThreads,
+} = useChatChannels(tasks, customChannels, messages);
 
-// アクティブなカスタムスレッド（アーカイブされていないもの）
-const activeCustomChannels = computed<ChatChannel[]>(() =>
-  customChannels.value.filter((ch) => !ch.archived),
-);
-
-// アーカイブされたカスタムスレッド
-const archivedCustomChannels = computed<ChatChannel[]>(() =>
-  customChannels.value.filter((ch) => ch.archived),
-);
-
-// Channel Logic
-// 全タスクチャンネル（アーカイブフラグを含む）
-const allTaskChannels = computed<ChatChannel[]>(() =>
-  tasks.value
-    .filter((task) => task.hasThread !== false)
-    .map((task) => ({
-      id: task.id,
-      name: task.threadName || task.title || "無題のタスク",
-      description: task.status,
-      type: "task" as const,
-      archived: task.threadArchived === true || task.status === "done",
-    })),
-);
-
-// アクティブなタスクチャンネル（アーカイブされていないもの）
-const activeTaskChannels = computed<ChatChannel[]>(() =>
-  allTaskChannels.value.filter((ch) => !ch.archived),
-);
-
-// アーカイブされたタスクチャンネル
-const archivedTaskChannels = computed<ChatChannel[]>(() =>
-  allTaskChannels.value.filter((ch) => ch.archived),
-);
-
-// 表示用（後方互換性のため taskChannels を維持）
-const taskChannels = computed<ChatChannel[]>(() => allTaskChannels.value);
-
-// 表示するアクティブタスクチャンネル（最大8件、またはすべて）
-const visibleActiveTaskChannels = computed(() => {
-  if (showAllTaskChannels.value) {
-    return activeTaskChannels.value;
-  }
-  return activeTaskChannels.value.slice(0, MAX_VISIBLE_TASK_CHANNELS);
-});
-
-// 隠れているアクティブタスクの数
-const hiddenActiveTaskCount = computed(() => {
-  return Math.max(
-    0,
-    activeTaskChannels.value.length - MAX_VISIBLE_TASK_CHANNELS,
+// "/" コマンド補完
+const { showCommandSuggestions, filteredCommands, selectCommand } =
+  useCommandSuggestions(
+    input,
+    () => project.value?.settings?.humorousCommandsEnabled ?? false,
+    () => composerInput.value?.focus(),
   );
-});
-
-const channels = computed<ChatChannel[]>(() => {
-  return [defaultChannel, ...taskChannels.value, ...customChannels.value];
-});
-
-const currentChannel = computed<ChatChannel>(() => {
-  return (
-    channels.value.find((c) => c.id === activeChannelId.value) || defaultChannel
-  );
-});
-
-const currentChannelMessages = computed(() => {
-  if (currentChannel.value.type === "task") {
-    return messages.value.filter(
-      (m) => m.linkedTaskId === currentChannel.value.id,
-    );
-  }
-  return messages.value.filter(
-    (m) =>
-      (m.channelId || "general") === activeChannelId.value && !m.linkedTaskId,
-  );
-});
-
-function selectChannel(id: string) {
-  if (activeChannelId.value === id) return;
-  activeChannelId.value = id;
-}
-
-// モバイルドロワーでのチャンネル選択（選択後にドロワーを閉じる）
-function selectChannelWithClose(id: string) {
-  selectChannel(id);
-  showMobileThreads.value = false;
-}
-
-function toggleMobileThreads() {
-  showMobileThreads.value = !showMobileThreads.value;
-}
 
 // Watchers
 function watchChat() {
+  unsubscribeChat?.();
   unsubscribeChat = listenProjectChat(projectId.value, (list) => {
     messages.value = list;
     scrollToBottom();
@@ -312,12 +176,14 @@ function watchChat() {
 }
 
 function watchMembers() {
+  unsubscribeMembers?.();
   unsubscribeMembers = listenProjectMembers(projectId.value, (list) => {
     projectMembers.value = list;
   });
 }
 
 function watchTasks() {
+  unsubscribeTasks?.();
   unsubscribeTasks = listenTasks(projectId.value, (list) => {
     tasks.value = list;
   });
@@ -379,10 +245,14 @@ async function refreshProjectContext() {
   customChannels.value = [];
   project.value = null;
 
-  if (!projectId.value) return;
+  const id = projectId.value;
+  if (!id) return;
 
   try {
-    project.value = await fetchProject(projectId.value);
+    const fetched = await fetchProject(id);
+    // await 中に別プロジェクトへ切り替わっていたら、この呼び出しの結果は捨てる
+    if (id !== projectId.value) return;
+    project.value = fetched;
   } catch (error) {
     logger.error`Failed to load project: ${error}`;
     return;
@@ -397,9 +267,19 @@ async function refreshProjectContext() {
 
 // Actions
 // Actions
+// IME変換確定のEnter（isComposing / keyCode 229）では送信しない
+function handleComposerEnter(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
+  handleSend();
+}
+
 async function handleSend() {
   const text = input.value.trim();
   if (!text || !user.value) return;
+  // 送信中の二重送信を防ぐため先にクリアする（失敗時は復元）
+  input.value = "";
+  const replyTo = replyingToId.value;
+  replyingToId.value = null;
   const activeTaskId =
     currentChannel.value.type === "task" ? currentChannel.value.id : null;
 
@@ -426,12 +306,13 @@ async function handleSend() {
           undefined,
           {
             isBot: true,
-            linkedTaskId: activeTaskId || result.result.linkedTaskId,
+            // タスクスレッド外で linkedTaskId を付けると通常チャンネルの
+            // フィルタで確認メッセージが非表示になるため、スレッド内のみ付与
+            linkedTaskId: activeTaskId ?? undefined,
             isTask: Boolean(activeTaskId),
           },
         );
       }
-      input.value = "";
       scrollToBottom();
       return;
     }
@@ -444,13 +325,13 @@ async function handleSend() {
       profile.value?.nickname || profile.value?.fullName || "ユーザー",
       text,
       activeChannelId.value, // Explicitly set channelId
-      replyingToId.value ?? undefined, // 返信先ID
+      replyTo ?? undefined, // 返信先ID
       activeTaskId ? { linkedTaskId: activeTaskId, isTask: true } : undefined,
     );
-    input.value = "";
-    replyingToId.value = null; // 返信状態をリセット
     scrollToBottom();
   } catch (e) {
+    input.value = text;
+    replyingToId.value = replyTo;
     logger.error`Failed to send message: ${e}`;
   }
 }
@@ -480,13 +361,6 @@ async function toggleTaskArchive(taskId: string, currentArchived: boolean) {
     logger.error`Failed to toggle task archive status: ${e}`;
   }
 }
-
-// 現在のチャンネルがアーカイブされているかどうか
-const isCurrentChannelArchived = computed(() => {
-  if (currentChannel.value.type !== "task") return false;
-  const task = tasks.value.find((t) => t.id === currentChannel.value.id);
-  return task?.threadArchived === true || task?.status === "done";
-});
 
 function closeThreadModal() {
   customThreadFormOpen.value = false;
@@ -909,7 +783,7 @@ watch(channels, (list) => {
               :class="{ active: activeChannelId === 'general' }"
               @click="selectChannel('general')"
             >
-              # {{ defaultChannel.name }}
+              # {{ DEFAULT_CHANNEL.name }}
             </button>
           </div>
 
@@ -1295,7 +1169,7 @@ watch(channels, (list) => {
                 <input
                   ref="composerInput"
                   v-model="input"
-                  @keydown.enter="handleSend"
+                  @keydown.enter="handleComposerEnter"
                   :placeholder="
                     replyingToMessage ? '返信を入力...' : 'メッセージを送信...'
                   "
@@ -1332,7 +1206,7 @@ watch(channels, (list) => {
             :class="{ active: activeChannelId === 'general' }"
             @click="selectChannelWithClose('general')"
           >
-            # {{ defaultChannel.name }}
+            # {{ DEFAULT_CHANNEL.name }}
           </button>
         </div>
 

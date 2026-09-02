@@ -143,18 +143,6 @@ export async function updateTaskCategory(
 }
 
 /**
- * カテゴリ名を変更する（後方互換用）
- * @deprecated updateTaskCategory を使用してください
- */
-export async function renameTaskCategory(
-  projectId: string,
-  categoryId: string,
-  name: string,
-) {
-  await updateTaskCategory(projectId, categoryId, { name });
-}
-
-/**
  * カテゴリを削除する
  * @param projectId プロジェクトID
  * @param categoryId カテゴリID

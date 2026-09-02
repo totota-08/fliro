@@ -4,21 +4,17 @@
  *
  * オーバーレイ + Esc で閉じる + 閉じるボタン
  */
-import { onBeforeUnmount, onMounted, watch } from "vue";
+import { useModalOverlay } from "@/composables/useModalOverlay";
 
 const props = withDefaults(
   defineProps<{
     open: boolean;
     title?: string;
-    size?: "sm" | "md" | "lg" | "xl";
-    closeOnOverlay?: boolean;
-    closeOnEscape?: boolean;
+    size?: "sm" | "md" | "lg";
   }>(),
   {
     title: undefined,
     size: "md",
-    closeOnOverlay: true,
-    closeOnEscape: true,
   },
 );
 
@@ -26,41 +22,9 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape" && props.closeOnEscape) {
-    emit("close");
-  }
-}
-
-function handleOverlayClick() {
-  if (props.closeOnOverlay) {
-    emit("close");
-  }
-}
-
-onMounted(() => {
-  if (props.open) {
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeydown);
-  }
-});
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = "";
-  window.removeEventListener("keydown", handleKeydown);
-});
-
-watch(
+useModalOverlay(
   () => props.open,
-  (isOpen) => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeydown);
-    } else {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", handleKeydown);
-    }
-  },
+  () => emit("close"),
 );
 </script>
 
@@ -72,7 +36,7 @@ watch(
         class="app-modal__overlay"
         role="dialog"
         aria-modal="true"
-        @click.self="handleOverlayClick"
+        @click.self="emit('close')"
       >
         <div :class="['app-modal__panel', `app-modal--${size}`]">
           <header v-if="title || $slots.header" class="app-modal__header">
@@ -140,10 +104,6 @@ watch(
 
 .app-modal--lg {
   max-width: 42rem;
-}
-
-.app-modal--xl {
-  max-width: 56rem;
 }
 
 .app-modal__header {

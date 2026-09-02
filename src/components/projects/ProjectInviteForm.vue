@@ -104,41 +104,13 @@ async function handleGenerate() {
 async function copyLink() {
   if (!generatedLink.value) return;
   try {
-    if (typeof navigator === "undefined" || !navigator.clipboard) {
-      throw new Error("Clipboard API unavailable");
-    }
     await navigator.clipboard.writeText(generatedLink.value);
     successMessage.value = "リンクをコピーしました。";
   } catch (error) {
     logger.warn`Failed to copy link: ${error}`;
-    const fallbackSuccess = tryFallbackCopy(generatedLink.value);
-    if (fallbackSuccess) {
-      successMessage.value = "リンクをコピーしました。";
-    } else {
-      errorMessage.value =
-        "コピーに失敗しました。リンクを手動で選択してください。";
-    }
+    errorMessage.value =
+      "コピーに失敗しました。リンクを手動で選択してください。";
   }
-}
-
-function tryFallbackCopy(text: string) {
-  if (typeof document === "undefined") return false;
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.style.position = "fixed";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-  let success = false;
-  try {
-    success = document.execCommand("copy");
-  } catch (error) {
-    success = false;
-  } finally {
-    document.body.removeChild(textarea);
-  }
-  return success;
 }
 </script>
 

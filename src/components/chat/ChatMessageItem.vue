@@ -5,12 +5,16 @@
  * ホバー時にアクションバーを表示
  * リアクション、返信、編集、コピー、削除に対応
  */
+import { formatTimeShort as formatTime } from "@/utils/datetime";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import BotAvatar from "@/components/ui/BotAvatar.vue";
 import ChatMessageActions from "./ChatMessageActions.vue";
 import ChatEmojiPicker from "./ChatEmojiPicker.vue";
 import type { ChatMessage, ReactionDetail } from "@/services/projectChat";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger("app.components.chat.ChatMessageItem");
 
 const props = defineProps<{
   message: ChatMessage;
@@ -102,13 +106,6 @@ const canEdit = computed(() => isOwnMessage.value);
 // 削除可能か（自分のメッセージまたはOwner/Admin）
 const canDelete = computed(() => isOwnMessage.value || props.isAdmin);
 
-// タイムスタンプのフォーマット
-function formatTime(createdAt?: number): string {
-  if (!createdAt) return "";
-  const date = new Date(createdAt);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
 // メッセージテキストのフォーマット（HTML変換）
 function formatMessage(text: string): string {
   if (!text) return "";
@@ -172,15 +169,8 @@ async function handleCopy() {
   try {
     await navigator.clipboard.writeText(props.message.text);
     emit("copy", props.message.text);
-  } catch {
-    // フォールバック
-    const textarea = document.createElement("textarea");
-    textarea.value = props.message.text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textarea);
-    emit("copy", props.message.text);
+  } catch (error) {
+    logger.error`メッセージのコピーに失敗しました: ${error}`;
   }
 }
 

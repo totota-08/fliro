@@ -1,3 +1,4 @@
+import { toMillis } from "@/utils/datetime";
 import { db } from "@/lib/firebase";
 import { database } from "@/lib/firebaseDatabase";
 import { getLogger } from "@logtape/logtape";
@@ -46,19 +47,6 @@ export interface ChatMessage {
   isBot?: boolean;
   isTask?: boolean;
   privateFor?: string | null;
-}
-
-function resolveTimestamp(value: any): number | undefined {
-  if (typeof value === "number") return value;
-  if (
-    value &&
-    typeof value === "object" &&
-    "seconds" in value &&
-    typeof value.seconds === "number"
-  ) {
-    return value.seconds * 1000;
-  }
-  return undefined;
 }
 
 function summarizeReactions(reactions: any): {
@@ -159,7 +147,7 @@ export function listenProjectChat(
           channelId:
             typeof data?.channelId === "string" ? data.channelId : "general",
           linkedTaskId: data?.linkedTaskId,
-          createdAt: resolveTimestamp(data?.createdAt),
+          createdAt: toMillis(data?.createdAt) ?? undefined,
           reactionSummary: reactions.summary,
           reactionDetails: reactions.details,
           replyToId: data?.replyToId,
@@ -242,37 +230,6 @@ export async function addMessageReaction(
       createdAt: serverTimestamp(),
     },
   );
-}
-
-/**
- * 指定したユーザーの指定した絵文字リアクションを削除する
- */
-export async function removeMessageReaction(
-  projectId: string,
-  messageId: string,
-  emoji: string,
-  userId: string,
-) {
-  if (!emoji || !userId) return;
-  const reactionsRef = dbRef(
-    database,
-    `projects/${projectId}/realtimeChat/${messageId}/reactions`,
-  );
-  const snapshot = await getValue(reactionsRef);
-  if (!snapshot.exists()) return;
-
-  // 該当するリアクションを探して削除
-  snapshot.forEach((child) => {
-    const data = child.val();
-    if (data?.emoji === emoji && data?.userId === userId) {
-      remove(
-        dbRef(
-          database,
-          `projects/${projectId}/realtimeChat/${messageId}/reactions/${child.key}`,
-        ),
-      );
-    }
-  });
 }
 
 /**

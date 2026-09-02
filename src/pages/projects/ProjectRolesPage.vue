@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { usePageTitle } from "@/composables/usePageTitle";
+import AppButton from "@/components/ui/AppButton.vue";
 import AppColorPicker from "@/components/ui/AppColorPicker.vue";
+import AppModal from "@/components/ui/AppModal.vue";
 import SectionCard from "@/components/ui/SectionCard.vue";
 import {
   ProjectPermission,
@@ -466,6 +468,7 @@ async function confirmDelete() {
   }
 }
 
+// カラーピッカー関連
 // ロールの表示名（IDから名前へ）
 function getRoleName(roleId: string): string {
   const role = roles.value.find((r) => r.id === roleId);
@@ -691,340 +694,238 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ロール作成モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isCreateModalOpen"
-        class="modal-overlay"
-        @click.self="closeCreateModal"
-      >
-        <div class="modal" role="dialog" aria-labelledby="create-modal-title">
-          <header class="modal__header">
-            <h3 id="create-modal-title">新しいロールを作成</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeCreateModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <form class="modal__body" @submit.prevent="createRole">
-            <div class="form-field">
-              <label class="form-label">
-                ロール名 <span class="required">*</span>
-              </label>
-              <input
-                v-model="newRole.name"
-                type="text"
-                class="form-input"
-                placeholder="例: moderator"
-                maxlength="30"
-                required
-              />
-            </div>
-
-            <div class="form-field">
-              <label class="form-label">カラー</label>
-              <AppColorPicker
-                v-model="newRole.color"
-                :preset-colors="presetColors"
-              />
-            </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeCreateModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!newRole.name.trim() || isCreating"
-              >
-                {{ isCreating ? "作成中..." : "作成" }}
-              </button>
-            </footer>
-          </form>
+    <AppModal
+      :open="isCreateModalOpen"
+      title="新しいロールを作成"
+      @close="closeCreateModal"
+    >
+      <form id="role-create-form" @submit.prevent="createRole">
+        <div class="form-field">
+          <label class="form-label">
+            ロール名 <span class="required">*</span>
+          </label>
+          <input
+            v-model="newRole.name"
+            type="text"
+            class="form-input"
+            placeholder="例: moderator"
+            maxlength="30"
+            required
+          />
         </div>
-      </div>
-    </Teleport>
+
+        <div class="form-field">
+          <label class="form-label">カラー</label>
+          <AppColorPicker
+            v-model="newRole.color"
+            :preset-colors="presetColors"
+          />
+        </div>
+      </form>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeCreateModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="role-create-form"
+          variant="primary"
+          :disabled="!newRole.name.trim() || isCreating"
+        >
+          {{ isCreating ? "作成中..." : "作成" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- ロール編集モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isEditModalOpen"
-        class="modal-overlay"
-        @click.self="closeEditModal"
-      >
-        <div
-          class="modal modal--lg"
-          role="dialog"
-          aria-labelledby="edit-modal-title"
+    <AppModal
+      :open="isEditModalOpen"
+      :title="`ロールを編集 - ${editingRole?.name ?? ''}`"
+      size="lg"
+      @close="closeEditModal"
+    >
+      <!-- タブ切り替え -->
+      <div class="modal-tabs">
+        <button
+          type="button"
+          class="modal-tab"
+          :class="{ 'modal-tab--active': editActiveTab === 'basic' }"
+          @click="editActiveTab = 'basic'"
         >
-          <header class="modal__header">
-            <h3 id="edit-modal-title">
-              ロールを編集 - {{ editingRole?.name }}
-            </h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeEditModal"
-            >
-              &times;
-            </button>
-          </header>
+          基本情報
+        </button>
+        <button
+          type="button"
+          class="modal-tab"
+          :class="{ 'modal-tab--active': editActiveTab === 'permissions' }"
+          @click="editActiveTab = 'permissions'"
+        >
+          権限
+        </button>
+      </div>
 
-          <!-- タブ切り替え -->
-          <div class="modal-tabs">
-            <button
-              type="button"
-              class="modal-tab"
-              :class="{ 'modal-tab--active': editActiveTab === 'basic' }"
-              @click="editActiveTab = 'basic'"
-            >
-              基本情報
-            </button>
-            <button
-              type="button"
-              class="modal-tab"
-              :class="{ 'modal-tab--active': editActiveTab === 'permissions' }"
-              @click="editActiveTab = 'permissions'"
-            >
-              権限
-            </button>
+      <form id="role-edit-form" @submit.prevent="saveRoleEdit">
+        <!-- 基本情報タブ -->
+        <div v-if="editActiveTab === 'basic'">
+          <div class="form-field">
+            <label class="form-label">
+              ロール名 <span class="required">*</span>
+            </label>
+            <input
+              v-model="editForm.name"
+              type="text"
+              class="form-input"
+              maxlength="30"
+              required
+            />
           </div>
 
-          <form class="modal__body" @submit.prevent="saveRoleEdit">
-            <!-- 基本情報タブ -->
-            <div v-if="editActiveTab === 'basic'">
-              <div class="form-field">
-                <label class="form-label">
-                  ロール名 <span class="required">*</span>
-                </label>
-                <input
-                  v-model="editForm.name"
-                  type="text"
-                  class="form-input"
-                  maxlength="30"
-                  required
-                />
-              </div>
-
-              <div class="form-field">
-                <label class="form-label">カラー</label>
-                <AppColorPicker
-                  v-model="editForm.color"
-                  :preset-colors="presetColors"
-                />
-              </div>
-            </div>
-
-            <!-- 権限タブ -->
-            <div
-              v-if="editActiveTab === 'permissions'"
-              class="permission-modal-body"
-            >
-              <p class="permission-modal-intro">
-                各ページ・機能へのアクセス権限を設定します。
-              </p>
-              <div
-                v-for="pagePerm in pagePermissions"
-                :key="pagePerm.page"
-                class="permission-page-group"
-              >
-                <div class="permission-page-group__header">
-                  <h4 class="permission-page-group__title">
-                    {{ pagePerm.page }}
-                  </h4>
-                  <p class="permission-page-group__desc">
-                    {{ pagePerm.description }}
-                  </p>
-                </div>
-                <div class="permission-page-group__items">
-                  <label
-                    v-for="perm in pagePerm.permissions"
-                    :key="perm.key"
-                    class="permission-checkbox"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="editForm.permissions.has(perm.key)"
-                      @change="toggleEditPermission(perm.key)"
-                    />
-                    <span class="permission-checkbox__label">{{
-                      perm.label
-                    }}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <footer class="modal__footer">
-              <button
-                type="button"
-                class="btn btn--ghost"
-                @click="closeEditModal"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                class="btn btn--primary"
-                :disabled="!editForm.name.trim() || isUpdating"
-              >
-                {{ isUpdating ? "保存中..." : "保存" }}
-              </button>
-            </footer>
-          </form>
+          <div class="form-field">
+            <label class="form-label">カラー</label>
+            <AppColorPicker
+              v-model="editForm.color"
+              :preset-colors="presetColors"
+            />
+          </div>
         </div>
-      </div>
-    </Teleport>
+
+        <!-- 権限タブ -->
+        <div
+          v-if="editActiveTab === 'permissions'"
+          class="permission-modal-body"
+        >
+          <p class="permission-modal-intro">
+            各ページ・機能へのアクセス権限を設定します。
+          </p>
+          <div
+            v-for="pagePerm in pagePermissions"
+            :key="pagePerm.page"
+            class="permission-page-group"
+          >
+            <div class="permission-page-group__header">
+              <h4 class="permission-page-group__title">
+                {{ pagePerm.page }}
+              </h4>
+              <p class="permission-page-group__desc">
+                {{ pagePerm.description }}
+              </p>
+            </div>
+            <div class="permission-page-group__items">
+              <label
+                v-for="perm in pagePerm.permissions"
+                :key="perm.key"
+                class="permission-checkbox"
+              >
+                <input
+                  type="checkbox"
+                  :checked="editForm.permissions.has(perm.key)"
+                  @change="toggleEditPermission(perm.key)"
+                />
+                <span class="permission-checkbox__label">{{ perm.label }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </form>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeEditModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          type="submit"
+          form="role-edit-form"
+          variant="primary"
+          :disabled="!editForm.name.trim() || isUpdating"
+        >
+          {{ isUpdating ? "保存中..." : "保存" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- 権限編集モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isPermissionModalOpen"
-        class="modal-overlay"
-        @click.self="closePermissionModal"
-      >
+    <AppModal
+      :open="isPermissionModalOpen"
+      :title="`権限を編集 - ${editingPermissionRole?.name ?? ''}`"
+      size="lg"
+      @close="closePermissionModal"
+    >
+      <div class="permission-modal-body">
+        <p class="permission-modal-intro">
+          各ページ・機能へのアクセス権限を設定します。
+        </p>
         <div
-          class="modal modal--lg"
-          role="dialog"
-          aria-labelledby="permission-modal-title"
+          v-for="pagePerm in pagePermissions"
+          :key="pagePerm.page"
+          class="permission-page-group"
         >
-          <header class="modal__header">
-            <h3 id="permission-modal-title">
-              権限を編集 - {{ editingPermissionRole?.name }}
-            </h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closePermissionModal"
-            >
-              &times;
-            </button>
-          </header>
-
-          <div class="modal__body permission-modal-body">
-            <p class="permission-modal-intro">
-              各ページ・機能へのアクセス権限を設定します。
+          <div class="permission-page-group__header">
+            <h4 class="permission-page-group__title">
+              {{ pagePerm.page }}
+            </h4>
+            <p class="permission-page-group__desc">
+              {{ pagePerm.description }}
             </p>
-            <div
-              v-for="pagePerm in pagePermissions"
-              :key="pagePerm.page"
-              class="permission-page-group"
-            >
-              <div class="permission-page-group__header">
-                <h4 class="permission-page-group__title">
-                  {{ pagePerm.page }}
-                </h4>
-                <p class="permission-page-group__desc">
-                  {{ pagePerm.description }}
-                </p>
-              </div>
-              <div class="permission-page-group__items">
-                <label
-                  v-for="perm in pagePerm.permissions"
-                  :key="perm.key"
-                  class="permission-checkbox"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="editingPermissions.has(perm.key)"
-                    @change="togglePermission(perm.key)"
-                  />
-                  <span class="permission-checkbox__label">{{
-                    perm.label
-                  }}</span>
-                </label>
-              </div>
-            </div>
           </div>
-
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closePermissionModal"
+          <div class="permission-page-group__items">
+            <label
+              v-for="perm in pagePerm.permissions"
+              :key="perm.key"
+              class="permission-checkbox"
             >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--primary"
-              :disabled="isSavingPermissions"
-              @click="savePermissions"
-            >
-              {{ isSavingPermissions ? "保存中..." : "保存" }}
-            </button>
-          </footer>
+              <input
+                type="checkbox"
+                :checked="editingPermissions.has(perm.key)"
+                @change="togglePermission(perm.key)"
+              />
+              <span class="permission-checkbox__label">{{ perm.label }}</span>
+            </label>
+          </div>
         </div>
       </div>
-    </Teleport>
+
+      <template #footer>
+        <AppButton variant="ghost" @click="closePermissionModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :disabled="isSavingPermissions"
+          @click="savePermissions"
+        >
+          {{ isSavingPermissions ? "保存中..." : "保存" }}
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- ロール削除確認モーダル -->
-    <Teleport to="body">
-      <div
-        v-if="isDeleteModalOpen"
-        class="modal-overlay"
-        @click.self="closeDeleteModal"
-      >
-        <div
-          class="modal modal--sm"
-          role="alertdialog"
-          aria-labelledby="delete-modal-title"
-        >
-          <header class="modal__header">
-            <h3 id="delete-modal-title">ロールを削除</h3>
-            <button
-              type="button"
-              class="modal__close"
-              aria-label="閉じる"
-              @click="closeDeleteModal"
-            >
-              &times;
-            </button>
-          </header>
+    <AppModal
+      :open="isDeleteModalOpen"
+      title="ロールを削除"
+      size="sm"
+      @close="closeDeleteModal"
+    >
+      <p>
+        「<strong>{{ deletingRole?.name }}</strong
+        >」を削除しますか？
+      </p>
+      <p class="modal__warning">この操作は取り消せません。</p>
 
-          <div class="modal__body">
-            <p>
-              「<strong>{{ deletingRole?.name }}</strong
-              >」を削除しますか？
-            </p>
-            <p class="modal__warning">この操作は取り消せません。</p>
-
-            <div v-if="deleteError" class="error-alert">
-              <p>{{ deleteError }}</p>
-            </div>
-          </div>
-
-          <footer class="modal__footer">
-            <button
-              type="button"
-              class="btn btn--ghost"
-              @click="closeDeleteModal"
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="isDeleting"
-              @click="confirmDelete"
-            >
-              {{ isDeleting ? "削除中..." : "削除する" }}
-            </button>
-          </footer>
-        </div>
+      <div v-if="deleteError" class="error-alert">
+        <p>{{ deleteError }}</p>
       </div>
-    </Teleport>
+      <template #footer>
+        <AppButton variant="ghost" @click="closeDeleteModal">
+          キャンセル
+        </AppButton>
+        <AppButton
+          variant="danger"
+          :disabled="isDeleting"
+          @click="confirmDelete"
+        >
+          {{ isDeleting ? "削除中..." : "削除する" }}
+        </AppButton>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -1294,123 +1195,13 @@ onBeforeUnmount(() => {
   color: var(--ui-text-muted, #64748b);
 }
 
-/* ボタン */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ui-space-2, 0.5rem);
-  padding: var(--ui-space-2, 0.5rem) var(--ui-space-4, 1rem);
-  border-radius: var(--ui-radius-md, 0.75rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
-}
-
-.btn--sm {
-  padding: var(--ui-space-1, 0.25rem) var(--ui-space-3, 0.75rem);
-  font-size: var(--ui-text-xs, 0.75rem);
-}
-
-.btn--primary {
-  background: var(--ui-brand-600, #4f7c82);
-  color: white;
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: var(--ui-brand-700, #3a5c61);
-}
-
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--ui-border, rgba(11, 46, 51, 0.12));
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.btn--ghost:hover {
-  background: var(--ui-surface-muted, #f1f5f9);
-}
-
-.btn--danger {
-  background: var(--color-danger, #ef4444);
-  color: white;
-}
-
-.btn--danger:hover:not(:disabled) {
-  background: var(--color-danger-hover, #dc2626);
-}
-
-.btn--danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--danger-outline {
-  background: transparent;
-  border: 1px solid var(--color-danger, #ef4444);
-  color: var(--color-danger, #ef4444);
-}
-
-.btn--danger-outline:hover {
-  background: var(--color-danger-bg, #fef2f2);
-}
-
-/* モーダル */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ui-space-4, 1rem);
-  z-index: 100;
-}
-
-.modal {
-  background: var(--ui-surface, #ffffff);
-  border-radius: var(--ui-radius-xl, 1.25rem);
-  width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--ui-shadow-lg);
-}
-
-.modal--sm {
-  max-width: 400px;
-}
-
-.modal--lg {
-  max-width: 640px;
-}
-
-.modal__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
-}
-
-.modal__header h3 {
-  margin: 0;
-  font-size: var(--ui-text-lg, 1.125rem);
-  font-weight: var(--ui-font-bold, 700);
-  color: var(--ui-brand-900, #0b2e33);
-}
-
 /* モーダルタブ */
 .modal-tabs {
   display: flex;
   border-bottom: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
+  /* AppModal 本文の padding を相殺してヘッダー直下いっぱいに広げる */
+  margin: calc(-1 * var(--ui-space-6, 1.5rem))
+    calc(-1 * var(--ui-space-6, 1.5rem)) var(--ui-space-4, 1rem);
   padding: 0 var(--ui-space-5, 1.25rem);
   gap: var(--ui-space-1, 0.25rem);
 }
@@ -1445,38 +1236,6 @@ onBeforeUnmount(() => {
   height: 2px;
   background: var(--ui-brand-600, #4f7c82);
   border-radius: var(--ui-radius-full, 9999px) var(--ui-radius-full, 9999px) 0 0;
-}
-
-.modal__close {
-  background: transparent;
-  border: none;
-  font-size: var(--ui-text-2xl, 1.5rem);
-  color: var(--ui-text-muted, #64748b);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal__close:hover {
-  color: var(--ui-text-strong, #0f172a);
-}
-
-.modal__body {
-  padding: var(--ui-space-5, 1.25rem);
-}
-
-.modal__warning {
-  margin-top: var(--ui-space-2, 0.5rem);
-  font-size: var(--ui-text-sm, 0.875rem);
-  color: var(--ui-text-muted, #64748b);
-}
-
-.modal__footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ui-space-3, 0.75rem);
-  padding: var(--ui-space-4, 1rem) var(--ui-space-5, 1.25rem);
-  border-top: 1px solid var(--ui-border-light, rgba(11, 46, 51, 0.08));
 }
 
 /* フォーム */
@@ -1619,18 +1378,6 @@ onBeforeUnmount(() => {
 
 .error-alert p {
   margin: 0;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* レスポンシブ */

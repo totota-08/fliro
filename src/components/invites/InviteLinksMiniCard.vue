@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import { useActionFeedback } from "@/composables/useActionFeedback";
 import { ROUTE_NAMES } from "@/constants/routes";
 import {
   buildInviteStatus,
   buildInviteUrl,
+  inviteStatusClass as statusClass,
+  inviteStatusLabel as statusLabel,
   listenProjectInvites,
   revokeProjectInvite,
   type ProjectInvite,
   type ProjectInviteStatus,
 } from "@/services/projectInvites";
+import { toMillis } from "@/utils/datetime";
 import { useAuthStore } from "@/store/auth";
 import { getLogger } from "@logtape/logtape";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
@@ -29,8 +33,8 @@ const { user, profile } = useAuthStore();
 
 const invites = ref<ProjectInvite[]>([]);
 const loading = ref(true);
-const actionMessage = ref("");
-const actionError = ref("");
+const { actionMessage, actionError, setActionMessage, setActionError } =
+  useActionFeedback();
 const revokeTarget = ref<string | null>(null);
 
 const limitSize = 8;
@@ -41,12 +45,11 @@ const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
 });
 
 let stopInvites: (() => void) | null = null;
-let actionTimer: ReturnType<typeof setTimeout> | null = null;
 
 const sortedInvites = computed(() => {
   const list = [...invites.value];
   list.sort(
-    (a, b) => resolveTimestamp(b.createdAt) - resolveTimestamp(a.createdAt),
+    (a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0),
   );
   return list;
 });
@@ -64,18 +67,9 @@ const statusSummary = computed(() => {
   return counts;
 });
 
-function resolveTimestamp(value: any) {
-  if (!value) return 0;
-  if (typeof value === "number") return value;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value.toMillis === "function") return value.toMillis();
-  if (typeof value.seconds === "number") return value.seconds * 1000;
-  return 0;
-}
-
-function formatDate(value: any) {
-  const ts = resolveTimestamp(value);
-  if (!ts) return "—";
+function formatDate(value: unknown) {
+  const ts = toMillis(value);
+  if (ts === null) return "—";
   return dateFormatter.format(new Date(ts));
 }
 
@@ -88,39 +82,6 @@ function formatUses(invite: ProjectInvite) {
   if (!invite.maxUses) return "";
   const used = invite.usedCount ?? 0;
   return `${used} / ${invite.maxUses}`;
-}
-
-function statusLabel(status: ProjectInviteStatus) {
-  if (status === "active") return "有効";
-  if (status === "expired") return "期限切れ";
-  return "無効";
-}
-
-function statusClass(status: ProjectInviteStatus) {
-  if (status === "active") return "status-active";
-  if (status === "expired") return "status-expired";
-  return "status-revoked";
-}
-
-function setActionMessage(message: string) {
-  actionMessage.value = message;
-  actionError.value = "";
-  if (actionTimer) {
-    clearTimeout(actionTimer);
-  }
-  actionTimer = setTimeout(() => {
-    actionMessage.value = "";
-  }, 2500);
-}
-
-function setActionError(message: string) {
-  actionError.value = message;
-  if (actionTimer) {
-    clearTimeout(actionTimer);
-  }
-  actionTimer = setTimeout(() => {
-    actionError.value = "";
-  }, 3000);
 }
 
 async function copyInvite(invite: ProjectInvite) {
@@ -207,9 +168,6 @@ watch(
 
 onBeforeUnmount(() => {
   stopInvites?.();
-  if (actionTimer) {
-    clearTimeout(actionTimer);
-  }
 });
 </script>
 

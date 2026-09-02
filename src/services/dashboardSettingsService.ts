@@ -157,13 +157,6 @@ export async function saveInsightCardSettings(
 }
 
 /**
- * Get default card configurations
- */
-export function getDefaultCards(): DashboardCardConfig[] {
-  return [...DEFAULT_CARDS];
-}
-
-/**
  * Get default insight card configurations
  */
 export function getDefaultInsightCards(): InsightCardConfig[] {

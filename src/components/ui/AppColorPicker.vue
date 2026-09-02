@@ -10,9 +10,6 @@ const props = withDefaults(
   defineProps<{
     modelValue?: string;
     presetColors?: string[];
-    disabled?: boolean;
-    showCustomPicker?: boolean;
-    label?: string;
   }>(),
   {
     modelValue: "#4f7c82",
@@ -26,9 +23,6 @@ const props = withDefaults(
       "#ef4444",
       "#8b5cf6",
     ],
-    disabled: false,
-    showCustomPicker: true,
-    label: undefined,
   },
 );
 
@@ -44,12 +38,10 @@ const colorValue = computed({
 const colorInputRef = ref<HTMLInputElement | null>(null);
 
 function selectPreset(color: string) {
-  if (props.disabled) return;
   colorValue.value = color;
 }
 
 function openCustomPicker() {
-  if (props.disabled) return;
   colorInputRef.value?.click();
 }
 
@@ -70,11 +62,7 @@ function isLightColor(hex: string): boolean {
 </script>
 
 <template>
-  <div
-    class="app-color-picker"
-    :class="{ 'app-color-picker--disabled': disabled }"
-  >
-    <span v-if="label" class="app-color-picker__label">{{ label }}</span>
+  <div class="app-color-picker">
     <div class="app-color-picker__grid">
       <button
         v-for="color in presetColors"
@@ -86,7 +74,6 @@ function isLightColor(hex: string): boolean {
           'app-color-picker__swatch--light': isLightColor(color),
         }"
         :style="{ backgroundColor: color }"
-        :disabled="disabled"
         :aria-label="`色を選択: ${color}`"
         :aria-pressed="isSelected(color)"
         @click="selectPreset(color)"
@@ -108,7 +95,6 @@ function isLightColor(hex: string): boolean {
       </button>
 
       <button
-        v-if="showCustomPicker"
         type="button"
         class="app-color-picker__custom"
         :class="{
@@ -116,7 +102,6 @@ function isLightColor(hex: string): boolean {
             colorValue.toLowerCase(),
           ),
         }"
-        :disabled="disabled"
         aria-label="カスタムカラーを選択"
         @click="openCustomPicker"
       >
@@ -130,7 +115,6 @@ function isLightColor(hex: string): boolean {
           v-model="colorValue"
           type="color"
           class="app-color-picker__input"
-          :disabled="disabled"
           aria-hidden="true"
         />
       </button>
@@ -143,17 +127,6 @@ function isLightColor(hex: string): boolean {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-2, 0.5rem);
-}
-
-.app-color-picker--disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.app-color-picker__label {
-  font-size: var(--ui-text-sm, 0.875rem);
-  font-weight: var(--ui-font-semibold, 600);
-  color: var(--ui-text, #0b2e33);
 }
 
 .app-color-picker__grid {

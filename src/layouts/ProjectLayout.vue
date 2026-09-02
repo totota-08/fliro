@@ -95,9 +95,13 @@ async function handleTaskSubmit(data: TaskFormData) {
       {
         title: data.title,
         description: data.description,
+        priority: data.priority,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         categoryId: data.categoryId || null,
         assigneeId: data.assigneeId || null,
+        assigneeName: data.assigneeId
+          ? (members.value.find((m) => m.id === data.assigneeId)?.name ?? null)
+          : null,
         progress: data.progress,
       },
       user.value.uid,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import DashboardSidebar from "@/components/demo/DashboardSidebar.vue";
+import { useSidebarState } from "@/composables/useSidebarState";
+import { computed, ref } from "vue";
+import DashboardSidebar from "@/components/projectDashboard/DashboardSidebar.vue";
 import DemoExplainerBanner from "@/components/demo/DemoExplainerBanner.vue";
 import { appName } from "@/constants/appMeta";
 
@@ -17,7 +18,7 @@ type TeamMember = {
   status: "オンライン" | "オフライン" | "離席中";
 };
 
-const isSidebarOpen = ref(true);
+const { isSidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
 
 const teamMembers = ref<TeamMember[]>([
   {
@@ -93,20 +94,6 @@ const teamMembers = ref<TeamMember[]>([
     status: "オンライン",
   },
 ]);
-
-const closeSidebar = () => {
-  isSidebarOpen.value = false;
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
-
-onMounted(() => {
-  if (window.matchMedia("(max-width: 1200px)").matches) {
-    isSidebarOpen.value = false;
-  }
-});
 
 const stats = computed(() => ({
   members: teamMembers.value.length,

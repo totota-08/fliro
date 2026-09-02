@@ -71,37 +71,42 @@ export function getPriorityBadgeVariant(
 }
 
 /**
- * 期限切れかどうかを判定
+ * 期限までの残り日数（暦日差）を計算する。
+ * 期限は "YYYY-MM-DD" を UTC 深夜として保存しているため、そのまま現在時刻と
+ * 比較すると JST では期限日当日の朝9時に「期限切れ」になってしまう。
+ * UTC のカレンダー日付を取り出し、ローカルの今日との暦日差で判定する。
+ */
+function calendarDaysUntil(seconds: number): number {
+  const due = new Date(seconds * 1000);
+  const dueDay = new Date(
+    due.getUTCFullYear(),
+    due.getUTCMonth(),
+    due.getUTCDate(),
+  );
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round(
+    (dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  );
+}
+
+/**
+ * 期限切れかどうかを判定（期限日当日はまだ期限切れではない）
  */
 export function isTaskOverdue(task: TaskDoc): boolean {
   if (!task.dueDate?.seconds) return false;
-  const dueTime = task.dueDate.seconds * 1000;
-  return dueTime < Date.now() && task.status !== "done";
+  return calendarDaysUntil(task.dueDate.seconds) < 0 && task.status !== "done";
 }
 
 /**
- * 期限が近いかどうかを判定（3日以内）
- */
-export function isTaskDueSoon(task: TaskDoc): boolean {
-  if (!task.dueDate?.seconds || task.status === "done") return false;
-  const dueTime = task.dueDate.seconds * 1000;
-  const now = Date.now();
-  const threeDays = 3 * 24 * 60 * 60 * 1000;
-  return dueTime > now && dueTime - now <= threeDays;
-}
-
-/**
- * 期限までの日数を計算
+ * 期限までの日数を計算（暦日差）
  */
 export function getDaysUntilDue(dueDate?: {
   seconds: number;
   nanoseconds: number;
 }): number | null {
   if (!dueDate?.seconds) return null;
-  const due = new Date(dueDate.seconds * 1000);
-  const now = new Date();
-  const diffTime = due.getTime() - now.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return calendarDaysUntil(dueDate.seconds);
 }
 
 /**
@@ -136,10 +141,12 @@ export function formatDueDate(dueDate?: {
   nanoseconds: number;
 }): string {
   if (!dueDate?.seconds) return "未設定";
+  // UTC 深夜として保存された暦日をタイムゾーンに関わらずそのまま表示する
   return new Date(dueDate.seconds * 1000).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
