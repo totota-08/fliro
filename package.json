@@ -25,7 +25,7 @@
   "dependencies": {
     "@logtape/logtape": "^1.2.2",
     "canvas-confetti": "^1.9.4",
-    "cropperjs": "^2.1.0",
+    "cropperjs": "^2.2.0",
     "firebase": "^12.8.0",
     "qrcode": "^1.5.4",
     "vue": "^3.5.27",
